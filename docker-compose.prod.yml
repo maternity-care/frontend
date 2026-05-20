@@ -1,0 +1,18 @@
+# Production compose file dùng trên VPS bởi CI/CD workflow.
+# File này được workflow SCP lên server.
+# VPS phải có file .env cùng cấp.
+services:
+  frontend:
+    image: ghcr.io/maternity-care/frontend:latest
+    container_name: maternity-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    networks:
+      - maternity_care_system_g44
+
+networks:
+  maternity_care_system_g44:
+    external: true
