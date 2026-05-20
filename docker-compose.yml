@@ -1,0 +1,16 @@
+services:
+  frontend:
+    container_name: maternity-frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    networks:
+      - maternity_care_system_g44
+
+networks:
+  maternity_care_system_g44:
+    external: true
