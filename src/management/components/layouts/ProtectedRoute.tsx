@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { StateBlock } from "@/management/components/ui/StateBlock";
+
+const subscribeMounted = () => () => {};
+const getMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,13 +23,9 @@ function ProtectedRouteContent({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeMounted, getMountedSnapshot, getServerMountedSnapshot);
   const { accessToken, clearSession } = useAuthStore();
   const { currentUser, loading, hasRole, hasPermission } = useAuth();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!mounted) return;

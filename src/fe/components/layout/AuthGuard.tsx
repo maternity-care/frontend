@@ -1,21 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { State } from "@/fe/components/ui/State";
 
+const subscribeMounted = () => () => {};
+const getMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
+
 function AuthGuardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeMounted, getMountedSnapshot, getServerMountedSnapshot);
   const { accessToken, clearSession } = useAuthStore();
   const { currentUser, loading } = useAuth();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!mounted) return;
