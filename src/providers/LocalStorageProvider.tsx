@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 type StoredData = Record<string, unknown>;
 
@@ -32,11 +32,7 @@ function readStoredData() {
 }
 
 export function LocalStorageProvider({ children }: { children: React.ReactNode }) {
-  const [storedData, setStoredData] = useState<StoredData>({});
-
-  useEffect(() => {
-    setStoredData(readStoredData());
-  }, []);
+  const [storedData, setStoredData] = useState<StoredData>(() => readStoredData());
 
   const saveData = useCallback(<T,>(key: string, value: T | undefined) => {
     if (typeof window === "undefined") return;

@@ -25,9 +25,10 @@ type ProfileFormValues = z.infer<typeof schema>;
 function ProfileContent() {
   const { currentUser, mutate } = useAuth();
   const setStoreUser = useAuthStore((state) => state.setUser);
-  const [profile, setProfile] = useState<UserProfile | null>(currentUser ?? null);
+  const [updatedProfile, setUpdatedProfile] = useState<UserProfile | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const profile = updatedProfile ?? currentUser ?? null;
 
   const {
     register,
@@ -39,7 +40,6 @@ function ProfileContent() {
   useEffect(() => {
     if (!currentUser) return;
 
-    setProfile(currentUser);
     reset({ name: currentUser.name });
   }, [currentUser, reset]);
 
@@ -48,7 +48,7 @@ function ProfileContent() {
     setMessage(null);
     try {
       const updated = await updateMyProfile(values);
-      setProfile(updated);
+      setUpdatedProfile(updated);
       setStoreUser(updated);
       await mutate(updated, { revalidate: false });
       setMessage("Đã cập nhật hồ sơ.");

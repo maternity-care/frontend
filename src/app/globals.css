@@ -16,10 +16,10 @@
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at top left, rgba(20, 184, 166, 0.12), transparent 34rem),
-    hsl(var(--background));
+  background: #f5f7fb;
   color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 button,

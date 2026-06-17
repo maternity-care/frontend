@@ -1,4 +1,4 @@
-﻿import type { Permission } from "../permissions/permissions.types";
+import type { Permission } from "../permissions/permissions.types";
 
 export interface Role {
   id: string;
@@ -7,4 +7,10 @@ export interface Role {
   permissions: Permission[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface UpdateRoleInput {
+  name?: string;
+  guardName?: string;
+  permissionIds?: string[];
 }
