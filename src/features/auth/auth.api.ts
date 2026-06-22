@@ -1,12 +1,16 @@
-import { apiClient, unwrapApiData } from "@/lib/axios";
+import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
 import type { UserProfile } from "../profile/profile.types";
-import type { AuthResponse, BackendAuthResponse, LoginInput } from "./auth.types";
+import type { AuthResponse, BackendAuthResponse, LoginInput, RegisterInput } from "./auth.types";
 
-function normalizeAuthResponse(response: BackendAuthResponse): AuthResponse {
+function normalizeAuthResponse(response: BackendAuthResponse, message?: string): AuthResponse {
   const accessToken = response.accessToken ?? response.access_token;
 
   if (!accessToken) {
     throw new Error("API login không trả access token.");
+  }
+
+   if (!response.user) {
+    throw new Error("API không trả thông tin user.");
   }
 
   return {
@@ -20,12 +24,16 @@ function normalizeAuthResponse(response: BackendAuthResponse): AuthResponse {
       response.permissions ??
       response.user.roles?.flatMap((role) => role.permissions?.map((permission) => permission.name) ?? []) ??
       [],
+    message,
   };
 }
 
 export async function login(input: LoginInput) {
-  const response = await unwrapApiData<BackendAuthResponse>(apiClient.post("/auth/login", input));
-  return normalizeAuthResponse(response);
+  const response = await unwrapApiResponse<BackendAuthResponse>(
+    apiClient.post("/auth/login", input)
+  );
+
+  return normalizeAuthResponse(response.data, response.message);
 }
 
 export function getCurrentUser() {
@@ -34,4 +42,12 @@ export function getCurrentUser() {
 
 export function logout(refreshToken: string) {
   return unwrapApiData<null>(apiClient.post("/auth/logout", { refresh_token: refreshToken }));
+}
+
+export async function register(input: RegisterInput) {
+  const response = await unwrapApiResponse<BackendAuthResponse>(
+    apiClient.post("/auth/register", input)
+  );
+
+  return normalizeAuthResponse(response.data, response.message);
 }
