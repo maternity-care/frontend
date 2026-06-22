@@ -13,6 +13,7 @@ export interface AuthResponse {
   user: UserProfile;
   roles: string[];
   permissions: string[];
+  message?: string;
 }
 
 export interface BackendAuthResponse {
@@ -38,4 +39,16 @@ export interface AuthState {
   setUser: (user: UserProfile | null) => void;
   setChecking: (isChecking: boolean) => void;
   clearSession: () => void;
+}
+
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data: T;
 }

@@ -8,6 +8,12 @@ export interface ApiResponse<T> {
   errors?: Record<string, unknown>;
 }
 
+export type ApiResult<T> = {
+  data: T;
+  message?: string;
+  success?: boolean;
+};
+
 function readCookie(name: string) {
   if (typeof document === "undefined") return null;
   const value = document.cookie
@@ -42,7 +48,21 @@ apiClient.interceptors.response.use(
   },
 );
 
+//chỉ lấy data, dùng cho profile/settings/upload...
 export async function unwrapApiData<T>(request: Promise<{ data: ApiResponse<T> }>) {
   const response = await request;
   return response.data.data;
+}
+
+// Hàm mới: lấy cả data + message, dùng cho login/register
+export async function unwrapApiResponse<T>(
+  request: Promise<{ data: ApiResponse<T> }>
+): Promise<ApiResult<T>> {
+  const response = await request;
+
+  return {
+    data: response.data.data,
+    message: response.data.message,
+    success: response.data.success,
+  };
 }

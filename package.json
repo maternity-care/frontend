@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
+    "antd": "^6.4.5",
     "axios": "latest",
     "clsx": "latest",
     "lucide-react": "latest",
