@@ -5,6 +5,20 @@ export interface LoginInput {
   password: string;
 }
 
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  reset_token: string | null;
+  reset_url: string | null;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  password: string;
+}
+
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string | null;
@@ -35,7 +49,7 @@ export interface AuthState {
   roles: string[];
   permissions: string[];
   isChecking: boolean;
-  setSession: (session: AuthResponse) => void;
+  setSession: (session: AuthResponse, rememberMe?: boolean) => void;
   setUser: (user: UserProfile | null) => void;
   setChecking: (isChecking: boolean) => void;
   clearSession: () => void;

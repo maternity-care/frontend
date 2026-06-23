@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LockKeyhole } from "lucide-react";
@@ -15,6 +16,7 @@ import { Input } from "@/management/components/ui/Input";
 const loginSchema = z.object({
   email: z.string().email("Email không hợp lệ"),
   password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+  rememberMe: z.boolean().optional(),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -34,6 +36,7 @@ function LoginForm() {
     defaultValues: {
       email: "admin@example.com",
       password: "password",
+      rememberMe: true,
     },
   });
 
@@ -41,10 +44,12 @@ function LoginForm() {
     setFormError(null);
     try {
       const session = await login(values);
-      setSession(session);
+      setSession(session, Boolean(values.rememberMe));
       router.replace(searchParams.get("next") ?? "/management/dashboard");
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Đăng nhập thất bại");
+      setFormError(
+        error instanceof Error ? error.message : "Đăng nhập thất bại",
+      );
     }
   };
 
@@ -56,11 +61,19 @@ function LoginForm() {
             <LockKeyhole className="h-5 w-5" aria-hidden="true" />
           </div>
           <h1 className="text-2xl font-semibold text-slate-950">Admin Login</h1>
-          <p className="mt-1 text-sm text-slate-500">Đăng nhập để quản trị hệ thống Maternity Care.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Đăng nhập để quản trị hệ thống Maternity Care.
+          </p>
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-          <Input label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register("email")} />
+          <Input
+            label="Email"
+            type="email"
+            autoComplete="email"
+            error={errors.email?.message}
+            {...register("email")}
+          />
           <Input
             label="Password"
             type="password"
@@ -69,7 +82,28 @@ function LoginForm() {
             {...register("password")}
           />
 
-          {formError ? <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div> : null}
+          <div className="flex items-center justify-between gap-4">
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300"
+                {...register("rememberMe")}
+              />
+              Ghi nhớ đăng nhập
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-slate-700 hover:text-slate-950 hover:underline"
+            >
+              Quên mật khẩu?
+            </Link>
+          </div>
+
+          {formError ? (
+            <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+              {formError}
+            </div>
+          ) : null}
 
           <Button className="w-full" type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Đang đăng nhập..." : "Login"}
@@ -82,7 +116,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">Loading...</main>}>
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+          Loading...
+        </main>
+      }
+    >
       <LoginForm />
     </Suspense>
   );
