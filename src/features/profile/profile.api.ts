@@ -1,4 +1,4 @@
-﻿import { apiClient, unwrapApiData } from "@/lib/axios";
+﻿import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
 import type { UpdateProfileInput, UserProfile } from "./profile.types";
 
 export function getMyProfile() {
@@ -6,5 +6,5 @@ export function getMyProfile() {
 }
 
 export function updateMyProfile(input: UpdateProfileInput) {
-  return unwrapApiData<UserProfile>(apiClient.patch("/users/me", input));
+  return unwrapApiResponse<UserProfile>(apiClient.patch("/users/me", input));
 }

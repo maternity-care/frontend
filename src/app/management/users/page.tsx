@@ -172,19 +172,20 @@ export default function UsersPage() {
     setNotice(null);
 
     try {
-      const updated = await updateUser(editingUser.id, {
+      const response = await updateUser(editingUser.id, {
         status: draftStatus,
         roleIds: draftRoleIds,
         permissionOverrides: Object.entries(draftOverrides)
           .filter(([, effect]) => effect !== "inherit")
           .map(([permissionId, effect]) => ({ permissionId, effect: effect as UserPermissionEffect })),
       });
+      const updated = response.data;
 
       setUsers((current) => current.map((user) => (user.id === updated.id ? updated : user)));
       setDraftRoleIds(toRoleIds(updated));
       setDraftOverrides(toOverrideDraft(updated));
       setDraftStatus(updated.status);
-      setNotice("Saved user permissions.");
+      setNotice(response.message || "Saved user permissions.");
     } catch (err) {
       setSaveError(getErrorMessage(err));
     } finally {

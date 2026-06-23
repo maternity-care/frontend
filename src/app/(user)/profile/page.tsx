@@ -47,11 +47,12 @@ function ProfileContent() {
     setError(null);
     setMessage(null);
     try {
-      const updated = await updateMyProfile(values);
+      const response = await updateMyProfile(values);
+      const updated = response.data;
       setUpdatedProfile(updated);
       setStoreUser(updated);
       await mutate(updated, { revalidate: false });
-      setMessage("Đã cập nhật hồ sơ.");
+      setMessage(response.message || "Đã cập nhật hồ sơ.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không cập nhật được hồ sơ");
     }

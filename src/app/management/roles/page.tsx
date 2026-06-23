@@ -114,10 +114,11 @@ export default function RolesPage() {
     setNotice(null);
 
     try {
-      const updated = await updateRole(editingRole.id, { permissionIds: draftPermissionIds });
+      const response = await updateRole(editingRole.id, { permissionIds: draftPermissionIds });
+      const updated = response.data;
       setRoles((current) => current.map((role) => (role.id === updated.id ? updated : role)));
       setDraftPermissionIds(toPermissionIds(updated));
-      setNotice("Saved role permissions.");
+      setNotice(response.message || "Saved role permissions.");
     } catch (err) {
       setSaveError(getErrorMessage(err));
     } finally {

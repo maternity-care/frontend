@@ -1,4 +1,4 @@
-import { apiClient, unwrapApiData } from "@/lib/axios";
+import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
 import type { Role, UpdateRoleInput } from "./roles.types";
 
 export function getRoles() {
@@ -6,5 +6,5 @@ export function getRoles() {
 }
 
 export function updateRole(id: string, input: UpdateRoleInput) {
-  return unwrapApiData<Role>(apiClient.patch(`/management/roles/${id}`, input));
+  return unwrapApiResponse<Role>(apiClient.patch(`/management/roles/${id}`, input));
 }
