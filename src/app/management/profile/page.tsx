@@ -50,11 +50,12 @@ function ManagementProfileContent() {
     setError(null);
     setMessage(null);
     try {
-      const updated = await updateMyProfile(values);
+      const response = await updateMyProfile(values);
+      const updated = response.data;
       setUpdatedProfile(updated);
       setUser(updated);
       await mutate(updated, { revalidate: false });
-      setMessage("Cập nhật hồ sơ thành công.");
+      setMessage(response.message || "Cập nhật hồ sơ thành công.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không cập nhật được hồ sơ");
     }
