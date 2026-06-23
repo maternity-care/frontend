@@ -1,11 +1,19 @@
 ﻿"use client";
 
 import { create } from "zustand";
-import { ACCESS_TOKEN_KEY, AUTH_COOKIE_MAX_AGE, REFRESH_TOKEN_KEY } from "@/lib/constants";
+import {
+  ACCESS_TOKEN_KEY,
+  AUTH_COOKIE_MAX_AGE,
+  REFRESH_TOKEN_KEY,
+} from "@/lib/constants";
 import type { AuthResponse, AuthState } from "./auth.types";
 
 function setCookie(name: string, value: string) {
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${AUTH_COOKIE_MAX_AGE}; samesite=lax`;
+}
+
+function setSessionCookie(name: string, value: string) {
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; samesite=lax`;
 }
 
 function clearCookie(name: string) {
@@ -14,8 +22,23 @@ function clearCookie(name: string) {
 
 function readStoredToken(key: string) {
   if (typeof window === "undefined") return null;
-  const value = window.localStorage.getItem(key);
+  const value =
+    window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key);
   return value && value !== "undefined" && value !== "null" ? value : null;
+}
+
+function storeToken(key: string, value: string, rememberMe: boolean) {
+  const targetStorage = rememberMe
+    ? window.localStorage
+    : window.sessionStorage;
+  const otherStorage = rememberMe ? window.sessionStorage : window.localStorage;
+  targetStorage.setItem(key, value);
+  otherStorage.removeItem(key);
+}
+
+function removeStoredToken(key: string) {
+  window.localStorage.removeItem(key);
+  window.sessionStorage.removeItem(key);
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -25,15 +48,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   roles: [],
   permissions: [],
   isChecking: true,
-  setSession: (session: AuthResponse) => {
-    window.localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
-    setCookie(ACCESS_TOKEN_KEY, session.accessToken);
+  setSession: (session: AuthResponse, rememberMe = true) => {
+    storeToken(ACCESS_TOKEN_KEY, session.accessToken, rememberMe);
+    const writeCookie = rememberMe ? setCookie : setSessionCookie;
+    writeCookie(ACCESS_TOKEN_KEY, session.accessToken);
 
     if (session.refreshToken) {
-      window.localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
-      setCookie(REFRESH_TOKEN_KEY, session.refreshToken);
+      storeToken(REFRESH_TOKEN_KEY, session.refreshToken, rememberMe);
+      writeCookie(REFRESH_TOKEN_KEY, session.refreshToken);
     } else {
-      window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+      removeStoredToken(REFRESH_TOKEN_KEY);
       clearCookie(REFRESH_TOKEN_KEY);
     }
 
@@ -49,10 +73,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) => set({ user }),
   setChecking: (isChecking) => set({ isChecking }),
   clearSession: () => {
-    window.localStorage.removeItem(ACCESS_TOKEN_KEY);
-    window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+    removeStoredToken(ACCESS_TOKEN_KEY);
+    removeStoredToken(REFRESH_TOKEN_KEY);
     clearCookie(ACCESS_TOKEN_KEY);
     clearCookie(REFRESH_TOKEN_KEY);
-    set({ user: null, accessToken: null, refreshToken: null, roles: [], permissions: [], isChecking: false });
+    set({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      roles: [],
+      permissions: [],
+      isChecking: false,
+    });
   },
 }));

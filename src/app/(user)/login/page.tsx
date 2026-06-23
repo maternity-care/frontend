@@ -3,7 +3,16 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Card, Checkbox, Form, Input, message, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Form,
+  Input,
+  message,
+  Typography,
+} from "antd";
 import { HeartPulse } from "lucide-react";
 import { login } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
@@ -47,7 +56,7 @@ function LoginForm() {
         password: values.password,
       });
 
-      setSession(session);
+      setSession(session, Boolean(values.rememberMe));
 
       if (values.rememberMe) {
         window.localStorage.setItem(REMEMBER_EMAIL_KEY, values.email);
@@ -67,7 +76,8 @@ function LoginForm() {
       // setFormError(
       //   error instanceof Error ? error.message : "Đăng nhập thất bại"
       // );
-      const errorMessage = error instanceof Error ? error.message : "Đăng nhập thất bại";
+      const errorMessage =
+        error instanceof Error ? error.message : "Đăng nhập thất bại";
       messageApi.error({
         content: errorMessage,
         duration: 3,
@@ -98,12 +108,7 @@ function LoginForm() {
         </Typography.Text>
 
         {formError ? (
-          <Alert
-            className="mt-5"
-            type="error"
-            message={formError}
-            showIcon
-          />
+          <Alert className="mt-5" type="error" message={formError} showIcon />
         ) : null}
 
         <Form<LoginFormValues>
@@ -142,9 +147,22 @@ function LoginForm() {
             />
           </Form.Item>
 
-          <Form.Item name="rememberMe" valuePropName="checked" className="!mb-4">
-            <Checkbox>Ghi nhớ tài khoản</Checkbox>
+          <Form.Item
+            name="rememberMe"
+            valuePropName="checked"
+            className="!mb-4"
+          >
+            <Checkbox>Ghi nhớ đăng nhập</Checkbox>
           </Form.Item>
+
+          <div className="-mt-2 mb-4 text-right text-sm">
+            <Link
+              href="/forgot-password"
+              className="font-medium text-teal-700 hover:text-teal-900 hover:underline"
+            >
+              Quên mật khẩu?
+            </Link>
+          </div>
 
           <Form.Item className="!mb-4">
             <Button
