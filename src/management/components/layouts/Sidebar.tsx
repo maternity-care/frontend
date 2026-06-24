@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/management/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/management/users", label: "Users", icon: Users },
+  { href: "/management/staffdoctormanagement", label: "Staff / Doctors Management", icon: Users },
   { href: "/management/roles", label: "Roles", icon: ShieldCheck },
   { href: "/management/permissions", label: "Permissions", icon: KeyRound },
   { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness },
