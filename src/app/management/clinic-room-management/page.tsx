@@ -188,7 +188,7 @@ export default function ClinicRoomManagementPage() {
       try {
         const response = await updateRoom(editingRoom.id, {
           facilityId: FACILITY_ID,
-          name: values.roomName.trim().toUpperCase(),
+          name: values.roomName.trim(),
           roomType: values.roomType,
           floor: String(values.floor),
           status: values.status,
@@ -234,7 +234,7 @@ export default function ClinicRoomManagementPage() {
     try {
       const response = await createRoom({
         facilityId: FACILITY_ID,
-        name: values.roomName.trim().toUpperCase(),
+        name: values.roomName.trim(),
         roomType: values.roomType,
         floor: String(values.floor),
         status: values.status,
@@ -371,19 +371,18 @@ export default function ClinicRoomManagementPage() {
         (currentPage - 1) * PAGE_SIZE + index + 1,
     },
     {
-      title: "Tên phòng",
-      dataIndex: "roomName",
-      align: "center",
-      render: (roomName: string) => (
-        <Space size={10}>
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-900 text-white">
-            <DoorOpen className="h-4 w-4" />
-          </span>
+  title: <div className="text-center">Tên phòng</div>,
+  dataIndex: "roomName",
+  render: (roomName: string) => (
+    <div className="flex items-center justify-start gap-3 pl-4">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-white">
+        <DoorOpen className="h-4 w-4" />
+      </span>
 
-          <Text strong>{roomName}</Text>
-        </Space>
-      ),
-    },
+      <Text strong>{roomName}</Text>
+    </div>
+  ),
+},
     {
       title: "Loại phòng",
       dataIndex: "roomType",
