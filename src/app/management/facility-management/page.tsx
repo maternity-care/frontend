@@ -8,7 +8,6 @@ import {
   Card,
   Input,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Statistic,
@@ -16,7 +15,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { Building2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Building2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
@@ -40,6 +39,22 @@ const { Text } = Typography;
 
 const PAGE_SIZE = 5;
 
+type DeleteConfirmState =
+  | {
+      open: false;
+    }
+  | {
+      open: true;
+      mode: "single";
+      facility: Facility;
+    }
+  | {
+      open: true;
+      mode: "selected";
+      ids: string[];
+      count: number;
+    };
+
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) {
     if (err.message.includes("Facility code already exists")) {
@@ -61,7 +76,9 @@ export default function FacilityManagementPage() {
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState<string | undefined>();
   const [serviceFilter, setServiceFilter] = useState<string | undefined>();
-  const [statusFilter, setStatusFilter] = useState<FacilityStatus | undefined>();
+  const [statusFilter, setStatusFilter] = useState<
+    FacilityStatus | undefined
+  >();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
 
@@ -69,6 +86,11 @@ export default function FacilityManagementPage() {
   const [detailFacility, setDetailFacility] = useState<Facility | null>(null);
   const [updateFacilityTarget, setUpdateFacilityTarget] =
     useState<Facility | null>(null);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>({
+    open: false,
+  });
+  const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
@@ -252,32 +274,32 @@ export default function FacilityManagementPage() {
         okText: "Đóng",
         centered: true,
       });
+
+      throw err;
     } finally {
       setTableLoading(false);
     }
   }
 
-  async function handleDeleteSelected() {
-    if (selectedFacilityIds.length === 0) return;
+  async function handleDeleteSelected(ids: string[]) {
+    if (ids.length === 0) return;
 
     setTableLoading(true);
     setError(null);
 
     try {
-      await deleteFacilities(selectedFacilityIds);
+      await deleteFacilities(ids);
 
       setFacilities((current) =>
-        current.filter(
-          (facility) => !selectedFacilityIds.includes(facility.id),
-        ),
+        current.filter((facility) => !ids.includes(facility.id)),
       );
 
       setDetailFacility((current) =>
-        current && selectedFacilityIds.includes(current.id) ? null : current,
+        current && ids.includes(current.id) ? null : current,
       );
 
       setUpdateFacilityTarget((current) =>
-        current && selectedFacilityIds.includes(current.id) ? null : current,
+        current && ids.includes(current.id) ? null : current,
       );
 
       setSelectedFacilityIds([]);
@@ -299,8 +321,59 @@ export default function FacilityManagementPage() {
         okText: "Đóng",
         centered: true,
       });
+
+      throw err;
     } finally {
       setTableLoading(false);
+    }
+  }
+
+  function confirmDeleteFacility(record: Facility) {
+    setDeleteConfirm({
+      open: true,
+      mode: "single",
+      facility: record,
+    });
+  }
+
+  function confirmDeleteSelected() {
+    if (selectedFacilityIds.length === 0) return;
+
+    setDeleteConfirm({
+      open: true,
+      mode: "selected",
+      ids: selectedFacilityIds,
+      count: selectedFacilityIds.length,
+    });
+  }
+
+  function closeDeleteConfirm() {
+    if (deleteConfirmLoading) return;
+
+    setDeleteConfirm({
+      open: false,
+    });
+  }
+
+  async function handleConfirmDelete() {
+    const target = deleteConfirm;
+
+    if (!target.open) return;
+
+    setDeleteConfirmLoading(true);
+
+    try {
+      if (target.mode === "single") {
+        await handleDeleteFacility(target.facility.id);
+      } else {
+        await handleDeleteSelected(target.ids);
+      }
+
+      setDeleteConfirm({
+        open: false,
+      });
+    } finally {
+      setDeleteConfirmLoading(false);
     }
   }
 
@@ -326,6 +399,7 @@ export default function FacilityManagementPage() {
             <Text strong className="block whitespace-normal break-words">
               {name}
             </Text>
+
             <Text type="secondary" className="text-xs">
               {record.code}
             </Text>
@@ -399,23 +473,15 @@ export default function FacilityManagementPage() {
             }}
           />
 
-          <Popconfirm
-            title="Xóa cơ sở"
-            description="Bạn có chắc muốn xóa cơ sở này không?"
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDeleteFacility(record.id)}
-          >
-            <Button
-              danger
-              title="Xóa"
-              icon={<Trash2 className="h-4 w-4" />}
-              onClick={(event) => {
-                event.stopPropagation();
-              }}
-            />
-          </Popconfirm>
+          <Button
+            danger
+            title="Xóa"
+            icon={<Trash2 className="h-4 w-4" />}
+            onClick={(event) => {
+              event.stopPropagation();
+              confirmDeleteFacility(record);
+            }}
+          />
         </Space>
       ),
     },
@@ -516,9 +582,7 @@ export default function FacilityManagementPage() {
 
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title={
-                <span className="text-emerald-700">Đang hoạt động</span>
-              }
+              title={<span className="text-emerald-700">Đang hoạt động</span>}
               value={activeFacilities}
               formatter={(value) => (
                 <span className="text-emerald-950">{value}</span>
@@ -556,26 +620,17 @@ export default function FacilityManagementPage() {
           }
           extra={
             <Space wrap>
-              <Popconfirm
-                title="Xóa cơ sở đã chọn"
-                description={`Bạn có chắc muốn xóa ${selectedFacilityIds.length} cơ sở đã chọn không?`}
-                okText="Xóa"
-                cancelText="Hủy"
-                okButtonProps={{ danger: true }}
+              <Button
+                danger
                 disabled={selectedFacilityIds.length === 0}
-                onConfirm={handleDeleteSelected}
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={confirmDeleteSelected}
               >
-                <Button
-                  danger
-                  disabled={selectedFacilityIds.length === 0}
-                  icon={<Trash2 className="h-4 w-4" />}
-                >
-                  Xóa đã chọn
-                  {selectedFacilityIds.length > 0
-                    ? ` (${selectedFacilityIds.length})`
-                    : ""}
-                </Button>
-              </Popconfirm>
+                Xóa đã chọn
+                {selectedFacilityIds.length > 0
+                  ? ` (${selectedFacilityIds.length})`
+                  : ""}
+              </Button>
 
               <Button
                 type="primary"
@@ -648,6 +703,79 @@ export default function FacilityManagementPage() {
         onClose={() => setUpdateFacilityTarget(null)}
         onUpdated={handleFacilityUpdated}
       />
+
+      <Modal
+        open={deleteConfirm.open}
+        centered
+        width={456}
+        title={null}
+        footer={null}
+        closable={false}
+        onCancel={closeDeleteConfirm}
+        mask={{ closable: !deleteConfirmLoading }}
+        className="[&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-[14px] [&_.ant-modal-content]:p-0"
+        styles={{
+          body: {
+            padding: 0,
+          },
+        }}
+      >
+        <div className="relative px-6 pb-6 pt-7 text-center">
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={closeDeleteConfirm}
+            disabled={deleteConfirmLoading}
+            className="absolute right-1 top-1 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+            <Trash2 className="h-7 w-7 text-red-600" />
+          </div>
+
+          <h3 className="mt-5 text-lg font-bold text-slate-950">
+            {deleteConfirm.open && deleteConfirm.mode === "selected"
+              ? "Xóa cơ sở đã chọn"
+              : "Xóa cơ sở"}
+          </h3>
+
+          <p className="mt-2 text-sm text-slate-500">
+            {deleteConfirm.open && deleteConfirm.mode === "selected"
+              ? `Bạn có chắc chắn muốn xóa ${deleteConfirm.count} cơ sở đã chọn không?`
+              : "Bạn có chắc chắn muốn xóa cơ sở này không?"}
+          </p>
+
+          {deleteConfirm.open && deleteConfirm.mode === "single" ? (
+            <p className="mx-auto mt-2 max-w-[340px] truncate text-sm font-semibold text-slate-800">
+              {deleteConfirm.facility.name}
+            </p>
+          ) : null}
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button
+              size="large"
+              onClick={closeDeleteConfirm}
+              disabled={deleteConfirmLoading}
+              className="h-11 rounded-lg font-semibold"
+            >
+              Hủy
+            </Button>
+
+            <Button
+              danger
+              type="primary"
+              size="large"
+              loading={deleteConfirmLoading}
+              onClick={handleConfirmDelete}
+              className="h-11 rounded-lg font-semibold"
+            >
+              Xóa
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 }
