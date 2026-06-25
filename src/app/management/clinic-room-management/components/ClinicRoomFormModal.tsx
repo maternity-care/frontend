@@ -26,27 +26,12 @@ import {
   Users,
   X,
 } from "lucide-react";
+import type {
+  ClinicRoom,
+  RoomFormValues,
+} from "@/management/features/rooms/rooms.types";
 
 const { Text, Title } = Typography;
-
-export type RoomStatus = "active" | "suspended";
-
-export type ClinicRoom = {
-  id: string;
-  roomName: string;
-  roomType: string;
-  floor: number;
-  capacity: number;
-  status: RoomStatus;
-};
-
-export type RoomFormValues = {
-  roomName: string;
-  roomType: string;
-  floor: number;
-  capacity: number;
-  status: RoomStatus;
-};
 
 type ClinicRoomFormModalProps = {
   open: boolean;
@@ -148,6 +133,7 @@ export function ClinicRoomFormModal({
 
   const previewRoomName = useMemo(() => {
     if (!roomName) return editingRoom ? editingRoom.roomName : "Phòng khám mới";
+
     return roomName;
   }, [roomName, editingRoom]);
 
