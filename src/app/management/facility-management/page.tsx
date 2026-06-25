@@ -187,6 +187,8 @@ export default function FacilityManagementPage() {
         description: values.description,
         internalNote: values.internalNote,
         status: values.status,
+        code: values.code,
+        ward: values.ward,
       });
 
       setFacilities((current) => [response.data, ...current]);
@@ -297,7 +299,7 @@ export default function FacilityManagementPage() {
       />
 
       <div className="mt-6 space-y-5">
-        {error ? <Alert type="error" message={error} showIcon /> : null}
+        {error ? <Alert type="error" title={error} showIcon /> : null}
 
         <Card className="border-slate-200 bg-white">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_190px_170px_170px_auto]">
