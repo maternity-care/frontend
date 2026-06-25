@@ -127,6 +127,11 @@ export function FacilityUpdateModal({
 }: FacilityUpdateModalProps) {
   const [form] = Form.useForm<FacilityUpdateFields>();
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingValues, setPendingValues] =
+    useState<FacilityUpdateFields | null>(null);
+  const [updateReason, setUpdateReason] = useState("");
+  const [reasonTouched, setReasonTouched] = useState(false);
 
   const name = Form.useWatch("name", form);
   const code = Form.useWatch("code", form);
@@ -187,51 +192,84 @@ export function FacilityUpdateModal({
   }, [openTime, closeTime]);
 
   function handleCancel() {
+    if (submitting) return;
+
     form.resetFields();
+    setConfirmOpen(false);
+    setPendingValues(null);
+    setUpdateReason("");
+    setReasonTouched(false);
     onClose();
   }
 
-  async function handleFinish(values: FacilityUpdateFields) {
-    if (!facility) return;
+  function handleCloseConfirm() {
+    if (submitting) return;
+
+    setConfirmOpen(false);
+    setPendingValues(null);
+    setUpdateReason("");
+    setReasonTouched(false);
+  }
+
+  function handleFinish(values: FacilityUpdateFields) {
+    setPendingValues(values);
+    setUpdateReason("");
+    setReasonTouched(false);
+    setConfirmOpen(true);
+  }
+
+  async function handleConfirmUpdate() {
+    if (!facility || !pendingValues) return;
+
+    const reason = updateReason.trim();
+
+    if (!reason) {
+      setReasonTouched(true);
+      return;
+    }
 
     setSubmitting(true);
 
     try {
-      const formattedOpenTime = values.openTime?.format("HH:mm") ?? "";
-      const formattedCloseTime = values.closeTime?.format("HH:mm") ?? "";
+      const formattedOpenTime = pendingValues.openTime?.format("HH:mm") ?? "";
+      const formattedCloseTime = pendingValues.closeTime?.format("HH:mm") ?? "";
       const workingHours =
         formattedOpenTime && formattedCloseTime
           ? `${formattedOpenTime}-${formattedCloseTime}`
           : "Chưa cập nhật";
 
       const response = await updateFacility(facility.id, {
-        name: values.name,
-        code: values.code.trim().toUpperCase(),
-        hotline: values.hotline,
-        email: values.email ?? "",
-        status: values.status,
-        address: values.address,
-        city: values.city,
-        district: values.district,
-        ward: values.ward,
-        latitude: values.latitude ?? "",
-        longitude: values.longitude ?? "",
-        workingDays: values.workingDays ?? "",
+        name: pendingValues.name,
+        code: pendingValues.code.trim().toUpperCase(),
+        hotline: pendingValues.hotline,
+        email: pendingValues.email ?? "",
+        status: pendingValues.status,
+        address: pendingValues.address,
+        city: pendingValues.city,
+        district: pendingValues.district,
+        ward: pendingValues.ward,
+        latitude: pendingValues.latitude ?? "",
+        longitude: pendingValues.longitude ?? "",
+        workingDays: pendingValues.workingDays ?? "",
         openTime: formattedOpenTime,
         closeTime: formattedCloseTime,
         workingHours,
-        featuredServices: values.description || "Chưa cập nhật",
-        description: values.description ?? "",
-        internalNote: values.internalNote ?? "",
+        featuredServices: pendingValues.description || "Chưa cập nhật",
+        description: pendingValues.description ?? "",
+        internalNote: reason,
       });
 
       onUpdated({
         ...response.data,
         workingHours,
-        featuredServices: values.description || "Chưa cập nhật",
+        featuredServices: pendingValues.description || "Chưa cập nhật",
       });
 
       form.resetFields();
+      setConfirmOpen(false);
+      setPendingValues(null);
+      setUpdateReason("");
+      setReasonTouched(false);
       onClose();
 
       Modal.success({
@@ -241,6 +279,8 @@ export function FacilityUpdateModal({
         centered: true,
       });
     } catch (err) {
+      setConfirmOpen(false);
+
       Modal.error({
         title: "Cập nhật cơ sở thất bại",
         content: getSubmitErrorMessage(err),
@@ -252,351 +292,452 @@ export function FacilityUpdateModal({
     }
   }
 
+  const reasonError = reasonTouched && updateReason.trim().length === 0;
+
   return (
-    <Modal
-      open={open}
-      width={1180}
-      centered
-      onCancel={handleCancel}
-      footer={null}
-      title={null}
-      className="facility-update-modal"
-      mask={{ closable: !submitting }}
-    >
-      <div className="border-b border-slate-200 px-1 pb-4">
-        <Title level={3} className="!mb-1 !text-slate-950">
-          Cập nhật cơ sở khám
-        </Title>
-
-        <Text className="text-slate-500">
-          Chỉnh sửa thông tin cơ sở khám, địa chỉ, liên hệ và trạng thái hoạt
-          động.
-        </Text>
-      </div>
-
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleFinish}
-        className="mt-5"
+    <>
+      <Modal
+        open={open}
+        width={1180}
+        centered
+        onCancel={handleCancel}
+        footer={null}
+        title={null}
+        className="facility-update-modal"
+        mask={{ closable: !submitting && !confirmOpen }}
       >
-        <div className="grid max-h-[68vh] gap-5 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-5">
-            <Card
-              className="border-slate-200"
-              title={
-                <Space>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white">
-                    <Building2 className="h-4 w-4" />
-                  </span>
+        <div className="border-b border-slate-200 px-1 pb-4">
+          <Title level={3} className="!mb-1 !text-slate-950">
+            Cập nhật cơ sở khám
+          </Title>
 
-                  <span>
-                    <p className="mb-0 text-base font-semibold text-slate-950">
-                      Thông tin cơ sở
-                    </p>
-                    <p className="mb-0 text-xs font-normal text-slate-500">
-                      Cập nhật tên, mã cơ sở, liên hệ và trạng thái hoạt động.
-                    </p>
-                  </span>
-                </Space>
-              }
-            >
-              <Row gutter={16}>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="name"
-                    label="Tên cơ sở"
-                    rules={[
-                      { required: true, message: "Vui lòng nhập tên cơ sở" },
-                    ]}
-                  >
-                    <Input
-                      size="large"
-                      placeholder="Ví dụ: Phòng khám Sản Phụ khoa An Tâm"
-                    />
-                  </Form.Item>
-                </Col>
+          <Text className="text-slate-500">
+            Chỉnh sửa thông tin cơ sở khám, địa chỉ, liên hệ và trạng thái hoạt
+            động.
+          </Text>
+        </div>
 
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="code"
-                    label="Mã cơ sở"
-                    rules={[
-                      { required: true, message: "Vui lòng nhập mã cơ sở" },
-                    ]}
-                  >
-                    <Input size="large" placeholder="Ví dụ: PK-SA-001" />
-                  </Form.Item>
-                </Col>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleFinish}
+          className="mt-5"
+        >
+          <div className="grid max-h-[68vh] gap-5 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="space-y-5">
+              <Card
+                className="border-slate-200"
+                title={
+                  <Space>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white">
+                      <Building2 className="h-4 w-4" />
+                    </span>
 
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="hotline"
-                    label="Số điện thoại"
-                    rules={[
-                      {
-                        required: true,
-                        message: "Vui lòng nhập số điện thoại",
-                      },
-                    ]}
-                  >
-                    <Input size="large" placeholder="024.3825.5555" />
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="email"
-                    label="Email"
-                    rules={[{ type: "email", message: "Email không hợp lệ" }]}
-                  >
-                    <Input size="large" placeholder="hotro@khamasantam.vn" />
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="status"
-                    label="Trạng thái"
-                    rules={[
-                      { required: true, message: "Vui lòng chọn trạng thái" },
-                    ]}
-                  >
-                    <Select
-                      size="large"
-                      options={[
-                        { value: "active", label: "Hoạt động" },
-                        { value: "suspended", label: "Tạm ngưng" },
+                    <span>
+                      <p className="mb-0 text-base font-semibold text-slate-950">
+                        Thông tin cơ sở
+                      </p>
+                      <p className="mb-0 text-xs font-normal text-slate-500">
+                        Cập nhật tên, mã cơ sở, liên hệ và trạng thái hoạt động.
+                      </p>
+                    </span>
+                  </Space>
+                }
+              >
+                <Row gutter={16}>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="name"
+                      label="Tên cơ sở"
+                      rules={[
+                        { required: true, message: "Vui lòng nhập tên cơ sở" },
                       ]}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Card>
+                    >
+                      <Input
+                        size="large"
+                        placeholder="Ví dụ: Phòng khám Sản Phụ khoa An Tâm"
+                      />
+                    </Form.Item>
+                  </Col>
 
-            <Card
-              className="border-slate-200"
-              title={
-                <Space>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-                    <MapPin className="h-4 w-4" />
-                  </span>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="code"
+                      label="Mã cơ sở"
+                      rules={[
+                        { required: true, message: "Vui lòng nhập mã cơ sở" },
+                      ]}
+                    >
+                      <Input size="large" placeholder="Ví dụ: PK-SA-001" />
+                    </Form.Item>
+                  </Col>
 
-                  <span>
-                    <p className="mb-0 text-base font-semibold text-slate-950">
-                      Vị trí & thời gian
-                    </p>
-                    <p className="mb-0 text-xs font-normal text-slate-500">
-                      Cập nhật địa chỉ, khu vực, tọa độ và thời gian hoạt động.
-                    </p>
-                  </span>
-                </Space>
-              }
-            >
-              <Row gutter={16}>
-                <Col xs={24}>
-                  <Form.Item
-                    name="address"
-                    label="Địa chỉ"
-                    rules={[
-                      { required: true, message: "Vui lòng nhập địa chỉ" },
-                    ]}
-                  >
-                    <Input size="large" placeholder="Số 45 Đường Láng" />
-                  </Form.Item>
-                </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="hotline"
+                      label="Số điện thoại"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng nhập số điện thoại",
+                        },
+                      ]}
+                    >
+                      <Input size="large" placeholder="024.3825.5555" />
+                    </Form.Item>
+                  </Col>
 
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="city"
-                    label="Tỉnh/Thành phố"
-                    rules={[
-                      {
-                        required: true,
-                        message: "Vui lòng nhập tỉnh/thành phố",
-                      },
-                    ]}
-                  >
-                    <Input size="large" placeholder="Hà Nội" />
-                  </Form.Item>
-                </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="email"
+                      label="Email"
+                      rules={[{ type: "email", message: "Email không hợp lệ" }]}
+                    >
+                      <Input size="large" placeholder="hotro@khamasantam.vn" />
+                    </Form.Item>
+                  </Col>
 
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="district"
-                    label="Quận/Huyện"
-                    rules={[
-                      { required: true, message: "Vui lòng nhập quận/huyện" },
-                    ]}
-                  >
-                    <Input size="large" placeholder="Đống Đa" />
-                  </Form.Item>
-                </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="status"
+                      label="Trạng thái"
+                      rules={[
+                        { required: true, message: "Vui lòng chọn trạng thái" },
+                      ]}
+                    >
+                      <Select
+                        size="large"
+                        options={[
+                          { value: "active", label: "Hoạt động" },
+                          { value: "suspended", label: "Tạm ngưng" },
+                        ]}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
 
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="ward"
-                    label="Phường/Xã"
-                    rules={[
-                      { required: true, message: "Vui lòng nhập phường/xã" },
-                    ]}
-                  >
-                    <Input size="large" placeholder="Láng Thượng" />
-                  </Form.Item>
-                </Col>
+              <Card
+                className="border-slate-200"
+                title={
+                  <Space>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
+                      <MapPin className="h-4 w-4" />
+                    </span>
 
-                <Col xs={24} md={12}>
-                  <Form.Item name="latitude" label="Vĩ độ">
-                    <Input size="large" placeholder="21.0285000" />
-                  </Form.Item>
-                </Col>
+                    <span>
+                      <p className="mb-0 text-base font-semibold text-slate-950">
+                        Vị trí & thời gian
+                      </p>
+                      <p className="mb-0 text-xs font-normal text-slate-500">
+                        Cập nhật địa chỉ, khu vực, tọa độ và thời gian hoạt
+                        động.
+                      </p>
+                    </span>
+                  </Space>
+                }
+              >
+                <Row gutter={16}>
+                  <Col xs={24}>
+                    <Form.Item
+                      name="address"
+                      label="Địa chỉ"
+                      rules={[
+                        { required: true, message: "Vui lòng nhập địa chỉ" },
+                      ]}
+                    >
+                      <Input size="large" placeholder="Số 45 Đường Láng" />
+                    </Form.Item>
+                  </Col>
 
-                <Col xs={24} md={12}>
-                  <Form.Item name="longitude" label="Kinh độ">
-                    <Input size="large" placeholder="105.8372000" />
-                  </Form.Item>
-                </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="city"
+                      label="Tỉnh/Thành phố"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng nhập tỉnh/thành phố",
+                        },
+                      ]}
+                    >
+                      <Input size="large" placeholder="Hà Nội" />
+                    </Form.Item>
+                  </Col>
 
-                <Col xs={24} md={8}>
-                  <Form.Item name="workingDays" label="Ngày hoạt động">
-                    <Input size="large" placeholder="Thứ 2 - Chủ nhật" />
-                  </Form.Item>
-                </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="district"
+                      label="Quận/Huyện"
+                      rules={[
+                        { required: true, message: "Vui lòng nhập quận/huyện" },
+                      ]}
+                    >
+                      <Input size="large" placeholder="Đống Đa" />
+                    </Form.Item>
+                  </Col>
 
-                <Col xs={24} md={8}>
-                  <Form.Item name="openTime" label="Giờ mở cửa">
-                    <TimePicker
-                      size="large"
-                      format="HH:mm"
-                      className="w-full"
-                    />
-                  </Form.Item>
-                </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="ward"
+                      label="Phường/Xã"
+                      rules={[
+                        { required: true, message: "Vui lòng nhập phường/xã" },
+                      ]}
+                    >
+                      <Input size="large" placeholder="Láng Thượng" />
+                    </Form.Item>
+                  </Col>
 
-                <Col xs={24} md={8}>
-                  <Form.Item name="closeTime" label="Giờ đóng cửa">
-                    <TimePicker
-                      size="large"
-                      format="HH:mm"
-                      className="w-full"
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Card>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="latitude" label="Vĩ độ">
+                      <Input size="large" placeholder="21.0285000" />
+                    </Form.Item>
+                  </Col>
 
-            <Card className="border-slate-200" title="Dịch vụ & ghi chú">
-              <Row gutter={16}>
-                <Col xs={24} md={12}>
-                  <Form.Item name="description" label="Dịch vụ nổi bật">
-                    <TextArea
-                      rows={4}
-                      placeholder="Ví dụ: Khám thai, Siêu âm, Xét nghiệm"
-                    />
-                  </Form.Item>
-                </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="longitude" label="Kinh độ">
+                      <Input size="large" placeholder="105.8372000" />
+                    </Form.Item>
+                  </Col>
 
-                <Col xs={24} md={12}>
-                  <Form.Item name="internalNote" label="Ghi chú nội bộ">
-                    <TextArea
-                      rows={4}
-                      placeholder="Ghi chú cho nhân sự nội bộ"
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Card>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="workingDays" label="Ngày hoạt động">
+                      <Input size="large" placeholder="Thứ 2 - Chủ nhật" />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24} md={8}>
+                    <Form.Item name="openTime" label="Giờ mở cửa">
+                      <TimePicker
+                        size="large"
+                        format="HH:mm"
+                        className="w-full"
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24} md={8}>
+                    <Form.Item name="closeTime" label="Giờ đóng cửa">
+                      <TimePicker
+                        size="large"
+                        format="HH:mm"
+                        className="w-full"
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+
+              <Card className="border-slate-200" title="Dịch vụ & ghi chú">
+                <Row gutter={16}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="description" label="Dịch vụ nổi bật">
+                      <TextArea
+                        rows={4}
+                        placeholder="Ví dụ: Khám thai, Siêu âm, Xét nghiệm"
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24} md={12}>
+                    <Form.Item name="internalNote" label="Ghi chú nội bộ">
+                      <TextArea
+                        rows={4}
+                        placeholder="Ghi chú cho nhân sự nội bộ"
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+            </div>
+
+            <aside className="rounded-xl border border-slate-200 bg-slate-50 p-5 xl:sticky xl:top-0 xl:self-start">
+              <div className="flex items-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-900 text-white">
+                  <Building2 className="h-6 w-6" />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-slate-950">
+                    {name || "Cơ sở khám"}
+                  </p>
+
+                  <p className="text-sm text-slate-500">
+                    {code || "Chưa nhập mã cơ sở"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <Tag color={status === "suspended" ? "default" : "green"}>
+                  {status === "suspended" ? "Tạm ngưng" : "Hoạt động"}
+                </Tag>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <PreviewLine
+                  icon={<Phone className="h-4 w-4" />}
+                  label="Số điện thoại"
+                  value={hotline}
+                />
+
+                <PreviewLine
+                  icon={<Mail className="h-4 w-4" />}
+                  label="Email"
+                  value={email}
+                />
+
+                <PreviewLine
+                  icon={<MapPin className="h-4 w-4" />}
+                  label="Địa chỉ"
+                  value={fullAddress}
+                />
+
+                <PreviewLine
+                  icon={<MapPin className="h-4 w-4" />}
+                  label="Tọa độ"
+                  value={
+                    latitude || longitude
+                      ? `${latitude || "?"}, ${longitude || "?"}`
+                      : ""
+                  }
+                />
+
+                <PreviewLine
+                  icon={<Clock3 className="h-4 w-4" />}
+                  label="Thời gian"
+                  value={
+                    workingDays || workingTime
+                      ? `${workingDays || "Ngày chưa nhập"} · ${
+                          workingTime || "Giờ chưa nhập"
+                        }`
+                      : ""
+                  }
+                />
+              </div>
+
+              <div className="mt-5 rounded-lg border border-dashed border-slate-300 bg-white p-4">
+                <p className="text-xs font-semibold uppercase text-slate-400">
+                  Dịch vụ nổi bật
+                </p>
+
+                <p className="mt-1 text-sm text-slate-700">
+                  {description || "Chưa nhập dịch vụ nổi bật."}
+                </p>
+              </div>
+            </aside>
           </div>
 
-          <aside className="rounded-xl border border-slate-200 bg-slate-50 p-5 xl:sticky xl:top-0 xl:self-start">
-            <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-900 text-white">
-                <Building2 className="h-6 w-6" />
-              </div>
+          <div className="mt-5 flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <Button onClick={handleCancel} disabled={submitting}>
+              <X className="mr-1 h-4 w-4" />
+              Hủy
+            </Button>
 
-              <div className="min-w-0">
-                <p className="truncate text-base font-semibold text-slate-950">
-                  {name || "Cơ sở khám"}
-                </p>
+            <Button type="primary" htmlType="submit" loading={submitting}>
+              <Save className="mr-1 h-4 w-4" />
+              Cập nhật cơ sở
+            </Button>
+          </div>
+        </Form>
+      </Modal>
 
-                <p className="text-sm text-slate-500">
-                  {code || "Chưa nhập mã cơ sở"}
-                </p>
-              </div>
-            </div>
+      <Modal
+        open={confirmOpen}
+        centered
+        width={456}
+        title={null}
+        footer={null}
+        closable={false}
+        onCancel={handleCloseConfirm}
+        mask={{ closable: !submitting }}
+        className="[&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-[14px] [&_.ant-modal-content]:p-0"
+        styles={{
+          body: {
+            padding: 0,
+          },
+        }}
+      >
+        <div className="relative px-6 pb-6 pt-7 text-center">
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={handleCloseConfirm}
+            disabled={submitting}
+            className="absolute right-3 top-3 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-            <div className="mt-5">
-              <Tag color={status === "suspended" ? "default" : "green"}>
-                {status === "suspended" ? "Tạm ngưng" : "Hoạt động"}
-              </Tag>
-            </div>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-100">
+            <Save className="h-7 w-7 text-blue-600" />
+          </div>
 
-            <div className="mt-5 space-y-3">
-              <PreviewLine
-                icon={<Phone className="h-4 w-4" />}
-                label="Số điện thoại"
-                value={hotline}
-              />
+          <h3 className="mt-5 text-lg font-bold text-slate-950">
+            Xác nhận cập nhật cơ sở
+          </h3>
 
-              <PreviewLine
-                icon={<Mail className="h-4 w-4" />}
-                label="Email"
-                value={email}
-              />
+          <p className="mt-2 text-sm text-slate-500">
+            Vui lòng nhập lý do cập nhật trước khi lưu thay đổi.
+          </p>
 
-              <PreviewLine
-                icon={<MapPin className="h-4 w-4" />}
-                label="Địa chỉ"
-                value={fullAddress}
-              />
+          {facility ? (
+            <p className="mx-auto mt-2 max-w-[340px] truncate text-sm font-semibold text-slate-800">
+              {facility.name}
+            </p>
+          ) : null}
 
-              <PreviewLine
-                icon={<MapPin className="h-4 w-4" />}
-                label="Tọa độ"
-                value={
-                  latitude || longitude
-                    ? `${latitude || "?"}, ${longitude || "?"}`
-                    : ""
+          <div className="mt-5 text-left">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Lý do cập nhật <span className="text-red-500">*</span>
+            </label>
+
+            <TextArea
+              value={updateReason}
+              rows={4}
+              maxLength={255}
+              showCount
+              status={reasonError ? "error" : undefined}
+              placeholder="Ví dụ: Cập nhật địa chỉ cơ sở, thay đổi hotline, điều chỉnh trạng thái hoạt động..."
+              onChange={(event) => {
+                setUpdateReason(event.target.value);
+
+                if (reasonTouched && event.target.value.trim()) {
+                  setReasonTouched(false);
                 }
-              />
+              }}
+            />
 
-              <PreviewLine
-                icon={<Clock3 className="h-4 w-4" />}
-                label="Thời gian"
-                value={
-                  workingDays || workingTime
-                    ? `${workingDays || "Ngày chưa nhập"} · ${
-                        workingTime || "Giờ chưa nhập"
-                      }`
-                    : ""
-                }
-              />
-            </div>
-
-            <div className="mt-5 rounded-lg border border-dashed border-slate-300 bg-white p-4">
-              <p className="text-xs font-semibold uppercase text-slate-400">
-                Dịch vụ nổi bật
+            {reasonError ? (
+              <p className="mb-0 mt-1 text-xs text-red-500">
+                Vui lòng nhập lý do cập nhật.
               </p>
+            ) : null}
+          </div>
 
-              <p className="mt-1 text-sm text-slate-700">
-                {description || "Chưa nhập dịch vụ nổi bật."}
-              </p>
-            </div>
-          </aside>
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button
+              size="large"
+              onClick={handleCloseConfirm}
+              disabled={submitting}
+              className="h-11 rounded-lg font-semibold"
+            >
+              Hủy
+            </Button>
+
+            <Button
+              type="primary"
+              size="large"
+              loading={submitting}
+              onClick={handleConfirmUpdate}
+              className="h-11 rounded-lg font-semibold"
+            >
+              Cập nhật
+            </Button>
+          </div>
         </div>
-
-        <div className="mt-5 flex justify-end gap-2 border-t border-slate-200 pt-4">
-          <Button onClick={handleCancel} disabled={submitting}>
-            <X className="mr-1 h-4 w-4" />
-            Hủy
-          </Button>
-
-          <Button type="primary" htmlType="submit" loading={submitting}>
-            <Save className="mr-1 h-4 w-4" />
-            Cập nhật cơ sở
-          </Button>
-        </div>
-      </Form>
-    </Modal>
+      </Modal>
+    </>
   );
 }
