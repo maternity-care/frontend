@@ -28,3 +28,29 @@ export interface UserProfile {
 export interface UpdateProfileInput {
   name?: string;
 }
+
+export type ProfileFormValues = {
+  name: string;
+};
+
+export type PregnantProfile = UserProfile & {
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  address?: string | null;
+  gestationalWeek?: string | number | null;
+  expectedDueDate?: string | null;
+  bloodType?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  lastCheckupAt?: string | null;
+};
+
+export type FeedbackState = {
+  message: string | null;
+  error: string | null;
+};
+
+export type ProfileUpdateHandler = (
+  profile: UserProfile,
+  message?: string
+) => Promise<void>;
