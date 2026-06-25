@@ -40,7 +40,7 @@ function RegisterForm() {
       });
 
       setTimeout(() => {
-        router.replace("/profile");
+        router.replace("/schedule");
       }, 700);
     } catch (error) {
       const errorMessage =

@@ -55,7 +55,7 @@ export function getCurrentUser() {
 }
 
 export function logout(refreshToken: string) {
-  return unwrapApiData<null>(
+  return unwrapApiResponse<null>(
     apiClient.post("/auth/logout", { refresh_token: refreshToken }),
   );
 }

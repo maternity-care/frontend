@@ -70,7 +70,7 @@ function LoginForm() {
       });
 
       setTimeout(() => {
-        router.replace(searchParams.get("next") ?? "/profile");
+        router.replace(searchParams.get("next") ?? "/schedule");
       }, 700);
     } catch (error) {
       // setFormError(
