@@ -34,6 +34,7 @@ import {
   type FacilityFormValues,
 } from "./components/FacilityFormModal";
 import { FacilityDetailModal } from "./components/FacilityDetailModal";
+import { FacilityUpdateModal } from "./components/FacilityUpdateModal";
 
 const { Text } = Typography;
 
@@ -63,8 +64,12 @@ export default function FacilityManagementPage() {
   const [statusFilter, setStatusFilter] = useState<FacilityStatus | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
+
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [detailFacility, setDetailFacility] = useState<Facility | null>(null);
+  const [updateFacilityTarget, setUpdateFacilityTarget] =
+    useState<Facility | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,13 +184,31 @@ export default function FacilityManagementPage() {
         status: values.status,
       });
 
-      setFacilities((current) => [response.data, ...current]);
+      const createdFacility: Facility = {
+        ...response.data,
+        workingHours,
+        featuredServices: values.description || "Chưa cập nhật",
+      };
+
+      setFacilities((current) => [createdFacility, ...current]);
       setCurrentPage(1);
     } catch (err) {
       const message = getErrorMessage(err);
       setError(message);
       throw err;
     }
+  }
+
+  function handleFacilityUpdated(updatedFacility: Facility) {
+    setFacilities((current) =>
+      current.map((facility) =>
+        facility.id === updatedFacility.id ? updatedFacility : facility,
+      ),
+    );
+
+    setDetailFacility((current) =>
+      current?.id === updatedFacility.id ? updatedFacility : current,
+    );
   }
 
   async function handleDeleteFacility(facilityId: string) {
@@ -198,9 +221,19 @@ export default function FacilityManagementPage() {
       setFacilities((current) =>
         current.filter((facility) => facility.id !== facilityId),
       );
+
       setSelectedFacilityIds((current) =>
         current.filter((id) => id !== facilityId),
       );
+
+      setDetailFacility((current) =>
+        current?.id === facilityId ? null : current,
+      );
+
+      setUpdateFacilityTarget((current) =>
+        current?.id === facilityId ? null : current,
+      );
+
       setCurrentPage(1);
 
       Modal.success({
@@ -238,6 +271,15 @@ export default function FacilityManagementPage() {
           (facility) => !selectedFacilityIds.includes(facility.id),
         ),
       );
+
+      setDetailFacility((current) =>
+        current && selectedFacilityIds.includes(current.id) ? null : current,
+      );
+
+      setUpdateFacilityTarget((current) =>
+        current && selectedFacilityIds.includes(current.id) ? null : current,
+      );
+
       setSelectedFacilityIds([]);
       setCurrentPage(1);
 
@@ -353,6 +395,7 @@ export default function FacilityManagementPage() {
             icon={<Pencil className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
+              setUpdateFacilityTarget(record);
             }}
           />
 
@@ -597,6 +640,13 @@ export default function FacilityManagementPage() {
         open={Boolean(detailFacility)}
         facility={detailFacility}
         onClose={() => setDetailFacility(null)}
+      />
+
+      <FacilityUpdateModal
+        open={Boolean(updateFacilityTarget)}
+        facility={updateFacilityTarget}
+        onClose={() => setUpdateFacilityTarget(null)}
+        onUpdated={handleFacilityUpdated}
       />
     </AdminLayout>
   );
