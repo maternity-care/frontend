@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BriefcaseBusiness, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2 } from "lucide-react";
+import { BriefcaseBusiness, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2, DoorOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/management/users", label: "Users", icon: Users },
   { href: "/management/staffdoctormanagement", label: "Staff / Doctors Management", icon: Users },
   { href: "/management/facility-management", label: "Facility Management", icon: Building2 },
+  { href: "/management/clinic-room-management", label: "Clinic Room Management", icon: DoorOpen },
   { href: "/management/roles", label: "Roles", icon: ShieldCheck },
   { href: "/management/permissions", label: "Permissions", icon: KeyRound },
   { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness },
