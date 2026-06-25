@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <Card className="w-full max-w-md shadow-sm">
-      <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+      <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-pink-50 text-pink-700">
         <Mail className="h-5 w-5" aria-hidden="true" />
       </div>
 
@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
             resetUrl ? (
               <Link
                 href={resetUrl}
-                className="font-medium text-teal-700 hover:text-teal-900 hover:underline"
+                className="font-medium text-pink-700 hover:text-pink-900 hover:underline"
               >
                 Mở trang đặt lại mật khẩu
               </Link>
@@ -98,7 +98,7 @@ export default function ForgotPasswordPage() {
       <p className="mt-5 text-center text-sm text-slate-600">
         <Link
           href="/login"
-          className="font-medium text-teal-700 hover:text-teal-900 hover:underline"
+          className="font-medium text-pink-700 hover:text-pink-900 hover:underline"
         >
           Quay lại đăng nhập
         </Link>
