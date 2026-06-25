@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
+  Alert,
   Button,
   Card,
   Input,
@@ -26,15 +27,23 @@ import {
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
-  ClinicRoomFormModal,
-  type ClinicRoom,
-  type RoomFormValues,
-  type RoomStatus,
-} from "./components/ClinicRoomFormModal";
+  createRoom,
+  deleteRoom,
+  deleteRooms,
+  getRooms,
+  updateRoom,
+} from "@/management/features/rooms/rooms.api";
+import type {
+  ClinicRoom,
+  RoomFormValues,
+  RoomStatus,
+} from "@/management/features/rooms/rooms.types";
+import { ClinicRoomFormModal } from "./components/ClinicRoomFormModal";
 
 const { Text, Title } = Typography;
 
 const PAGE_SIZE = 5;
+const FACILITY_ID = "1";
 
 type DeleteConfirmState =
   | {
@@ -52,33 +61,6 @@ type DeleteConfirmState =
       count: number;
     };
 
-const initialRooms: ClinicRoom[] = [
-  {
-    id: "1",
-    roomName: "P101",
-    roomType: "Siêu âm",
-    floor: 1,
-    capacity: 2,
-    status: "active",
-  },
-  {
-    id: "2",
-    roomName: "P202",
-    roomType: "Xét nghiệm",
-    floor: 2,
-    capacity: 3,
-    status: "active",
-  },
-  {
-    id: "3",
-    roomName: "P301",
-    roomType: "Tư vấn",
-    floor: 3,
-    capacity: 4,
-    status: "suspended",
-  },
-];
-
 const roomTypeOptions = [
   { value: "Siêu âm", label: "Siêu âm" },
   { value: "Xét nghiệm", label: "Xét nghiệm" },
@@ -92,8 +74,20 @@ const statusOptions = [
   { value: "suspended", label: "Tạm ngưng" },
 ];
 
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) {
+    if (err.message.includes("Validation failed")) {
+      return "Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại các trường bắt buộc.";
+    }
+
+    return err.message;
+  }
+
+  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
+}
+
 export default function ClinicRoomManagementPage() {
-  const [rooms, setRooms] = useState<ClinicRoom[]>(initialRooms);
+  const [rooms, setRooms] = useState<ClinicRoom[]>([]);
   const [query, setQuery] = useState("");
   const [roomTypeFilter, setRoomTypeFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<RoomStatus | undefined>();
@@ -106,7 +100,42 @@ export default function ClinicRoomManagementPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>({
     open: false,
   });
+
+  const [loading, setLoading] = useState(true);
+  const [tableLoading, setTableLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadRooms() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const data = await getRooms();
+
+        if (mounted) {
+          setRooms(data);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(getErrorMessage(err));
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadRooms();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredRooms = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -153,56 +182,93 @@ export default function ClinicRoomManagementPage() {
   }
 
   async function handleSubmitRoom(values: RoomFormValues) {
+    setError(null);
+
     if (editingRoom) {
-      const updatedRoom: ClinicRoom = {
-        ...editingRoom,
-        roomName: values.roomName.trim().toUpperCase(),
+      try {
+        const response = await updateRoom(editingRoom.id, {
+          facilityId: FACILITY_ID,
+          name: values.roomName.trim().toUpperCase(),
+          roomType: values.roomType,
+          floor: String(values.floor),
+          status: values.status,
+          capacity: values.capacity,
+        });
+
+        const updatedRoom: ClinicRoom = {
+          ...response.data,
+          capacity: values.capacity,
+        };
+
+        setRooms((current) =>
+          current.map((room) =>
+            room.id === editingRoom.id ? updatedRoom : room,
+          ),
+        );
+
+        closeRoomModal();
+
+        Modal.success({
+          title: "Cập nhật phòng thành công",
+          content: "Thông tin phòng khám đã được cập nhật.",
+          okText: "Đóng",
+          centered: true,
+        });
+
+        return;
+      } catch (err) {
+        const message = getErrorMessage(err);
+        setError(message);
+
+        Modal.error({
+          title: "Cập nhật phòng thất bại",
+          content: message,
+          okText: "Đóng",
+          centered: true,
+        });
+
+        throw err;
+      }
+    }
+
+    try {
+      const response = await createRoom({
+        facilityId: FACILITY_ID,
+        name: values.roomName.trim().toUpperCase(),
         roomType: values.roomType,
-        floor: values.floor,
-        capacity: values.capacity,
+        floor: String(values.floor),
         status: values.status,
+        capacity: values.capacity,
+      });
+
+      const createdRoom: ClinicRoom = {
+        ...response.data,
+        capacity: values.capacity,
       };
 
-      setRooms((current) =>
-        current.map((room) =>
-          room.id === editingRoom.id ? updatedRoom : room,
-        ),
-      );
-
+      setRooms((current) => [createdRoom, ...current]);
+      setCurrentPage(1);
       closeRoomModal();
 
       Modal.success({
-        title: "Cập nhật phòng thành công",
-        content: "Thông tin phòng khám đã được cập nhật.",
+        title: "Thêm phòng thành công",
+        content: "Phòng khám mới đã được thêm vào danh sách.",
+        okText: "Đóng",
+        centered: true,
+      });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      setError(message);
+
+      Modal.error({
+        title: "Thêm phòng thất bại",
+        content: message,
         okText: "Đóng",
         centered: true,
       });
 
-      return;
+      throw err;
     }
-
-    const newRoom: ClinicRoom = {
-      id:
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : String(Date.now()),
-      roomName: values.roomName.trim().toUpperCase(),
-      roomType: values.roomType,
-      floor: values.floor,
-      capacity: values.capacity,
-      status: values.status,
-    };
-
-    setRooms((current) => [newRoom, ...current]);
-    setCurrentPage(1);
-    closeRoomModal();
-
-    Modal.success({
-      title: "Thêm phòng thành công",
-      content: "Phòng khám mới đã được thêm vào danh sách.",
-      okText: "Đóng",
-      centered: true,
-    });
   }
 
   function confirmDeleteRoom(room: ClinicRoom) {
@@ -236,10 +302,14 @@ export default function ClinicRoomManagementPage() {
     if (!deleteConfirm.open) return;
 
     setDeleteLoading(true);
+    setTableLoading(true);
+    setError(null);
 
     try {
       if (deleteConfirm.mode === "single") {
         const roomId = deleteConfirm.room.id;
+
+        await deleteRoom(roomId);
 
         setRooms((current) => current.filter((room) => room.id !== roomId));
 
@@ -255,6 +325,8 @@ export default function ClinicRoomManagementPage() {
         });
       } else {
         const ids = deleteConfirm.ids;
+
+        await deleteRooms(ids);
 
         setRooms((current) =>
           current.filter((room) => !ids.includes(room.id)),
@@ -274,8 +346,19 @@ export default function ClinicRoomManagementPage() {
       setDeleteConfirm({
         open: false,
       });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      setError(message);
+
+      Modal.error({
+        title: "Xóa phòng thất bại",
+        content: message,
+        okText: "Đóng",
+        centered: true,
+      });
     } finally {
       setDeleteLoading(false);
+      setTableLoading(false);
     }
   }
 
@@ -372,6 +455,16 @@ export default function ClinicRoomManagementPage() {
       />
 
       <div className="mt-6 space-y-5">
+        {error ? (
+          <Alert
+            type="error"
+            title={error}
+            showIcon
+            closable
+            onClose={() => setError(null)}
+          />
+        ) : null}
+
         <Card className="border-slate-200 bg-white">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
@@ -519,6 +612,7 @@ export default function ClinicRoomManagementPage() {
             rowKey="id"
             size="middle"
             tableLayout="fixed"
+            loading={loading || tableLoading}
             columns={columns}
             dataSource={filteredRooms}
             rowSelection={{

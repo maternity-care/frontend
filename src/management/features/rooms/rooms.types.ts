@@ -43,6 +43,14 @@ export interface ClinicRoom {
   updatedAt?: string;
 }
 
+export interface RoomFormValues {
+  roomName: string;
+  roomType: string;
+  floor: number;
+  capacity: number;
+  status: RoomStatus;
+}
+
 export interface GetRoomsByFacilityParams {
   search?: string;
   floor?: string;
