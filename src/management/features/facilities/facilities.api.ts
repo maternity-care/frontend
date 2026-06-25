@@ -3,13 +3,23 @@ import type {
   BackendFacility,
   CreateFacilityInput,
   Facility,
+  GetFacilitiesParams,
   UpdateFacilityInput,
 } from "./facilities.types";
 
 function normalizeStatus(status: string): Facility["status"] {
-  return status === "Hoạt động" || status === "1" || status === "active"
+  const normalizedStatus = status.trim().toLowerCase();
+
+  return normalizedStatus === "hoạt động" ||
+    normalizedStatus === "hoat dong" ||
+    normalizedStatus === "1" ||
+    normalizedStatus === "active"
     ? "active"
     : "suspended";
+}
+
+function toBackendStatus(status: Facility["status"]) {
+  return status === "active" ? "Hoạt động" : "Không hoạt động";
 }
 
 function normalizeFacility(facility: BackendFacility): Facility {
@@ -35,22 +45,17 @@ function normalizeFacility(facility: BackendFacility): Facility {
 
 function toBackendPayload(input: CreateFacilityInput | UpdateFacilityInput) {
   const payload = {
-    name: input.name,
-    code: input.code,
-    phone: input.hotline,
-    email: input.email,
-    address: input.address,
-    province: input.city,
-    district: input.district,
-    ward: input.ward,
-    latitude: input.latitude,
-    longitude: input.longitude,
-    status:
-      input.status === undefined
-        ? undefined
-        : input.status === "active"
-          ? "Hoạt động"
-          : "Tạm ngưng",
+    name: input.name?.trim(),
+    code: input.code?.trim(),
+    phone: input.hotline?.trim(),
+    email: input.email?.trim() || "",
+    address: input.address?.trim(),
+    province: input.city?.trim(),
+    district: input.district?.trim(),
+    ward: input.ward?.trim(),
+    latitude: input.latitude?.trim() || "0",
+    longitude: input.longitude?.trim() || "0",
+    status: input.status === undefined ? undefined : toBackendStatus(input.status),
   };
 
   return Object.fromEntries(
@@ -58,9 +63,23 @@ function toBackendPayload(input: CreateFacilityInput | UpdateFacilityInput) {
   );
 }
 
-export async function getFacilities() {
+function toQueryParams(params?: GetFacilitiesParams) {
+  const queryParams = {
+    search: params?.search?.trim() || undefined,
+    city: params?.city?.trim() || undefined,
+    status: params?.status ? toBackendStatus(params.status) : undefined,
+  };
+
+  return Object.fromEntries(
+    Object.entries(queryParams).filter(([, value]) => value !== undefined),
+  );
+}
+
+export async function getFacilities(params?: GetFacilitiesParams) {
   const data = await unwrapApiData<BackendFacility[]>(
-    apiClient.get("/management/facilities"),
+    apiClient.get("/management/facilities", {
+      params: toQueryParams(params),
+    }),
   );
 
   return data.map(normalizeFacility);
