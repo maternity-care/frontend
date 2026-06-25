@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
+  Alert,
   Button,
   Card,
   Input,
-  Popconfirm,
+  Modal,
   Select,
   Space,
   Statistic,
@@ -18,92 +19,26 @@ import { Building2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
+  createFacility,
+  deleteFacilities,
+  deleteFacility,
+  getFacilities,
+} from "@/management/features/facilities/facilities.api";
+import type {
+  Facility,
+  FacilityStatus,
+} from "@/management/features/facilities/facilities.types";
+import {
   FacilityFormModal,
   type FacilityFormValues,
 } from "./components/FacilityFormModal";
 
 const { Text } = Typography;
 
-type FacilityStatus = "active" | "suspended";
-
-type Facility = {
-  id: string;
-  name: string;
-  address: string;
-  city: string;
-  hotline: string;
-  workingHours: string;
-  featuredServices: string;
-  status: FacilityStatus;
-};
-
-const initialFacilities: Facility[] = [
-  {
-    id: "1",
-    name: "Cơ sở Quận 1",
-    address: "12 Nguyễn Huệ, Q1",
-    city: "TP. Hồ Chí Minh",
-    hotline: "028 1234 5678",
-    workingHours: "07:30-17:00",
-    featuredServices: "Khám thai, Siêu âm",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Cơ sở Quận 7",
-    address: "45 Nguyễn Văn Linh",
-    city: "TP. Hồ Chí Minh",
-    hotline: "028 8765 4321",
-    workingHours: "08:00-18:00",
-    featuredServices: "Xét nghiệm, Tư vấn",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Cơ sở Thủ Đức",
-    address: "88 Võ Văn Ngân",
-    city: "TP. Hồ Chí Minh",
-    hotline: "028 2468 1357",
-    workingHours: "07:30-16:30",
-    featuredServices: "Khám thai",
-    status: "suspended",
-  },
-  {
-    id: "4",
-    name: "Cơ sở Cần Thơ",
-    address: "22 Nguyễn Trãi, Ninh Kiều",
-    city: "Cần Thơ",
-    hotline: "0292 1111 222",
-    workingHours: "07:00-17:00",
-    featuredServices: "Siêu âm, Tư vấn",
-    status: "active",
-  },
-  {
-    id: "5",
-    name: "Cơ sở Đà Nẵng",
-    address: "15 Hải Phòng, Hải Châu",
-    city: "Đà Nẵng",
-    hotline: "0236 3333 444",
-    workingHours: "08:00-17:30",
-    featuredServices: "Khám thai, Xét nghiệm",
-    status: "active",
-  },
-  {
-    id: "6",
-    name: "Cơ sở Hà Nội",
-    address: "30 Kim Mã, Ba Đình",
-    city: "Hà Nội",
-    hotline: "024 5555 666",
-    workingHours: "07:30-17:30",
-    featuredServices: "Khám thai, Siêu âm",
-    status: "suspended",
-  },
-];
-
 const PAGE_SIZE = 5;
 
 export default function FacilityManagementPage() {
-  const [facilities, setFacilities] = useState<Facility[]>(initialFacilities);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState<string | undefined>();
   const [serviceFilter, setServiceFilter] = useState<string | undefined>();
@@ -113,6 +48,34 @@ export default function FacilityManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Facility | null>(null);
+  const [deleteSelectedModalOpen, setDeleteSelectedModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    getFacilities()
+      .then((data) => {
+        if (!mounted) return;
+        setFacilities(data);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        setError(
+          err instanceof Error ? err.message : "Không tải được danh sách cơ sở",
+        );
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredFacilities = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -153,45 +116,86 @@ export default function FacilityManagementPage() {
     setCurrentPage(1);
   }
 
-  function handleDeleteSelected() {
+  async function handleDeleteSelected() {
     if (selectedFacilityIds.length === 0) return;
 
-    setFacilities((current) =>
-      current.filter((facility) => !selectedFacilityIds.includes(facility.id)),
-    );
-    setSelectedFacilityIds([]);
-    setCurrentPage(1);
+    setTableLoading(true);
+    setError(null);
+
+    try {
+      await deleteFacilities(selectedFacilityIds);
+      setFacilities((current) =>
+        current.filter(
+          (facility) => !selectedFacilityIds.includes(facility.id),
+        ),
+      );
+      setSelectedFacilityIds([]);
+      setCurrentPage(1);
+      setDeleteSelectedModalOpen(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Không thể xóa các cơ sở đã chọn",
+      );
+    } finally {
+      setTableLoading(false);
+    }
   }
 
-  function handleDeleteFacility(facilityId: string) {
-    setFacilities((current) =>
-      current.filter((facility) => facility.id !== facilityId),
-    );
-    setSelectedFacilityIds((current) =>
-      current.filter((id) => id !== facilityId),
-    );
-    setCurrentPage(1);
+  async function handleDeleteFacility(facilityId: string) {
+    setTableLoading(true);
+    setError(null);
+
+    try {
+      await deleteFacility(facilityId);
+      setFacilities((current) =>
+        current.filter((facility) => facility.id !== facilityId),
+      );
+      setSelectedFacilityIds((current) =>
+        current.filter((id) => id !== facilityId),
+      );
+      setCurrentPage(1);
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể xóa cơ sở");
+    } finally {
+      setTableLoading(false);
+    }
   }
 
-  function handleCreateFacility(values: FacilityFormValues) {
+  async function handleCreateFacility(values: FacilityFormValues) {
     const workingHours =
       values.openTime && values.closeTime
         ? `${values.openTime}-${values.closeTime}`
         : "Chưa cập nhật";
 
-    const newFacility: Facility = {
-      id: crypto.randomUUID(),
-      name: values.name,
-      address: values.address,
-      city: values.city,
-      hotline: values.hotline,
-      workingHours,
-      featuredServices: values.description || "Chưa cập nhật",
-      status: values.status,
-    };
+    setTableLoading(true);
+    setError(null);
 
-    setFacilities((current) => [newFacility, ...current]);
-    setCurrentPage(1);
+    try {
+      const response = await createFacility({
+        name: values.name,
+        address: values.address,
+        city: values.city,
+        district: values.district,
+        hotline: values.hotline,
+        email: values.email,
+        workingDays: values.workingDays,
+        openTime: values.openTime,
+        closeTime: values.closeTime,
+        workingHours,
+        featuredServices: values.description || "Chưa cập nhật",
+        description: values.description,
+        internalNote: values.internalNote,
+        status: values.status,
+      });
+
+      setFacilities((current) => [response.data, ...current]);
+      setCurrentPage(1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể thêm cơ sở");
+    } finally {
+      setTableLoading(false);
+    }
   }
 
   const columns: ColumnsType<Facility> = [
@@ -274,16 +278,12 @@ export default function FacilityManagementPage() {
         <Space size={8}>
           <Button title="Sửa" icon={<Pencil className="h-4 w-4" />} />
 
-          <Popconfirm
-            title="Xóa cơ sở"
-            description="Bạn có chắc muốn xóa cơ sở này không?"
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDeleteFacility(record.id)}
-          >
-            <Button danger title="Xóa" icon={<Trash2 className="h-4 w-4" />} />
-          </Popconfirm>
+          <Button
+            danger
+            title="Xóa"
+            icon={<Trash2 className="h-4 w-4" />}
+            onClick={() => setDeleteTarget(record)}
+          />
         </Space>
       ),
     },
@@ -297,6 +297,8 @@ export default function FacilityManagementPage() {
       />
 
       <div className="mt-6 space-y-5">
+        {error ? <Alert type="error" message={error} showIcon /> : null}
+
         <Card className="border-slate-200 bg-white">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_190px_170px_170px_auto]">
             <Input
@@ -418,26 +420,17 @@ export default function FacilityManagementPage() {
           }
           extra={
             <Space wrap>
-              <Popconfirm
-                title="Xóa cơ sở đã chọn"
-                description={`Bạn có chắc muốn xóa ${selectedFacilityIds.length} cơ sở đã chọn không?`}
-                okText="Xóa"
-                cancelText="Hủy"
-                okButtonProps={{ danger: true }}
+              <Button
+                danger
                 disabled={selectedFacilityIds.length === 0}
-                onConfirm={handleDeleteSelected}
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={() => setDeleteSelectedModalOpen(true)}
               >
-                <Button
-                  danger
-                  disabled={selectedFacilityIds.length === 0}
-                  icon={<Trash2 className="h-4 w-4" />}
-                >
-                  Xóa đã chọn
-                  {selectedFacilityIds.length > 0
-                    ? ` (${selectedFacilityIds.length})`
-                    : ""}
-                </Button>
-              </Popconfirm>
+                Xóa đã chọn
+                {selectedFacilityIds.length > 0
+                  ? ` (${selectedFacilityIds.length})`
+                  : ""}
+              </Button>
 
               <Button
                 type="primary"
@@ -453,6 +446,7 @@ export default function FacilityManagementPage() {
             rowKey="id"
             size="middle"
             tableLayout="fixed"
+            loading={loading || tableLoading}
             columns={columns}
             dataSource={filteredFacilities}
             rowSelection={{
@@ -479,6 +473,68 @@ export default function FacilityManagementPage() {
         onClose={() => setCreateModalOpen(false)}
         onSubmit={handleCreateFacility}
       />
+
+      <Modal
+        title="Xác nhận xóa"
+        open={Boolean(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+        mask={{ closable: !tableLoading }}
+        footer={[
+          <Button
+            key="cancel"
+            disabled={tableLoading}
+            onClick={() => setDeleteTarget(null)}
+          >
+            Hủy
+          </Button>,
+          <Button
+            key="delete"
+            danger
+            type="primary"
+            loading={tableLoading}
+            onClick={() => {
+              if (deleteTarget) void handleDeleteFacility(deleteTarget.id);
+            }}
+          >
+            Xóa
+          </Button>,
+        ]}
+      >
+        <p className="mb-0">
+          Bạn có chắc chắn muốn xóa cơ sở{" "}
+          <Text strong>{deleteTarget?.name}</Text> không?
+        </p>
+      </Modal>
+
+      <Modal
+        title="Xác nhận xóa"
+        open={deleteSelectedModalOpen}
+        onCancel={() => setDeleteSelectedModalOpen(false)}
+        mask={{ closable: !tableLoading }}
+        footer={[
+          <Button
+            key="cancel"
+            disabled={tableLoading}
+            onClick={() => setDeleteSelectedModalOpen(false)}
+          >
+            Hủy
+          </Button>,
+          <Button
+            key="delete"
+            danger
+            type="primary"
+            loading={tableLoading}
+            onClick={() => void handleDeleteSelected()}
+          >
+            Xóa
+          </Button>,
+        ]}
+      >
+        <p className="mb-0">
+          Bạn có chắc chắn muốn xóa {selectedFacilityIds.length} cơ sở đã chọn
+          không?
+        </p>
+      </Modal>
     </AdminLayout>
   );
 }
