@@ -1,5 +1,11 @@
 export type FacilityStatus = "active" | "suspended";
 
+export interface GetFacilitiesParams {
+  search?: string;
+  city?: string;
+  status?: FacilityStatus;
+}
+
 export interface BackendFacility {
   id: string;
   name: string;
@@ -20,11 +26,11 @@ export interface BackendFacility {
 export interface Facility {
   id: string;
   name: string;
-  code?: string;
+  code: string;
   address: string;
   city: string;
-  district?: string;
-  ward?: string;
+  district: string;
+  ward: string;
   hotline: string;
   email?: string;
   latitude?: string;
@@ -38,11 +44,11 @@ export interface Facility {
 
 export interface CreateFacilityInput {
   name: string;
-  code?: string;
+  code: string;
   address: string;
-  city?: string;
-  district?: string;
-  ward?: string;
+  city: string;
+  district: string;
+  ward: string;
   hotline: string;
   email?: string;
   latitude?: string;
