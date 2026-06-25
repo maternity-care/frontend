@@ -38,7 +38,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (pathname === "/login" && token) {
-    return NextResponse.redirect(new URL("/profile", request.url));
+    return NextResponse.redirect(new URL("/schedule", request.url));
   }
 
   return NextResponse.next();
