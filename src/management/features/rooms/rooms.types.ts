@@ -3,7 +3,14 @@ export type RoomStatus = "active" | "suspended";
 export interface BackendRoom {
   id: string;
   name: string;
-  roomType: string;
+
+  // Backend có thể trả một trong các field này
+  roomType?: string;
+  type?: string;
+  room_type?: string;
+  roomTypeName?: string;
+  room_type_name?: string;
+
   floor: string;
   status: string;
   createdAt: string;

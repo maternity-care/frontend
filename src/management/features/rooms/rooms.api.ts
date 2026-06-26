@@ -75,11 +75,22 @@ function toBackendStatus(status?: RoomStatus) {
   return status === "active" ? "Hoạt động" : "Tạm ngưng";
 }
 
+function getBackendRoomType(room: BackendRoom) {
+  return (
+    room.roomType ||
+    room.type ||
+    room.room_type ||
+    room.roomTypeName ||
+    room.room_type_name ||
+    "Chưa cập nhật"
+  );
+}
+
 function normalizeRoom(room: BackendRoom, capacity = 1): ClinicRoom {
   return {
     id: room.id,
     roomName: room.name,
-    roomType: room.roomType,
+    roomType: getBackendRoomType(room),
     floor: Number(room.floor) || 1,
     capacity,
     status: normalizeStatus(room.status),
@@ -121,7 +132,7 @@ export async function getRooms() {
 
   const data = unwrapData<BackendRoom[]>(response.data);
 
-  return data.map((room) => normalizeRoom(room));
+  return Array.isArray(data) ? data.map((room) => normalizeRoom(room)) : [];
 }
 
 export async function getRoomById(id: string) {
@@ -178,16 +189,19 @@ export async function getRoomsByFacility(
   facilityId: string,
   params?: GetRoomsByFacilityParams,
 ) {
-  const response = await apiClient.get<ApiEnvelope<BackendRoom[]>>(
-    `/management/facility/rooms/${facilityId}`,
-    {
-      params: toQueryParams(params),
-    },
+  const response = await apiClient.get<
+    ApiEnvelope<BackendRoom[] | BackendRoomsByFacility>
+  >(`/management/facility/rooms/${facilityId}`, {
+    params: toQueryParams(params),
+  });
+
+  const data = unwrapData<BackendRoom[] | BackendRoomsByFacility>(
+    response.data,
   );
 
-  const data = unwrapData<BackendRoom[]>(response.data);
+  const rooms = Array.isArray(data) ? data : data.rooms;
 
-  return data.map((room) => normalizeRoom(room));
+  return Array.isArray(rooms) ? rooms.map((room) => normalizeRoom(room)) : [];
 }
 
 export async function getRoomsGroupedByFacilities() {
@@ -197,8 +211,10 @@ export async function getRoomsGroupedByFacilities() {
 
   const data = unwrapData<BackendRoomsByFacility[]>(response.data);
 
-  return data.map<RoomsByFacility>((item) => ({
-    facility: item.facility,
-    rooms: item.rooms.map((room) => normalizeRoom(room)),
-  }));
+  return Array.isArray(data)
+    ? data.map<RoomsByFacility>((item) => ({
+        facility: item.facility,
+        rooms: item.rooms.map((room) => normalizeRoom(room)),
+      }))
+    : [];
 }
