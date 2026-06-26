@@ -1,3 +1,4 @@
+//src/app/management/facility-management/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -15,7 +16,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { Building2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Building2, Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
@@ -460,10 +461,19 @@ export default function FacilityManagementPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 120,
+      width: 160,
       align: "center",
       render: (_value, record) => (
         <Space size={8}>
+          <Button
+            title="Xem chi tiết"
+            icon={<Eye className="h-4 w-4" />}
+            onClick={(event) => {
+              event.stopPropagation();
+              setDetailFacility(record);
+            }}
+          />
+
           <Button
             title="Sửa"
             icon={<Pencil className="h-4 w-4" />}
