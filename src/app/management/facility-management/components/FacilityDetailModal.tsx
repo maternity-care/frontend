@@ -1,10 +1,13 @@
+//src/app/management/facility-management/components/FacilityDetailModal.tsx
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Button, Card, Col, Modal, Row, Space, Tag, Typography } from "antd";
 import {
   Building2,
   CalendarClock,
   Clock3,
+  DoorOpen,
   Hash,
   Mail,
   MapPin,
@@ -87,6 +90,7 @@ export function FacilityDetailModal({
   facility,
   onClose,
 }: FacilityDetailModalProps) {
+  const router = useRouter();
   const fullAddress = facility
     ? [facility.address, facility.ward, facility.district, facility.city]
         .filter(Boolean)
@@ -102,7 +106,26 @@ export function FacilityDetailModal({
       centered
       title={null}
       footer={
-        <div className="flex justify-end border-t border-slate-200 pt-3">
+        <div className="flex justify-between gap-3 border-t border-slate-200 pt-3">
+          <Button
+            icon={<DoorOpen className="h-4 w-4" />}
+            onClick={() => {
+              if (!facility) return;
+
+              const params = new URLSearchParams({
+                facilityId: facility.id,
+                facilityName: facility.name,
+              });
+
+              onClose();
+              router.push(
+                `/management/clinic-room-management?${params.toString()}`,
+              );
+            }}
+          >
+            Xem phòng
+          </Button>
+
           <Button
             type="primary"
             icon={<X className="h-4 w-4" />}
