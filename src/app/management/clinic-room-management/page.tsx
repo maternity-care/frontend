@@ -27,6 +27,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
@@ -34,6 +35,7 @@ import {
   deleteRoom,
   deleteRooms,
   getRooms,
+  getRoomsByFacility,
   updateRoom,
 } from "@/management/features/rooms/rooms.api";
 import type {
@@ -46,7 +48,7 @@ import { ClinicRoomFormModal } from "./components/ClinicRoomFormModal";
 const { Text, Title } = Typography;
 
 const PAGE_SIZE = 5;
-const FACILITY_ID = "1";
+const DEFAULT_FACILITY_ID = "1";
 
 type DeleteConfirmState =
   | {
@@ -106,6 +108,14 @@ function formatDateTime(value?: string) {
 }
 
 export default function ClinicRoomManagementPage() {
+  const searchParams = useSearchParams();
+
+  const facilityIdFromQuery = searchParams.get("facilityId");
+  const facilityNameFromQuery = searchParams.get("facilityName");
+
+  const activeFacilityId = facilityIdFromQuery || DEFAULT_FACILITY_ID;
+  const isFacilityFiltered = Boolean(facilityIdFromQuery);
+
   const [rooms, setRooms] = useState<ClinicRoom[]>([]);
   const [query, setQuery] = useState("");
   const [roomTypeFilter, setRoomTypeFilter] = useState<string | undefined>();
@@ -134,10 +144,17 @@ export default function ClinicRoomManagementPage() {
       setError(null);
 
       try {
-        const data = await getRooms();
+        const data = isFacilityFiltered
+          ? await getRoomsByFacility(activeFacilityId, {
+              search: query,
+              status: statusFilter,
+            })
+          : await getRooms();
 
         if (mounted) {
           setRooms(data);
+          setSelectedRoomIds([]);
+          setCurrentPage(1);
         }
       } catch (err) {
         if (mounted) {
@@ -155,7 +172,7 @@ export default function ClinicRoomManagementPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [activeFacilityId, isFacilityFiltered, query, statusFilter]);
 
   const filteredRooms = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -215,7 +232,7 @@ export default function ClinicRoomManagementPage() {
     if (editingRoom) {
       try {
         const response = await updateRoom(editingRoom.id, {
-          facilityId: FACILITY_ID,
+          facilityId: activeFacilityId,
           name: values.roomName.trim(),
           roomType: values.roomType,
           floor: String(values.floor),
@@ -265,7 +282,7 @@ export default function ClinicRoomManagementPage() {
 
     try {
       const response = await createRoom({
-        facilityId: FACILITY_ID,
+        facilityId: activeFacilityId,
         name: values.roomName.trim(),
         roomType: values.roomType,
         floor: String(values.floor),
@@ -421,7 +438,9 @@ export default function ClinicRoomManagementPage() {
       title: "Loại phòng",
       dataIndex: "roomType",
       align: "center",
-      render: (roomType: string) => <Tag color="blue">{roomType}</Tag>,
+      render: (roomType: string) => (
+        <Tag color="blue">{roomType || "Chưa cập nhật"}</Tag>
+      ),
     },
     {
       title: "Tầng",
@@ -519,12 +538,15 @@ export default function ClinicRoomManagementPage() {
               </p>
 
               <Title level={3} className="!mb-0 !text-slate-950">
-                Phòng khám tại Cơ sở Quận 1
+                {isFacilityFiltered
+                  ? `Phòng khám tại ${facilityNameFromQuery || "cơ sở đã chọn"}`
+                  : "Tất cả phòng khám"}
               </Title>
 
               <Text className="text-slate-500">
-                Quản lý phòng, loại phòng, tầng, sức chứa và trạng thái hoạt
-                động.
+                {isFacilityFiltered
+                  ? "Danh sách phòng được lọc theo cơ sở khám đã chọn."
+                  : "Quản lý phòng, loại phòng, tầng, sức chứa và trạng thái hoạt động."}
               </Text>
             </div>
           </div>
