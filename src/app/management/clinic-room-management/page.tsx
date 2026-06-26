@@ -6,6 +6,7 @@ import {
   Alert,
   Button,
   Card,
+  Descriptions,
   Input,
   Modal,
   Select,
@@ -18,6 +19,7 @@ import {
 import {
   Building2,
   DoorOpen,
+  Eye,
   Pencil,
   Plus,
   Search,
@@ -86,6 +88,22 @@ function getErrorMessage(err: unknown) {
   return "Đã có lỗi xảy ra. Vui lòng thử lại.";
 }
 
+function formatDateTime(value?: string) {
+  if (!value) return "Chưa cập nhật";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 export default function ClinicRoomManagementPage() {
   const [rooms, setRooms] = useState<ClinicRoom[]>([]);
   const [query, setQuery] = useState("");
@@ -96,6 +114,7 @@ export default function ClinicRoomManagementPage() {
 
   const [roomModalOpen, setRoomModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<ClinicRoom | null>(null);
+  const [detailRoom, setDetailRoom] = useState<ClinicRoom | null>(null);
 
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>({
     open: false,
@@ -181,6 +200,14 @@ export default function ClinicRoomManagementPage() {
     setEditingRoom(null);
   }
 
+  function openDetailModal(room: ClinicRoom) {
+    setDetailRoom(room);
+  }
+
+  function closeDetailModal() {
+    setDetailRoom(null);
+  }
+
   async function handleSubmitRoom(values: RoomFormValues) {
     setError(null);
 
@@ -204,6 +231,10 @@ export default function ClinicRoomManagementPage() {
           current.map((room) =>
             room.id === editingRoom.id ? updatedRoom : room,
           ),
+        );
+
+        setDetailRoom((current) =>
+          current?.id === editingRoom.id ? updatedRoom : current,
         );
 
         closeRoomModal();
@@ -313,9 +344,9 @@ export default function ClinicRoomManagementPage() {
 
         setRooms((current) => current.filter((room) => room.id !== roomId));
 
-        setSelectedRoomIds((current) =>
-          current.filter((id) => id !== roomId),
-        );
+        setSelectedRoomIds((current) => current.filter((id) => id !== roomId));
+
+        setDetailRoom((current) => (current?.id === roomId ? null : current));
 
         Modal.success({
           title: "Xóa phòng thành công",
@@ -328,8 +359,10 @@ export default function ClinicRoomManagementPage() {
 
         await deleteRooms(ids);
 
-        setRooms((current) =>
-          current.filter((room) => !ids.includes(room.id)),
+        setRooms((current) => current.filter((room) => !ids.includes(room.id)));
+
+        setDetailRoom((current) =>
+          current && ids.includes(current.id) ? null : current,
         );
 
         setSelectedRoomIds([]);
@@ -371,18 +404,18 @@ export default function ClinicRoomManagementPage() {
         (currentPage - 1) * PAGE_SIZE + index + 1,
     },
     {
-  title: <div className="text-center">Tên phòng</div>,
-  dataIndex: "roomName",
-  render: (roomName: string) => (
-    <div className="flex items-center justify-start gap-3 pl-4">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-white">
-        <DoorOpen className="h-4 w-4" />
-      </span>
+      title: <div className="text-center">Tên phòng</div>,
+      dataIndex: "roomName",
+      render: (roomName: string) => (
+        <div className="flex items-center justify-start gap-3 pl-4">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-white">
+            <DoorOpen className="h-4 w-4" />
+          </span>
 
-      <Text strong>{roomName}</Text>
-    </div>
-  ),
-},
+          <Text strong>{roomName}</Text>
+        </div>
+      ),
+    },
     {
       title: "Loại phòng",
       dataIndex: "roomType",
@@ -419,10 +452,19 @@ export default function ClinicRoomManagementPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 140,
+      width: 180,
       align: "center",
       render: (_value, record) => (
         <Space size={8}>
+          <Button
+            title="Xem chi tiết"
+            icon={<Eye className="h-4 w-4" />}
+            onClick={(event) => {
+              event.stopPropagation();
+              openDetailModal(record);
+            }}
+          />
+
           <Button
             title="Sửa"
             icon={<Pencil className="h-4 w-4" />}
@@ -544,9 +586,7 @@ export default function ClinicRoomManagementPage() {
 
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title={
-                <span className="text-emerald-700">Đang hoạt động</span>
-              }
+              title={<span className="text-emerald-700">Đang hoạt động</span>}
               value={activeRooms}
               formatter={(value) => (
                 <span className="text-emerald-950">{value}</span>
@@ -579,7 +619,7 @@ export default function ClinicRoomManagementPage() {
               </p>
 
               <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Theo dõi tên phòng, loại phòng, tầng, sức chứa và trạng thái.
+                Click vào một dòng hoặc icon con mắt để xem chi tiết phòng khám.
               </p>
             </div>
           }
@@ -614,6 +654,23 @@ export default function ClinicRoomManagementPage() {
             loading={loading || tableLoading}
             columns={columns}
             dataSource={filteredRooms}
+            onRow={(record) => ({
+              className: "cursor-pointer",
+              onClick: (event) => {
+                const target = event.target as HTMLElement;
+
+                if (
+                  target.closest("button") ||
+                  target.closest("a") ||
+                  target.closest(".ant-checkbox") ||
+                  target.closest(".ant-checkbox-wrapper")
+                ) {
+                  return;
+                }
+
+                openDetailModal(record);
+              },
+            })}
             rowSelection={{
               selectedRowKeys: selectedRoomIds,
               onChange: (selectedRowKeys) => {
@@ -639,6 +696,96 @@ export default function ClinicRoomManagementPage() {
         onClose={closeRoomModal}
         onSubmit={handleSubmitRoom}
       />
+
+      <Modal
+        open={Boolean(detailRoom)}
+        width={720}
+        centered
+        title={null}
+        footer={
+          <div className="flex justify-end">
+            <Button type="primary" onClick={closeDetailModal}>
+              Đóng
+            </Button>
+          </div>
+        }
+        onCancel={closeDetailModal}
+        mask={{ closable: true }}
+      >
+        {detailRoom ? (
+          <div>
+            <div className="mb-5 flex items-start gap-4 border-b border-slate-200 pb-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                <DoorOpen className="h-6 w-6" />
+              </div>
+
+              <div>
+                <Title level={3} className="!mb-1 !text-slate-950">
+                  {detailRoom.roomName}
+                </Title>
+
+                <Space size={8} wrap>
+                  <Tag color="blue">{detailRoom.roomType}</Tag>
+
+                  {detailRoom.status === "active" ? (
+                    <Tag color="green">Đang hoạt động</Tag>
+                  ) : (
+                    <Tag color="default">Tạm ngưng</Tag>
+                  )}
+                </Space>
+              </div>
+            </div>
+
+            <Descriptions
+              bordered
+              column={2}
+              size="middle"
+              styles={{
+                label: {
+                  width: 160,
+                  fontWeight: 600,
+                },
+              }}
+            >
+              <Descriptions.Item label="Tên phòng" span={1}>
+                {detailRoom.roomName}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Loại phòng" span={1}>
+                {detailRoom.roomType}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Tầng" span={1}>
+                {detailRoom.floor}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Sức chứa" span={1}>
+                {detailRoom.capacity} người
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Trạng thái" span={1}>
+                {detailRoom.status === "active" ? (
+                  <Tag color="green">Đang hoạt động</Tag>
+                ) : (
+                  <Tag color="default">Tạm ngưng</Tag>
+                )}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Mã phòng" span={1}>
+                {detailRoom.id}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Ngày tạo" span={1}>
+                {formatDateTime(detailRoom.createdAt)}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Cập nhật lần cuối" span={1}>
+                {formatDateTime(detailRoom.updatedAt)}
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={deleteConfirm.open}
