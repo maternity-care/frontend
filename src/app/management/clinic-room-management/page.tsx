@@ -1,3 +1,4 @@
+//src/app/management/clinic-room-management/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

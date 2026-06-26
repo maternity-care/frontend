@@ -1,3 +1,4 @@
+//src/app/management/facility-management/components/FacilityDetailModal.tsx
 "use client";
 
 import { Button, Card, Col, Modal, Row, Space, Tag, Typography } from "antd";
