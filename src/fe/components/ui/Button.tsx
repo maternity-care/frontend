@@ -10,9 +10,9 @@ export function Button({ className, variant = "primary", ...props }: ButtonProps
     <button
       className={cn(
         "inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-        variant === "primary" && "bg-teal-700 text-white hover:bg-teal-800",
-        variant === "light" && "bg-white text-teal-800 shadow-sm ring-1 ring-teal-100 hover:bg-teal-50",
-        variant === "ghost" && "text-slate-700 hover:bg-teal-50",
+        variant === "primary" && "bg-pink-700 text-white hover:bg-pink-800",
+        variant === "light" && "bg-white text-pink-800 shadow-sm ring-1 ring-pink-100 hover:bg-pink-50",
+        variant === "ghost" && "text-slate-700 hover:bg-pink-50",
         className,
       )}
       {...props}
