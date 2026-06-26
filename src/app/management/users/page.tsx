@@ -1,489 +1,936 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Ban, Check, RotateCcw, Save, Search, ShieldCheck, SlidersHorizontal, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { ColumnsType } from "antd/es/table";
+import {
+  Button,
+  Card,
+  Descriptions,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
+import {
+  CalendarClock,
+  Download,
+  Eye,
+  Lock,
+  Pencil,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  X,
+} from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
-import { Badge } from "@/management/components/ui/Badge";
-import { Button } from "@/management/components/ui/Button";
-import { Card, CardTitle } from "@/management/components/ui/Card";
-import { Modal } from "@/management/components/ui/Modal";
 import { PageHeader } from "@/management/components/ui/PageHeader";
-import { StateBlock } from "@/management/components/ui/StateBlock";
-import { getPermissions } from "@/management/features/permissions/permissions.api";
-import type { Permission } from "@/management/features/permissions/permissions.types";
-import { getRoles } from "@/management/features/roles/roles.api";
-import type { Role } from "@/management/features/roles/roles.types";
-import { getUsers, updateUser } from "@/management/features/users/users.api";
-import type { User, UserPermissionEffect } from "@/management/features/users/users.types";
-import { cn, formatDate, getErrorMessage } from "@/lib/utils";
+import {
+  UserAccountFormModal,
+  accountTypeOptions,
+  getAccountTypeLabel,
+  getRoleColor,
+  getRoleLabel,
+  roleOptions,
+  statusOptions,
+} from "./components/UserAccountFormModal";
+import type {
+  AccountType,
+  UserAccount,
+  UserFormValues,
+  UserRole,
+  UserStatus,
+} from "./components/UserAccountFormModal";
 
-type OverrideMode = "inherit" | UserPermissionEffect;
+const { Text, Title } = Typography;
 
-function permissionGroup(name: string) {
-  return name.split(/[.:-]/)[0] || "general";
+type DeleteConfirmState =
+  | { open: false }
+  | { open: true; mode: "single"; user: UserAccount }
+  | { open: true; mode: "selected"; ids: string[]; count: number };
+
+const PAGE_SIZE = 6;
+
+const initialUsers: UserAccount[] = [
+  {
+    id: "U001",
+    fullName: "Nguyễn Lan",
+    email: "lan@example.com",
+    phone: "0901234567",
+    role: "pregnant",
+    roleLabel: "Thai phụ",
+    accountType: "customer",
+    accountTypeLabel: "Khách hàng",
+    status: "active",
+    createdAt: "2026-06-12T08:30:00.000Z",
+    lastLogin: "2026-06-25T20:15:00.000Z",
+  },
+  {
+    id: "U002",
+    fullName: "Trần Minh",
+    email: "minh@mcs.vn",
+    phone: "0912345678",
+    role: "staff",
+    roleLabel: "Staff",
+    accountType: "internal",
+    accountTypeLabel: "Nội bộ",
+    status: "active",
+    createdAt: "2026-06-10T09:15:00.000Z",
+    lastLogin: "2026-06-26T08:20:00.000Z",
+  },
+  {
+    id: "U003",
+    fullName: "BS. Nguyễn An",
+    email: "an@mcs.vn",
+    phone: "0923456789",
+    role: "doctor",
+    roleLabel: "Bác sĩ",
+    accountType: "internal",
+    accountTypeLabel: "Nội bộ",
+    status: "active",
+    createdAt: "2026-06-08T10:00:00.000Z",
+    lastLogin: "2026-06-25T17:45:00.000Z",
+  },
+  {
+    id: "U004",
+    fullName: "Lê Hạnh",
+    email: "hanh@example.com",
+    phone: "0934567890",
+    role: "pregnant",
+    roleLabel: "Thai phụ",
+    accountType: "customer",
+    accountTypeLabel: "Khách hàng",
+    status: "locked",
+    createdAt: "2026-06-02T14:40:00.000Z",
+    lastLogin: "2026-06-15T09:30:00.000Z",
+  },
+  {
+    id: "U005",
+    fullName: "Phạm Quốc Bảo",
+    email: "bao.owner@mcs.vn",
+    phone: "0945678901",
+    role: "owner",
+    roleLabel: "Owner",
+    accountType: "system",
+    accountTypeLabel: "Quản trị cơ sở",
+    status: "active",
+    createdAt: "2026-05-28T11:25:00.000Z",
+    lastLogin: "2026-06-26T07:10:00.000Z",
+  },
+  {
+    id: "U006",
+    fullName: "Admin System",
+    email: "admin@example.com",
+    phone: "0956789012",
+    role: "admin",
+    roleLabel: "Admin",
+    accountType: "system",
+    accountTypeLabel: "Hệ thống",
+    status: "active",
+    createdAt: "2026-05-20T08:00:00.000Z",
+    lastLogin: "2026-06-26T09:00:00.000Z",
+  },
+];
+
+function formatDate(value?: string) {
+  if (!value) return "Chưa cập nhật";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
-function toOverrideDraft(user?: User) {
-  return (user?.permissionOverrides ?? []).reduce<Record<string, OverrideMode>>((acc, override) => {
-    acc[override.permission.id] = override.effect;
-    return acc;
-  }, {});
+function formatDateTime(value?: string) {
+  if (!value) return "Chưa cập nhật";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
-function toRoleIds(user?: User) {
-  return (user?.roles ?? []).map((role) => role.id);
+function exportUsersToCsv(users: UserAccount[]) {
+  const headers = [
+    "STT",
+    "Họ tên",
+    "Email",
+    "Số điện thoại",
+    "Vai trò",
+    "Trạng thái",
+    "Loại tài khoản",
+    "Ngày tạo",
+  ];
+
+  const rows = users.map((user, index) => [
+    index + 1,
+    user.fullName,
+    user.email,
+    user.phone,
+    user.roleLabel,
+    user.status === "active" ? "Hoạt động" : "Đã khóa",
+    user.accountTypeLabel,
+    formatDate(user.createdAt),
+  ]);
+
+  const csvContent = [headers, ...rows]
+    .map((row) =>
+      row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","),
+    )
+    .join("\n");
+
+  const blob = new Blob([`\uFEFF${csvContent}`], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "danh-sach-tai-khoan.csv";
+  link.click();
+
+  URL.revokeObjectURL(url);
 }
 
-export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [draftRoleIds, setDraftRoleIds] = useState<string[]>([]);
-  const [draftOverrides, setDraftOverrides] = useState<Record<string, OverrideMode>>({});
-  const [draftStatus, setDraftStatus] = useState(1);
+export default function UsersManagementPage() {
+  const [users, setUsers] = useState<UserAccount[]>(initialUsers);
   const [query, setQuery] = useState("");
-  const [permissionQuery, setPermissionQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<UserRole | undefined>();
+  const [statusFilter, setStatusFilter] = useState<UserStatus | undefined>();
+  const [accountTypeFilter, setAccountTypeFilter] = useState<
+    AccountType | undefined
+  >();
 
-  useEffect(() => {
-    let mounted = true;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
-    Promise.all([getUsers(), getRoles(), getPermissions()])
-      .then(([usersData, rolesData, permissionsData]) => {
-        if (!mounted) return;
-        setUsers(usersData);
-        setRoles(rolesData);
-        setPermissions(permissionsData);
-      })
-      .catch((err) => {
-        if (mounted) setError(getErrorMessage(err));
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+  const [detailUser, setDetailUser] = useState<UserAccount | null>(null);
+  const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+  const [formModalOpen, setFormModalOpen] = useState(false);
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const editingUser = useMemo(
-    () => users.find((user) => user.id === editingUserId) ?? null,
-    [editingUserId, users],
-  );
+  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>({
+    open: false,
+  });
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const filteredUsers = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    if (!keyword) return users;
-    return users.filter((user) =>
-      [user.name, user.email, ...(user.roles ?? []).map((role) => role.name)]
-        .join(" ")
-        .toLowerCase()
-        .includes(keyword),
-    );
-  }, [query, users]);
 
-  const activeUsers = users.filter((user) => user.status === 1).length;
-  const userOverrides = users.reduce((total, user) => total + (user.permissionOverrides?.length ?? 0), 0);
+    return users.filter((user) => {
+      const matchKeyword =
+        !keyword ||
+        user.fullName.toLowerCase().includes(keyword) ||
+        user.email.toLowerCase().includes(keyword) ||
+        user.phone.toLowerCase().includes(keyword);
 
-  const selectedRoles = useMemo(
-    () => roles.filter((role) => draftRoleIds.includes(role.id)),
-    [draftRoleIds, roles],
-  );
+      const matchRole = !roleFilter || user.role === roleFilter;
+      const matchStatus = !statusFilter || user.status === statusFilter;
+      const matchAccountType =
+        !accountTypeFilter || user.accountType === accountTypeFilter;
 
-  const inheritedPermissionIds = useMemo(() => {
-    return new Set(selectedRoles.flatMap((role) => (role.permissions ?? []).map((permission) => permission.id)));
-  }, [selectedRoles]);
-
-  const effectivePermissionIds = useMemo(() => {
-    const ids = new Set(inheritedPermissionIds);
-    Object.entries(draftOverrides).forEach(([permissionId, effect]) => {
-      if (effect === "allow") ids.add(permissionId);
-      if (effect === "deny") ids.delete(permissionId);
+      return matchKeyword && matchRole && matchStatus && matchAccountType;
     });
-    return ids;
-  }, [draftOverrides, inheritedPermissionIds]);
+  }, [users, query, roleFilter, statusFilter, accountTypeFilter]);
 
-  const groupedPermissions = useMemo(() => {
-    const keyword = permissionQuery.trim().toLowerCase();
-    const filtered = keyword
-      ? permissions.filter((permission) => permission.name.toLowerCase().includes(keyword))
-      : permissions;
+  const activeUsers = users.filter((user) => user.status === "active").length;
+  const lockedUsers = users.filter((user) => user.status === "locked").length;
 
-    return filtered.reduce<Record<string, Permission[]>>((acc, permission) => {
-      const group = permissionGroup(permission.name);
-      acc[group] = [...(acc[group] ?? []), permission];
-      return acc;
-    }, {});
-  }, [permissionQuery, permissions]);
+  const createdThisMonth = users.filter((user) => {
+    const createdDate = new Date(user.createdAt);
+    const now = new Date();
 
-  const hasChanges = useMemo(() => {
-    if (!editingUser) return false;
-    const initialRoleIds = toRoleIds(editingUser).sort().join(",");
-    const currentRoleIds = [...draftRoleIds].sort().join(",");
-    const initialOverrides = JSON.stringify(toOverrideDraft(editingUser));
-    const currentOverrides = JSON.stringify(draftOverrides);
-    return initialRoleIds !== currentRoleIds || initialOverrides !== currentOverrides || editingUser.status !== draftStatus;
-  }, [draftOverrides, draftRoleIds, draftStatus, editingUser]);
-
-  function openEditor(user: User) {
-    setEditingUserId(user.id);
-    setDraftRoleIds(toRoleIds(user));
-    setDraftOverrides(toOverrideDraft(user));
-    setDraftStatus(user.status);
-    setPermissionQuery("");
-    setSaveError(null);
-    setNotice(null);
-  }
-
-  function closeEditor() {
-    setEditingUserId(null);
-    setSaveError(null);
-    setNotice(null);
-  }
-
-  function toggleRole(roleId: string) {
-    setDraftRoleIds((current) =>
-      current.includes(roleId) ? current.filter((id) => id !== roleId) : [...current, roleId],
+    return (
+      createdDate.getMonth() === now.getMonth() &&
+      createdDate.getFullYear() === now.getFullYear()
     );
+  }).length;
+
+  function clearFilters() {
+    setQuery("");
+    setRoleFilter(undefined);
+    setStatusFilter(undefined);
+    setAccountTypeFilter(undefined);
+    setCurrentPage(1);
   }
 
-  function setPermissionMode(permissionId: string, mode: OverrideMode) {
-    setDraftOverrides((current) => {
-      const next = { ...current };
-      if (mode === "inherit") {
-        delete next[permissionId];
-      } else {
-        next[permissionId] = mode;
-      }
-      return next;
+  function openCreateModal() {
+    setEditingUser(null);
+    setFormModalOpen(true);
+  }
+
+  function openEditModal(user: UserAccount) {
+    setEditingUser(user);
+    setFormModalOpen(true);
+  }
+
+  function closeFormModal() {
+    setFormModalOpen(false);
+    setEditingUser(null);
+  }
+
+  async function handleSubmitUser(values: UserFormValues) {
+    if (editingUser) {
+      const updatedUser: UserAccount = {
+        ...editingUser,
+        fullName: values.fullName,
+        email: values.email,
+        phone: values.phone,
+        role: values.role,
+        roleLabel: getRoleLabel(values.role),
+        accountType: values.accountType,
+        accountTypeLabel: getAccountTypeLabel(values.accountType),
+        status: values.status,
+      };
+
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === editingUser.id ? updatedUser : user,
+        ),
+      );
+
+      setDetailUser((current) =>
+        current?.id === editingUser.id ? updatedUser : current,
+      );
+
+      closeFormModal();
+
+      Modal.success({
+        title: "Cập nhật tài khoản thành công",
+        content: "Thông tin tài khoản đã được cập nhật.",
+        okText: "Đóng",
+        centered: true,
+      });
+
+      return;
+    }
+
+    const newUser: UserAccount = {
+      id: `U${Date.now()}`,
+      fullName: values.fullName,
+      email: values.email,
+      phone: values.phone,
+      role: values.role,
+      roleLabel: getRoleLabel(values.role),
+      accountType: values.accountType,
+      accountTypeLabel: getAccountTypeLabel(values.accountType),
+      status: values.status,
+      createdAt: new Date().toISOString(),
+      lastLogin: undefined,
+    };
+
+    setUsers((current) => [newUser, ...current]);
+    setCurrentPage(1);
+    closeFormModal();
+
+    Modal.success({
+      title: "Thêm tài khoản thành công",
+      content: "Tài khoản mới đã được thêm vào danh sách.",
+      okText: "Đóng",
+      centered: true,
     });
   }
 
-  async function handleSave() {
-    if (!editingUser) return;
-    setSaving(true);
-    setSaveError(null);
-    setNotice(null);
+  function confirmDeleteUser(user: UserAccount) {
+    setDeleteConfirm({ open: true, mode: "single", user });
+  }
+
+  function confirmDeleteSelected() {
+    if (selectedUserIds.length === 0) return;
+
+    setDeleteConfirm({
+      open: true,
+      mode: "selected",
+      ids: selectedUserIds,
+      count: selectedUserIds.length,
+    });
+  }
+
+  function closeDeleteConfirm() {
+    if (deleteLoading) return;
+
+    setDeleteConfirm({ open: false });
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteConfirm.open) return;
+
+    setDeleteLoading(true);
 
     try {
-      const response = await updateUser(editingUser.id, {
-        status: draftStatus,
-        roleIds: draftRoleIds,
-        permissionOverrides: Object.entries(draftOverrides)
-          .filter(([, effect]) => effect !== "inherit")
-          .map(([permissionId, effect]) => ({ permissionId, effect: effect as UserPermissionEffect })),
-      });
-      const updated = response.data;
+      if (deleteConfirm.mode === "single") {
+        const userId = deleteConfirm.user.id;
 
-      setUsers((current) => current.map((user) => (user.id === updated.id ? updated : user)));
-      setDraftRoleIds(toRoleIds(updated));
-      setDraftOverrides(toOverrideDraft(updated));
-      setDraftStatus(updated.status);
-      setNotice(response.message || "Saved user permissions.");
-    } catch (err) {
-      setSaveError(getErrorMessage(err));
+        setUsers((current) => current.filter((user) => user.id !== userId));
+        setSelectedUserIds((current) =>
+          current.filter((id) => id !== userId),
+        );
+        setDetailUser((current) => (current?.id === userId ? null : current));
+
+        Modal.success({
+          title: "Xóa tài khoản thành công",
+          content: "Tài khoản đã được xóa khỏi danh sách.",
+          okText: "Đóng",
+          centered: true,
+        });
+      } else {
+        const ids = deleteConfirm.ids;
+
+        setUsers((current) => current.filter((user) => !ids.includes(user.id)));
+        setSelectedUserIds([]);
+        setCurrentPage(1);
+        setDetailUser((current) =>
+          current && ids.includes(current.id) ? null : current,
+        );
+
+        Modal.success({
+          title: "Xóa tài khoản thành công",
+          content: "Các tài khoản đã chọn đã được xóa khỏi danh sách.",
+          okText: "Đóng",
+          centered: true,
+        });
+      }
+
+      setDeleteConfirm({ open: false });
     } finally {
-      setSaving(false);
+      setDeleteLoading(false);
     }
   }
 
-  function handleReset() {
-    if (!editingUser) return;
-    setDraftRoleIds(toRoleIds(editingUser));
-    setDraftOverrides(toOverrideDraft(editingUser));
-    setDraftStatus(editingUser.status);
-    setSaveError(null);
-    setNotice(null);
-  }
+  const columns: ColumnsType<UserAccount> = [
+    {
+      title: "STT",
+      width: 64,
+      align: "center",
+      render: (_value, _record, index) =>
+        (currentPage - 1) * PAGE_SIZE + index + 1,
+    },
+    {
+      title: "Họ tên",
+      dataIndex: "fullName",
+      render: (fullName: string) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
+            <UserRound className="h-4 w-4" />
+          </span>
+
+          <Text strong className="block truncate text-slate-900">
+            {fullName}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: "Email",
+      dataIndex: "email",
+      ellipsis: true,
+      render: (email: string) => (
+        <Text className="block truncate text-slate-600">{email}</Text>
+      ),
+    },
+    {
+      title: "Số điện thoại",
+      dataIndex: "phone",
+      width: 128,
+      align: "center",
+      responsive: ["xl"],
+    },
+    {
+      title: "Vai trò",
+      dataIndex: "roleLabel",
+      width: 118,
+      align: "center",
+      render: (roleLabel: string, record) => (
+        <Tag color={getRoleColor(record.role)}>{roleLabel}</Tag>
+      ),
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      width: 126,
+      align: "center",
+      render: (status: UserStatus) =>
+        status === "active" ? (
+          <Tag color="green">Hoạt động</Tag>
+        ) : (
+          <Tag color="default">Đã khóa</Tag>
+        ),
+    },
+    {
+      title: "Ngày tạo",
+      dataIndex: "createdAt",
+      width: 118,
+      align: "center",
+      responsive: ["lg"],
+      render: (createdAt: string) => formatDate(createdAt),
+    },
+    {
+      title: "Thao tác",
+      key: "actions",
+      width: 146,
+      align: "center",
+      render: (_value, record) => (
+        <Space size={6}>
+          <Button
+            title="Xem chi tiết"
+            icon={<Eye className="h-4 w-4" />}
+            onClick={(event) => {
+              event.stopPropagation();
+              setDetailUser(record);
+            }}
+          />
+
+          <Button
+            title="Sửa"
+            icon={<Pencil className="h-4 w-4" />}
+            onClick={(event) => {
+              event.stopPropagation();
+              openEditModal(record);
+            }}
+          />
+
+          <Button
+            danger
+            title="Xóa"
+            icon={<Trash2 className="h-4 w-4" />}
+            onClick={(event) => {
+              event.stopPropagation();
+              confirmDeleteUser(record);
+            }}
+          />
+        </Space>
+      ),
+    },
+  ];
 
   return (
     <AdminLayout permissions={["user.view"]}>
-      <PageHeader title="Users" description="Quản lý role và override permission riêng cho từng user." />
+      <PageHeader
+        title="User Management"
+        description="Quản lý tài khoản người dùng trong hệ thống."
+      />
 
-      {loading ? <StateBlock type="loading" title="Đang tải dữ liệu phân quyền" /> : null}
-      {error ? <StateBlock type="error" title="Không tải được users" description={error} /> : null}
-      {!loading && !error && users.length === 0 ? <StateBlock type="empty" title="Chưa có user nào" /> : null}
+      <div className="mt-6 space-y-5">
+        <Card className="border-slate-200 bg-white">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="mb-1 text-sm font-semibold uppercase text-sky-700">
+                Management
+              </p>
 
-      {!loading && !error && users.length > 0 ? (
-        <div className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border-slate-200 bg-white">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-slate-500">Total Users</p>
-                  <p className="mt-2 text-3xl font-semibold text-slate-950">{users.length}</p>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-                  <Users className="h-5 w-5" aria-hidden="true" />
-                </div>
-              </div>
-            </Card>
-            <Card className="border-emerald-100 bg-emerald-50/60">
-              <p className="text-sm text-emerald-700">Active Accounts</p>
-              <p className="mt-2 text-3xl font-semibold text-emerald-950">{activeUsers}</p>
-            </Card>
-            <Card className="border-blue-100 bg-blue-50/60">
-              <p className="text-sm text-blue-700">User Overrides</p>
-              <p className="mt-2 text-3xl font-semibold text-blue-950">{userOverrides}</p>
-            </Card>
+              <Title level={3} className="!mb-0 !text-slate-950">
+                Quản lý tài khoản người dùng
+              </Title>
+
+              <Text className="text-slate-500">
+                Theo dõi, tìm kiếm và kiểm tra thông tin tài khoản trong hệ
+                thống.
+              </Text>
+            </div>
+
+            <Button
+              size="large"
+              icon={<Download className="h-4 w-4" />}
+              onClick={() => exportUsersToCsv(filteredUsers)}
+            >
+              Xuất danh sách
+            </Button>
           </div>
+        </Card>
 
-          <Card className="overflow-hidden p-0">
-            <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <CardTitle>User Directory</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">Bấm Configure để mở modal phân quyền.</p>
-              </div>
-              <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-white px-3 lg:w-96">
-                <Search className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search user, email, role"
-                  className="h-10 min-w-0 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400"
-                />
-              </div>
-            </div>
+        <Card className="border-slate-200 bg-white">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_165px_165px_180px_auto]">
+            <Input
+              size="large"
+              allowClear
+              value={query}
+              prefix={<Search className="h-4 w-4 text-slate-400" />}
+              placeholder="Tìm theo tên/email/SĐT"
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setCurrentPage(1);
+              }}
+            />
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px] text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">User</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Roles</th>
-                    <th className="px-4 py-3 font-medium">Overrides</th>
-                    <th className="px-4 py-3 font-medium">Created</th>
-                    <th className="px-4 py-3 text-right font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="bg-white transition hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-900 text-sm font-semibold text-white">
-                            {user.name.slice(0, 1).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-slate-950">{user.name}</p>
-                            <p className="truncate text-xs text-slate-500">{user.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge tone={user.status === 1 ? "green" : "neutral"}>{user.status === 1 ? "Active" : "Inactive"}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1.5">
-                          {(user.roles ?? []).slice(0, 3).map((role) => (
-                            <Badge key={role.id}>{role.name}</Badge>
-                          ))}
-                          {(user.roles?.length ?? 0) > 3 ? <Badge>+{user.roles.length - 3}</Badge> : null}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{user.permissionOverrides?.length ?? 0}</td>
-                      <td className="px-4 py-3 text-slate-600">{formatDate(user.createdAt)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end">
-                          <Button variant="secondary" onClick={() => openEditor(user)}>
-                            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                            Configure
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Select
+              size="large"
+              allowClear
+              value={roleFilter}
+              placeholder="Vai trò"
+              options={roleOptions}
+              onChange={(value: UserRole | undefined) => {
+                setRoleFilter(value);
+                setCurrentPage(1);
+              }}
+            />
+
+            <Select
+              size="large"
+              allowClear
+              value={statusFilter}
+              placeholder="Trạng thái"
+              options={statusOptions}
+              onChange={(value: UserStatus | undefined) => {
+                setStatusFilter(value);
+                setCurrentPage(1);
+              }}
+            />
+
+            <Select
+              size="large"
+              allowClear
+              value={accountTypeFilter}
+              placeholder="Loại tài khoản"
+              options={accountTypeOptions}
+              onChange={(value: AccountType | undefined) => {
+                setAccountTypeFilter(value);
+                setCurrentPage(1);
+              }}
+            />
+
+            <Button size="large" onClick={clearFilters}>
+              Xóa bộ lọc
+            </Button>
+          </div>
+        </Card>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-slate-200 bg-white">
+            <Statistic
+              title={<span className="text-slate-500">Tổng tài khoản</span>}
+              value={users.length}
+              formatter={(value) => (
+                <span className="text-slate-950">{value}</span>
+              )}
+            />
+          </Card>
+
+          <Card className="border-emerald-100 bg-emerald-50/60">
+            <Statistic
+              title={<span className="text-emerald-700">Đang hoạt động</span>}
+              value={activeUsers}
+              formatter={(value) => (
+                <span className="text-emerald-950">{value}</span>
+              )}
+            />
+          </Card>
+
+          <Card className="border-red-100 bg-red-50/60">
+            <Statistic
+              title={<span className="text-red-700">Đã khóa</span>}
+              value={lockedUsers}
+              formatter={(value) => (
+                <span className="text-red-950">{value}</span>
+              )}
+            />
+          </Card>
+
+          <Card className="border-sky-100 bg-sky-50/60">
+            <Statistic
+              title={<span className="text-sky-700">Tạo mới tháng này</span>}
+              value={createdThisMonth}
+              formatter={(value) => (
+                <span className="text-sky-950">{value}</span>
+              )}
+            />
           </Card>
         </div>
-      ) : null}
+
+        <Card
+          className="overflow-hidden border-slate-200 bg-white"
+          styles={{ body: { padding: 0 } }}
+          title={
+            <div>
+              <p className="mb-0 text-base font-semibold text-slate-950">
+                Danh sách tài khoản
+              </p>
+              <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
+                Chọn nhiều tài khoản để xóa hoặc thao tác từng tài khoản.
+              </p>
+            </div>
+          }
+          extra={
+            <Space wrap>
+              <Button
+                danger
+                disabled={selectedUserIds.length === 0}
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={confirmDeleteSelected}
+              >
+                Xóa đã chọn
+                {selectedUserIds.length > 0
+                  ? ` (${selectedUserIds.length})`
+                  : ""}
+              </Button>
+
+              <Button
+                type="primary"
+                icon={<Plus className="h-4 w-4" />}
+                onClick={openCreateModal}
+              >
+                Thêm tài khoản
+              </Button>
+            </Space>
+          }
+        >
+          <Table
+            rowKey="id"
+            size="middle"
+            tableLayout="fixed"
+            columns={columns}
+            dataSource={filteredUsers}
+            className="[&_.ant-table-cell]:px-3"
+            rowSelection={{
+              selectedRowKeys: selectedUserIds,
+              onChange: (selectedRowKeys) => {
+                setSelectedUserIds(selectedRowKeys.map(String));
+              },
+            }}
+            onRow={(record) => ({
+              className: "cursor-pointer",
+              onClick: (event) => {
+                const target = event.target as HTMLElement;
+
+                if (
+                  target.closest("button") ||
+                  target.closest("a") ||
+                  target.closest(".ant-checkbox") ||
+                  target.closest(".ant-checkbox-wrapper")
+                ) {
+                  return;
+                }
+
+                setDetailUser(record);
+              },
+            })}
+            pagination={{
+              current: currentPage,
+              pageSize: PAGE_SIZE,
+              total: filteredUsers.length,
+              showSizeChanger: false,
+              showTotal: (total, range) =>
+                `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} tài khoản`,
+              onChange: (page) => setCurrentPage(page),
+            }}
+          />
+        </Card>
+      </div>
+
+      <UserAccountFormModal
+        open={formModalOpen}
+        editingUser={editingUser}
+        onClose={closeFormModal}
+        onSubmit={handleSubmitUser}
+      />
 
       <Modal
-        open={Boolean(editingUser)}
-        title={editingUser ? `Configure ${editingUser.name}` : "Configure user"}
-        description={editingUser?.email}
-        onClose={closeEditor}
+        open={Boolean(detailUser)}
+        width={760}
+        centered
+        title={null}
         footer={
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-              <Badge tone="green">{effectivePermissionIds.size} effective</Badge>
-              <Badge>{inheritedPermissionIds.size} inherited</Badge>
-              <Badge tone="blue">{Object.keys(draftOverrides).length} overrides</Badge>
-              {notice ? <Badge tone="green">{notice}</Badge> : null}
-              {saveError ? <span className="text-red-600">{saveError}</span> : null}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="ghost" onClick={closeEditor} disabled={saving}>
-                Cancel
-              </Button>
-              <Button variant="secondary" onClick={handleReset} disabled={!hasChanges || saving}>
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                Reset
-              </Button>
-              <Button onClick={handleSave} disabled={!hasChanges || saving}>
-                <Save className="h-4 w-4" aria-hidden="true" />
-                {saving ? "Saving" : "Save"}
-              </Button>
-            </div>
+          <div className="flex justify-end border-t border-slate-200 pt-3">
+            <Button
+              type="primary"
+              icon={<X className="h-4 w-4" />}
+              onClick={() => setDetailUser(null)}
+            >
+              Đóng
+            </Button>
           </div>
         }
+        onCancel={() => setDetailUser(null)}
+        mask={{ closable: true }}
       >
-        {editingUser ? (
-          <div className="grid min-h-[620px] lg:grid-cols-[310px_minmax(0,1fr)]">
-            <aside className="border-b border-border bg-slate-50 p-5 lg:border-b-0 lg:border-r">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-900 text-base font-semibold text-white">
-                  {editingUser.name.slice(0, 1).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-950">{editingUser.name}</p>
-                  <p className="truncate text-sm text-slate-500">{editingUser.email}</p>
-                </div>
+        {detailUser ? (
+          <div>
+            <div className="mb-5 flex items-start gap-4 border-b border-slate-200 pb-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                <UserRound className="h-6 w-6" />
               </div>
 
-              <div className="mt-6">
-                <p className="text-sm font-semibold text-slate-950">Account Status</p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {[1, 0].map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => setDraftStatus(status)}
-                      className={cn(
-                        "flex h-10 items-center justify-center rounded-md border text-sm font-medium transition",
-                        draftStatus === status
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-border bg-white text-slate-700 hover:bg-slate-100",
-                      )}
-                    >
-                      {status === 1 ? "Active" : "Inactive"}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <div className="min-w-0">
+                <Title level={3} className="!mb-1 !text-slate-950">
+                  {detailUser.fullName}
+                </Title>
 
-              <div className="mt-6">
-                <div className="mb-3 flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-slate-500" aria-hidden="true" />
-                  <p className="text-sm font-semibold text-slate-950">Roles</p>
-                </div>
-                <div className="space-y-2">
-                  {roles.map((role) => {
-                    const checked = draftRoleIds.includes(role.id);
-                    return (
-                      <label
-                        key={role.id}
-                        className={cn(
-                          "flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm transition",
-                          checked ? "border-slate-900 bg-slate-900 text-white" : "border-border bg-white text-slate-700 hover:bg-slate-100",
-                        )}
-                      >
-                        <span className="min-w-0 truncate">{role.name}</span>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleRole(role.id)}
-                          className="h-4 w-4 accent-slate-900"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+                <Space size={8} wrap>
+                  <Tag color={getRoleColor(detailUser.role)}>
+                    {detailUser.roleLabel}
+                  </Tag>
 
-              <div className="mt-6 rounded-md border border-border bg-white p-4">
-                <p className="text-xs font-medium uppercase text-slate-500">Effective Access</p>
-                <p className="mt-2 text-3xl font-semibold text-slate-950">{effectivePermissionIds.size}</p>
-                <p className="text-sm text-slate-500">permissions after role + user overrides</p>
-              </div>
-            </aside>
+                  {detailUser.status === "active" ? (
+                    <Tag color="green">Hoạt động</Tag>
+                  ) : (
+                    <Tag color="default">Đã khóa</Tag>
+                  )}
 
-            <section className="min-w-0 p-5">
-              <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">Permission Overrides</p>
-                  <p className="text-sm text-slate-500">Inherit theo role, allow để thêm quyền, deny để tắt quyền riêng.</p>
-                </div>
-                <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-white px-3 lg:w-80">
-                  <Search className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                  <input
-                    value={permissionQuery}
-                    onChange={(event) => setPermissionQuery(event.target.value)}
-                    placeholder="Search permission"
-                    className="h-10 min-w-0 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400"
-                  />
-                </div>
+                  <Tag>{detailUser.accountTypeLabel}</Tag>
+                </Space>
               </div>
+            </div>
 
-              <div className="space-y-4">
-                {Object.entries(groupedPermissions).map(([group, groupPermissions]) => (
-                  <div key={group} className="overflow-hidden rounded-md border border-border">
-                    <div className="flex items-center justify-between bg-slate-50 px-3 py-2">
-                      <p className="text-xs font-semibold uppercase text-slate-500">{group}</p>
-                      <Badge>{groupPermissions.length} items</Badge>
-                    </div>
-                    <div className="divide-y divide-border">
-                      {groupPermissions.map((permission) => {
-                        const inherited = inheritedPermissionIds.has(permission.id);
-                        const mode = draftOverrides[permission.id] ?? "inherit";
-                        const effective = effectivePermissionIds.has(permission.id);
+            <Descriptions
+              bordered
+              column={2}
+              size="middle"
+              styles={{
+                label: {
+                  width: 160,
+                  fontWeight: 600,
+                },
+              }}
+            >
+              <Descriptions.Item label="Mã tài khoản" span={1}>
+                {detailUser.id}
+              </Descriptions.Item>
 
-                        return (
-                          <div
-                            key={permission.id}
-                            className="grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-slate-950">{permission.name}</p>
-                              <p className="text-xs text-slate-500">
-                                {permission.guardName}
-                                {inherited ? " · inherited" : ""}
-                              </p>
-                            </div>
-                            <Badge tone={effective ? "green" : "neutral"}>{effective ? "Enabled" : "Disabled"}</Badge>
-                            <div className="grid grid-cols-3 overflow-hidden rounded-md border border-border text-xs font-medium">
-                              {(["inherit", "allow", "deny"] as OverrideMode[]).map((item) => (
-                                <button
-                                  key={item}
-                                  type="button"
-                                  title={item === "inherit" && inherited ? "Inherited from selected roles" : item}
-                                  onClick={() => setPermissionMode(permission.id, item)}
-                                  className={cn(
-                                    "flex h-8 min-w-16 items-center justify-center gap-1 px-2 capitalize transition",
-                                    mode === item
-                                      ? item === "deny"
-                                        ? "bg-red-600 text-white"
-                                        : item === "allow"
-                                          ? "bg-emerald-600 text-white"
-                                          : "bg-slate-900 text-white"
-                                      : "bg-white text-slate-600 hover:bg-slate-50",
-                                  )}
-                                >
-                                  {item === "allow" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                                  {item === "deny" ? <Ban className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                                  {item}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+              <Descriptions.Item label="Họ tên" span={1}>
+                {detailUser.fullName}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Email" span={1}>
+                {detailUser.email}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Số điện thoại" span={1}>
+                {detailUser.phone}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Vai trò" span={1}>
+                <Tag color={getRoleColor(detailUser.role)}>
+                  {detailUser.roleLabel}
+                </Tag>
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Loại tài khoản" span={1}>
+                {detailUser.accountTypeLabel}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Trạng thái" span={1}>
+                {detailUser.status === "active" ? (
+                  <Tag color="green">Hoạt động</Tag>
+                ) : (
+                  <Tag color="default">Đã khóa</Tag>
+                )}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Ngày tạo" span={1}>
+                <Space size={6}>
+                  <CalendarClock className="h-4 w-4 text-slate-400" />
+                  {formatDateTime(detailUser.createdAt)}
+                </Space>
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Đăng nhập gần nhất" span={1}>
+                {formatDateTime(detailUser.lastLogin)}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Bảo mật" span={1}>
+                <Space size={6}>
+                  {detailUser.status === "locked" ? (
+                    <Lock className="h-4 w-4 text-slate-400" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                  )}
+                  {detailUser.status === "locked"
+                    ? "Tài khoản đang bị khóa"
+                    : "Tài khoản đang hoạt động bình thường"}
+                </Space>
+              </Descriptions.Item>
+            </Descriptions>
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={deleteConfirm.open}
+        centered
+        width={456}
+        title={null}
+        footer={null}
+        closable={false}
+        onCancel={closeDeleteConfirm}
+        mask={{ closable: !deleteLoading }}
+        className="[&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-[14px] [&_.ant-modal-content]:p-0"
+        styles={{
+          body: {
+            padding: 0,
+          },
+        }}
+      >
+        <div className="relative px-6 pb-6 pt-7 text-center">
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={closeDeleteConfirm}
+            disabled={deleteLoading}
+            className="absolute right-3 top-3 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+            <Trash2 className="h-7 w-7 text-red-600" />
+          </div>
+
+          <h3 className="mt-5 text-lg font-bold text-slate-950">
+            {deleteConfirm.open && deleteConfirm.mode === "selected"
+              ? "Xóa tài khoản đã chọn"
+              : "Xóa tài khoản"}
+          </h3>
+
+          <p className="mt-2 text-sm text-slate-500">
+            {deleteConfirm.open && deleteConfirm.mode === "selected"
+              ? `Bạn có chắc chắn muốn xóa ${deleteConfirm.count} tài khoản đã chọn không?`
+              : "Bạn có chắc chắn muốn xóa tài khoản này không?"}
+          </p>
+
+          {deleteConfirm.open && deleteConfirm.mode === "single" ? (
+            <p className="mx-auto mt-2 max-w-[340px] truncate text-sm font-semibold text-slate-800">
+              {deleteConfirm.user.fullName} - {deleteConfirm.user.email}
+            </p>
+          ) : null}
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button
+              size="large"
+              onClick={closeDeleteConfirm}
+              disabled={deleteLoading}
+              className="h-11 rounded-lg font-semibold"
+            >
+              Hủy
+            </Button>
+
+            <Button
+              danger
+              type="primary"
+              size="large"
+              loading={deleteLoading}
+              onClick={handleConfirmDelete}
+              className="h-11 rounded-lg font-semibold"
+            >
+              Xóa
+            </Button>
+          </div>
+        </div>
       </Modal>
     </AdminLayout>
   );
