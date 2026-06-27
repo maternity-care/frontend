@@ -29,6 +29,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
@@ -54,6 +55,7 @@ import type {
 } from "./components/UserAccountFormModal";
 
 const { Text, Title } = Typography;
+const USER_MESSAGES = RESPONSE_MESSAGES.USER_MANAGEMENT;
 
 type DeleteConfirmState =
   | { open: false }
@@ -96,11 +98,11 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
+  return USER_MESSAGES.DEFAULT_ERROR;
 }
 
 function formatDate(value?: string) {
-  if (!value) return "Chưa cập nhật";
+  if (!value) return USER_MESSAGES.NOT_UPDATED;
 
   const date = new Date(value);
 
@@ -114,7 +116,7 @@ function formatDate(value?: string) {
 }
 
 function formatDateTime(value?: string) {
-  if (!value) return "Chưa cập nhật";
+  if (!value) return USER_MESSAGES.NOT_UPDATED;
 
   const date = new Date(value);
 
@@ -130,17 +132,17 @@ function formatDateTime(value?: string) {
 }
 
 function formatBackendRoleLabel(roleName?: string) {
-  if (!roleName) return "Chưa phân quyền";
+  if (!roleName) return USER_MESSAGES.NOT_ASSIGNED;
 
   const roleLabelMap: Record<string, string> = {
-    super_admin: "Super Admin",
-    admin: "Admin",
-    doctor: "Bác sĩ",
-    nurse: "Điều dưỡng",
-    staff: "Staff",
-    member: "Thai phụ",
-    partner: "Partner",
-    owner: "Owner",
+    super_admin: USER_MESSAGES.ROLES.SUPER_ADMIN,
+    admin: USER_MESSAGES.ROLES.ADMIN,
+    doctor: USER_MESSAGES.ROLES.DOCTOR,
+    nurse: USER_MESSAGES.ROLES.NURSE,
+    staff: USER_MESSAGES.ROLES.STAFF,
+    member: USER_MESSAGES.ROLES.MEMBER,
+    partner: USER_MESSAGES.ROLES.PARTNER,
+    owner: USER_MESSAGES.ROLES.OWNER,
   };
 
   return (
@@ -181,6 +183,10 @@ function toBackendStatus(status?: UserStatus) {
 
 function toUiStatus(status: number): UserStatus {
   return status === 1 ? "active" : "locked";
+}
+
+function getStatusText(status: UserStatus) {
+  return status === "active" ? USER_MESSAGES.ACTIVE : USER_MESSAGES.LOCKED;
 }
 
 function deriveAccountType(roleName?: string): AccountType {
@@ -239,23 +245,23 @@ function buildSearchParams(query: string) {
 
 function exportUsersToCsv(users: UserAccount[]) {
   const headers = [
-    "STT",
-    "Họ tên",
-    "Email",
-    "Số điện thoại",
-    "Vai trò",
-    "Trạng thái",
-    "Loại tài khoản",
-    "Ngày tạo",
+    USER_MESSAGES.STT,
+    RESPONSE_MESSAGES.COMMON.NAME,
+    RESPONSE_MESSAGES.COMMON.EMAIL,
+    RESPONSE_MESSAGES.COMMON.PHONE,
+    RESPONSE_MESSAGES.COMMON.ROLE,
+    RESPONSE_MESSAGES.COMMON.STATUS,
+    USER_MESSAGES.ACCOUNT_TYPE,
+    RESPONSE_MESSAGES.COMMON.CREATED_AT,
   ];
 
   const rows = users.map((user, index) => [
     index + 1,
     user.fullName,
     user.email,
-    user.phone || "Chưa cập nhật",
+    user.phone || USER_MESSAGES.NOT_UPDATED,
     user.roleLabel,
-    user.status === "active" ? "Hoạt động" : "Đã khóa",
+    getStatusText(user.status),
     user.accountTypeLabel,
     formatDate(user.createdAt),
   ]);
@@ -274,7 +280,7 @@ function exportUsersToCsv(users: UserAccount[]) {
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = "danh-sach-tai-khoan.csv";
+  link.download = USER_MESSAGES.CSV_FILENAME;
   link.click();
 
   URL.revokeObjectURL(url);
@@ -444,9 +450,9 @@ export default function UsersManagementPage() {
         setDetailUser((current) => (current?.id === userId ? null : current));
 
         Modal.success({
-          title: "Xóa tài khoản thành công",
-          content: "Tài khoản đã được xóa khỏi danh sách.",
-          okText: "Đóng",
+          title: USER_MESSAGES.DELETE_SUCCESS_TITLE,
+          content: USER_MESSAGES.DELETE_SINGLE_SUCCESS_CONTENT,
+          okText: RESPONSE_MESSAGES.COMMON.CLOSE,
           centered: true,
         });
       } else {
@@ -463,9 +469,9 @@ export default function UsersManagementPage() {
         );
 
         Modal.success({
-          title: "Xóa tài khoản thành công",
-          content: "Các tài khoản đã chọn đã được xóa khỏi danh sách.",
-          okText: "Đóng",
+          title: USER_MESSAGES.DELETE_SUCCESS_TITLE,
+          content: USER_MESSAGES.DELETE_SELECTED_SUCCESS_CONTENT,
+          okText: RESPONSE_MESSAGES.COMMON.CLOSE,
           centered: true,
         });
       }
@@ -477,9 +483,9 @@ export default function UsersManagementPage() {
       setError(message);
 
       Modal.error({
-        title: "Xóa tài khoản thất bại",
+        title: USER_MESSAGES.DELETE_ERROR_TITLE,
         content: message,
-        okText: "Đóng",
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
         centered: true,
       });
     } finally {
@@ -490,14 +496,14 @@ export default function UsersManagementPage() {
 
   const columns: ColumnsType<UserAccount> = [
     {
-      title: "STT",
+      title: USER_MESSAGES.STT,
       width: 64,
       align: "center",
       render: (_value, _record, index) =>
         (currentPage - 1) * PAGE_SIZE + index + 1,
     },
     {
-      title: "Họ tên",
+      title: RESPONSE_MESSAGES.COMMON.NAME,
       dataIndex: "fullName",
       render: (fullName: string) => (
         <div className="flex min-w-0 items-center gap-3">
@@ -512,7 +518,7 @@ export default function UsersManagementPage() {
       ),
     },
     {
-      title: "Email",
+      title: RESPONSE_MESSAGES.COMMON.EMAIL,
       dataIndex: "email",
       ellipsis: true,
       render: (email: string) => (
@@ -520,15 +526,15 @@ export default function UsersManagementPage() {
       ),
     },
     {
-      title: "Số điện thoại",
+      title: RESPONSE_MESSAGES.COMMON.PHONE,
       dataIndex: "phone",
       width: 128,
       align: "center",
       responsive: ["xl"],
-      render: (phone: string) => phone || "Chưa cập nhật",
+      render: (phone: string) => phone || USER_MESSAGES.NOT_UPDATED,
     },
     {
-      title: "Vai trò",
+      title: RESPONSE_MESSAGES.COMMON.ROLE,
       dataIndex: "roleLabel",
       width: 130,
       align: "center",
@@ -537,19 +543,19 @@ export default function UsersManagementPage() {
       ),
     },
     {
-      title: "Trạng thái",
+      title: RESPONSE_MESSAGES.COMMON.STATUS,
       dataIndex: "status",
       width: 126,
       align: "center",
       render: (status: UserStatus) =>
         status === "active" ? (
-          <Tag color="green">Hoạt động</Tag>
+          <Tag color="green">{USER_MESSAGES.ACTIVE}</Tag>
         ) : (
-          <Tag color="default">Đã khóa</Tag>
+          <Tag color="default">{USER_MESSAGES.LOCKED}</Tag>
         ),
     },
     {
-      title: "Ngày tạo",
+      title: RESPONSE_MESSAGES.COMMON.CREATED_AT,
       dataIndex: "createdAt",
       width: 118,
       align: "center",
@@ -557,14 +563,14 @@ export default function UsersManagementPage() {
       render: (createdAt: string) => formatDate(createdAt),
     },
     {
-      title: "Thao tác",
+      title: RESPONSE_MESSAGES.COMMON.ACTIONS,
       key: "actions",
       width: 146,
       align: "center",
       render: (_value, record) => (
         <Space size={6}>
           <Button
-            title="Xem chi tiết"
+            title={USER_MESSAGES.VIEW_DETAIL}
             icon={<Eye className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
@@ -573,7 +579,7 @@ export default function UsersManagementPage() {
           />
 
           <Button
-            title="Sửa"
+            title={USER_MESSAGES.EDIT_ACCOUNT}
             icon={<Pencil className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
@@ -583,7 +589,7 @@ export default function UsersManagementPage() {
 
           <Button
             danger
-            title="Xóa"
+            title={USER_MESSAGES.DELETE_ACCOUNT}
             icon={<Trash2 className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
@@ -598,8 +604,8 @@ export default function UsersManagementPage() {
   return (
     <AdminLayout permissions={["user.view"]}>
       <PageHeader
-        title="User Management"
-        description="Quản lý tài khoản người dùng trong hệ thống."
+        title={USER_MESSAGES.PAGE_TITLE}
+        description={USER_MESSAGES.PAGE_DESCRIPTION}
       />
 
       <div className="mt-6 space-y-5">
@@ -617,16 +623,15 @@ export default function UsersManagementPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="mb-1 text-sm font-semibold uppercase text-sky-700">
-                Management
+                {USER_MESSAGES.MANAGEMENT}
               </p>
 
               <Title level={3} className="!mb-0 !text-slate-950">
-                Quản lý tài khoản người dùng
+                {USER_MESSAGES.TITLE}
               </Title>
 
               <Text className="text-slate-500">
-                Theo dõi, tìm kiếm và kiểm tra thông tin tài khoản trong hệ
-                thống.
+                {USER_MESSAGES.DESCRIPTION}
               </Text>
             </div>
 
@@ -635,7 +640,7 @@ export default function UsersManagementPage() {
               icon={<Download className="h-4 w-4" />}
               onClick={() => exportUsersToCsv(filteredUsers)}
             >
-              Xuất danh sách
+              {USER_MESSAGES.EXPORT_LIST}
             </Button>
           </div>
         </Card>
@@ -647,7 +652,7 @@ export default function UsersManagementPage() {
               allowClear
               value={query}
               prefix={<Search className="h-4 w-4 text-slate-400" />}
-              placeholder="Tìm theo tên/email/SĐT"
+              placeholder={USER_MESSAGES.SEARCH_PLACEHOLDER}
               onChange={(event) => {
                 setQuery(event.target.value);
                 setCurrentPage(1);
@@ -658,7 +663,7 @@ export default function UsersManagementPage() {
               size="large"
               allowClear
               value={roleFilter}
-              placeholder="Vai trò"
+              placeholder={USER_MESSAGES.ROLE_PLACEHOLDER}
               options={roleOptions}
               onChange={(value: UserRole | undefined) => {
                 setRoleFilter(value);
@@ -670,7 +675,7 @@ export default function UsersManagementPage() {
               size="large"
               allowClear
               value={statusFilter}
-              placeholder="Trạng thái"
+              placeholder={USER_MESSAGES.STATUS_PLACEHOLDER}
               options={statusOptions}
               onChange={(value: UserStatus | undefined) => {
                 setStatusFilter(value);
@@ -682,7 +687,7 @@ export default function UsersManagementPage() {
               size="large"
               allowClear
               value={accountTypeFilter}
-              placeholder="Loại tài khoản"
+              placeholder={USER_MESSAGES.ACCOUNT_TYPE_PLACEHOLDER}
               options={accountTypeOptions}
               onChange={(value: AccountType | undefined) => {
                 setAccountTypeFilter(value);
@@ -691,7 +696,7 @@ export default function UsersManagementPage() {
             />
 
             <Button size="large" onClick={clearFilters}>
-              Xóa bộ lọc
+              {USER_MESSAGES.CLEAR_FILTERS}
             </Button>
           </div>
         </Card>
@@ -699,7 +704,7 @@ export default function UsersManagementPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="border-slate-200 bg-white">
             <Statistic
-              title={<span className="text-slate-500">Tổng tài khoản</span>}
+              title={<span className="text-slate-500">{USER_MESSAGES.TOTAL_ACCOUNTS}</span>}
               value={totalUsers}
               formatter={(value) => (
                 <span className="text-slate-950">{value}</span>
@@ -709,7 +714,7 @@ export default function UsersManagementPage() {
 
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title={<span className="text-emerald-700">Đang hoạt động</span>}
+              title={<span className="text-emerald-700">{USER_MESSAGES.ACTIVE_ACCOUNTS}</span>}
               value={activeUsers}
               formatter={(value) => (
                 <span className="text-emerald-950">{value}</span>
@@ -719,7 +724,7 @@ export default function UsersManagementPage() {
 
           <Card className="border-red-100 bg-red-50/60">
             <Statistic
-              title={<span className="text-red-700">Đã khóa</span>}
+              title={<span className="text-red-700">{USER_MESSAGES.LOCKED_ACCOUNTS}</span>}
               value={lockedUsers}
               formatter={(value) => (
                 <span className="text-red-950">{value}</span>
@@ -729,7 +734,7 @@ export default function UsersManagementPage() {
 
           <Card className="border-sky-100 bg-sky-50/60">
             <Statistic
-              title={<span className="text-sky-700">Tạo mới tháng này</span>}
+              title={<span className="text-sky-700">{USER_MESSAGES.CREATED_THIS_MONTH}</span>}
               value={createdThisMonth}
               formatter={(value) => (
                 <span className="text-sky-950">{value}</span>
@@ -744,10 +749,10 @@ export default function UsersManagementPage() {
           title={
             <div>
               <p className="mb-0 text-base font-semibold text-slate-950">
-                Danh sách tài khoản
+                {USER_MESSAGES.LIST_TITLE}
               </p>
               <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Chọn nhiều tài khoản để xóa hoặc thao tác từng tài khoản.
+                {USER_MESSAGES.LIST_DESCRIPTION}
               </p>
             </div>
           }
@@ -759,7 +764,7 @@ export default function UsersManagementPage() {
                 icon={<Trash2 className="h-4 w-4" />}
                 onClick={confirmDeleteSelected}
               >
-                Xóa đã chọn
+                {USER_MESSAGES.DELETE_SELECTED}
                 {selectedUserIds.length > 0
                   ? ` (${selectedUserIds.length})`
                   : ""}
@@ -770,7 +775,7 @@ export default function UsersManagementPage() {
                 icon={<Plus className="h-4 w-4" />}
                 onClick={openCreateModal}
               >
-                Thêm tài khoản
+                {USER_MESSAGES.ADD_ACCOUNT}
               </Button>
             </Space>
           }
@@ -812,7 +817,7 @@ export default function UsersManagementPage() {
               total: filteredUsers.length,
               showSizeChanger: false,
               showTotal: (total, range) =>
-                `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} tài khoản`,
+                `${USER_MESSAGES.PAGINATION_TOTAL_PREFIX} ${range[0]} - ${range[1]} ${USER_MESSAGES.PAGINATION_TOTAL_MIDDLE} ${total} ${USER_MESSAGES.PAGINATION_TOTAL_SUFFIX}`,
               onChange: (page) => setCurrentPage(page),
             }}
           />
@@ -855,7 +860,7 @@ export default function UsersManagementPage() {
               icon={<X className="h-4 w-4" />}
               onClick={() => setDetailUser(null)}
             >
-              Đóng
+              {RESPONSE_MESSAGES.COMMON.CLOSE}
             </Button>
           </div>
         }
@@ -880,9 +885,9 @@ export default function UsersManagementPage() {
                   </Tag>
 
                   {detailUser.status === "active" ? (
-                    <Tag color="green">Hoạt động</Tag>
+                    <Tag color="green">{USER_MESSAGES.ACTIVE}</Tag>
                   ) : (
-                    <Tag color="default">Đã khóa</Tag>
+                    <Tag color="default">{USER_MESSAGES.LOCKED}</Tag>
                   )}
 
                   <Tag>{detailUser.accountTypeLabel}</Tag>
@@ -901,52 +906,52 @@ export default function UsersManagementPage() {
                 },
               }}
             >
-              <Descriptions.Item label="Mã tài khoản" span={1}>
+              <Descriptions.Item label={USER_MESSAGES.ACCOUNT_ID} span={1}>
                 {detailUser.id}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Họ tên" span={1}>
+              <Descriptions.Item label={RESPONSE_MESSAGES.COMMON.NAME} span={1}>
                 {detailUser.fullName}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Email" span={1}>
+              <Descriptions.Item label={RESPONSE_MESSAGES.COMMON.EMAIL} span={1}>
                 {detailUser.email}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Số điện thoại" span={1}>
-                {detailUser.phone || "Chưa cập nhật"}
+              <Descriptions.Item label={RESPONSE_MESSAGES.COMMON.PHONE} span={1}>
+                {detailUser.phone || USER_MESSAGES.NOT_UPDATED}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Vai trò" span={1}>
+              <Descriptions.Item label={RESPONSE_MESSAGES.COMMON.ROLE} span={1}>
                 <Tag color={getRoleColor(detailUser.role)}>
                   {detailUser.roleLabel}
                 </Tag>
               </Descriptions.Item>
 
-              <Descriptions.Item label="Loại tài khoản" span={1}>
+              <Descriptions.Item label={USER_MESSAGES.ACCOUNT_TYPE} span={1}>
                 {detailUser.accountTypeLabel}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Trạng thái" span={1}>
+              <Descriptions.Item label={RESPONSE_MESSAGES.COMMON.STATUS} span={1}>
                 {detailUser.status === "active" ? (
-                  <Tag color="green">Hoạt động</Tag>
+                  <Tag color="green">{USER_MESSAGES.ACTIVE}</Tag>
                 ) : (
-                  <Tag color="default">Đã khóa</Tag>
+                  <Tag color="default">{USER_MESSAGES.LOCKED}</Tag>
                 )}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Ngày tạo" span={1}>
+              <Descriptions.Item label={RESPONSE_MESSAGES.COMMON.CREATED_AT} span={1}>
                 <Space size={6}>
                   <CalendarClock className="h-4 w-4 text-slate-400" />
                   {formatDateTime(detailUser.createdAt)}
                 </Space>
               </Descriptions.Item>
 
-              <Descriptions.Item label="Đăng nhập gần nhất" span={1}>
+              <Descriptions.Item label={USER_MESSAGES.LAST_LOGIN} span={1}>
                 {formatDateTime(detailUser.lastLogin)}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Bảo mật" span={1}>
+              <Descriptions.Item label={USER_MESSAGES.SECURITY} span={1}>
                 <Space size={6}>
                   {detailUser.status === "locked" ? (
                     <Lock className="h-4 w-4 text-slate-400" />
@@ -955,8 +960,8 @@ export default function UsersManagementPage() {
                   )}
 
                   {detailUser.status === "locked"
-                    ? "Tài khoản đang bị khóa"
-                    : "Tài khoản đang hoạt động bình thường"}
+                    ? USER_MESSAGES.ACCOUNT_LOCKED_SECURITY
+                    : USER_MESSAGES.ACCOUNT_ACTIVE_SECURITY}
                 </Space>
               </Descriptions.Item>
             </Descriptions>
@@ -983,7 +988,7 @@ export default function UsersManagementPage() {
         <div className="relative px-6 pb-6 pt-7 text-center">
           <button
             type="button"
-            aria-label="Đóng"
+            aria-label={RESPONSE_MESSAGES.COMMON.CLOSE}
             onClick={closeDeleteConfirm}
             disabled={deleteLoading}
             className="absolute right-3 top-3 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -997,14 +1002,14 @@ export default function UsersManagementPage() {
 
           <h3 className="mt-5 text-lg font-bold text-slate-950">
             {deleteConfirm.open && deleteConfirm.mode === "selected"
-              ? "Xóa tài khoản đã chọn"
-              : "Xóa tài khoản"}
+              ? USER_MESSAGES.DELETE_SELECTED_ACCOUNTS
+              : USER_MESSAGES.DELETE_ACCOUNT}
           </h3>
 
           <p className="mt-2 text-sm text-slate-500">
             {deleteConfirm.open && deleteConfirm.mode === "selected"
-              ? `Bạn có chắc chắn muốn xóa ${deleteConfirm.count} tài khoản đã chọn không?`
-              : "Bạn có chắc chắn muốn xóa tài khoản này không?"}
+              ? `${USER_MESSAGES.DELETE_SELECTED_CONFIRM_PREFIX} ${deleteConfirm.count} ${USER_MESSAGES.DELETE_SELECTED_CONFIRM_SUFFIX}`
+              : USER_MESSAGES.DELETE_SINGLE_CONFIRM}
           </p>
 
           {deleteConfirm.open && deleteConfirm.mode === "single" ? (
@@ -1020,7 +1025,7 @@ export default function UsersManagementPage() {
               disabled={deleteLoading}
               className="h-11 rounded-lg font-semibold"
             >
-              Hủy
+              {RESPONSE_MESSAGES.COMMON.CANCEL}
             </Button>
 
             <Button
@@ -1031,7 +1036,7 @@ export default function UsersManagementPage() {
               onClick={handleConfirmDelete}
               className="h-11 rounded-lg font-semibold"
             >
-              Xóa
+              {RESPONSE_MESSAGES.COMMON.DELETE}
             </Button>
           </div>
         </div>
