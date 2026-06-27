@@ -33,6 +33,11 @@ export const RESPONSE_MESSAGES = {
         DATE_OF_BIRTH: "Ngày sinh",
         PASSWORD: "Mật khẩu",
         SAVE_CHANGES: "Lưu thay đổi",
+        ROLE: "Vai trò",
+        STATUS: "Trạng thái",
+        CREATED_AT: "Ngày tạo",
+        UPDATED_AT: "Cập nhật lần cuối",
+        ACTIONS: "Hành động",
     },
 
     COMMON_DESCRIPTION: {
@@ -91,6 +96,7 @@ export const RESPONSE_MESSAGES = {
         NEW_PASSWORD: "Mật khẩu mới",
         newPasswordRequired: "Vui lòng nhập mật khẩu mới",
         newPasswordMinLength: "Mật khẩu mới tối thiểu 6 ký tự",
+        RETURN_LOGIN: "Vui lòng đăng nhập lại"
     },
 
     HOME: {
@@ -221,5 +227,7 @@ export const RESPONSE_MESSAGES = {
         PREGNANT_INFO: "Thông tin thai phụ",
         PERSONAL_INFO: "Thông tin cá nhân",
         FOLLOW_MOM_AND_BABY: " Theo dõi thông tin chăm sóc mẹ và bé",
+        UNABLE_TO_LOAD_PROFILE: "Không thể tải thông tin hồ sơ",
+        BLOOD_TYPE: "Nhóm máu",
     }
 }

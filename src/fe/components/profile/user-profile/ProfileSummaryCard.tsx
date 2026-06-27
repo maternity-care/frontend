@@ -3,7 +3,7 @@ import { Baby } from "lucide-react";
 
 import { InfoIconBox } from "./InfoIconBox";
 import { PregnantProfile } from "@/features/profile/profile.types";
-import { displayValue, EMPTY_TEXT, getInitials, getRoleText } from "@/utils/profile/utils";
+import { displayValue, EMPTY_TEXT, getInitials, getRoleText, getStatusText } from "@/utils/profile/utils";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type ProfileSummaryCardProps = {
@@ -12,7 +12,6 @@ type ProfileSummaryCardProps = {
 
 export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
   const isActive = profile.status === 1;
-  const roleText = getRoleText(profile.roles);
 
   return (
     <Card className="overflow-hidden border-0 shadow-sm">
@@ -36,10 +35,10 @@ export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
 
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <Tag color={isActive ? "success" : "default"}>
-            {isActive ? "Đang hoạt động" : "Tạm khóa"}
+            {getStatusText(profile.status)}
           </Tag>
 
-          <Tag color="pink">{roleText}</Tag>
+          <Tag color="pink">{getRoleText(profile.roles)}</Tag>
         </div>
       </div>
 
@@ -61,14 +60,14 @@ export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-white p-3">
-            <p className="text-xs text-slate-500">Tuần thai</p>
+            <p className="text-xs text-slate-500">{RESPONSE_MESSAGES.SCHEDULE.GESTATIONAL_WEEK}</p>
             <p className="mt-1 font-semibold text-slate-950">
               {displayValue(profile.gestationalWeek)}
             </p>
           </div>
 
           <div className="rounded-xl bg-white p-3">
-            <p className="text-xs text-slate-500">Nhóm máu</p>
+            <p className="text-xs text-slate-500">{RESPONSE_MESSAGES.PROFILE.BLOOD_TYPE}</p>
             <p className="mt-1 font-semibold text-slate-950">
               {displayValue(profile.bloodType)}
             </p>
