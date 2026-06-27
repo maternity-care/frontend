@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSyncExternalStore } from "react";
 import {
   HeartPulse,
   LogOut,
@@ -16,8 +17,17 @@ import { Button } from "@/fe/components/ui/Button";
 import useSetting from "@/hooks/useSetting";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
+const subscribeToHydration = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const hasMounted = useSyncExternalStore(
+    subscribeToHydration,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
   const { user, refreshToken, clearSession } = useAuthStore();
   const { getOrDefault } = useSetting();
 
@@ -26,7 +36,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     getOrDefault("app_name", RESPONSE_MESSAGES.COMMON.DEFAULT_NAME)
   );
 
-  const isLoggedIn = Boolean(user || refreshToken);
+  // Zustand reads tokens from browser storage. Keep the first client render
+  // identical to SSR, then show the authenticated navigation after hydration.
+  const isLoggedIn = hasMounted && Boolean(user || refreshToken);
 
   const handleLogout = async () => {
     try {
