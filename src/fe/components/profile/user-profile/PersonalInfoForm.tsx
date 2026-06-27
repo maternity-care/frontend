@@ -6,6 +6,7 @@ import { Mail, Save, UserRound } from "lucide-react";
 
 import { updateMyProfile } from "@/features/profile/profile.api";
 import { PregnantProfile, ProfileFormValues, ProfileUpdateHandler } from "@/features/profile/profile.types";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type PersonalInfoFormProps = {
   profile: PregnantProfile;
@@ -59,25 +60,25 @@ export function PersonalInfoForm({
         <Col xs={24} md={12}>
           <Form.Item
             name="name"
-            label="Họ và tên"
+            label={RESPONSE_MESSAGES.COMMON.NAME}
             rules={[
               {
                 required: true,
                 whitespace: true,
-                message: "Name là bắt buộc",
+                message: RESPONSE_MESSAGES.COMMON_DESCRIPTION.NAME_RULE,
               },
             ]}
           >
             <Input
               size="large"
-              placeholder="Nhập họ và tên"
+              placeholder={RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_NAME}
               prefix={<UserRound className="h-4 w-4 text-slate-400" />}
             />
           </Form.Item>
         </Col>
 
         <Col xs={24} md={12}>
-          <Form.Item label="Email">
+          <Form.Item label={RESPONSE_MESSAGES.COMMON.EMAIL}>
             <Input
               size="large"
               value={profile.email}
@@ -90,7 +91,7 @@ export function PersonalInfoForm({
 
       <div className="flex justify-end gap-3">
         <Button onClick={onCancel} disabled={saving}>
-          Hủy
+          {RESPONSE_MESSAGES.COMMON.CANCEL}
         </Button>
 
         <Button
@@ -99,7 +100,7 @@ export function PersonalInfoForm({
           loading={saving}
           icon={<Save className="h-4 w-4" />}
         >
-          Lưu thay đổi
+          {RESPONSE_MESSAGES.COMMON.SAVE_CHANGES}
         </Button>
       </div>
     </Form>

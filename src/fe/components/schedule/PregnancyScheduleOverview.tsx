@@ -9,6 +9,7 @@ import type { PregnancyScheduleItem } from "@/features/schedule/schedule.types";
 import { CreateScheduleModal } from "./CreateScheduleModal";
 import { ScheduleList } from "./ScheduleList";
 import { ScheduleCalendar } from "./ScheduleCalendar";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 const { Title, Text } = Typography;
 
@@ -58,23 +59,22 @@ export function PregnancyScheduleOverview({
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} lg={15}>
             <div className="mb-2 text-sm font-medium text-pink-600">
-              Xin chào, {patientName || "thai phụ"}
+              {RESPONSE_MESSAGES.COMMON.HELLO}, {patientName || RESPONSE_MESSAGES.COMMON.PREGNANT}
             </div>
 
             <Title level={2} className="!mb-2">
-              Lịch chăm sóc thai kỳ
+              {RESPONSE_MESSAGES.SCHEDULE.TITLE}
             </Title>
 
             <Text type="secondary">
-              Theo dõi lịch khám, siêu âm, xét nghiệm và tự tạo lịch nhắc trong
-              quá trình mang thai.
+              {RESPONSE_MESSAGES.SCHEDULE.TITLE_DESCRIPTION}
             </Text>
 
             {nextSchedule ? (
               <div className="mt-6 rounded-2xl border border-pink-100 bg-pink-50 p-4">
                 <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-pink-700">
                   <CalendarDays className="h-4 w-4" />
-                  Lịch hẹn gần nhất
+                  {RESPONSE_MESSAGES.SCHEDULE.NEXT_APPOINTMENT}
                 </div>
 
                 <div className="text-lg font-semibold text-slate-950">
@@ -103,20 +103,20 @@ export function PregnancyScheduleOverview({
             <Row gutter={[16, 16]}>
               <Col span={12}>
                 <Card className="!bg-pink-50">
-                  <Statistic title="Tuần thai" value={gestationalWeek} suffix="tuần" />
+                  <Statistic title={RESPONSE_MESSAGES.SCHEDULE.GESTATIONAL_WEEK} value={gestationalWeek} suffix="tuần" />
                 </Card>
               </Col>
 
               <Col span={12}>
                 <Card className="!bg-pink-50">
-                  <Statistic title="Lịch hẹn" value={totalCount} suffix="mục" />
+                  <Statistic title={RESPONSE_MESSAGES.SCHEDULE.UPCOMING_APPOINTMENTS} value={totalCount} suffix="mục" />
                 </Card>
               </Col>
 
               <Col span={24}>
                 <Card className="!bg-pink-50">
                   <div className="mb-2 flex items-center justify-between">
-                    <Text strong>Tiến độ chăm sóc</Text>
+                    <Text strong>{RESPONSE_MESSAGES.SCHEDULE.PROGRESS_CARE}</Text>
                     <Text type="secondary">
                       {completedCount}/{totalCount}
                     </Text>
@@ -132,10 +132,10 @@ export function PregnancyScheduleOverview({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Title level={3} className="!mb-1">
-            Quản lý lịch chăm sóc
+            {RESPONSE_MESSAGES.SCHEDULE.MANAGE_SCHEDULE}
           </Title>
           <Text type="secondary">
-            Xem lịch sắp tới hoặc tạo lịch nhắc cá nhân như Google Calendar.
+            {RESPONSE_MESSAGES.SCHEDULE.MANAGE_SCHEDULE_DESCRIPTION}
           </Text>
         </div>
 
@@ -145,7 +145,7 @@ export function PregnancyScheduleOverview({
           icon={<CalendarPlus className="h-4 w-4" />}
           onClick={() => setOpenCreateModal(true)}
         >
-          Tạo lịch nhắc
+          {RESPONSE_MESSAGES.SCHEDULE.CREATE_SCHEDULE}
         </Button>
       </div>
 
