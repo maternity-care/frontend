@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Col, Row } from "antd";
+import { Alert, Col, Row } from "antd";
 
 import { useAuthStore } from "@/features/auth/auth.store";
-import type { FeedbackState, PregnantProfile, UserProfile } from "@/features/profile/profile.types";
+import type {
+  FeedbackState,
+  UserProfile,
+} from "@/features/profile/profile.types";
 import useAuth from "@/hooks/useAuth";
-import { ProfileError } from "./ProfileError";
+
 import { ProfileEditCard } from "./ProfileEditCard";
-import { PregnantInfoCard } from "./PregnantInfoCard";
-import { CareTrackingCard } from "./CardTrackingCard";
 import { ProfileLoading } from "./ProfileLoading";
 import { ProfileSummaryCard } from "./ProfileSummaryCard";
-
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 export function ProfileContent() {
   const { currentUser, mutate } = useAuth();
@@ -24,7 +25,7 @@ export function ProfileContent() {
     error: null,
   });
 
-  const profile = (updatedProfile ?? currentUser ?? null) as PregnantProfile | null;
+  const profile = updatedProfile ?? currentUser ?? null;
 
   const clearFeedback = () => {
     setFeedback({
@@ -42,7 +43,7 @@ export function ProfileContent() {
     });
 
     setFeedback({
-      message: message || "Đã cập nhật hồ sơ thai phụ.",
+      message: message || "Đã cập nhật hồ sơ.",
       error: null,
     });
   };
@@ -59,7 +60,14 @@ export function ProfileContent() {
   }
 
   if (!profile) {
-    return <ProfileError error={feedback.error} />;
+    return (
+      <Alert
+        type="error"
+        showIcon
+        message={RESPONSE_MESSAGES.PROFILE.UNABLE_TO_LOAD_PROFILE}
+        description={feedback.error ?? RESPONSE_MESSAGES.AUTH.RETURN_LOGIN}
+      />
+    );
   }
 
   return (
@@ -77,16 +85,6 @@ export function ProfileContent() {
             onUpdated={handleProfileUpdated}
             onError={handleProfileError}
           />
-
-          <Row gutter={[24, 24]} className="mt-6">
-            <Col xs={24} xl={12}>
-              <PregnantInfoCard profile={profile} />
-            </Col>
-
-            <Col xs={24} xl={12}>
-              <CareTrackingCard profile={profile} />
-            </Col>
-          </Row>
         </Col>
       </Row>
     </div>
