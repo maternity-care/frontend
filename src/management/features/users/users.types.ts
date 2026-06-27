@@ -1,3 +1,5 @@
+// src/management/features/users/users.types.ts
+
 export type UserPermissionEffect = "allow" | "deny";
 
 export interface Permission {
@@ -60,8 +62,8 @@ export interface UserPermissionOverrideInput {
 
 export interface CreateUserInput {
   name: string;
-  personalEmail: string;
-  phone?: string;
+  email: string;
+  password: string;
   position?: string;
   roleIds?: string[];
   permissionOverrides?: UserPermissionOverrideInput[];
@@ -70,7 +72,6 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   name?: string;
   email?: string;
-  phone?: string;
   password?: string;
   status?: number;
   roleIds?: string[];

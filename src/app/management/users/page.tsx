@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
   Alert,
@@ -32,12 +32,10 @@ import {
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
-  createUser,
   deleteUser,
   deleteUsers,
   getUser,
   getUsersPage,
-  updateUser,
 } from "@/management/features/users/users.api";
 import type { User as BackendUser } from "@/management/features/users/users.types";
 import {
@@ -45,14 +43,12 @@ import {
   accountTypeOptions,
   getAccountTypeLabel,
   getRoleColor,
-  getRoleLabel,
   roleOptions,
   statusOptions,
 } from "./components/UserAccountFormModal";
 import type {
   AccountType,
   UserAccount,
-  UserFormValues,
   UserRole,
   UserStatus,
 } from "./components/UserAccountFormModal";
@@ -64,8 +60,6 @@ type DeleteConfirmState =
   | { open: true; mode: "single"; user: UserAccount }
   | { open: true; mode: "selected"; ids: string[]; count: number };
 
-type ApiResponseData<T> = T | { data: T };
-
 const PAGE_SIZE = 6;
 
 function getErrorMessage(error: unknown) {
@@ -75,10 +69,19 @@ function getErrorMessage(error: unknown) {
         response?: {
           data?: {
             message?: string | string[];
+            errors?: {
+              fields?: string[];
+            };
           };
         };
       }
     ).response;
+
+    const fields = response?.data?.errors?.fields;
+
+    if (Array.isArray(fields) && fields.length > 0) {
+      return fields.join(", ");
+    }
 
     const message = response?.data?.message;
 
@@ -94,14 +97,6 @@ function getErrorMessage(error: unknown) {
   }
 
   return "Đã có lỗi xảy ra. Vui lòng thử lại.";
-}
-
-function getResponseData<T>(response: ApiResponseData<T>): T {
-  if (response && typeof response === "object" && "data" in response) {
-    return response.data;
-  }
-
-  return response as T;
 }
 
 function formatDate(value?: string) {
@@ -162,6 +157,7 @@ function toUiRole(roleName?: string): UserRole {
   if (roleName === "doctor") return "doctor";
   if (roleName === "staff" || roleName === "nurse") return "staff";
   if (roleName === "partner" || roleName === "owner") return "owner";
+
   return "pregnant";
 }
 
@@ -311,45 +307,47 @@ export default function UsersManagementPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await getUsersPage({
-        ...buildSearchParams(query),
-        roleId: toBackendRoleId(roleFilter),
-        status: toBackendStatus(statusFilter),
-        page: 1,
-        limit: 1000,
-      });
-
-      const backendUsers = Array.isArray(response.users) ? response.users : [];
-
-setUsers(backendUsers.map((user) => normalizeUser(user)));
-setTotalUsers(response.total ?? backendUsers.length);
-      setSelectedUserIds([]);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [query, roleFilter, statusFilter]);
-
   useEffect(() => {
-  let mounted = true;
+    let mounted = true;
 
-  async function fetchData() {
-    if (!mounted) return;
-    await loadUsers();
-  }
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setError(null);
 
-  void fetchData();
+      try {
+        const response = await getUsersPage({
+          ...buildSearchParams(query),
+          roleId: toBackendRoleId(roleFilter),
+          status: toBackendStatus(statusFilter),
+          page: 1,
+          limit: 1000,
+        });
 
-  return () => {
-    mounted = false;
-  };
-}, [loadUsers]);
+        if (!mounted) return;
+
+        const backendUsers = Array.isArray(response.users)
+          ? response.users
+          : [];
+
+        setUsers(backendUsers.map((user) => normalizeUser(user)));
+        setTotalUsers(response.total ?? backendUsers.length);
+        setSelectedUserIds([]);
+      } catch (err) {
+        if (mounted) {
+          setError(getErrorMessage(err));
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }, 0);
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(timer);
+    };
+  }, [query, roleFilter, statusFilter]);
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
@@ -401,112 +399,6 @@ setTotalUsers(response.total ?? backendUsers.length);
       setDetailUser(normalizeUser(response));
     } catch {
       setDetailUser(user);
-    }
-  }
-
-  async function handleSubmitUser(values: UserFormValues) {
-    setError(null);
-
-    if (editingUser) {
-      try {
-        const response = await updateUser(editingUser.id, {
-          name: values.fullName,
-          email: values.email,
-          phone: values.phone,
-          status: toBackendStatus(values.status),
-          roleIds: toBackendRoleId(values.role)
-            ? [toBackendRoleId(values.role) as string]
-            : [],
-          permissionOverrides: [],
-        });
-
-        const updatedBackendUser = getResponseData<BackendUser>(response);
-        const updatedUser = normalizeUser(updatedBackendUser);
-
-        setUsers((current) =>
-          current.map((user) =>
-            user.id === editingUser.id ? updatedUser : user,
-          ),
-        );
-
-        setDetailUser((current) =>
-          current?.id === editingUser.id ? updatedUser : current,
-        );
-
-        closeFormModal();
-
-        Modal.success({
-          title: "Cập nhật tài khoản thành công",
-          content: "Thông tin tài khoản đã được cập nhật.",
-          okText: "Đóng",
-          centered: true,
-        });
-
-        return;
-      } catch (err) {
-        const message = getErrorMessage(err);
-
-        setError(message);
-
-        Modal.error({
-          title: "Cập nhật tài khoản thất bại",
-          content: message,
-          okText: "Đóng",
-          centered: true,
-        });
-
-        throw err;
-      }
-    }
-
-    try {
-      const createResponse = await createUser({
-        name: values.fullName,
-        personalEmail: values.email,
-        phone: values.phone,
-        position: undefined,
-        roleIds: toBackendRoleId(values.role)
-          ? [toBackendRoleId(values.role) as string]
-          : [],
-        permissionOverrides: [],
-      });
-
-      let createdBackendUser = getResponseData<BackendUser>(createResponse);
-
-      if (values.status === "locked") {
-        const updateResponse = await updateUser(createdBackendUser.id, {
-          status: 0,
-        });
-
-        createdBackendUser = getResponseData<BackendUser>(updateResponse);
-      }
-
-      const createdUser = normalizeUser(createdBackendUser);
-
-      setUsers((current) => [createdUser, ...current]);
-      setTotalUsers((current) => current + 1);
-      setCurrentPage(1);
-      closeFormModal();
-
-      Modal.success({
-        title: "Thêm tài khoản thành công",
-        content: "Tài khoản mới đã được thêm vào danh sách.",
-        okText: "Đóng",
-        centered: true,
-      });
-    } catch (err) {
-      const message = getErrorMessage(err);
-
-      setError(message);
-
-      Modal.error({
-        title: "Thêm tài khoản thất bại",
-        content: message,
-        okText: "Đóng",
-        centered: true,
-      });
-
-      throw err;
     }
   }
 
@@ -931,7 +823,24 @@ setTotalUsers(response.total ?? backendUsers.length);
         open={formModalOpen}
         editingUser={editingUser}
         onClose={closeFormModal}
-        onSubmit={handleSubmitUser}
+        onSaved={(savedUser, mode) => {
+          if (mode === "create") {
+            setUsers((current) => [savedUser, ...current]);
+            setTotalUsers((current) => current + 1);
+            setCurrentPage(1);
+            return;
+          }
+
+          setUsers((current) =>
+            current.map((user) =>
+              user.id === savedUser.id ? savedUser : user,
+            ),
+          );
+
+          setDetailUser((current) =>
+            current?.id === savedUser.id ? savedUser : current,
+          );
+        }}
       />
 
       <Modal
