@@ -24,3 +24,22 @@ export function getRoleText(
 ) {
   return roles?.map((role) => role.name).filter(Boolean).join(", ") || "Pregnant Woman";
 }
+
+export function formatDateTime(value?: string | null) {
+  if (!value) return EMPTY_TEXT;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+export function getStatusText(status: number) {
+  return status === 1 ? "Đang hoạt động" : "Tạm khóa";
+}

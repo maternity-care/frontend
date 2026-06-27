@@ -15,22 +15,33 @@ export interface Role {
   updatedAt: string;
 }
 
+export type PermissionOverrideEffect = "allow" | "deny";
+
+export interface PermissionOverride {
+  permission: Permission;
+  effect: PermissionOverrideEffect;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
   status: number;
   roles: Role[];
+  permissionOverrides?: PermissionOverride[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface UpdateProfileInput {
   name?: string;
+  password?: string;
 }
 
 export type ProfileFormValues = {
   name: string;
+  password?: string;
+  confirmPassword?: string;
 };
 
 export type PregnantProfile = UserProfile & {
