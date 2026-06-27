@@ -9,6 +9,7 @@ import type {
   PregnancyScheduleStatus,
   PregnancyScheduleType,
 } from "@/features/schedule/schedule.types";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 const { Text } = Typography;
 
@@ -39,7 +40,7 @@ type ScheduleListProps = {
 
 export function ScheduleList({ schedules }: ScheduleListProps) {
   return (
-    <Card title="Lịch chăm sóc sắp tới" className="h-full shadow-sm">
+    <Card title={RESPONSE_MESSAGES.SCHEDULE.UPCOMING_APPOINTMENTS_CARE} className="h-full shadow-sm">
       {schedules.length ? (
         <div className="divide-y divide-slate-100">
           {schedules.map((item) => (
@@ -88,7 +89,7 @@ export function ScheduleList({ schedules }: ScheduleListProps) {
           ))}
         </div>
       ) : (
-        <Empty description="Chưa có lịch sắp tới" />
+        <Empty description={RESPONSE_MESSAGES.SCHEDULE.DONT_HAVE_UPCOMING_APPOINTMENTS} />
       )}
     </Card>
   );
