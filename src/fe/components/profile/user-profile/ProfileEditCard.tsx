@@ -3,14 +3,18 @@
 import { useState } from "react";
 import { Alert, Button, Card } from "antd";
 import { Pencil, UserRound, X } from "lucide-react";
-import { FeedbackState, PregnantProfile, ProfileUpdateHandler } from "@/features/profile/profile.types";
+
+import type {
+  FeedbackState,
+  ProfileUpdateHandler,
+  UserProfile,
+} from "@/features/profile/profile.types";
 import { PersonalInfoForm } from "./PersonalInfoForm";
 import { PersonalInfoView } from "./ProfileInfoView";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
-
 type ProfileEditCardProps = {
-  profile: PregnantProfile;
+  profile: UserProfile;
   feedback: FeedbackState;
   onClearFeedback: () => void;
   onUpdated: ProfileUpdateHandler;
