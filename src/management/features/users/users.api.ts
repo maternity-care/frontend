@@ -63,8 +63,8 @@ function normalizeUsersList(payload: BackendUsersPayload): UsersListData {
 function toCreatePayload(input: CreateUserInput) {
   return {
     name: input.name.trim(),
-    personalEmail: input.personalEmail.trim(),
-    phone: input.phone?.trim() || undefined,
+    email: input.email.trim(),
+    password: input.password.trim(),
     position: input.position?.trim() || undefined,
     roleIds: input.roleIds ?? [],
     permissionOverrides: input.permissionOverrides ?? [],
@@ -75,8 +75,7 @@ function toUpdatePayload(input: UpdateUserInput) {
   const payload = {
     name: input.name?.trim(),
     email: input.email?.trim(),
-    phone: input.phone?.trim(),
-    password: input.password,
+    password: input.password?.trim() || undefined,
     status: input.status,
     roleIds: input.roleIds,
     permissionOverrides: input.permissionOverrides,

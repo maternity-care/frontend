@@ -1,8 +1,11 @@
+// src/app/management/users/components/UserAccountFormModal.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -25,6 +28,8 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { createUser, updateUser } from "@/management/features/users/users.api";
+import type { User as BackendUser } from "@/management/features/users/users.types";
 
 const { Text, Title } = Typography;
 
@@ -50,9 +55,10 @@ export interface UserFormValues {
   fullName: string;
   email: string;
   phone: string;
-  role: UserRole;
-  accountType: AccountType;
-  status: UserStatus;
+  password?: string;
+  role?: UserRole;
+  accountType?: AccountType;
+  status?: UserStatus;
 }
 
 export const roleOptions = [
@@ -74,6 +80,22 @@ export const accountTypeOptions = [
   { value: "system", label: "Hệ thống" },
 ];
 
+type ApiResponseData<T> = T | { data: T };
+
+type UserAccountFormModalProps = {
+  open: boolean;
+  editingUser: UserAccount | null;
+  onClose: () => void;
+  onSaved?: (user: UserAccount, mode: "create" | "update") => void;
+};
+
+const initialValues: Partial<UserFormValues> = {
+  fullName: "",
+  email: "",
+  phone: "",
+  password: "",
+};
+
 export function getRoleLabel(role: UserRole) {
   return roleOptions.find((item) => item.value === role)?.label || role;
 }
@@ -90,24 +112,136 @@ export function getRoleColor(role: UserRole) {
   if (role === "owner") return "purple";
   if (role === "doctor") return "blue";
   if (role === "staff") return "cyan";
+
   return "green";
 }
 
-type UserAccountFormModalProps = {
-  open: boolean;
-  editingUser: UserAccount | null;
-  onClose: () => void;
-  onSubmit: (values: UserFormValues) => void | Promise<void>;
-};
+function getErrorMessage(error: unknown) {
+  if (typeof error === "object" && error && "response" in error) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string | string[];
+            errors?: {
+              fields?: string[];
+            };
+          };
+        };
+      }
+    ).response;
 
-const initialValues: UserFormValues = {
-  fullName: "",
-  email: "",
-  phone: "",
-  role: "pregnant",
-  accountType: "customer",
-  status: "active",
-};
+    const fields = response?.data?.errors?.fields;
+
+    if (Array.isArray(fields) && fields.length > 0) {
+      return fields.join(", ");
+    }
+
+    const message = response?.data?.message;
+
+    if (Array.isArray(message)) {
+      return message.join(", ");
+    }
+
+    if (message) return message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
+}
+
+function getResponseData<T>(response: ApiResponseData<T>): T {
+  if (response && typeof response === "object" && "data" in response) {
+    return response.data;
+  }
+
+  return response as T;
+}
+
+function toBackendRoleId(role: UserRole) {
+  const roleIdMap: Record<UserRole, string> = {
+    admin: "2",
+    doctor: "3",
+    staff: "5",
+    pregnant: "6",
+    owner: "7",
+  };
+
+  return roleIdMap[role];
+}
+
+function toBackendStatus(status: UserStatus) {
+  return status === "active" ? 1 : 0;
+}
+
+function toUiStatus(status: number): UserStatus {
+  return status === 1 ? "active" : "locked";
+}
+
+function toUiRole(roleName?: string): UserRole {
+  if (roleName === "super_admin" || roleName === "admin") return "admin";
+  if (roleName === "doctor") return "doctor";
+  if (roleName === "staff" || roleName === "nurse") return "staff";
+  if (roleName === "partner" || roleName === "owner") return "owner";
+
+  return "pregnant";
+}
+
+function formatBackendRoleLabel(roleName?: string) {
+  if (!roleName) return "Chưa phân quyền";
+
+  const roleLabelMap: Record<string, string> = {
+    super_admin: "Super Admin",
+    admin: "Admin",
+    doctor: "Bác sĩ",
+    nurse: "Điều dưỡng",
+    staff: "Staff",
+    member: "Thai phụ",
+    partner: "Partner",
+    owner: "Owner",
+  };
+
+  return (
+    roleLabelMap[roleName] ||
+    roleName
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  );
+}
+
+function deriveAccountType(roleName?: string): AccountType {
+  if (roleName === "super_admin" || roleName === "admin") return "system";
+
+  if (roleName === "doctor" || roleName === "nurse" || roleName === "staff") {
+    return "internal";
+  }
+
+  return "customer";
+}
+
+function normalizeUser(user: BackendUser): UserAccount {
+  const firstRole = user.roles?.[0];
+  const roleName = firstRole?.name;
+  const accountType = deriveAccountType(roleName);
+
+  return {
+    id: user.id,
+    fullName: user.name,
+    email: user.email,
+    phone: user.phone || "",
+    role: toUiRole(roleName),
+    roleLabel: formatBackendRoleLabel(roleName),
+    accountType,
+    accountTypeLabel: getAccountTypeLabel(accountType),
+    status: toUiStatus(user.status),
+    createdAt: user.createdAt,
+    lastLogin: undefined,
+  };
+}
 
 function PreviewLine({
   icon,
@@ -138,10 +272,11 @@ export function UserAccountFormModal({
   open,
   editingUser,
   onClose,
-  onSubmit,
+  onSaved,
 }: UserAccountFormModalProps) {
   const [form] = Form.useForm<UserFormValues>();
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fullName = Form.useWatch("fullName", form);
   const email = Form.useWatch("email", form);
@@ -153,21 +288,30 @@ export function UserAccountFormModal({
   useEffect(() => {
     if (!open) return;
 
-    if (editingUser) {
-      form.setFieldsValue({
-        fullName: editingUser.fullName,
-        email: editingUser.email,
-        phone: editingUser.phone,
-        role: editingUser.role,
-        accountType: editingUser.accountType,
-        status: editingUser.status,
-      });
+    const timer = window.setTimeout(() => {
+      setError(null);
 
-      return;
-    }
+      if (editingUser) {
+        form.setFieldsValue({
+          fullName: editingUser.fullName,
+          email: editingUser.email,
+          phone: editingUser.phone,
+          password: "",
+          role: editingUser.role,
+          accountType: editingUser.accountType,
+          status: editingUser.status,
+        });
 
-    form.resetFields();
-    form.setFieldsValue(initialValues);
+        return;
+      }
+
+      form.resetFields();
+      form.setFieldsValue(initialValues);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [open, editingUser, form]);
 
   const modalTitle = editingUser ? "Cập nhật tài khoản" : "Thêm tài khoản";
@@ -184,23 +328,90 @@ export function UserAccountFormModal({
     if (submitting) return;
 
     form.resetFields();
+    setError(null);
     onClose();
   }
 
   async function handleFinish(values: UserFormValues) {
     setSubmitting(true);
+    setError(null);
 
     try {
-      await onSubmit({
-        fullName: values.fullName.trim(),
+      const password = values.password?.trim();
+
+      if (editingUser) {
+        const response = await updateUser(editingUser.id, {
+          name: values.fullName.trim(),
+          email: values.email.trim(),
+          password: password || undefined,
+          status: values.status ? toBackendStatus(values.status) : undefined,
+          roleIds: values.role ? [toBackendRoleId(values.role)] : [],
+          permissionOverrides: [],
+        });
+
+        const backendUser = getResponseData<BackendUser>(response);
+        const updatedUser = normalizeUser(backendUser);
+
+        onSaved?.(updatedUser, "update");
+
+        Modal.success({
+          title: "Cập nhật tài khoản thành công",
+          content: "Thông tin tài khoản đã được cập nhật.",
+          okText: "Đóng",
+          centered: true,
+        });
+
+        form.resetFields();
+        onClose();
+
+        return;
+      }
+
+      if (!password || password.length < 6) {
+        form.setFields([
+          {
+            name: "password",
+            errors: ["Mật khẩu phải có ít nhất 6 ký tự"],
+          },
+        ]);
+
+        return;
+      }
+
+      const response = await createUser({
+        name: values.fullName.trim(),
         email: values.email.trim(),
-        phone: values.phone.trim(),
-        role: values.role,
-        accountType: values.accountType,
-        status: values.status,
+        password,
+        position: undefined,
+        roleIds: values.role ? [toBackendRoleId(values.role)] : [],
+        permissionOverrides: [],
+      });
+
+      let backendUser = getResponseData<BackendUser>(response);
+
+      if (values.status === "locked") {
+        const updateResponse = await updateUser(backendUser.id, {
+          status: 0,
+        });
+
+        backendUser = getResponseData<BackendUser>(updateResponse);
+      }
+
+      const createdUser = normalizeUser(backendUser);
+
+      onSaved?.(createdUser, "create");
+
+      Modal.success({
+        title: "Thêm tài khoản thành công",
+        content: "Tài khoản mới đã được thêm vào danh sách.",
+        okText: "Đóng",
+        centered: true,
       });
 
       form.resetFields();
+      onClose();
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -215,6 +426,7 @@ export function UserAccountFormModal({
       footer={null}
       onCancel={handleCancel}
       mask={{ closable: !submitting }}
+      destroyOnHidden
       styles={{
         body: {
           paddingTop: 20,
@@ -230,12 +442,26 @@ export function UserAccountFormModal({
         <Text className="text-sm text-slate-500">{modalDescription}</Text>
       </div>
 
+      {error ? (
+        <Alert
+          className="mt-4"
+          type="error"
+          title={error}
+          showIcon
+          closable
+          onClose={() => setError(null)}
+        />
+      ) : null}
+
       <Form
+        key={editingUser?.id ?? "create-user"}
         form={form}
         layout="vertical"
         initialValues={initialValues}
         onFinish={handleFinish}
         className="mt-4"
+        autoComplete="off"
+        clearOnDestroy
       >
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="space-y-4">
@@ -277,7 +503,7 @@ export function UserAccountFormModal({
                       { required: true, message: "Vui lòng nhập họ tên" },
                     ]}
                   >
-                    <Input placeholder="Ví dụ: Nguyễn Lan" />
+                    <Input placeholder="Ví dụ: Nguyễn Lan" autoComplete="off" />
                   </Form.Item>
                 </Col>
 
@@ -290,22 +516,46 @@ export function UserAccountFormModal({
                       { type: "email", message: "Email không hợp lệ" },
                     ]}
                   >
-                    <Input placeholder="lan@example.com" />
+                    <Input
+                      placeholder="lan@example.com"
+                      autoComplete="new-email"
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
+                  <Form.Item name="phone" label="Số điện thoại">
+                    <Input
+                      placeholder="0901234567"
+                      autoComplete="new-phone"
+                      inputMode="tel"
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
                   <Form.Item
-                    name="phone"
-                    label="Số điện thoại"
+                    name="password"
+                    label={editingUser ? "Mật khẩu mới" : "Mật khẩu"}
                     rules={[
                       {
-                        required: true,
-                        message: "Vui lòng nhập số điện thoại",
+                        required: !editingUser,
+                        message: "Vui lòng nhập mật khẩu",
+                      },
+                      {
+                        min: 6,
+                        message: "Mật khẩu phải có ít nhất 6 ký tự",
                       },
                     ]}
                   >
-                    <Input placeholder="0901234567" />
+                    <Input.Password
+                      placeholder={
+                        editingUser
+                          ? "Bỏ trống nếu không đổi mật khẩu"
+                          : "Nhập mật khẩu"
+                      }
+                      autoComplete="new-password"
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -407,13 +657,19 @@ export function UserAccountFormModal({
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Tag color={getRoleColor(role || "pregnant")}>
-                {role ? getRoleLabel(role) : "Thai phụ"}
-              </Tag>
+              {role ? (
+                <Tag color={getRoleColor(role)}>{getRoleLabel(role)}</Tag>
+              ) : (
+                <Tag>Chưa chọn vai trò</Tag>
+              )}
 
-              <Tag color={status === "locked" ? "default" : "green"}>
-                {status === "locked" ? "Đã khóa" : "Hoạt động"}
-              </Tag>
+              {status ? (
+                <Tag color={status === "locked" ? "default" : "green"}>
+                  {status === "locked" ? "Đã khóa" : "Hoạt động"}
+                </Tag>
+              ) : (
+                <Tag>Chưa chọn trạng thái</Tag>
+              )}
             </div>
 
             <div className="mt-4 space-y-2.5">
@@ -439,7 +695,7 @@ export function UserAccountFormModal({
                 icon={<Users className="h-4 w-4" />}
                 label="Loại tài khoản"
                 value={
-                  accountType ? getAccountTypeLabel(accountType) : "Khách hàng"
+                  accountType ? getAccountTypeLabel(accountType) : "Chưa chọn"
                 }
               />
             </div>
