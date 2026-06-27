@@ -56,7 +56,7 @@ export default function ForgotPasswordPage() {
         <Alert
           className="mt-5"
           type="success"
-          message={message}
+          title={message}
           description={
             resetUrl ? (
               <Link
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
         />
       ) : null}
       {error ? (
-        <Alert className="mt-5" type="error" message={error} showIcon />
+        <Alert className="mt-5" type="error" title={error} showIcon />
       ) : null}
 
       <Form<ForgotPasswordFormValues>

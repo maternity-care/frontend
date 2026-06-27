@@ -59,15 +59,15 @@ function ResetPasswordForm() {
         <Alert
           className="mt-5"
           type="error"
-          message="Link đặt lại mật khẩu không hợp lệ."
+          title="Link đặt lại mật khẩu không hợp lệ."
           showIcon
         />
       ) : null}
       {message ? (
-        <Alert className="mt-5" type="success" message={message} showIcon />
+        <Alert className="mt-5" type="success" title={message} showIcon />
       ) : null}
       {error ? (
-        <Alert className="mt-5" type="error" message={error} showIcon />
+        <Alert className="mt-5" type="error" title={error} showIcon />
       ) : null}
 
       <Form<ResetPasswordFormValues>
