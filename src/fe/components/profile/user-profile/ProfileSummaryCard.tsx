@@ -52,7 +52,7 @@ export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
           </InfoIconBox>
 
           <div>
-            <p className="text-sm font-medium text-slate-950">Hồ sơ thai kỳ</p>
+            <p className="text-sm font-medium text-slate-950">{RESPONSE_MESSAGES.SCHEDULE.Pregnancy_records}</p>
             <p className="text-xs text-slate-500">
               {RESPONSE_MESSAGES.PROFILE.FOLLOW_MOM_AND_BABY}
             </p>
