@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
+  Alert,
   Button,
   Card,
   Descriptions,
@@ -31,6 +32,15 @@ import {
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
+  createUser,
+  deleteUser,
+  deleteUsers,
+  getUser,
+  getUsersPage,
+  updateUser,
+} from "@/management/features/users/users.api";
+import type { User as BackendUser } from "@/management/features/users/users.types";
+import {
   UserAccountFormModal,
   accountTypeOptions,
   getAccountTypeLabel,
@@ -54,88 +64,45 @@ type DeleteConfirmState =
   | { open: true; mode: "single"; user: UserAccount }
   | { open: true; mode: "selected"; ids: string[]; count: number };
 
+type ApiResponseData<T> = T | { data: T };
+
 const PAGE_SIZE = 6;
 
-const initialUsers: UserAccount[] = [
-  {
-    id: "U001",
-    fullName: "Nguyễn Lan",
-    email: "lan@example.com",
-    phone: "0901234567",
-    role: "pregnant",
-    roleLabel: "Thai phụ",
-    accountType: "customer",
-    accountTypeLabel: "Khách hàng",
-    status: "active",
-    createdAt: "2026-06-12T08:30:00.000Z",
-    lastLogin: "2026-06-25T20:15:00.000Z",
-  },
-  {
-    id: "U002",
-    fullName: "Trần Minh",
-    email: "minh@mcs.vn",
-    phone: "0912345678",
-    role: "staff",
-    roleLabel: "Staff",
-    accountType: "internal",
-    accountTypeLabel: "Nội bộ",
-    status: "active",
-    createdAt: "2026-06-10T09:15:00.000Z",
-    lastLogin: "2026-06-26T08:20:00.000Z",
-  },
-  {
-    id: "U003",
-    fullName: "BS. Nguyễn An",
-    email: "an@mcs.vn",
-    phone: "0923456789",
-    role: "doctor",
-    roleLabel: "Bác sĩ",
-    accountType: "internal",
-    accountTypeLabel: "Nội bộ",
-    status: "active",
-    createdAt: "2026-06-08T10:00:00.000Z",
-    lastLogin: "2026-06-25T17:45:00.000Z",
-  },
-  {
-    id: "U004",
-    fullName: "Lê Hạnh",
-    email: "hanh@example.com",
-    phone: "0934567890",
-    role: "pregnant",
-    roleLabel: "Thai phụ",
-    accountType: "customer",
-    accountTypeLabel: "Khách hàng",
-    status: "locked",
-    createdAt: "2026-06-02T14:40:00.000Z",
-    lastLogin: "2026-06-15T09:30:00.000Z",
-  },
-  {
-    id: "U005",
-    fullName: "Phạm Quốc Bảo",
-    email: "bao.owner@mcs.vn",
-    phone: "0945678901",
-    role: "owner",
-    roleLabel: "Owner",
-    accountType: "system",
-    accountTypeLabel: "Quản trị cơ sở",
-    status: "active",
-    createdAt: "2026-05-28T11:25:00.000Z",
-    lastLogin: "2026-06-26T07:10:00.000Z",
-  },
-  {
-    id: "U006",
-    fullName: "Admin System",
-    email: "admin@example.com",
-    phone: "0956789012",
-    role: "admin",
-    roleLabel: "Admin",
-    accountType: "system",
-    accountTypeLabel: "Hệ thống",
-    status: "active",
-    createdAt: "2026-05-20T08:00:00.000Z",
-    lastLogin: "2026-06-26T09:00:00.000Z",
-  },
-];
+function getErrorMessage(error: unknown) {
+  if (typeof error === "object" && error && "response" in error) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string | string[];
+          };
+        };
+      }
+    ).response;
+
+    const message = response?.data?.message;
+
+    if (Array.isArray(message)) {
+      return message.join(", ");
+    }
+
+    if (message) return message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
+}
+
+function getResponseData<T>(response: ApiResponseData<T>): T {
+  if (response && typeof response === "object" && "data" in response) {
+    return response.data;
+  }
+
+  return response as T;
+}
 
 function formatDate(value?: string) {
   if (!value) return "Chưa cập nhật";
@@ -167,6 +134,113 @@ function formatDateTime(value?: string) {
   });
 }
 
+function formatBackendRoleLabel(roleName?: string) {
+  if (!roleName) return "Chưa phân quyền";
+
+  const roleLabelMap: Record<string, string> = {
+    super_admin: "Super Admin",
+    admin: "Admin",
+    doctor: "Bác sĩ",
+    nurse: "Điều dưỡng",
+    staff: "Staff",
+    member: "Thai phụ",
+    partner: "Partner",
+    owner: "Owner",
+  };
+
+  return (
+    roleLabelMap[roleName] ||
+    roleName
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  );
+}
+
+function toUiRole(roleName?: string): UserRole {
+  if (roleName === "super_admin" || roleName === "admin") return "admin";
+  if (roleName === "doctor") return "doctor";
+  if (roleName === "staff" || roleName === "nurse") return "staff";
+  if (roleName === "partner" || roleName === "owner") return "owner";
+  return "pregnant";
+}
+
+function toBackendRoleId(role?: UserRole) {
+  const roleIdMap: Record<UserRole, string> = {
+    admin: "2",
+    doctor: "3",
+    staff: "5",
+    pregnant: "6",
+    owner: "7",
+  };
+
+  return role ? roleIdMap[role] : undefined;
+}
+
+function toBackendStatus(status?: UserStatus) {
+  if (!status) return undefined;
+
+  return status === "active" ? 1 : 0;
+}
+
+function toUiStatus(status: number): UserStatus {
+  return status === 1 ? "active" : "locked";
+}
+
+function deriveAccountType(roleName?: string): AccountType {
+  if (roleName === "super_admin" || roleName === "admin") return "system";
+
+  if (roleName === "doctor" || roleName === "nurse" || roleName === "staff") {
+    return "internal";
+  }
+
+  return "customer";
+}
+
+function normalizeUser(user: BackendUser): UserAccount {
+  const firstRole = user.roles?.[0];
+  const roleName = firstRole?.name;
+  const accountType = deriveAccountType(roleName);
+
+  return {
+    id: user.id,
+    fullName: user.name,
+    email: user.email,
+    phone: user.phone || "",
+    role: toUiRole(roleName),
+    roleLabel: formatBackendRoleLabel(roleName),
+    accountType,
+    accountTypeLabel: getAccountTypeLabel(accountType),
+    status: toUiStatus(user.status),
+    createdAt: user.createdAt,
+    lastLogin: undefined,
+  };
+}
+
+function buildSearchParams(query: string) {
+  const keyword = query.trim();
+
+  if (!keyword) return {};
+
+  const onlyNumber = /^[0-9+\-\s]+$/.test(keyword);
+
+  if (keyword.includes("@")) {
+    return {
+      email: keyword,
+    };
+  }
+
+  if (onlyNumber) {
+    return {
+      phone: keyword,
+    };
+  }
+
+  return {
+    name: keyword,
+  };
+}
+
 function exportUsersToCsv(users: UserAccount[]) {
   const headers = [
     "STT",
@@ -183,7 +257,7 @@ function exportUsersToCsv(users: UserAccount[]) {
     index + 1,
     user.fullName,
     user.email,
-    user.phone,
+    user.phone || "Chưa cập nhật",
     user.roleLabel,
     user.status === "active" ? "Hoạt động" : "Đã khóa",
     user.accountTypeLabel,
@@ -211,7 +285,9 @@ function exportUsersToCsv(users: UserAccount[]) {
 }
 
 export default function UsersManagementPage() {
-  const [users, setUsers] = useState<UserAccount[]>(initialUsers);
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
+
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>();
   const [statusFilter, setStatusFilter] = useState<UserStatus | undefined>();
@@ -229,26 +305,57 @@ export default function UsersManagementPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>({
     open: false,
   });
+
+  const [loading, setLoading] = useState(true);
+  const [tableLoading, setTableLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await getUsersPage({
+        ...buildSearchParams(query),
+        roleId: toBackendRoleId(roleFilter),
+        status: toBackendStatus(statusFilter),
+        page: 1,
+        limit: 1000,
+      });
+
+      const backendUsers = Array.isArray(response.users) ? response.users : [];
+
+setUsers(backendUsers.map((user) => normalizeUser(user)));
+setTotalUsers(response.total ?? backendUsers.length);
+      setSelectedUserIds([]);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [query, roleFilter, statusFilter]);
+
+  useEffect(() => {
+  let mounted = true;
+
+  async function fetchData() {
+    if (!mounted) return;
+    await loadUsers();
+  }
+
+  void fetchData();
+
+  return () => {
+    mounted = false;
+  };
+}, [loadUsers]);
 
   const filteredUsers = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-
     return users.filter((user) => {
-      const matchKeyword =
-        !keyword ||
-        user.fullName.toLowerCase().includes(keyword) ||
-        user.email.toLowerCase().includes(keyword) ||
-        user.phone.toLowerCase().includes(keyword);
-
-      const matchRole = !roleFilter || user.role === roleFilter;
-      const matchStatus = !statusFilter || user.status === statusFilter;
-      const matchAccountType =
-        !accountTypeFilter || user.accountType === accountTypeFilter;
-
-      return matchKeyword && matchRole && matchStatus && matchAccountType;
+      return !accountTypeFilter || user.accountType === accountTypeFilter;
     });
-  }, [users, query, roleFilter, statusFilter, accountTypeFilter]);
+  }, [users, accountTypeFilter]);
 
   const activeUsers = users.filter((user) => user.status === "active").length;
   const lockedUsers = users.filter((user) => user.status === "locked").length;
@@ -286,66 +393,121 @@ export default function UsersManagementPage() {
     setEditingUser(null);
   }
 
+  async function openDetailUser(user: UserAccount) {
+    setDetailUser(user);
+
+    try {
+      const response = await getUser(user.id);
+      setDetailUser(normalizeUser(response));
+    } catch {
+      setDetailUser(user);
+    }
+  }
+
   async function handleSubmitUser(values: UserFormValues) {
+    setError(null);
+
     if (editingUser) {
-      const updatedUser: UserAccount = {
-        ...editingUser,
-        fullName: values.fullName,
-        email: values.email,
+      try {
+        const response = await updateUser(editingUser.id, {
+          name: values.fullName,
+          email: values.email,
+          phone: values.phone,
+          status: toBackendStatus(values.status),
+          roleIds: toBackendRoleId(values.role)
+            ? [toBackendRoleId(values.role) as string]
+            : [],
+          permissionOverrides: [],
+        });
+
+        const updatedBackendUser = getResponseData<BackendUser>(response);
+        const updatedUser = normalizeUser(updatedBackendUser);
+
+        setUsers((current) =>
+          current.map((user) =>
+            user.id === editingUser.id ? updatedUser : user,
+          ),
+        );
+
+        setDetailUser((current) =>
+          current?.id === editingUser.id ? updatedUser : current,
+        );
+
+        closeFormModal();
+
+        Modal.success({
+          title: "Cập nhật tài khoản thành công",
+          content: "Thông tin tài khoản đã được cập nhật.",
+          okText: "Đóng",
+          centered: true,
+        });
+
+        return;
+      } catch (err) {
+        const message = getErrorMessage(err);
+
+        setError(message);
+
+        Modal.error({
+          title: "Cập nhật tài khoản thất bại",
+          content: message,
+          okText: "Đóng",
+          centered: true,
+        });
+
+        throw err;
+      }
+    }
+
+    try {
+      const createResponse = await createUser({
+        name: values.fullName,
+        personalEmail: values.email,
         phone: values.phone,
-        role: values.role,
-        roleLabel: getRoleLabel(values.role),
-        accountType: values.accountType,
-        accountTypeLabel: getAccountTypeLabel(values.accountType),
-        status: values.status,
-      };
+        position: undefined,
+        roleIds: toBackendRoleId(values.role)
+          ? [toBackendRoleId(values.role) as string]
+          : [],
+        permissionOverrides: [],
+      });
 
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === editingUser.id ? updatedUser : user,
-        ),
-      );
+      let createdBackendUser = getResponseData<BackendUser>(createResponse);
 
-      setDetailUser((current) =>
-        current?.id === editingUser.id ? updatedUser : current,
-      );
+      if (values.status === "locked") {
+        const updateResponse = await updateUser(createdBackendUser.id, {
+          status: 0,
+        });
 
+        createdBackendUser = getResponseData<BackendUser>(updateResponse);
+      }
+
+      const createdUser = normalizeUser(createdBackendUser);
+
+      setUsers((current) => [createdUser, ...current]);
+      setTotalUsers((current) => current + 1);
+      setCurrentPage(1);
       closeFormModal();
 
       Modal.success({
-        title: "Cập nhật tài khoản thành công",
-        content: "Thông tin tài khoản đã được cập nhật.",
+        title: "Thêm tài khoản thành công",
+        content: "Tài khoản mới đã được thêm vào danh sách.",
+        okText: "Đóng",
+        centered: true,
+      });
+    } catch (err) {
+      const message = getErrorMessage(err);
+
+      setError(message);
+
+      Modal.error({
+        title: "Thêm tài khoản thất bại",
+        content: message,
         okText: "Đóng",
         centered: true,
       });
 
-      return;
+      throw err;
     }
-
-    const newUser: UserAccount = {
-      id: `U${Date.now()}`,
-      fullName: values.fullName,
-      email: values.email,
-      phone: values.phone,
-      role: values.role,
-      roleLabel: getRoleLabel(values.role),
-      accountType: values.accountType,
-      accountTypeLabel: getAccountTypeLabel(values.accountType),
-      status: values.status,
-      createdAt: new Date().toISOString(),
-      lastLogin: undefined,
-    };
-
-    setUsers((current) => [newUser, ...current]);
-    setCurrentPage(1);
-    closeFormModal();
-
-    Modal.success({
-      title: "Thêm tài khoản thành công",
-      content: "Tài khoản mới đã được thêm vào danh sách.",
-      okText: "Đóng",
-      centered: true,
-    });
   }
 
   function confirmDeleteUser(user: UserAccount) {
@@ -373,12 +535,17 @@ export default function UsersManagementPage() {
     if (!deleteConfirm.open) return;
 
     setDeleteLoading(true);
+    setTableLoading(true);
+    setError(null);
 
     try {
       if (deleteConfirm.mode === "single") {
         const userId = deleteConfirm.user.id;
 
+        await deleteUser(userId);
+
         setUsers((current) => current.filter((user) => user.id !== userId));
+        setTotalUsers((current) => Math.max(current - 1, 0));
         setSelectedUserIds((current) =>
           current.filter((id) => id !== userId),
         );
@@ -393,7 +560,10 @@ export default function UsersManagementPage() {
       } else {
         const ids = deleteConfirm.ids;
 
+        await deleteUsers(ids);
+
         setUsers((current) => current.filter((user) => !ids.includes(user.id)));
+        setTotalUsers((current) => Math.max(current - ids.length, 0));
         setSelectedUserIds([]);
         setCurrentPage(1);
         setDetailUser((current) =>
@@ -409,8 +579,20 @@ export default function UsersManagementPage() {
       }
 
       setDeleteConfirm({ open: false });
+    } catch (err) {
+      const message = getErrorMessage(err);
+
+      setError(message);
+
+      Modal.error({
+        title: "Xóa tài khoản thất bại",
+        content: message,
+        okText: "Đóng",
+        centered: true,
+      });
     } finally {
       setDeleteLoading(false);
+      setTableLoading(false);
     }
   }
 
@@ -451,11 +633,12 @@ export default function UsersManagementPage() {
       width: 128,
       align: "center",
       responsive: ["xl"],
+      render: (phone: string) => phone || "Chưa cập nhật",
     },
     {
       title: "Vai trò",
       dataIndex: "roleLabel",
-      width: 118,
+      width: 130,
       align: "center",
       render: (roleLabel: string, record) => (
         <Tag color={getRoleColor(record.role)}>{roleLabel}</Tag>
@@ -493,7 +676,7 @@ export default function UsersManagementPage() {
             icon={<Eye className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
-              setDetailUser(record);
+              void openDetailUser(record);
             }}
           />
 
@@ -528,6 +711,16 @@ export default function UsersManagementPage() {
       />
 
       <div className="mt-6 space-y-5">
+        {error ? (
+          <Alert
+            type="error"
+            title={error}
+            showIcon
+            closable
+            onClose={() => setError(null)}
+          />
+        ) : null}
+
         <Card className="border-slate-200 bg-white">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -615,7 +808,7 @@ export default function UsersManagementPage() {
           <Card className="border-slate-200 bg-white">
             <Statistic
               title={<span className="text-slate-500">Tổng tài khoản</span>}
-              value={users.length}
+              value={totalUsers}
               formatter={(value) => (
                 <span className="text-slate-950">{value}</span>
               )}
@@ -694,6 +887,7 @@ export default function UsersManagementPage() {
             rowKey="id"
             size="middle"
             tableLayout="fixed"
+            loading={loading || tableLoading}
             columns={columns}
             dataSource={filteredUsers}
             className="[&_.ant-table-cell]:px-3"
@@ -717,7 +911,7 @@ export default function UsersManagementPage() {
                   return;
                 }
 
-                setDetailUser(record);
+                void openDetailUser(record);
               },
             })}
             pagination={{
@@ -811,7 +1005,7 @@ export default function UsersManagementPage() {
               </Descriptions.Item>
 
               <Descriptions.Item label="Số điện thoại" span={1}>
-                {detailUser.phone}
+                {detailUser.phone || "Chưa cập nhật"}
               </Descriptions.Item>
 
               <Descriptions.Item label="Vai trò" span={1}>
@@ -850,6 +1044,7 @@ export default function UsersManagementPage() {
                   ) : (
                     <ShieldCheck className="h-4 w-4 text-emerald-500" />
                   )}
+
                   {detailUser.status === "locked"
                     ? "Tài khoản đang bị khóa"
                     : "Tài khoản đang hoạt động bình thường"}
