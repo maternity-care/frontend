@@ -14,8 +14,8 @@ import { Card, CardTitle } from "@/management/components/ui/Card";
 import { Input } from "@/management/components/ui/Input";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import { StateBlock } from "@/management/components/ui/StateBlock";
-import { updateMyProfile } from "@/management/features/users/users.api";
 import type { User } from "@/management/features/users/users.types";
+import { updateMyProfile } from "@/features/profile/profile.api";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name là bắt buộc"),
