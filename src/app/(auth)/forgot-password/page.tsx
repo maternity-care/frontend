@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { Mail } from "lucide-react";
 import { forgotPassword } from "@/features/auth/auth.api";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type ForgotPasswordFormValues = {
   email: string;
@@ -45,10 +46,10 @@ export default function ForgotPasswordPage() {
       </div>
 
       <Typography.Title level={3} className="!mb-2">
-        Quên mật khẩu
+        {RESPONSE_MESSAGES.AUTH.FORGOT_PASSWORD}
       </Typography.Title>
       <Typography.Text type="secondary">
-        Nhập email tài khoản để tạo link đặt lại mật khẩu.
+        {RESPONSE_MESSAGES.AUTH.FORGOT_PASSWORD_DESCRIPTION}
       </Typography.Text>
 
       {message ? (
@@ -62,7 +63,7 @@ export default function ForgotPasswordPage() {
                 href={resetUrl}
                 className="font-medium text-pink-700 hover:text-pink-900 hover:underline"
               >
-                Mở trang đặt lại mật khẩu
+                {RESPONSE_MESSAGES.AUTH.RESET_PASSWORD_LINK}
               </Link>
             ) : null
           }
@@ -83,15 +84,15 @@ export default function ForgotPasswordPage() {
           label="Email"
           name="email"
           rules={[
-            { required: true, message: "Vui lòng nhập email" },
-            { type: "email", message: "Email không hợp lệ" },
+            { required: true, message: RESPONSE_MESSAGES.AUTH.ENTER_EMAIL },
+            { type: "email", message: RESPONSE_MESSAGES.AUTH.EMAIL_INVALID },
           ]}
         >
-          <Input autoComplete="email" placeholder="Nhập email" />
+          <Input autoComplete="email" placeholder={RESPONSE_MESSAGES.AUTH.ENTER_EMAIL} />
         </Form.Item>
 
         <Button type="primary" htmlType="submit" loading={isSubmitting} block>
-          Tạo link đặt lại mật khẩu
+          {RESPONSE_MESSAGES.AUTH.CREATE_RESET_PASSWORD_LINK}
         </Button>
       </Form>
 
@@ -100,7 +101,7 @@ export default function ForgotPasswordPage() {
           href="/login"
           className="font-medium text-pink-700 hover:text-pink-900 hover:underline"
         >
-          Quay lại đăng nhập
+          {RESPONSE_MESSAGES.AUTH.LOGIN}
         </Link>
       </p>
     </Card>

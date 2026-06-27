@@ -7,6 +7,7 @@ import { Button, Card, Form, Input, message, Typography } from "antd";
 import { HeartPulse } from "lucide-react";
 import { register } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type RegisterFormValues = {
   name: string;
@@ -65,15 +66,15 @@ function RegisterForm() {
           className="mb-6 inline-flex items-center gap-2 font-semibold text-teal-900"
         >
           <HeartPulse className="h-5 w-5" />
-          Maternity Care
+          {RESPONSE_MESSAGES.COMMON.DEFAULT_NAME}
         </Link>
 
         <Typography.Title level={3} className="!mb-2">
-          Đăng ký tài khoản
+          {RESPONSE_MESSAGES.AUTH.REGISTER}
         </Typography.Title>
 
         <Typography.Text type="secondary">
-          Tạo tài khoản để sử dụng hệ thống Maternity Care.
+          {RESPONSE_MESSAGES.AUTH.REGISTER_DESCRIPTION}
         </Typography.Text>
 
         <Form<RegisterFormValues>
@@ -82,49 +83,49 @@ function RegisterForm() {
           onFinish={onFinish}
         >
           <Form.Item
-            label="Họ và tên"
+            label={RESPONSE_MESSAGES.COMMON.NAME}
             name="name"
             rules={[
-              { required: true, message: "Vui lòng nhập họ và tên" },
-              { min: 2, message: "Họ và tên tối thiểu 2 ký tự" },
+              { required: true, message: RESPONSE_MESSAGES.AUTH.NAME_REQUIRED },
+              { min: 2, message: RESPONSE_MESSAGES.AUTH.NAME_MIN_LENGTH },
             ]}
           >
-            <Input placeholder="Nhập họ và tên" autoComplete="name" />
+            <Input placeholder={RESPONSE_MESSAGES.AUTH.ENTER_NAME} autoComplete="name" />
           </Form.Item>
 
           <Form.Item
-            label="Email"
+            label={RESPONSE_MESSAGES.COMMON.EMAIL}
             name="email"
             rules={[
-              { required: true, message: "Vui lòng nhập email" },
-              { type: "email", message: "Email không hợp lệ" },
+              { required: true, message: RESPONSE_MESSAGES.AUTH.emailRequired },
+              { type: "email", message: RESPONSE_MESSAGES.AUTH.emailInvalid },
             ]}
           >
-            <Input placeholder="Nhập email" autoComplete="email" />
+            <Input placeholder={RESPONSE_MESSAGES.AUTH.ENTER_EMAIL} autoComplete="email" />
           </Form.Item>
 
           <Form.Item
-            label="Mật khẩu"
+            label={RESPONSE_MESSAGES.COMMON.PASSWORD}
             name="password"
             rules={[
-              { required: true, message: "Vui lòng nhập mật khẩu" },
-              { min: 6, message: "Mật khẩu tối thiểu 6 ký tự" },
+              { required: true, message: RESPONSE_MESSAGES.AUTH.passwordRequired },
+              { min: 6, message: RESPONSE_MESSAGES.AUTH.passwordMinLength },
             ]}
             hasFeedback
           >
             <Input.Password
-              placeholder="Nhập mật khẩu"
+              placeholder={RESPONSE_MESSAGES.AUTH.ENTER_PASSWORD}
               autoComplete="new-password"
             />
           </Form.Item>
 
           <Form.Item
-            label="Xác nhận mật khẩu"
+            label={RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD}
             name="confirmPassword"
             dependencies={["password"]}
             hasFeedback
             rules={[
-              { required: true, message: "Vui lòng xác nhận mật khẩu" },
+              { required: true, message: RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD_REQUIRED },
               ({ getFieldValue }) => ({
                 validator(_, value) {
                   if (!value || getFieldValue("password") === value) {
@@ -132,14 +133,14 @@ function RegisterForm() {
                   }
 
                   return Promise.reject(
-                    new Error("Mật khẩu xác nhận không khớp")
+                    new Error(RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD_MISMATCH)
                   );
                 },
               }),
             ]}
           >
             <Input.Password
-              placeholder="Nhập lại mật khẩu"
+              placeholder={RESPONSE_MESSAGES.AUTH.ENTER_PASSWORD}
               autoComplete="new-password"
             />
           </Form.Item>
@@ -151,17 +152,17 @@ function RegisterForm() {
               loading={isSubmitting}
               block
             >
-              Đăng ký
+              {RESPONSE_MESSAGES.AUTH.REGISTER}
             </Button>
           </Form.Item>
 
           <p className="text-center text-sm text-slate-600">
-            Bạn đã có tài khoản?{" "}
+            {RESPONSE_MESSAGES.AUTH.HAVE_ACCOUNT}{" "}
             <Link
               href="/login"
               className="font-medium text-teal-700 hover:text-teal-900 hover:underline"
             >
-              Đăng nhập
+              {RESPONSE_MESSAGES.AUTH.LOGIN}
             </Link>
           </p>
         </Form>
