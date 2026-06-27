@@ -1,7 +1,7 @@
 //src/app/management/clinic-room-management/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
   Alert,
@@ -107,7 +107,7 @@ function formatDateTime(value?: string) {
   });
 }
 
-export default function ClinicRoomManagementPage() {
+function ClinicRoomManagementContent() {
   const searchParams = useSearchParams();
 
   const facilityIdFromQuery = searchParams.get("facilityId");
@@ -883,5 +883,19 @@ export default function ClinicRoomManagementPage() {
         </div>
       </Modal>
     </AdminLayout>
+  );
+}
+
+export default function ClinicRoomManagementPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
+          Đang tải danh sách phòng khám...
+        </div>
+      }
+    >
+      <ClinicRoomManagementContent />
+    </Suspense>
   );
 }
