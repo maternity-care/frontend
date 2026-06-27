@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { logout as logoutApi } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
 import useAuth from "@/hooks/useAuth";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 const { Header } = Layout;
 const { Text } = Typography;
@@ -92,12 +93,12 @@ export function UserHeader() {
     {
       key: "profile",
       icon: <UserRound className="h-4 w-4" />,
-      label: "Xem hồ sơ",
+      label: RESPONSE_MESSAGES.NAVIGATION.VIEW_PROFILE,
     },
     {
       key: "schedule",
       icon: <CalendarDays className="h-4 w-4" />,
-      label: "Lịch chăm sóc",
+      label: RESPONSE_MESSAGES.NAVIGATION.SCHEDULE,
     },
     {
       type: "divider",
@@ -106,7 +107,7 @@ export function UserHeader() {
       key: "logout",
       danger: true,
       icon: <LogOut className="h-4 w-4" />,
-      label: "Đăng xuất",
+      label: RESPONSE_MESSAGES.AUTH.LOGOUT,
     },
   ];
 
@@ -122,9 +123,9 @@ export function UserHeader() {
 
           <div className="leading-tight">
             <div className="text-base font-semibold text-slate-950">
-              Maternity Care
+              {RESPONSE_MESSAGES.COMMON.DEFAULT_NAME}
             </div>
-            <div className="text-xs text-slate-500">Thai phụ</div>
+            <div className="text-xs text-slate-500">{RESPONSE_MESSAGES.COMMON.PREGNANT}</div>
           </div>
         </Link>
 
@@ -146,7 +147,7 @@ export function UserHeader() {
 
             <div className="hidden text-left sm:block">
               <Text strong className="block max-w-36 truncate">
-                {currentUser?.name || "Thai phụ"}
+                {currentUser?.name || RESPONSE_MESSAGES.COMMON.PREGNANT}
               </Text>
               <Text type="secondary" className="block max-w-36 truncate text-xs">
                 {currentUser?.email || ""}

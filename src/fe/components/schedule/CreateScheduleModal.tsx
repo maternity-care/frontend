@@ -8,6 +8,7 @@ import type {
   PregnancyScheduleItem,
   PregnancyScheduleType,
 } from "@/features/schedule/schedule.types";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type CreateScheduleFormValues = {
   title: string;
@@ -111,11 +112,11 @@ export function CreateScheduleModal({
 
   return (
     <Modal
-      title="Tạo lịch nhắc mới"
+      title={RESPONSE_MESSAGES.SCHEDULE.CREATE_NEW_SCHEDULE}
       open={open}
       onCancel={handleCancel}
-      okText="Tạo lịch"
-      cancelText="Hủy"
+      okText={RESPONSE_MESSAGES.SCHEDULE.CREATE_SCHEDULE}
+      cancelText={RESPONSE_MESSAGES.COMMON.CANCEL}
       destroyOnHidden
       okButtonProps={{
         htmlType: "submit",
@@ -131,26 +132,26 @@ export function CreateScheduleModal({
         onFinish={handleFinish}
       >
         <Form.Item
-          label="Tiêu đề"
+          label={RESPONSE_MESSAGES.COMMON.TITLE}
           name="title"
           rules={[
             {
               required: true,
               whitespace: true,
-              message: "Vui lòng nhập tiêu đề lịch nhắc",
+              message: RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_TITLE_DESCRIPTION,
             },
           ]}
         >
-          <Input placeholder="Ví dụ: Uống viên sắt, tái khám, đo huyết áp..." />
+          <Input placeholder={RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_TITLE_SCHEDULE_EXAMPLE} />
         </Form.Item>
 
         <Form.Item
-          label="Loại lịch"
+          label={RESPONSE_MESSAGES.SCHEDULE.SCHEDULE_TYPE}
           name="type"
           rules={[
             {
               required: true,
-              message: "Vui lòng chọn loại lịch",
+              message: RESPONSE_MESSAGES.SCHEDULE.SCHEDULE_TYPE_REQUIRED,
             },
           ]}
         >
@@ -159,12 +160,12 @@ export function CreateScheduleModal({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Form.Item
-            label="Ngày"
+            label={RESPONSE_MESSAGES.COMMON.DATE}
             name="date"
             rules={[
               {
                 required: true,
-                message: "Vui lòng chọn ngày",
+                message: RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_DATE_DESCRIPTION,
               },
             ]}
           >
@@ -172,12 +173,12 @@ export function CreateScheduleModal({
           </Form.Item>
 
           <Form.Item
-            label="Giờ"
+            label={RESPONSE_MESSAGES.COMMON.HOUR}
             name="time"
             rules={[
               {
                 required: true,
-                message: "Vui lòng chọn giờ",
+                message: RESPONSE_MESSAGES.COMMON_DESCRIPTION.enterHourDescription,
               },
             ]}
           >
@@ -185,14 +186,14 @@ export function CreateScheduleModal({
           </Form.Item>
         </div>
 
-        <Form.Item label="Địa điểm" name="location">
-          <Input placeholder="Ví dụ: Phòng khám, bệnh viện, tại nhà..." />
+        <Form.Item label={RESPONSE_MESSAGES.COMMON.LOCATION} name="location">
+          <Input placeholder={RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_LOCATION_SCHEDULE_EXAMPLE} />
         </Form.Item>
 
         <Form.Item label="Ghi chú" name="note">
           <Input.TextArea
             rows={3}
-            placeholder="Nhập ghi chú cho lịch nhắc nếu có"
+            placeholder={RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_NOTE_DESCRIPTION}
           />
         </Form.Item>
       </Form>
