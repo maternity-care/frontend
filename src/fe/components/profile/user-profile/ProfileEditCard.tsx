@@ -74,11 +74,11 @@ export function ProfileEditCard({
     >
       <div className="mb-5 grid gap-3">
         {feedback.message ? (
-          <Alert type="success" showIcon message={feedback.message} />
+          <Alert type="success" showIcon title={feedback.message} />
         ) : null}
 
         {feedback.error ? (
-          <Alert type="error" showIcon message={feedback.error} />
+          <Alert type="error" showIcon title={feedback.error} />
         ) : null}
       </div>
 
