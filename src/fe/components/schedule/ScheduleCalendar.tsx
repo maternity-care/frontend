@@ -9,6 +9,7 @@ import type {
   PregnancyScheduleStatus,
   PregnancyScheduleType,
 } from "@/features/schedule/schedule.types";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 const { Text } = Typography;
 
@@ -53,20 +54,20 @@ export function ScheduleCalendar({ schedules }: ScheduleCalendarProps) {
               content={
                 <div className="max-w-64 space-y-1 text-sm">
                   <div>
-                    <Text type="secondary">Thời gian: </Text>
+                    <Text type="secondary">{RESPONSE_MESSAGES.COMMON.HOUR} </Text>
                     <Text>{item.time}</Text>
                   </div>
 
                   {item.location ? (
                     <div>
-                      <Text type="secondary">Địa điểm: </Text>
+                      <Text type="secondary">{RESPONSE_MESSAGES.COMMON.LOCATION}: </Text>
                       <Text>{item.location}</Text>
                     </div>
                   ) : null}
 
                   {item.note ? (
                     <div>
-                      <Text type="secondary">Ghi chú: </Text>
+                      <Text type="secondary">{RESPONSE_MESSAGES.COMMON.NOTE}: </Text>
                       <Text>{item.note}</Text>
                     </div>
                   ) : null}
@@ -84,7 +85,7 @@ export function ScheduleCalendar({ schedules }: ScheduleCalendarProps) {
 
           {daySchedules.length > 3 ? (
             <div className="text-xs text-slate-500">
-              +{daySchedules.length - 3} lịch khác
+              +{daySchedules.length - 3} {RESPONSE_MESSAGES.SCHEDULE.OTHER_SCHEDULE}
             </div>
           ) : null}
         </div>
@@ -93,7 +94,7 @@ export function ScheduleCalendar({ schedules }: ScheduleCalendarProps) {
   };
 
   return (
-    <Card title="Dạng xem lịch" className="shadow-sm">
+    <Card title={RESPONSE_MESSAGES.SCHEDULE.CALENDAR_VIEW} className="shadow-sm">
       <Calendar cellRender={cellRender} />
     </Card>
   );

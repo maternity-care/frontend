@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { KeyRound } from "lucide-react";
 import { resetPassword } from "@/features/auth/auth.api";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type ResetPasswordFormValues = {
   password: string;
@@ -48,10 +49,10 @@ function ResetPasswordForm() {
       </div>
 
       <Typography.Title level={3} className="!mb-2">
-        Đặt lại mật khẩu
+        {RESPONSE_MESSAGES.AUTH.RESET_PASSWORD}
       </Typography.Title>
       <Typography.Text type="secondary">
-        Nhập mật khẩu mới cho tài khoản của bạn.
+        {RESPONSE_MESSAGES.AUTH.ENTER_NEW_PASSWORD}
       </Typography.Text>
 
       {!token ? (
@@ -75,32 +76,32 @@ function ResetPasswordForm() {
         onFinish={onFinish}
       >
         <Form.Item
-          label="Mật khẩu mới"
+          label={RESPONSE_MESSAGES.AUTH.NEW_PASSWORD}
           name="password"
           rules={[
-            { required: true, message: "Vui lòng nhập mật khẩu mới" },
-            { min: 6, message: "Mật khẩu tối thiểu 6 ký tự" },
+            { required: true, message: RESPONSE_MESSAGES.AUTH.newPasswordRequired },
+            { min: 6, message: RESPONSE_MESSAGES.AUTH.newPasswordMinLength },
           ]}
         >
           <Input.Password
             autoComplete="new-password"
-            placeholder="Nhập mật khẩu mới"
+            placeholder={RESPONSE_MESSAGES.AUTH.ENTER_NEW_PASSWORD}
           />
         </Form.Item>
 
         <Form.Item
-          label="Xác nhận mật khẩu"
+          label={RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD}
           name="confirmPassword"
           dependencies={["password"]}
           rules={[
-            { required: true, message: "Vui lòng xác nhận mật khẩu" },
+            { required: true, message: RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD_REQUIRED },
             ({ getFieldValue }) => ({
               validator(_, value) {
                 if (!value || getFieldValue("password") === value) {
                   return Promise.resolve();
                 }
                 return Promise.reject(
-                  new Error("Mật khẩu xác nhận không khớp"),
+                  new Error(RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD_MISMATCH),
                 );
               },
             }),
@@ -108,7 +109,7 @@ function ResetPasswordForm() {
         >
           <Input.Password
             autoComplete="new-password"
-            placeholder="Nhập lại mật khẩu mới"
+            placeholder={RESPONSE_MESSAGES.AUTH.ENTER_NEW_PASSWORD}
           />
         </Form.Item>
 
@@ -119,7 +120,7 @@ function ResetPasswordForm() {
           disabled={!token}
           block
         >
-          Đặt lại mật khẩu
+          {RESPONSE_MESSAGES.AUTH.RESET_PASSWORD}
         </Button>
       </Form>
 
@@ -128,7 +129,7 @@ function ResetPasswordForm() {
           href="/login"
           className="font-medium text-teal-700 hover:text-teal-900 hover:underline"
         >
-          Quay lại đăng nhập
+          {RESPONSE_MESSAGES.AUTH.LOGIN_ACCOUNT}
         </Link>
       </p>
     </Card>
