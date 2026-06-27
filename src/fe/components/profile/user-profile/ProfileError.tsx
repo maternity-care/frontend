@@ -9,7 +9,7 @@ export function ProfileError({ error }: ProfileErrorProps) {
     <Alert
       type="error"
       showIcon
-      message="Không tải được hồ sơ"
+      title="Không tải được hồ sơ"
       description={error ?? "Vui lòng thử tải lại trang hoặc đăng nhập lại."}
     />
   );
