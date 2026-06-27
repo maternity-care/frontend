@@ -28,10 +28,12 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { createUser, updateUser } from "@/management/features/users/users.api";
 import type { User as BackendUser } from "@/management/features/users/users.types";
 
 const { Text, Title } = Typography;
+const MODAL_MESSAGES = RESPONSE_MESSAGES.USER_ACCOUNT_MODAL;
 
 export type UserRole = "pregnant" | "staff" | "doctor" | "owner" | "admin";
 export type UserStatus = "active" | "locked";
@@ -62,22 +64,22 @@ export interface UserFormValues {
 }
 
 export const roleOptions = [
-  { value: "pregnant", label: "Thai phụ" },
-  { value: "staff", label: "Staff" },
-  { value: "doctor", label: "Bác sĩ" },
-  { value: "owner", label: "Owner" },
-  { value: "admin", label: "Admin" },
+  { value: "pregnant", label: MODAL_MESSAGES.ROLES.MEMBER },
+  { value: "staff", label: MODAL_MESSAGES.ROLES.STAFF },
+  { value: "doctor", label: MODAL_MESSAGES.ROLES.DOCTOR },
+  { value: "owner", label: MODAL_MESSAGES.ROLES.OWNER },
+  { value: "admin", label: MODAL_MESSAGES.ROLES.ADMIN },
 ];
 
 export const statusOptions = [
-  { value: "active", label: "Hoạt động" },
-  { value: "locked", label: "Đã khóa" },
+  { value: "active", label: MODAL_MESSAGES.ACTIVE },
+  { value: "locked", label: MODAL_MESSAGES.LOCKED },
 ];
 
 export const accountTypeOptions = [
-  { value: "customer", label: "Khách hàng" },
-  { value: "internal", label: "Nội bộ" },
-  { value: "system", label: "Hệ thống" },
+  { value: "customer", label: MODAL_MESSAGES.ACCOUNT_TYPES.CUSTOMER },
+  { value: "internal", label: MODAL_MESSAGES.ACCOUNT_TYPES.INTERNAL },
+  { value: "system", label: MODAL_MESSAGES.ACCOUNT_TYPES.SYSTEM },
 ];
 
 type ApiResponseData<T> = T | { data: T };
@@ -150,7 +152,7 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
+  return MODAL_MESSAGES.DEFAULT_ERROR;
 }
 
 function getResponseData<T>(response: ApiResponseData<T>): T {
@@ -191,17 +193,17 @@ function toUiRole(roleName?: string): UserRole {
 }
 
 function formatBackendRoleLabel(roleName?: string) {
-  if (!roleName) return "Chưa phân quyền";
+  if (!roleName) return MODAL_MESSAGES.NOT_ASSIGNED;
 
   const roleLabelMap: Record<string, string> = {
-    super_admin: "Super Admin",
-    admin: "Admin",
-    doctor: "Bác sĩ",
-    nurse: "Điều dưỡng",
-    staff: "Staff",
-    member: "Thai phụ",
-    partner: "Partner",
-    owner: "Owner",
+    super_admin: MODAL_MESSAGES.ROLES.SUPER_ADMIN,
+    admin: MODAL_MESSAGES.ROLES.ADMIN,
+    doctor: MODAL_MESSAGES.ROLES.DOCTOR,
+    nurse: MODAL_MESSAGES.ROLES.NURSE,
+    staff: MODAL_MESSAGES.ROLES.STAFF,
+    member: MODAL_MESSAGES.ROLES.MEMBER,
+    partner: MODAL_MESSAGES.ROLES.PARTNER,
+    owner: MODAL_MESSAGES.ROLES.OWNER,
   };
 
   return (
@@ -261,7 +263,7 @@ function PreviewLine({
           {label}
         </p>
         <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">
-          {value || "Chưa nhập"}
+          {value || MODAL_MESSAGES.NOT_ENTERED}
         </div>
       </div>
     </div>
@@ -314,14 +316,16 @@ export function UserAccountFormModal({
     };
   }, [open, editingUser, form]);
 
-  const modalTitle = editingUser ? "Cập nhật tài khoản" : "Thêm tài khoản";
+  const modalTitle = editingUser
+    ? MODAL_MESSAGES.UPDATE_ACCOUNT
+    : MODAL_MESSAGES.ADD_ACCOUNT;
 
   const modalDescription = editingUser
-    ? "Chỉnh sửa thông tin người dùng, vai trò, loại tài khoản và trạng thái."
-    : "Tạo tài khoản mới cho người dùng trong hệ thống.";
+    ? MODAL_MESSAGES.UPDATE_ACCOUNT_DESCRIPTION
+    : MODAL_MESSAGES.CREATE_ACCOUNT_DESCRIPTION;
 
   const previewName = useMemo(() => {
-    return fullName || editingUser?.fullName || "Tài khoản mới";
+    return fullName || editingUser?.fullName || MODAL_MESSAGES.NEW_ACCOUNT;
   }, [fullName, editingUser]);
 
   function handleCancel() {
@@ -338,14 +342,24 @@ export function UserAccountFormModal({
 
     try {
       const password = values.password?.trim();
+      const selectedRole = values.role;
+      const selectedStatus = values.status;
+      const selectedAccountType = values.accountType;
+
+      if (!selectedRole || !selectedStatus || !selectedAccountType) {
+        await form
+          .validateFields(["role", "status", "accountType"])
+          .catch(() => undefined);
+        return;
+      }
 
       if (editingUser) {
         const response = await updateUser(editingUser.id, {
           name: values.fullName.trim(),
           email: values.email.trim(),
           password: password || undefined,
-          status: values.status ? toBackendStatus(values.status) : undefined,
-          roleIds: values.role ? [toBackendRoleId(values.role)] : [],
+          status: toBackendStatus(selectedStatus),
+          roleIds: [toBackendRoleId(selectedRole)],
           permissionOverrides: [],
         });
 
@@ -355,9 +369,9 @@ export function UserAccountFormModal({
         onSaved?.(updatedUser, "update");
 
         Modal.success({
-          title: "Cập nhật tài khoản thành công",
-          content: "Thông tin tài khoản đã được cập nhật.",
-          okText: "Đóng",
+          title: MODAL_MESSAGES.UPDATE_SUCCESS_TITLE,
+          content: MODAL_MESSAGES.UPDATE_SUCCESS_CONTENT,
+          okText: RESPONSE_MESSAGES.COMMON.CLOSE,
           centered: true,
         });
 
@@ -371,7 +385,7 @@ export function UserAccountFormModal({
         form.setFields([
           {
             name: "password",
-            errors: ["Mật khẩu phải có ít nhất 6 ký tự"],
+            errors: [MODAL_MESSAGES.PASSWORD_MIN_LENGTH],
           },
         ]);
 
@@ -383,13 +397,13 @@ export function UserAccountFormModal({
         email: values.email.trim(),
         password,
         position: undefined,
-        roleIds: values.role ? [toBackendRoleId(values.role)] : [],
+        roleIds: [toBackendRoleId(selectedRole)],
         permissionOverrides: [],
       });
 
       let backendUser = getResponseData<BackendUser>(response);
 
-      if (values.status === "locked") {
+      if (selectedStatus === "locked") {
         const updateResponse = await updateUser(backendUser.id, {
           status: 0,
         });
@@ -402,9 +416,9 @@ export function UserAccountFormModal({
       onSaved?.(createdUser, "create");
 
       Modal.success({
-        title: "Thêm tài khoản thành công",
-        content: "Tài khoản mới đã được thêm vào danh sách.",
-        okText: "Đóng",
+        title: MODAL_MESSAGES.CREATE_SUCCESS_TITLE,
+        content: MODAL_MESSAGES.CREATE_SUCCESS_CONTENT,
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
         centered: true,
       });
 
@@ -485,10 +499,10 @@ export function UserAccountFormModal({
 
                   <span>
                     <p className="mb-0 text-base font-semibold text-slate-950">
-                      Thông tin cá nhân
+                      {MODAL_MESSAGES.PERSONAL_INFO}
                     </p>
                     <p className="mb-0 text-xs font-normal text-slate-500">
-                      Nhập họ tên, email và số điện thoại.
+                      {MODAL_MESSAGES.PERSONAL_INFO_DESCRIPTION}
                     </p>
                   </span>
                 </Space>
@@ -498,35 +512,51 @@ export function UserAccountFormModal({
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="fullName"
-                    label="Họ tên"
+                    label={RESPONSE_MESSAGES.COMMON.NAME}
                     rules={[
-                      { required: true, message: "Vui lòng nhập họ tên" },
+                      {
+                        required: true,
+                        message:
+                          RESPONSE_MESSAGES.COMMON_DESCRIPTION.NAME_REQUIRED,
+                      },
                     ]}
                   >
-                    <Input placeholder="Ví dụ: Nguyễn Lan" autoComplete="off" />
+                    <Input
+                      placeholder={MODAL_MESSAGES.FULL_NAME_PLACEHOLDER}
+                      autoComplete="off"
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="email"
-                    label="Email"
+                    label={RESPONSE_MESSAGES.COMMON.EMAIL}
                     rules={[
-                      { required: true, message: "Vui lòng nhập email" },
-                      { type: "email", message: "Email không hợp lệ" },
+                      {
+                        required: true,
+                        message: RESPONSE_MESSAGES.AUTH.emailRequired,
+                      },
+                      {
+                        type: "email",
+                        message: RESPONSE_MESSAGES.AUTH.emailInvalid,
+                      },
                     ]}
                   >
                     <Input
-                      placeholder="lan@example.com"
+                      placeholder={MODAL_MESSAGES.EMAIL_PLACEHOLDER}
                       autoComplete="new-email"
                     />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
-                  <Form.Item name="phone" label="Số điện thoại">
+                  <Form.Item
+                    name="phone"
+                    label={RESPONSE_MESSAGES.COMMON.PHONE}
+                  >
                     <Input
-                      placeholder="0901234567"
+                      placeholder={MODAL_MESSAGES.PHONE_PLACEHOLDER}
                       autoComplete="new-phone"
                       inputMode="tel"
                     />
@@ -536,23 +566,27 @@ export function UserAccountFormModal({
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="password"
-                    label={editingUser ? "Mật khẩu mới" : "Mật khẩu"}
+                    label={
+                      editingUser
+                        ? MODAL_MESSAGES.NEW_PASSWORD
+                        : RESPONSE_MESSAGES.COMMON.PASSWORD
+                    }
                     rules={[
                       {
                         required: !editingUser,
-                        message: "Vui lòng nhập mật khẩu",
+                        message: RESPONSE_MESSAGES.AUTH.passwordRequired,
                       },
                       {
                         min: 6,
-                        message: "Mật khẩu phải có ít nhất 6 ký tự",
+                        message: MODAL_MESSAGES.PASSWORD_MIN_LENGTH,
                       },
                     ]}
                   >
                     <Input.Password
                       placeholder={
                         editingUser
-                          ? "Bỏ trống nếu không đổi mật khẩu"
-                          : "Nhập mật khẩu"
+                          ? MODAL_MESSAGES.NEW_PASSWORD_PLACEHOLDER
+                          : MODAL_MESSAGES.PASSWORD_PLACEHOLDER
                       }
                       autoComplete="new-password"
                     />
@@ -581,10 +615,10 @@ export function UserAccountFormModal({
 
                   <span>
                     <p className="mb-0 text-base font-semibold text-slate-950">
-                      Phân quyền tài khoản
+                      {MODAL_MESSAGES.ACCOUNT_PERMISSION}
                     </p>
                     <p className="mb-0 text-xs font-normal text-slate-500">
-                      Chọn vai trò, loại tài khoản và trạng thái.
+                      {MODAL_MESSAGES.ACCOUNT_PERMISSION_DESCRIPTION}
                     </p>
                   </span>
                 </Space>
@@ -594,28 +628,34 @@ export function UserAccountFormModal({
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="role"
-                    label="Vai trò"
+                    label={RESPONSE_MESSAGES.COMMON.ROLE}
                     rules={[
-                      { required: true, message: "Vui lòng chọn vai trò" },
+                      {
+                        required: true,
+                        message: MODAL_MESSAGES.ROLE_REQUIRED,
+                      },
                     ]}
                   >
-                    <Select placeholder="Chọn vai trò" options={roleOptions} />
+                    <Select
+                      placeholder={MODAL_MESSAGES.SELECT_ROLE}
+                      options={roleOptions}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="accountType"
-                    label="Loại tài khoản"
+                    label={MODAL_MESSAGES.ACCOUNT_TYPE}
                     rules={[
                       {
                         required: true,
-                        message: "Vui lòng chọn loại tài khoản",
+                        message: MODAL_MESSAGES.ACCOUNT_TYPE_REQUIRED,
                       },
                     ]}
                   >
                     <Select
-                      placeholder="Chọn loại tài khoản"
+                      placeholder={MODAL_MESSAGES.SELECT_ACCOUNT_TYPE}
                       options={accountTypeOptions}
                     />
                   </Form.Item>
@@ -624,13 +664,16 @@ export function UserAccountFormModal({
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="status"
-                    label="Trạng thái"
+                    label={RESPONSE_MESSAGES.COMMON.STATUS}
                     rules={[
-                      { required: true, message: "Vui lòng chọn trạng thái" },
+                      {
+                        required: true,
+                        message: MODAL_MESSAGES.STATUS_REQUIRED,
+                      },
                     ]}
                   >
                     <Select
-                      placeholder="Chọn trạng thái"
+                      placeholder={MODAL_MESSAGES.SELECT_STATUS}
                       options={statusOptions}
                     />
                   </Form.Item>
@@ -651,7 +694,7 @@ export function UserAccountFormModal({
                 </p>
 
                 <p className="mb-0 text-sm text-slate-500">
-                  {email || "Chưa có email"}
+                  {email || MODAL_MESSAGES.NO_EMAIL}
                 </p>
               </div>
             </div>
@@ -660,42 +703,46 @@ export function UserAccountFormModal({
               {role ? (
                 <Tag color={getRoleColor(role)}>{getRoleLabel(role)}</Tag>
               ) : (
-                <Tag>Chưa chọn vai trò</Tag>
+                <Tag>{MODAL_MESSAGES.SELECT_ROLE}</Tag>
               )}
 
               {status ? (
                 <Tag color={status === "locked" ? "default" : "green"}>
-                  {status === "locked" ? "Đã khóa" : "Hoạt động"}
+                  {status === "locked"
+                    ? MODAL_MESSAGES.LOCKED
+                    : MODAL_MESSAGES.ACTIVE}
                 </Tag>
               ) : (
-                <Tag>Chưa chọn trạng thái</Tag>
+                <Tag>{MODAL_MESSAGES.SELECT_STATUS}</Tag>
               )}
             </div>
 
             <div className="mt-4 space-y-2.5">
               <PreviewLine
                 icon={<UserRound className="h-4 w-4" />}
-                label="Họ tên"
+                label={RESPONSE_MESSAGES.COMMON.NAME}
                 value={fullName}
               />
 
               <PreviewLine
                 icon={<Mail className="h-4 w-4" />}
-                label="Email"
+                label={RESPONSE_MESSAGES.COMMON.EMAIL}
                 value={email}
               />
 
               <PreviewLine
                 icon={<Phone className="h-4 w-4" />}
-                label="Số điện thoại"
+                label={RESPONSE_MESSAGES.COMMON.PHONE}
                 value={phone}
               />
 
               <PreviewLine
                 icon={<Users className="h-4 w-4" />}
-                label="Loại tài khoản"
+                label={MODAL_MESSAGES.ACCOUNT_TYPE}
                 value={
-                  accountType ? getAccountTypeLabel(accountType) : "Chưa chọn"
+                  accountType
+                    ? getAccountTypeLabel(accountType)
+                    : MODAL_MESSAGES.NOT_SELECTED
                 }
               />
             </div>
@@ -705,7 +752,7 @@ export function UserAccountFormModal({
         <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-4">
           <Button onClick={handleCancel} disabled={submitting}>
             <X className="mr-1 h-4 w-4" />
-            Hủy
+            {RESPONSE_MESSAGES.COMMON.CANCEL}
           </Button>
 
           <Button type="primary" htmlType="submit" loading={submitting}>
@@ -715,7 +762,9 @@ export function UserAccountFormModal({
               <Save className="mr-1 h-4 w-4" />
             )}
 
-            {editingUser ? "Cập nhật tài khoản" : "Thêm tài khoản"}
+            {editingUser
+              ? MODAL_MESSAGES.UPDATE_ACCOUNT
+              : MODAL_MESSAGES.ADD_ACCOUNT}
           </Button>
         </div>
       </Form>
