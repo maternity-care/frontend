@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   href="/profile"
                 >
                   <UserRound className="h-4 w-4" />
-                  {user?.name ?? RESPONSE_MESSAGES.NAVIGATION.COMMON}
+                  {user?.name ?? RESPONSE_MESSAGES.NAVIGATION.CART}
                 </Link>
 
                 <Link

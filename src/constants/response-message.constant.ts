@@ -213,7 +213,8 @@ export const RESPONSE_MESSAGES = {
         SCHEDULE_TYPE: "Loại lịch",
         SCHEDULE_TYPE_REQUIRED: "Vui lòng chọn loại lịch",
         OTHER_SCHEDULE: "Lịch khác",
-        CALENDAR_VIEW: "Dạng xem lịch"
+        CALENDAR_VIEW: "Dạng xem lịch",
+        Pregnancy_records: "Hồ sơ thai kỳ",
     },
 
     PROFILE: {
