@@ -109,7 +109,7 @@ function LoginForm() {
         </Typography.Text>
 
         {formError ? (
-          <Alert className="mt-5" type="error" message={formError} showIcon />
+          <Alert className="mt-5" type="error" title={formError} showIcon />
         ) : null}
 
         <Form<LoginFormValues>
