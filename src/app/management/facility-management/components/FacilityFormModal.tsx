@@ -18,9 +18,11 @@ import {
   Typography,
 } from "antd";
 import { Building2, Clock3, Mail, MapPin, Phone, Save, X } from "lucide-react";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
+const FACILITY_MESSAGES = RESPONSE_MESSAGES.FACILITY_MANAGEMENT;
 
 export type FacilityFormValues = {
   name: string;
@@ -72,17 +74,17 @@ const initialValues: FacilityFormFields = {
 function getSubmitErrorMessage(err: unknown) {
   if (err instanceof Error) {
     if (err.message.includes("Facility code already exists")) {
-      return "Mã cơ sở đã tồn tại. Vui lòng nhập mã cơ sở khác.";
+      return FACILITY_MESSAGES.FACILITY_CODE_EXISTS;
     }
 
     if (err.message.includes("Validation failed")) {
-      return "Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại các trường bắt buộc.";
+      return FACILITY_MESSAGES.VALIDATION_FAILED;
     }
 
     return err.message;
   }
 
-  return "Không thể thêm cơ sở. Vui lòng thử lại.";
+  return FACILITY_MESSAGES.CREATE_ERROR_DEFAULT;
 }
 
 function PreviewLine({
@@ -102,7 +104,7 @@ function PreviewLine({
           {label}
         </p>
         <p className="mt-0.5 truncate text-sm font-semibold text-slate-900">
-          {value || "Chưa nhập"}
+          {value || FACILITY_MESSAGES.NOT_ENTERED}
         </p>
       </div>
     </div>
@@ -178,16 +180,16 @@ export function FacilityFormModal({
       onClose();
 
       Modal.success({
-        title: "Thêm cơ sở thành công",
-        content: "Cơ sở khám mới đã được tạo và hiển thị trong danh sách.",
-        okText: "Đóng",
+        title: FACILITY_MESSAGES.CREATE_SUCCESS_TITLE,
+        content: FACILITY_MESSAGES.CREATE_SUCCESS_CONTENT,
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
         centered: true,
       });
     } catch (err) {
       Modal.error({
-        title: "Thêm cơ sở thất bại",
+        title: FACILITY_MESSAGES.CREATE_ERROR_TITLE,
         content: getSubmitErrorMessage(err),
-        okText: "Đóng",
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
         centered: true,
       });
     } finally {
@@ -210,10 +212,10 @@ export function FacilityFormModal({
     >
       <div className="border-b border-slate-200 px-1 pb-4">
         <Title level={3} className="!mb-1 !text-slate-950">
-          Thêm cơ sở khám
+          {FACILITY_MESSAGES.ADD_FACILITY_TITLE}
         </Title>
         <Text className="text-slate-500">
-          Tạo cơ sở mới để quản lý lịch khám, dịch vụ và thông tin liên hệ.
+          {FACILITY_MESSAGES.ADD_FACILITY_DESCRIPTION}
         </Text>
       </div>
 
@@ -235,10 +237,10 @@ export function FacilityFormModal({
                   </span>
                   <span>
                     <p className="mb-0 text-base font-semibold text-slate-950">
-                      Thông tin cơ sở
+                      {FACILITY_MESSAGES.FACILITY_INFO}
                     </p>
                     <p className="mb-0 text-xs font-normal text-slate-500">
-                      Nhập tên, mã cơ sở, liên hệ và trạng thái hoạt động.
+                      {FACILITY_MESSAGES.FACILITY_INFO_CREATE_DESCRIPTION}
                     </p>
                   </span>
                 </Space>
@@ -248,14 +250,17 @@ export function FacilityFormModal({
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="name"
-                    label="Tên cơ sở"
+                    label={FACILITY_MESSAGES.FACILITY_NAME}
                     rules={[
-                      { required: true, message: "Vui lòng nhập tên cơ sở" },
+                      {
+                        required: true,
+                        message: FACILITY_MESSAGES.VALIDATION.NAME_REQUIRED,
+                      },
                     ]}
                   >
                     <Input
                       size="large"
-                      placeholder="Ví dụ: Phòng khám Sản Phụ khoa An Tâm"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.NAME}
                     />
                   </Form.Item>
                 </Col>
@@ -263,53 +268,79 @@ export function FacilityFormModal({
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="code"
-                    label="Mã cơ sở"
+                    label={FACILITY_MESSAGES.FACILITY_CODE}
                     rules={[
-                      { required: true, message: "Vui lòng nhập mã cơ sở" },
+                      {
+                        required: true,
+                        message: FACILITY_MESSAGES.VALIDATION.CODE_REQUIRED,
+                      },
                     ]}
                   >
-                    <Input size="large" placeholder="Ví dụ: PK-SA-001" />
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.CODE}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="hotline"
-                    label="Số điện thoại"
+                    label={FACILITY_MESSAGES.PHONE}
                     rules={[
                       {
                         required: true,
-                        message: "Vui lòng nhập số điện thoại",
+                        message: FACILITY_MESSAGES.VALIDATION.PHONE_REQUIRED,
                       },
                     ]}
                   >
-                    <Input size="large" placeholder="024.3825.5555" />
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.PHONE}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="email"
-                    label="Email"
-                    rules={[{ type: "email", message: "Email không hợp lệ" }]}
+                    label={FACILITY_MESSAGES.EMAIL}
+                    rules={[
+                      {
+                        type: "email",
+                        message: FACILITY_MESSAGES.VALIDATION.EMAIL_INVALID,
+                      },
+                    ]}
                   >
-                    <Input size="large" placeholder="hotro@khamasantam.vn" />
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.EMAIL}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="status"
-                    label="Trạng thái"
+                    label={FACILITY_MESSAGES.STATUS}
                     rules={[
-                      { required: true, message: "Vui lòng chọn trạng thái" },
+                      {
+                        required: true,
+                        message: FACILITY_MESSAGES.VALIDATION.STATUS_REQUIRED,
+                      },
                     ]}
                   >
                     <Select
                       size="large"
                       options={[
-                        { value: "active", label: "Hoạt động" },
-                        { value: "suspended", label: "Tạm ngưng" },
+                        {
+                          value: "active",
+                          label: FACILITY_MESSAGES.ACTIVE,
+                        },
+                        {
+                          value: "suspended",
+                          label: FACILITY_MESSAGES.SUSPENDED,
+                        },
                       ]}
                     />
                   </Form.Item>
@@ -326,10 +357,10 @@ export function FacilityFormModal({
                   </span>
                   <span>
                     <p className="mb-0 text-base font-semibold text-slate-950">
-                      Vị trí & thời gian
+                      {FACILITY_MESSAGES.LOCATION_TIME}
                     </p>
                     <p className="mb-0 text-xs font-normal text-slate-500">
-                      Cập nhật địa chỉ, khu vực và tọa độ cơ sở.
+                      {FACILITY_MESSAGES.LOCATION_TIME_CREATE_DESCRIPTION}
                     </p>
                   </span>
                 </Space>
@@ -339,74 +370,110 @@ export function FacilityFormModal({
                 <Col xs={24}>
                   <Form.Item
                     name="address"
-                    label="Địa chỉ"
+                    label={FACILITY_MESSAGES.ADDRESS}
                     rules={[
-                      { required: true, message: "Vui lòng nhập địa chỉ" },
+                      {
+                        required: true,
+                        message: FACILITY_MESSAGES.VALIDATION.ADDRESS_REQUIRED,
+                      },
                     ]}
                   >
-                    <Input size="large" placeholder="Số 45 Đường Láng" />
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.ADDRESS}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="city"
-                    label="Tỉnh/Thành phố"
+                    label={FACILITY_MESSAGES.CITY}
                     rules={[
                       {
                         required: true,
-                        message: "Vui lòng nhập tỉnh/thành phố",
+                        message: FACILITY_MESSAGES.VALIDATION.CITY_REQUIRED,
                       },
                     ]}
                   >
-                    <Input size="large" placeholder="Hà Nội" />
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.CITY}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="district"
-                    label="Quận/Huyện"
+                    label={FACILITY_MESSAGES.DISTRICT}
                     rules={[
-                      { required: true, message: "Vui lòng nhập quận/huyện" },
+                      {
+                        required: true,
+                        message: FACILITY_MESSAGES.VALIDATION.DISTRICT_REQUIRED,
+                      },
                     ]}
                   >
-                    <Input size="large" placeholder="Đống Đa" />
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.DISTRICT}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="ward"
-                    label="Phường/Xã"
+                    label={FACILITY_MESSAGES.WARD}
                     rules={[
-                      { required: true, message: "Vui lòng nhập phường/xã" },
+                      {
+                        required: true,
+                        message: FACILITY_MESSAGES.VALIDATION.WARD_REQUIRED,
+                      },
                     ]}
                   >
-                    <Input size="large" placeholder="Láng Thượng" />
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.WARD}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={12}>
-                  <Form.Item name="latitude" label="Vĩ độ">
-                    <Input size="large" placeholder="21.0285000" />
+                  <Form.Item name="latitude" label={FACILITY_MESSAGES.LATITUDE}>
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.LATITUDE}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={12}>
-                  <Form.Item name="longitude" label="Kinh độ">
-                    <Input size="large" placeholder="105.8372000" />
+                  <Form.Item
+                    name="longitude"
+                    label={FACILITY_MESSAGES.LONGITUDE}
+                  >
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.LONGITUDE}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
-                  <Form.Item name="workingDays" label="Ngày hoạt động">
-                    <Input size="large" placeholder="Thứ 2 - Chủ nhật" />
+                  <Form.Item
+                    name="workingDays"
+                    label={FACILITY_MESSAGES.WORKING_DAYS}
+                  >
+                    <Input
+                      size="large"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.WORKING_DAYS}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={8}>
-                  <Form.Item name="openTime" label="Giờ mở cửa">
+                  <Form.Item name="openTime" label={FACILITY_MESSAGES.OPEN_TIME}>
                     <TimePicker
                       size="large"
                       format="HH:mm"
@@ -416,7 +483,7 @@ export function FacilityFormModal({
                 </Col>
 
                 <Col xs={24} md={8}>
-                  <Form.Item name="closeTime" label="Giờ đóng cửa">
+                  <Form.Item name="closeTime" label={FACILITY_MESSAGES.CLOSE_TIME}>
                     <TimePicker
                       size="large"
                       format="HH:mm"
@@ -427,22 +494,31 @@ export function FacilityFormModal({
               </Row>
             </Card>
 
-            <Card className="border-slate-200" title="Dịch vụ & ghi chú">
+            <Card
+              className="border-slate-200"
+              title={FACILITY_MESSAGES.SERVICES_NOTE}
+            >
               <Row gutter={16}>
                 <Col xs={24} md={12}>
-                  <Form.Item name="description" label="Dịch vụ nổi bật">
+                  <Form.Item
+                    name="description"
+                    label={FACILITY_MESSAGES.FEATURED_SERVICES}
+                  >
                     <TextArea
                       rows={4}
-                      placeholder="Ví dụ: Khám thai, Siêu âm, Xét nghiệm"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.SERVICES}
                     />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={12}>
-                  <Form.Item name="internalNote" label="Ghi chú nội bộ">
+                  <Form.Item
+                    name="internalNote"
+                    label={FACILITY_MESSAGES.INTERNAL_NOTE}
+                  >
                     <TextArea
                       rows={4}
-                      placeholder="Ghi chú cho nhân sự nội bộ"
+                      placeholder={FACILITY_MESSAGES.PLACEHOLDERS.INTERNAL_NOTE}
                     />
                   </Form.Item>
                 </Col>
@@ -458,57 +534,61 @@ export function FacilityFormModal({
 
               <div className="min-w-0">
                 <p className="truncate text-base font-semibold text-slate-950">
-                  {name || "Cơ sở mới"}
+                  {name || FACILITY_MESSAGES.NEW_FACILITY}
                 </p>
                 <p className="text-sm text-slate-500">
-                  {code || "Chưa nhập mã cơ sở"}
+                  {code || FACILITY_MESSAGES.FACILITY_CODE_NOT_ENTERED}
                 </p>
               </div>
             </div>
 
             <div className="mt-5">
               <Tag color={status === "suspended" ? "default" : "green"}>
-                {status === "suspended" ? "Tạm ngưng" : "Hoạt động"}
+                {status === "suspended"
+                  ? FACILITY_MESSAGES.SUSPENDED
+                  : FACILITY_MESSAGES.ACTIVE}
               </Tag>
             </div>
 
             <div className="mt-5 space-y-3">
               <PreviewLine
                 icon={<Phone className="h-4 w-4" />}
-                label="Số điện thoại"
+                label={FACILITY_MESSAGES.PHONE}
                 value={hotline}
               />
 
               <PreviewLine
                 icon={<Mail className="h-4 w-4" />}
-                label="Email"
+                label={FACILITY_MESSAGES.EMAIL}
                 value={email}
               />
 
               <PreviewLine
                 icon={<MapPin className="h-4 w-4" />}
-                label="Địa chỉ"
+                label={FACILITY_MESSAGES.ADDRESS}
                 value={fullAddress}
               />
 
               <PreviewLine
                 icon={<MapPin className="h-4 w-4" />}
-                label="Tọa độ"
+                label={FACILITY_MESSAGES.COORDINATES}
                 value={
                   latitude || longitude
-                    ? `${latitude || "?"}, ${longitude || "?"}`
+                    ? `${latitude || FACILITY_MESSAGES.UNKNOWN_VALUE}, ${
+                        longitude || FACILITY_MESSAGES.UNKNOWN_VALUE
+                      }`
                     : ""
                 }
               />
 
               <PreviewLine
                 icon={<Clock3 className="h-4 w-4" />}
-                label="Thời gian"
+                label={FACILITY_MESSAGES.TIME}
                 value={
                   workingDays || workingTime
-                    ? `${workingDays || "Ngày chưa nhập"} · ${
-                        workingTime || "Giờ chưa nhập"
-                      }`
+                    ? `${workingDays || FACILITY_MESSAGES.DAY_NOT_ENTERED}${
+                        FACILITY_MESSAGES.TIME_SEPARATOR
+                      }${workingTime || FACILITY_MESSAGES.TIME_NOT_ENTERED}`
                     : ""
                 }
               />
@@ -516,10 +596,10 @@ export function FacilityFormModal({
 
             <div className="mt-5 rounded-lg border border-dashed border-slate-300 bg-white p-4">
               <p className="text-xs font-semibold uppercase text-slate-400">
-                Dịch vụ nổi bật
+                {FACILITY_MESSAGES.FEATURED_SERVICES}
               </p>
               <p className="mt-1 text-sm text-slate-700">
-                {description || "Chưa nhập dịch vụ nổi bật."}
+                {description || FACILITY_MESSAGES.FEATURED_SERVICES_NOT_ENTERED}
               </p>
             </div>
           </aside>
@@ -528,12 +608,12 @@ export function FacilityFormModal({
         <div className="mt-5 flex justify-end gap-2 border-t border-slate-200 pt-4">
           <Button onClick={handleCancel} disabled={submitting}>
             <X className="mr-1 h-4 w-4" />
-            Hủy
+            {RESPONSE_MESSAGES.COMMON.CANCEL}
           </Button>
 
           <Button type="primary" htmlType="submit" loading={submitting}>
             <Save className="mr-1 h-4 w-4" />
-            Lưu cơ sở
+            {FACILITY_MESSAGES.SAVE_FACILITY}
           </Button>
         </div>
       </Form>
