@@ -10,7 +10,7 @@ type CareTrackingCardProps = {
 };
 
 export function CareTrackingCard({ profile }: CareTrackingCardProps) {
-  const isActive = profile.status === 1;
+  const isActive = profile.status === "active";
 
   const items: DescriptionsProps["items"] = [
     {

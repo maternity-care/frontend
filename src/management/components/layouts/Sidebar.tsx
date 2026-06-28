@@ -3,23 +3,29 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BriefcaseBusiness, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2, DoorOpen } from "lucide-react";
+import { useAuthStore } from "@/features/auth/auth.store";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/management/dashboard", label: "Dashboard", icon: Gauge },
-  { href: "/management/users", label: "Users", icon: Users },
-  { href: "/management/staffdoctormanagement", label: "Staff / Doctors Management", icon: Users },
-  { href: "/management/facility-management", label: "Facility Management", icon: Building2 },
-  { href: "/management/clinic-room-management", label: "Clinic Room Management", icon: DoorOpen },
-  { href: "/management/roles", label: "Roles", icon: ShieldCheck },
-  { href: "/management/permissions", label: "Permissions", icon: KeyRound },
-  { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness },
-  { href: "/management/uploads", label: "Uploads", icon: Upload },
-  { href: "/management/profile", label: "Profile", icon: UserCog },
+  { href: "/management/users", label: "Users", icon: Users, roles: ["super_admin"] },
+  { href: "/management/staffs", label: "Staffs", icon: UserCog, roles: ["super_admin", "admin"] },
+  { href: "/management/profile", label: "Hồ sơ cá nhân", icon: UserCog },
+  // { href: "/management/staffdoctormanagement", label: "Staff / Doctors Management", icon: Users },
+  // { href: "/management/facility-management", label: "Facility Management", icon: Building2 },
+  // { href: "/management/clinic-room-management", label: "Clinic Room Management", icon: DoorOpen },
+  // { href: "/management/roles", label: "Roles", icon: ShieldCheck },
+  // { href: "/management/permissions", label: "Permissions", icon: KeyRound },
+  // { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness },
+  // { href: "/management/uploads", label: "Uploads", icon: Upload },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const roles = useAuthStore((state) => state.roles);
+  const visibleNavItems = navItems.filter(
+    (item) => !item.roles || item.roles.some((role) => roles.includes(role)),
+  );
 
   return (
     <aside className="relative hidden w-72 shrink-0 bg-slate-950 text-slate-300 lg:block">
@@ -40,7 +46,7 @@ export function Sidebar() {
         </div>
       </div>
       <nav className="space-y-1 px-3">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
 
@@ -48,12 +54,23 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-slate-400 transition hover:bg-white/10 hover:text-white",
-                active && "bg-white text-slate-950 shadow-sm hover:bg-white hover:text-slate-950",
+                "relative flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-slate-400 transition hover:bg-white/10 hover:text-white",
+                active &&
+                  "bg-cyan-400/15 text-white ring-1 ring-inset ring-cyan-300/20 hover:bg-cyan-400/15",
               )}
             >
-              <Icon className="h-4 w-4" aria-hidden="true" />
+              {active ? (
+                <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-cyan-300" />
+              ) : null}
+              <Icon
+                className={cn(
+                  "h-4 w-4",
+                  active ? "text-cyan-200" : "text-slate-500",
+                )}
+                aria-hidden="true"
+              />
               {item.label}
             </Link>
           );
