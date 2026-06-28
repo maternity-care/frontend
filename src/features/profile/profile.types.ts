@@ -15,6 +15,13 @@ export interface Role {
   updatedAt: string;
 }
 
+export type PermissionOverrideEffect = "allow" | "deny";
+
+export interface PermissionOverride {
+  permission: Permission;
+  effect: PermissionOverrideEffect;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -25,6 +32,7 @@ export interface UserProfile {
   status: "active" | "inactive" | "locked";
   roles: Role[];
   facilities?: Facility[];
+  permissionOverrides?: PermissionOverride[];
   createdAt: string;
   updatedAt: string;
 }
@@ -41,6 +49,7 @@ export interface Facility {
 
 export interface UpdateProfileInput {
   name?: string;
+  password?: string;
 }
 
 export interface UpdateManagementProfileInput {
@@ -56,6 +65,8 @@ export interface ChangeManagementPasswordInput {
 
 export type ProfileFormValues = {
   name: string;
+  password?: string;
+  confirmPassword?: string;
 };
 
 export type PregnantProfile = UserProfile & {

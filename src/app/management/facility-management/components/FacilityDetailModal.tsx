@@ -14,9 +14,11 @@ import {
   Phone,
   X,
 } from "lucide-react";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import type { Facility } from "@/management/features/facilities/facilities.types";
 
 const { Text, Title } = Typography;
+const FACILITY_MESSAGES = RESPONSE_MESSAGES.FACILITY_MANAGEMENT;
 
 type FacilityDetailModalProps = {
   open: boolean;
@@ -25,13 +27,13 @@ type FacilityDetailModalProps = {
 };
 
 function formatDateTime(value?: string) {
-  if (!value) return "Chưa cập nhật";
+  if (!value) return FACILITY_MESSAGES.NOT_UPDATED;
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) return value;
 
-  return date.toLocaleString("vi-VN", {
+  return date.toLocaleString(FACILITY_MESSAGES.DATE_TIME_LOCALE, {
     hour: "2-digit",
     minute: "2-digit",
     day: "2-digit",
@@ -41,18 +43,18 @@ function formatDateTime(value?: string) {
 }
 
 function splitWorkingHours(value?: string) {
-  if (!value || value === "Chưa cập nhật") {
+  if (!value || value === FACILITY_MESSAGES.NOT_UPDATED) {
     return {
-      openTime: "Chưa cập nhật",
-      closeTime: "Chưa cập nhật",
+      openTime: FACILITY_MESSAGES.NOT_UPDATED,
+      closeTime: FACILITY_MESSAGES.NOT_UPDATED,
     };
   }
 
   const [openTime, closeTime] = value.split("-").map((item) => item.trim());
 
   return {
-    openTime: openTime || "Chưa cập nhật",
-    closeTime: closeTime || "Chưa cập nhật",
+    openTime: openTime || FACILITY_MESSAGES.NOT_UPDATED,
+    closeTime: closeTime || FACILITY_MESSAGES.NOT_UPDATED,
   };
 }
 
@@ -77,7 +79,7 @@ function InfoItem({
             {label}
           </p>
           <div className="break-words text-sm font-medium text-slate-900">
-            {value || "Chưa cập nhật"}
+            {value || FACILITY_MESSAGES.NOT_UPDATED}
           </div>
         </div>
       </div>
@@ -123,16 +125,16 @@ export function FacilityDetailModal({
               );
             }}
           >
-            Xem phòng
+            {FACILITY_MESSAGES.VIEW_ROOMS}
           </Button>
 
           <Button
             type="primary"
-            icon={<X className="h-4 w-4" />}
-            onClick={onClose}
-          >
-            Đóng
-          </Button>
+          icon={<X className="h-4 w-4" />}
+          onClick={onClose}
+        >
+          {RESPONSE_MESSAGES.COMMON.CLOSE}
+        </Button>
         </div>
       }
       closable={false}
@@ -158,12 +160,16 @@ export function FacilityDetailModal({
                 </Title>
 
                 <Space size={8} wrap>
-                  <Tag color="blue">{facility.code || "Chưa có mã"}</Tag>
+                  <Tag color="blue">
+                    {facility.code || FACILITY_MESSAGES.NO_CODE}
+                  </Tag>
 
                   {facility.status === "active" ? (
-                    <Tag color="green">Đang hoạt động</Tag>
+                    <Tag color="green">
+                      {FACILITY_MESSAGES.ACTIVE_DISPLAY}
+                    </Tag>
                   ) : (
-                    <Tag color="default">Tạm ngưng</Tag>
+                    <Tag color="default">{FACILITY_MESSAGES.SUSPENDED}</Tag>
                   )}
                 </Space>
               </div>
@@ -177,10 +183,10 @@ export function FacilityDetailModal({
               title={
                 <div>
                   <p className="mb-0 text-base font-semibold text-slate-950">
-                    Thông tin cơ sở
+                    {FACILITY_MESSAGES.DETAIL_CONTACT_SECTION}
                   </p>
                   <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                    Liên hệ, mã cơ sở và địa chỉ hành chính.
+                    {FACILITY_MESSAGES.FACILITY_INFO_DETAIL_DESCRIPTION}
                   </p>
                 </div>
               }
@@ -189,7 +195,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={12}>
                   <InfoItem
                     icon={<Hash className="h-4 w-4" aria-hidden="true" />}
-                    label="Mã cơ sở"
+                    label={FACILITY_MESSAGES.FACILITY_CODE}
                     value={facility.code}
                   />
                 </Col>
@@ -197,7 +203,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={12}>
                   <InfoItem
                     icon={<Phone className="h-4 w-4" aria-hidden="true" />}
-                    label="Hotline"
+                    label={FACILITY_MESSAGES.HOTLINE}
                     value={facility.hotline}
                   />
                 </Col>
@@ -205,7 +211,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={12}>
                   <InfoItem
                     icon={<Mail className="h-4 w-4" aria-hidden="true" />}
-                    label="Email"
+                    label={FACILITY_MESSAGES.EMAIL}
                     value={facility.email}
                   />
                 </Col>
@@ -213,7 +219,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={12}>
                   <InfoItem
                     icon={<MapPin className="h-4 w-4" aria-hidden="true" />}
-                    label="Tỉnh/Thành phố"
+                    label={FACILITY_MESSAGES.CITY}
                     value={facility.city}
                   />
                 </Col>
@@ -221,7 +227,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={12}>
                   <InfoItem
                     icon={<MapPin className="h-4 w-4" aria-hidden="true" />}
-                    label="Quận/Huyện"
+                    label={FACILITY_MESSAGES.DISTRICT}
                     value={facility.district}
                   />
                 </Col>
@@ -229,7 +235,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={12}>
                   <InfoItem
                     icon={<MapPin className="h-4 w-4" aria-hidden="true" />}
-                    label="Phường/Xã"
+                    label={FACILITY_MESSAGES.WARD}
                     value={facility.ward}
                   />
                 </Col>
@@ -237,7 +243,7 @@ export function FacilityDetailModal({
                 <Col xs={24}>
                   <InfoItem
                     icon={<MapPin className="h-4 w-4" aria-hidden="true" />}
-                    label="Địa chỉ đầy đủ"
+                    label={FACILITY_MESSAGES.FULL_ADDRESS}
                     value={fullAddress}
                   />
                 </Col>
@@ -250,10 +256,10 @@ export function FacilityDetailModal({
               title={
                 <div>
                   <p className="mb-0 text-base font-semibold text-slate-950">
-                    Thời gian & hệ thống
+                    {FACILITY_MESSAGES.DETAIL_SYSTEM_SECTION}
                   </p>
                   <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                    Giờ mở cửa, giờ đóng cửa, tọa độ và lịch sử cập nhật.
+                    {FACILITY_MESSAGES.SYSTEM_TIME_DESCRIPTION}
                   </p>
                 </div>
               }
@@ -262,7 +268,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={8}>
                   <InfoItem
                     icon={<Clock3 className="h-4 w-4" aria-hidden="true" />}
-                    label="Giờ hoạt động"
+                    label={FACILITY_MESSAGES.WORKING_HOURS}
                     value={facility.workingHours}
                   />
                 </Col>
@@ -270,7 +276,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={8}>
                   <InfoItem
                     icon={<Clock3 className="h-4 w-4" aria-hidden="true" />}
-                    label="Giờ mở cửa"
+                    label={FACILITY_MESSAGES.OPEN_TIME}
                     value={openTime}
                   />
                 </Col>
@@ -278,7 +284,7 @@ export function FacilityDetailModal({
                 <Col xs={24} md={8}>
                   <InfoItem
                     icon={<Clock3 className="h-4 w-4" aria-hidden="true" />}
-                    label="Giờ đóng cửa"
+                    label={FACILITY_MESSAGES.CLOSE_TIME}
                     value={closeTime}
                   />
                 </Col>
@@ -286,13 +292,13 @@ export function FacilityDetailModal({
                 <Col xs={24} md={12}>
                   <InfoItem
                     icon={<MapPin className="h-4 w-4" aria-hidden="true" />}
-                    label="Tọa độ"
+                    label={FACILITY_MESSAGES.COORDINATES}
                     value={
                       facility.latitude || facility.longitude
-                        ? `${facility.latitude || "?"}, ${
-                            facility.longitude || "?"
+                        ? `${facility.latitude || FACILITY_MESSAGES.UNKNOWN_VALUE}, ${
+                            facility.longitude || FACILITY_MESSAGES.UNKNOWN_VALUE
                           }`
-                        : "Chưa cập nhật"
+                        : FACILITY_MESSAGES.NOT_UPDATED
                     }
                   />
                 </Col>
@@ -302,7 +308,7 @@ export function FacilityDetailModal({
                     icon={
                       <CalendarClock className="h-4 w-4" aria-hidden="true" />
                     }
-                    label="Ngày tạo"
+                    label={FACILITY_MESSAGES.CREATED_AT}
                     value={formatDateTime(facility.createdAt)}
                   />
                 </Col>
@@ -312,7 +318,7 @@ export function FacilityDetailModal({
                     icon={
                       <CalendarClock className="h-4 w-4" aria-hidden="true" />
                     }
-                    label="Cập nhật lần cuối"
+                    label={FACILITY_MESSAGES.UPDATED_AT}
                     value={formatDateTime(facility.updatedAt)}
                   />
                 </Col>
@@ -320,10 +326,10 @@ export function FacilityDetailModal({
                 <Col xs={24}>
                   <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
                     <Text className="text-xs font-semibold uppercase text-slate-400">
-                      Dịch vụ nổi bật
+                      {FACILITY_MESSAGES.FEATURED_SERVICES}
                     </Text>
                     <p className="mb-0 mt-1 text-sm text-slate-700">
-                      {facility.featuredServices || "Chưa cập nhật"}
+                      {facility.featuredServices || FACILITY_MESSAGES.NOT_UPDATED}
                     </p>
                   </div>
                 </Col>
