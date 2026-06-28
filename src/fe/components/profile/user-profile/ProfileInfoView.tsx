@@ -12,7 +12,7 @@ type PersonalInfoViewProps = {
 };
 
 export function PersonalInfoView({ profile }: PersonalInfoViewProps) {
-  const isActive = profile.status === 1;
+  const isActive = profile.status === "active";
 
   return (
     <Descriptions column={1} size="middle">

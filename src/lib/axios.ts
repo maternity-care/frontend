@@ -1,5 +1,10 @@
 ﻿import axios, { AxiosError } from "axios";
-import { ACCESS_TOKEN_KEY, API_BASE_URL } from "./constants";
+import {
+  ACCESS_TOKEN_KEY,
+  ACTIVE_FACILITY_KEY,
+  API_BASE_URL,
+  MANAGEMENT_ACCESS_TOKEN_KEY,
+} from "./constants";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -13,6 +18,16 @@ export type ApiResult<T> = {
   message?: string;
   success?: boolean;
 };
+
+export class ApiClientError extends Error {
+  constructor(
+    message: string,
+    public readonly validationErrors: string[] = [],
+  ) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
 
 function readCookie(name: string) {
   if (typeof document === "undefined") return null;
@@ -29,13 +44,28 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  const tokenKey =
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith("/management")
+      ? MANAGEMENT_ACCESS_TOKEN_KEY
+      : ACCESS_TOKEN_KEY;
   const token =
     typeof window !== "undefined"
-      ? window.localStorage.getItem(ACCESS_TOKEN_KEY) ?? readCookie(ACCESS_TOKEN_KEY)
+      ? window.localStorage.getItem(tokenKey) ??
+        window.sessionStorage.getItem(tokenKey) ??
+        readCookie(tokenKey)
       : null;
 
   if (token && token !== "undefined" && token !== "null") {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  const activeFacilityId =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem(ACTIVE_FACILITY_KEY)
+      : null;
+  if (activeFacilityId) {
+    config.headers["X-Facility-Id"] = activeFacilityId;
   }
   return config;
 });
@@ -44,7 +74,15 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiResponse<unknown>>) => {
     const message = error.response?.data?.message ?? error.message ?? "Không thể kết nối API.";
-    return Promise.reject(new Error(message));
+    const fields = error.response?.data?.errors?.fields;
+    return Promise.reject(
+      new ApiClientError(
+        message,
+        Array.isArray(fields)
+          ? fields.filter((field): field is string => typeof field === "string")
+          : [],
+      ),
+    );
   },
 );
 
