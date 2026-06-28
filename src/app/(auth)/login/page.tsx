@@ -55,6 +55,7 @@ function LoginForm() {
       const session = await login({
         email: values.email,
         password: values.password,
+        rememberMe: Boolean(values.rememberMe),
       });
 
       setSession(session, Boolean(values.rememberMe));

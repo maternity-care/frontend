@@ -1,6 +1,7 @@
 // src/management/features/users/users.types.ts
 
 export type UserPermissionEffect = "allow" | "deny";
+export type AccountStatus = "active" | "inactive" | "locked";
 
 export interface Permission {
   id: string;
@@ -31,12 +32,50 @@ export interface User {
   name: string;
   email: string;
   phone?: string | null;
-  status: number;
+  status: AccountStatus;
   roles: Role[];
   permissionOverrides?: UserPermissionOverride[];
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+  staffProfile?: StaffProfile | null;
+}
+
+export interface StaffProfile {
+  id: string;
+  staffId: string;
+  personalEmail: string;
+  employeeCode: string;
+  status: AccountStatus;
+  facilityAssignments: FacilityStaffAssignment[];
+  doctor?: DoctorProfile | null;
+}
+
+export type StaffPosition = "admin" | "doctor" | "nurse" | "staff";
+export interface FacilityStaffAssignment {
+  facilityId: string;
+  roles: StaffPosition[];
+}
+
+export interface DoctorProfile {
+  id: string;
+  licenseNo: string;
+  title: string;
+  specialty: string;
+  yearsOfExperience: number;
+  bio?: string;
+  status: string;
+}
+
+export interface CreateStaffProfileInput {
+  personalEmail: string;
+  position: StaffPosition;
+  facilityIds: string[];
+  licenseNo?: string;
+  title?: string;
+  specialty?: string;
+  yearsOfExperience?: number;
+  bio?: string;
 }
 
 export interface GetUsersParams {
@@ -44,7 +83,7 @@ export interface GetUsersParams {
   email?: string;
   phone?: string;
   roleId?: string;
-  status?: number;
+  status?: AccountStatus;
   page?: number;
   limit?: number;
   sort?: string;
@@ -62,18 +101,28 @@ export interface UserPermissionOverrideInput {
 
 export interface CreateUserInput {
   name: string;
-  email: string;
-  password: string;
-  position?: string;
-  roleIds?: string[];
+  personalEmail: string;
+  phone: string;
   permissionOverrides?: UserPermissionOverrideInput[];
+  facilityAssignments: FacilityStaffAssignment[];
+  licenseNo?: string;
+  title?: string;
+  specialty?: string;
+  yearsOfExperience?: number;
+  bio?: string;
 }
 
 export interface UpdateUserInput {
   name?: string;
   email?: string;
   password?: string;
-  status?: number;
+  status?: AccountStatus;
   roleIds?: string[];
   permissionOverrides?: UserPermissionOverrideInput[];
+  facilityAssignments?: FacilityStaffAssignment[];
+  licenseNo?: string;
+  title?: string;
+  specialty?: string;
+  yearsOfExperience?: number;
+  bio?: string;
 }

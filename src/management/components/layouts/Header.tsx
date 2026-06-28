@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, Menu, Search, UserRound } from "lucide-react";
+import { Bell, LogOut, MapPin, Menu, Search, UserRound } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthStore } from "@/features/auth/auth.store";
 import { Button } from "@/management/components/ui/Button";
 
 export function Header() {
   const router = useRouter();
   const { currentUser, logout } = useAuth();
+  const { activeFacilityId, setActiveFacility } = useAuthStore();
+  const isSuperAdmin = currentUser?.roles?.some((role) => role.name === "super_admin");
 
   const handleLogout = async () => {
     await logout();
@@ -36,6 +39,29 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        {!isSuperAdmin && currentUser?.facilities?.length ? (
+          <label className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 shadow-sm md:flex">
+            <MapPin className="h-4 w-4 text-cyan-700" aria-hidden="true" />
+            <span className="sr-only">Cơ sở đang làm việc</span>
+            <select
+              value={activeFacilityId ?? currentUser.facilities[0]?.id ?? ""}
+              onChange={(event) => setActiveFacility(event.target.value)}
+              className="max-w-52 bg-transparent text-sm font-medium text-slate-700 outline-none"
+              title="Cơ sở đang làm việc"
+            >
+              {currentUser.facilities.map((facility) => (
+                <option
+                  key={facility.id}
+                  value={facility.id}
+                  disabled={facility.status !== "active"}
+                >
+                  {facility.name}
+                  {facility.status !== "active" ? " (Tạm ngưng)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <button
           type="button"
           aria-label="Notifications"

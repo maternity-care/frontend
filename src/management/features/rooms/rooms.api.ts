@@ -72,7 +72,7 @@ function normalizeStatus(status: string): RoomStatus {
 function toBackendStatus(status?: RoomStatus) {
   if (!status) return undefined;
 
-  return status === "active" ? "Hoạt động" : "Tạm ngưng";
+  return status === "active" ? "active" : "inactive";
 }
 
 function getBackendRoomType(room: BackendRoom) {

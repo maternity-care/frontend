@@ -3,6 +3,7 @@ import type { UserProfile } from "../profile/profile.types";
 export interface LoginInput {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }
 
 export interface ForgotPasswordInput {
@@ -20,6 +21,7 @@ export interface ResetPasswordInput {
 }
 
 export interface AuthResponse {
+  accountType: "user" | "staff";
   accessToken: string;
   refreshToken: string | null;
   tokenType: "Bearer";
@@ -43,14 +45,17 @@ export interface BackendAuthResponse {
 }
 
 export interface AuthState {
+  accountType: "user" | "staff";
   user: UserProfile | null;
   accessToken: string | null;
   refreshToken: string | null;
   roles: string[];
   permissions: string[];
+  activeFacilityId: string | null;
   isChecking: boolean;
   setSession: (session: AuthResponse, rememberMe?: boolean) => void;
   setUser: (user: UserProfile | null) => void;
+  setActiveFacility: (facilityId: string) => void;
   setChecking: (isChecking: boolean) => void;
   clearSession: () => void;
 }

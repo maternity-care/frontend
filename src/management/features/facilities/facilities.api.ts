@@ -19,7 +19,7 @@ function normalizeStatus(status: string): Facility["status"] {
 }
 
 function toBackendStatus(status: Facility["status"]) {
-  return status === "active" ? "Hoạt động" : "Không hoạt động";
+  return status === "active" ? "active" : "inactive";
 }
 
 function normalizeFacility(facility: BackendFacility): Facility {
