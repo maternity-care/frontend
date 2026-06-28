@@ -11,7 +11,7 @@ type ProfileSummaryCardProps = {
 };
 
 export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
-  const isActive = profile.status === 1;
+  const isActive = profile.status === "active";
   const roleText = getRoleText(profile.roles);
 
   return (

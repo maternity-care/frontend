@@ -6,6 +6,7 @@ import {
   Activity,
   ArrowUpRight,
   BriefcaseBusiness,
+  Building2,
   CheckCircle2,
   Database,
   KeyRound,
@@ -32,7 +33,7 @@ function permissionGroup(name: string) {
   return name.split(/[.:-]/)[0] || "general";
 }
 
-export default function DashboardPage() {
+function SuperAdminDashboard() {
   const storeUser = useAuthStore((state) => state.user);
   const [cachedUser] = useState<UserProfile | null>(() => {
     if (typeof window === "undefined") return null;
@@ -74,7 +75,7 @@ export default function DashboardPage() {
 
   const currentUser = storeUser ?? cachedUser;
 
-  const activeUsers = users.filter((item) => item.status === 1).length;
+  const activeUsers = users.filter((item) => item.status === "active").length;
   const inactiveUsers = Math.max(users.length - activeUsers, 0);
   const userOverrides = users.reduce((count, item) => count + (item.permissionOverrides?.length ?? 0), 0);
   const permissionModules = useMemo(
@@ -304,8 +305,8 @@ export default function DashboardPage() {
                   <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
                     <p className="text-xs font-medium uppercase text-slate-500">Status</p>
                     <div className="mt-1">
-                      <Badge tone={currentUser?.status === 1 ? "green" : "neutral"}>
-                        {currentUser?.status === 1 ? "Active" : "Inactive"}
+                      <Badge tone={currentUser?.status === "active" ? "green" : "neutral"}>
+                        {currentUser?.status === "active" ? "Active" : "Inactive"}
                       </Badge>
                     </div>
                   </div>
@@ -362,7 +363,7 @@ export default function DashboardPage() {
                       <td className="px-5 py-3 text-slate-600">{item.permissionOverrides?.length ?? 0}</td>
                       <td className="px-5 py-3 text-slate-600">{formatDate(item.createdAt)}</td>
                       <td className="px-5 py-3">
-                        <Badge tone={item.status === 1 ? "green" : "neutral"}>{item.status === 1 ? "Active" : "Inactive"}</Badge>
+                        <Badge tone={item.status === "active" ? "green" : "neutral"}>{item.status === "active" ? "Active" : "Inactive"}</Badge>
                       </td>
                     </tr>
                   ))}
@@ -373,5 +374,53 @@ export default function DashboardPage() {
         </div>
       ) : null}
     </AdminLayout>
+  );
+}
+
+function FacilityDashboard() {
+  const user = useAuthStore((state) => state.user);
+  const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
+  const roles = useAuthStore((state) => state.roles);
+  const activeFacility = user?.facilities?.find(
+    (facility) => String(facility.id) === String(activeFacilityId),
+  );
+
+  return (
+    <AdminLayout roles={["admin", "doctor", "nurse", "staff"]}>
+      <PageHeader
+        title="Tổng quan cơ sở"
+        description={activeFacility?.name ?? "Chọn cơ sở làm việc để tiếp tục."}
+      />
+      <Card>
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white">
+            <Building2 className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <CardTitle>{activeFacility?.name ?? "Chưa chọn cơ sở"}</CardTitle>
+            <p className="mt-1 text-sm text-slate-500">
+              {activeFacility?.code ?? "-"}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {roles.map((role) => (
+                <Badge key={role} tone="blue">
+                  {role}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+    </AdminLayout>
+  );
+}
+
+export default function DashboardPage() {
+  const roles = useAuthStore((state) => state.roles);
+
+  return roles.includes("super_admin") ? (
+    <SuperAdminDashboard />
+  ) : (
+    <FacilityDashboard />
   );
 }

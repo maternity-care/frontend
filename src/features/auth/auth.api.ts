@@ -12,6 +12,7 @@ import type {
 
 function normalizeAuthResponse(
   response: BackendAuthResponse,
+  accountType: "user" | "staff",
   message?: string,
 ): AuthResponse {
   const accessToken = response.accessToken ?? response.access_token;
@@ -25,6 +26,7 @@ function normalizeAuthResponse(
   }
 
   return {
+    accountType,
     accessToken,
     refreshToken: response.refreshToken ?? response.refresh_token ?? null,
     tokenType: response.tokenType ?? "Bearer",
@@ -47,17 +49,54 @@ export async function login(input: LoginInput) {
     apiClient.post("/auth/login", input),
   );
 
-  return normalizeAuthResponse(response.data, response.message);
+  return normalizeAuthResponse(response.data, "user", response.message);
+}
+
+export async function managementLogin(input: LoginInput) {
+  const response = await unwrapApiResponse<BackendAuthResponse>(
+    apiClient.post("/management/auth/login", input),
+  );
+
+  return normalizeAuthResponse(response.data, "staff", response.message);
 }
 
 export function getCurrentUser() {
-  return unwrapApiData<UserProfile>(apiClient.get("/auth/me"));
+  const endpoint =
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith("/management")
+      ? "/management/auth/me"
+      : "/auth/me";
+  return unwrapApiData<UserProfile>(apiClient.get(endpoint));
 }
 
-export function logout(refreshToken: string) {
+export function logout(refreshToken: string, accountType: "user" | "staff" = "user") {
   return unwrapApiResponse<null>(
-    apiClient.post("/auth/logout", { refresh_token: refreshToken }),
+    apiClient.post(
+      accountType === "staff" ? "/management/auth/logout" : "/auth/logout",
+      { refresh_token: refreshToken },
+    ),
   );
+}
+
+export function managementForgotPassword(input: ForgotPasswordInput) {
+  return unwrapApiResponse<ForgotPasswordResponse>(
+    apiClient.post("/management/auth/forgot-password", input),
+  );
+}
+
+export function managementResetPassword(input: ResetPasswordInput) {
+  return unwrapApiResponse<null>(
+    apiClient.post("/management/auth/reset-password", input),
+  );
+}
+
+export async function managementRefresh(refreshToken: string) {
+  const response = await unwrapApiResponse<BackendAuthResponse>(
+    apiClient.post("/management/auth/refresh", {
+      refresh_token: refreshToken,
+    }),
+  );
+  return normalizeAuthResponse(response.data, "staff", response.message);
 }
 
 export function forgotPassword(input: ForgotPasswordInput) {
@@ -75,5 +114,5 @@ export async function register(input: RegisterInput) {
     apiClient.post("/auth/register", input),
   );
 
-  return normalizeAuthResponse(response.data, response.message);
+  return normalizeAuthResponse(response.data, "user", response.message);
 }

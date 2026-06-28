@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LockKeyhole } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { login } from "@/features/auth/auth.api";
+import { managementLogin } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { Button } from "@/management/components/ui/Button";
 import { Card } from "@/management/components/ui/Card";
@@ -43,7 +43,11 @@ function LoginForm() {
   const onSubmit = async (values: LoginForm) => {
     setFormError(null);
     try {
-      const session = await login(values);
+      const session = await managementLogin({
+        email: values.email,
+        password: values.password,
+        rememberMe: Boolean(values.rememberMe),
+      });
       setSession(session, Boolean(values.rememberMe));
       router.replace(searchParams.get("next") ?? "/management/dashboard");
     } catch (error) {
@@ -92,7 +96,7 @@ function LoginForm() {
               Ghi nhớ đăng nhập
             </label>
             <Link
-              href="/forgot-password"
+              href="/management/forgot-password"
               className="text-sm font-medium text-slate-700 hover:text-slate-950 hover:underline"
             >
               Quên mật khẩu?

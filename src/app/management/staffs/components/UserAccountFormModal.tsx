@@ -1,16 +1,17 @@
-// src/app/management/users/components/UserAccountFormModal.tsx
+// src/app/management/staffs/components/UserAccountFormModal.tsx
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  Alert,
+  App,
   Button,
   Card,
   Col,
   Form,
   Input,
+  InputNumber,
   Modal,
   Row,
   Select,
@@ -20,7 +21,9 @@ import {
 } from "antd";
 import {
   Mail,
+  MinusCircle,
   Pencil,
+  Plus,
   Phone,
   Save,
   ShieldCheck,
@@ -30,10 +33,13 @@ import {
 } from "lucide-react";
 import { createUser, updateUser } from "@/management/features/users/users.api";
 import type { User as BackendUser } from "@/management/features/users/users.types";
+import type { StaffPosition } from "@/management/features/users/users.types";
+import { getFacilities } from "@/management/features/facilities/facilities.api";
+import { ApiClientError } from "@/lib/axios";
 
 const { Text, Title } = Typography;
 
-export type UserRole = "pregnant" | "staff" | "doctor" | "owner" | "admin";
+export type UserRole = "pregnant" | "staff" | "doctor" | "nurse" | "owner" | "admin";
 export type UserStatus = "active" | "locked";
 export type AccountType = "customer" | "internal" | "system";
 
@@ -49,6 +55,7 @@ export interface UserAccount {
   status: UserStatus;
   createdAt: string;
   lastLogin?: string;
+  staffProfile?: BackendUser["staffProfile"];
 }
 
 export interface UserFormValues {
@@ -59,14 +66,19 @@ export interface UserFormValues {
   role?: UserRole;
   accountType?: AccountType;
   status?: UserStatus;
+  facilityAssignments?: Array<{ facilityId: string; roles: StaffPosition[] }>;
+  licenseNo?: string;
+  title?: string;
+  specialty?: string;
+  yearsOfExperience?: number;
+  bio?: string;
 }
 
 export const roleOptions = [
-  { value: "pregnant", label: "Thai phụ" },
-  { value: "staff", label: "Staff" },
-  { value: "doctor", label: "Bác sĩ" },
-  { value: "owner", label: "Owner" },
   { value: "admin", label: "Admin" },
+  { value: "doctor", label: "Bác sĩ" },
+  { value: "nurse", label: "Điều dưỡng" },
+  { value: "staff", label: "Nhân viên" },
 ];
 
 export const statusOptions = [
@@ -94,6 +106,7 @@ const initialValues: Partial<UserFormValues> = {
   email: "",
   phone: "",
   password: "",
+  facilityAssignments: [{ facilityId: "", roles: ["staff"] }],
 };
 
 export function getRoleLabel(role: UserRole) {
@@ -111,6 +124,7 @@ export function getRoleColor(role: UserRole) {
   if (role === "admin") return "red";
   if (role === "owner") return "purple";
   if (role === "doctor") return "blue";
+  if (role === "nurse") return "cyan";
   if (role === "staff") return "cyan";
 
   return "green";
@@ -165,6 +179,7 @@ function toBackendRoleId(role: UserRole) {
   const roleIdMap: Record<UserRole, string> = {
     admin: "2",
     doctor: "3",
+    nurse: "4",
     staff: "5",
     pregnant: "6",
     owner: "7",
@@ -174,17 +189,18 @@ function toBackendRoleId(role: UserRole) {
 }
 
 function toBackendStatus(status: UserStatus) {
-  return status === "active" ? 1 : 0;
+  return status === "active" ? "active" : "locked";
 }
 
-function toUiStatus(status: number): UserStatus {
-  return status === 1 ? "active" : "locked";
+function toUiStatus(status: string): UserStatus {
+  return status === "active" ? "active" : "locked";
 }
 
 function toUiRole(roleName?: string): UserRole {
   if (roleName === "super_admin" || roleName === "admin") return "admin";
   if (roleName === "doctor") return "doctor";
-  if (roleName === "staff" || roleName === "nurse") return "staff";
+  if (roleName === "nurse") return "nurse";
+  if (roleName === "staff") return "staff";
   if (roleName === "partner" || roleName === "owner") return "owner";
 
   return "pregnant";
@@ -225,7 +241,7 @@ function deriveAccountType(roleName?: string): AccountType {
 
 function normalizeUser(user: BackendUser): UserAccount {
   const firstRole = user.roles?.[0];
-  const roleName = firstRole?.name;
+  const roleName = user.staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
   const accountType = deriveAccountType(roleName);
 
   return {
@@ -275,22 +291,46 @@ export function UserAccountFormModal({
   onSaved,
 }: UserAccountFormModalProps) {
   const [form] = Form.useForm<UserFormValues>();
+  const { message: messageApi } = App.useApp();
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [facilityOptions, setFacilityOptions] = useState<
+    Array<{ value: string; label: string }>
+  >([]);
 
   const fullName = Form.useWatch("fullName", form);
   const email = Form.useWatch("email", form);
   const phone = Form.useWatch("phone", form);
-  const role = Form.useWatch("role", form);
+  const facilityAssignments = Form.useWatch("facilityAssignments", form);
+  const role = facilityAssignments?.[0]?.roles?.[0];
+  const hasDoctorRole = facilityAssignments?.some(
+    (assignment) => assignment?.roles?.includes("doctor"),
+  );
   const accountType = Form.useWatch("accountType", form);
   const status = Form.useWatch("status", form);
 
   useEffect(() => {
     if (!open) return;
 
-    const timer = window.setTimeout(() => {
-      setError(null);
+    void getFacilities()
+      .then((facilities) => {
+        setFacilityOptions(
+          facilities
+            .filter((facility) => facility.status === "active")
+            .map((facility) => ({
+              value: facility.id,
+              label: `${facility.name} (${facility.code})`,
+            })),
+        );
+      })
+      .catch((facilityError) => {
+        void messageApi.error(
+          facilityError instanceof Error
+            ? facilityError.message
+            : "Không tải được danh sách cơ sở.",
+        );
+      });
 
+    const timer = window.setTimeout(() => {
       if (editingUser) {
         form.setFieldsValue({
           fullName: editingUser.fullName,
@@ -300,6 +340,8 @@ export function UserAccountFormModal({
           role: editingUser.role,
           accountType: editingUser.accountType,
           status: editingUser.status,
+          facilityAssignments:
+            editingUser.staffProfile?.facilityAssignments ?? initialValues.facilityAssignments,
         });
 
         return;
@@ -312,7 +354,7 @@ export function UserAccountFormModal({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [open, editingUser, form]);
+  }, [open, editingUser, form, messageApi]);
 
   const modalTitle = editingUser ? "Cập nhật tài khoản" : "Thêm tài khoản";
 
@@ -328,13 +370,11 @@ export function UserAccountFormModal({
     if (submitting) return;
 
     form.resetFields();
-    setError(null);
     onClose();
   }
 
   async function handleFinish(values: UserFormValues) {
     setSubmitting(true);
-    setError(null);
 
     try {
       const password = values.password?.trim();
@@ -345,8 +385,13 @@ export function UserAccountFormModal({
           email: values.email.trim(),
           password: password || undefined,
           status: values.status ? toBackendStatus(values.status) : undefined,
-          roleIds: values.role ? [toBackendRoleId(values.role)] : [],
           permissionOverrides: [],
+          facilityAssignments: values.facilityAssignments,
+          licenseNo: values.licenseNo,
+          title: values.title,
+          specialty: values.specialty,
+          yearsOfExperience: values.yearsOfExperience,
+          bio: values.bio,
         });
 
         const backendUser = getResponseData<BackendUser>(response);
@@ -354,12 +399,9 @@ export function UserAccountFormModal({
 
         onSaved?.(updatedUser, "update");
 
-        Modal.success({
-          title: "Cập nhật tài khoản thành công",
-          content: "Thông tin tài khoản đã được cập nhật.",
-          okText: "Đóng",
-          centered: true,
-        });
+        void messageApi.success(
+          response.message ?? "Cập nhật tài khoản thành công.",
+        );
 
         form.resetFields();
         onClose();
@@ -367,31 +409,24 @@ export function UserAccountFormModal({
         return;
       }
 
-      if (!password || password.length < 6) {
-        form.setFields([
-          {
-            name: "password",
-            errors: ["Mật khẩu phải có ít nhất 6 ký tự"],
-          },
-        ]);
-
-        return;
-      }
-
       const response = await createUser({
         name: values.fullName.trim(),
-        email: values.email.trim(),
-        password,
-        position: undefined,
-        roleIds: values.role ? [toBackendRoleId(values.role)] : [],
+        personalEmail: values.email.trim(),
+        phone: values.phone.trim(),
         permissionOverrides: [],
+        facilityAssignments: values.facilityAssignments ?? [],
+        licenseNo: values.licenseNo,
+        title: values.title,
+        specialty: values.specialty,
+        yearsOfExperience: values.yearsOfExperience,
+        bio: values.bio,
       });
 
       let backendUser = getResponseData<BackendUser>(response);
 
       if (values.status === "locked") {
         const updateResponse = await updateUser(backendUser.id, {
-          status: 0,
+          status: "locked",
         });
 
         backendUser = getResponseData<BackendUser>(updateResponse);
@@ -401,17 +436,32 @@ export function UserAccountFormModal({
 
       onSaved?.(createdUser, "create");
 
-      Modal.success({
-        title: "Thêm tài khoản thành công",
-        content: "Tài khoản mới đã được thêm vào danh sách.",
-        okText: "Đóng",
-        centered: true,
-      });
+      void messageApi.success(
+        response.message ?? "Thêm tài khoản thành công.",
+      );
 
       form.resetFields();
       onClose();
     } catch (err) {
-      setError(getErrorMessage(err));
+      if (err instanceof ApiClientError && err.validationErrors.length > 0) {
+        const fieldNames = Object.keys(
+          form.getFieldsValue(true),
+        ) as Array<keyof UserFormValues>;
+        const fieldErrors = fieldNames
+          .map((name) => ({
+            name,
+            errors: err.validationErrors.filter(
+              (message) =>
+                message.startsWith(`${name} `) ||
+                message.includes(`property ${name} `),
+            ),
+          }))
+          .filter((field) => field.errors.length > 0);
+        if (fieldErrors.length > 0) {
+          form.setFields(fieldErrors);
+        }
+      }
+      void messageApi.error(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -441,17 +491,6 @@ export function UserAccountFormModal({
 
         <Text className="text-sm text-slate-500">{modalDescription}</Text>
       </div>
-
-      {error ? (
-        <Alert
-          className="mt-4"
-          type="error"
-          title={error}
-          showIcon
-          closable
-          onClose={() => setError(null)}
-        />
-      ) : null}
 
       <Form
         key={editingUser?.id ?? "create-user"}
@@ -510,7 +549,7 @@ export function UserAccountFormModal({
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="email"
-                    label="Email"
+                    label={editingUser ? "Email" : "Email cá nhân"}
                     rules={[
                       { required: true, message: "Vui lòng nhập email" },
                       { type: "email", message: "Email không hợp lệ" },
@@ -524,7 +563,21 @@ export function UserAccountFormModal({
                 </Col>
 
                 <Col xs={24} md={8}>
-                  <Form.Item name="phone" label="Số điện thoại">
+                  <Form.Item
+                    name="phone"
+                    label="Số điện thoại"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập số điện thoại",
+                      },
+                      {
+                        pattern: /^(?:\+84|0)[35789]\d{8}$/,
+                        message:
+                          "Số điện thoại Việt Nam không hợp lệ",
+                      },
+                    ]}
+                  >
                     <Input
                       placeholder="0901234567"
                       autoComplete="new-phone"
@@ -533,15 +586,11 @@ export function UserAccountFormModal({
                   </Form.Item>
                 </Col>
 
-                <Col xs={24} md={12}>
+                {editingUser ? <Col xs={24} md={12}>
                   <Form.Item
                     name="password"
-                    label={editingUser ? "Mật khẩu mới" : "Mật khẩu"}
+                    label="Mật khẩu mới"
                     rules={[
-                      {
-                        required: !editingUser,
-                        message: "Vui lòng nhập mật khẩu",
-                      },
                       {
                         min: 6,
                         message: "Mật khẩu phải có ít nhất 6 ký tự",
@@ -549,15 +598,11 @@ export function UserAccountFormModal({
                     ]}
                   >
                     <Input.Password
-                      placeholder={
-                        editingUser
-                          ? "Bỏ trống nếu không đổi mật khẩu"
-                          : "Nhập mật khẩu"
-                      }
+                      placeholder="Bỏ trống nếu không đổi mật khẩu"
                       autoComplete="new-password"
                     />
                   </Form.Item>
-                </Col>
+                </Col> : null}
               </Row>
             </Card>
 
@@ -581,61 +626,113 @@ export function UserAccountFormModal({
 
                   <span>
                     <p className="mb-0 text-base font-semibold text-slate-950">
-                      Phân quyền tài khoản
+                      Hồ sơ nhân viên
                     </p>
                     <p className="mb-0 text-xs font-normal text-slate-500">
-                      Chọn vai trò, loại tài khoản và trạng thái.
+                      Chức vụ quyết định role và hồ sơ nghiệp vụ.
                     </p>
                   </span>
                 </Space>
               }
             >
-              <Row gutter={[12, 0]}>
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="role"
-                    label="Vai trò"
-                    rules={[
-                      { required: true, message: "Vui lòng chọn vai trò" },
-                    ]}
-                  >
-                    <Select placeholder="Chọn vai trò" options={roleOptions} />
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="accountType"
-                    label="Loại tài khoản"
-                    rules={[
-                      {
-                        required: true,
-                        message: "Vui lòng chọn loại tài khoản",
-                      },
-                    ]}
-                  >
-                    <Select
-                      placeholder="Chọn loại tài khoản"
-                      options={accountTypeOptions}
-                    />
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="status"
-                    label="Trạng thái"
-                    rules={[
-                      { required: true, message: "Vui lòng chọn trạng thái" },
-                    ]}
-                  >
-                    <Select
-                      placeholder="Chọn trạng thái"
-                      options={statusOptions}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
+              <Form.List name="facilityAssignments">
+                {(fields, { add, remove }) => (
+                  <>
+                    {fields.map((field) => (
+                      <Row gutter={12} key={field.key} align="middle">
+                        <Col xs={24} md={11}>
+                          <Form.Item
+                            {...field}
+                            name={[field.name, "facilityId"]}
+                            label="Cơ sở làm việc"
+                            rules={[{ required: true, message: "Vui lòng chọn cơ sở" }]}
+                          >
+                            <Select
+                              placeholder="Chọn cơ sở"
+                              options={facilityOptions}
+                              optionFilterProp="label"
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={20} md={11}>
+                          <Form.Item
+                            {...field}
+                            name={[field.name, "roles"]}
+                            label="Chức vụ tại cơ sở"
+                            rules={[{ required: true, message: "Vui lòng chọn ít nhất một chức vụ" }]}
+                          >
+                            <Select mode="multiple" options={roleOptions} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={4} md={2}>
+                          <Button
+                            type="text"
+                            danger
+                            icon={<MinusCircle className="h-4 w-4" />}
+                            onClick={() => remove(field.name)}
+                            disabled={fields.length === 1}
+                            title="Xóa phân công"
+                          />
+                        </Col>
+                      </Row>
+                    ))}
+                    <Form.Item>
+                      <Button
+                        type="dashed"
+                        icon={<Plus className="h-4 w-4" />}
+                        onClick={() => add({ facilityId: "", roles: ["staff"] })}
+                      >
+                        Thêm cơ sở làm việc
+                      </Button>
+                    </Form.Item>
+                  </>
+                )}
+              </Form.List>
+              {hasDoctorRole ? (
+                <Row gutter={[12, 0]}>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="licenseNo"
+                      label="Số giấy phép hành nghề"
+                      rules={[{ required: true, message: "Vui lòng nhập số giấy phép" }]}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="title"
+                      label="Học hàm / chức danh"
+                      rules={[{ required: true, message: "Vui lòng nhập chức danh" }]}
+                    >
+                      <Input placeholder="BS.CKI, ThS.BS..." />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="specialty"
+                      label="Chuyên khoa"
+                      rules={[{ required: true, message: "Vui lòng nhập chuyên khoa" }]}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="yearsOfExperience"
+                      label="Số năm kinh nghiệm"
+                      rules={[{ required: true, message: "Vui lòng nhập kinh nghiệm" }]}
+                    >
+                      <InputNumber min={0} className="w-full" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24}>
+                    <Form.Item name="bio" label="Giới thiệu chuyên môn">
+                      <Input.TextArea rows={3} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              ) : null}
             </Card>
           </div>
 
