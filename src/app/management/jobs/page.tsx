@@ -63,7 +63,7 @@ export default function JobsPage() {
   };
 
   return (
-    <AdminLayout>
+    <AdminLayout roles={["super_admin"]}>
       <PageHeader title="Jobs" description="Tạo test queue job qua POST /management/jobs/test." />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">

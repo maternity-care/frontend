@@ -57,7 +57,7 @@ export default function PermissionsPage() {
   }, [filteredPermissions]);
 
   return (
-    <AdminLayout permissions={["permission.view"]}>
+    <AdminLayout roles={["super_admin"]} permissions={["permission.view"]}>
       <PageHeader title="Permissions" description="Danh mục quyền hệ thống dùng cho role và override riêng từng user." />
 
       {loading ? <StateBlock type="loading" title="Đang tải permissions" /> : null}

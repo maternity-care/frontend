@@ -1,4 +1,4 @@
-//src/app/management/facility-management/components/FacilityDetailModal.tsx
+// src/app/management/facilities/components/FacilityDetailModal.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -121,7 +121,7 @@ export function FacilityDetailModal({
 
               onClose();
               router.push(
-                `/management/clinic-room-management?${params.toString()}`,
+                `/management/rooms?${params.toString()}`,
               );
             }}
           >
