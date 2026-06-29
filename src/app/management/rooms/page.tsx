@@ -1,16 +1,14 @@
 // src/app/management/rooms/page.tsx
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
   Alert,
   Button,
   Card,
   Descriptions,
-  Input,
   Modal,
-  Select,
   Space,
   Statistic,
   Table,
@@ -23,14 +21,15 @@ import {
   Eye,
   Pencil,
   Plus,
-  Search,
   Trash2,
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
+import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
+import { TableFilter } from "@/management/components/ui/TableFilter";
 import {
   createRoom,
   deleteRoom,
@@ -48,9 +47,6 @@ import { ClinicRoomFormModal } from "./components/ClinicRoomFormModal";
 
 const { Text, Title } = Typography;
 const ROOM_MESSAGES = RESPONSE_MESSAGES.CLINIC_ROOM_MANAGEMENT;
-
-const PAGE_SIZE = 5;
-const DEFAULT_FACILITY_ID = "1";
 
 type DeleteConfirmState =
   | {
@@ -129,15 +125,18 @@ function ClinicRoomManagementContent() {
 
   const facilityIdFromQuery = searchParams.get("facilityId");
   const facilityNameFromQuery = searchParams.get("facilityName");
+  const sessionFacilityId = useAuthStore((state) => state.activeFacilityId);
 
-  const activeFacilityId = facilityIdFromQuery || DEFAULT_FACILITY_ID;
-  const isFacilityFiltered = Boolean(facilityIdFromQuery);
+  const activeFacilityId = facilityIdFromQuery || sessionFacilityId;
+  const isFacilityFiltered = Boolean(activeFacilityId);
 
   const [rooms, setRooms] = useState<ClinicRoom[]>([]);
   const [query, setQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>();
   const [roomTypeFilter, setRoomTypeFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<RoomStatus | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
 
   const [roomModalOpen, setRoomModalOpen] = useState(false);
@@ -162,11 +161,10 @@ function ClinicRoomManagementContent() {
 
       try {
         const data = isFacilityFiltered
-          ? await getRoomsByFacility(activeFacilityId, {
-              search: query,
-              status: statusFilter,
+          ? await getRoomsByFacility(activeFacilityId!, {
+              rawSearch: searchQuery,
             })
-          : await getRooms();
+          : await getRooms({ rawSearch: searchQuery });
 
         if (mounted) {
           setRooms(data);
@@ -189,36 +187,15 @@ function ClinicRoomManagementContent() {
     return () => {
       mounted = false;
     };
-  }, [activeFacilityId, isFacilityFiltered, query, statusFilter]);
+  }, [activeFacilityId, isFacilityFiltered, searchQuery]);
 
-  const filteredRooms = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-
-    return rooms.filter((room) => {
-      const matchKeyword =
-        !keyword ||
-        room.roomName.toLowerCase().includes(keyword) ||
-        room.roomType.toLowerCase().includes(keyword);
-
-      const matchType = !roomTypeFilter || room.roomType === roomTypeFilter;
-      const matchStatus = !statusFilter || room.status === statusFilter;
-
-      return matchKeyword && matchType && matchStatus;
-    });
-  }, [rooms, query, roomTypeFilter, statusFilter]);
+  const filteredRooms = rooms;
 
   const activeRooms = rooms.filter((room) => room.status === "active").length;
 
   const suspendedRooms = rooms.filter(
     (room) => room.status === "suspended",
   ).length;
-
-  function clearFilters() {
-    setQuery("");
-    setRoomTypeFilter(undefined);
-    setStatusFilter(undefined);
-    setCurrentPage(1);
-  }
 
   function openCreateModal() {
     setEditingRoom(null);
@@ -245,6 +222,17 @@ function ClinicRoomManagementContent() {
 
   async function handleSubmitRoom(values: RoomFormValues) {
     setError(null);
+
+    if (!activeFacilityId) {
+      const message = "Vui lòng chọn cơ sở trước khi quản lý phòng.";
+      setError(message);
+      Modal.warning({
+        title: "Chưa chọn cơ sở",
+        content: message,
+        centered: true,
+      });
+      return;
+    }
 
     if (editingRoom) {
       try {
@@ -436,7 +424,7 @@ function ClinicRoomManagementContent() {
       width: 70,
       align: "center",
       render: (_value, _record, index) =>
-        (currentPage - 1) * PAGE_SIZE + index + 1,
+        (currentPage - 1) * pageSize + index + 1,
     },
     {
       title: <div className="text-center">{ROOM_MESSAGES.ROOM_NAME}</div>,
@@ -532,7 +520,7 @@ function ClinicRoomManagementContent() {
         description={ROOM_MESSAGES.PAGE_DESCRIPTION}
       />
 
-      <div className="mt-6 space-y-5">
+      <div className="mt-6 flex flex-col gap-5">
         {error ? (
           <Alert
             type="error"
@@ -543,7 +531,7 @@ function ClinicRoomManagementContent() {
           />
         ) : null}
 
-        <Card className="border-slate-200 bg-white">
+        <Card className="management-filter">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
               <Building2 className="h-5 w-5" />
@@ -572,51 +560,26 @@ function ClinicRoomManagementContent() {
           </div>
         </Card>
 
-        <Card className="border-slate-200 bg-white">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_auto]">
-            <Input
-              size="large"
-              allowClear
-              value={query}
-              prefix={<Search className="h-4 w-4 text-slate-400" />}
-              placeholder={ROOM_MESSAGES.SEARCH_PLACEHOLDER}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setCurrentPage(1);
-              }}
-            />
+        <div className="order-2">
+        <TableFilter
+          columns={[
+            { field: "name", label: ROOM_MESSAGES.SEARCH_PLACEHOLDER, type: "text", contains: true },
+            { field: "roomType", label: ROOM_MESSAGES.ROOM_TYPE_PLACEHOLDER, type: "select", options: roomTypeOptions, width: 180 },
+            { field: "status", label: ROOM_MESSAGES.STATUS_PLACEHOLDER, type: "select", options: statusOptions, width: 180 },
+          ]}
+          values={{ name: query, roomType: roomTypeFilter, status: statusFilter }}
+          clearLabel={ROOM_MESSAGES.CLEAR_FILTERS}
+          onChange={(values, search) => {
+            setSearchQuery(search);
+            setQuery(String(values.name ?? ""));
+            setRoomTypeFilter(values.roomType ? String(values.roomType) : undefined);
+            setStatusFilter(values.status as RoomStatus | undefined);
+            setCurrentPage(1);
+          }}
+        />
+        </div>
 
-            <Select
-              size="large"
-              allowClear
-              value={roomTypeFilter}
-              placeholder={ROOM_MESSAGES.ROOM_TYPE_PLACEHOLDER}
-              options={roomTypeOptions}
-              onChange={(value: string | undefined) => {
-                setRoomTypeFilter(value);
-                setCurrentPage(1);
-              }}
-            />
-
-            <Select
-              size="large"
-              allowClear
-              value={statusFilter}
-              placeholder={ROOM_MESSAGES.STATUS_PLACEHOLDER}
-              options={statusOptions}
-              onChange={(value: RoomStatus | undefined) => {
-                setStatusFilter(value);
-                setCurrentPage(1);
-              }}
-            />
-
-            <Button size="large" onClick={clearFilters}>
-              {ROOM_MESSAGES.CLEAR_FILTERS}
-            </Button>
-          </div>
-        </Card>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="order-1 grid gap-4 md:grid-cols-3">
           <Card className="border-slate-200 bg-white">
             <Statistic
               title={
@@ -661,7 +624,7 @@ function ClinicRoomManagementContent() {
         </div>
 
         <Card
-          className="overflow-hidden border-slate-200 bg-white"
+          className="order-3 overflow-hidden border-slate-200 bg-white"
           styles={{
             body: {
               padding: 0,
@@ -703,12 +666,14 @@ function ClinicRoomManagementContent() {
           }
         >
           <Table
+            className="management-table"
             rowKey="id"
             size="middle"
             tableLayout="fixed"
             loading={loading || tableLoading}
             columns={columns}
             dataSource={filteredRooms}
+            scroll={{ x: 860 }}
             onRow={(record) => ({
               className: "cursor-pointer",
               onClick: (event) => {
@@ -734,12 +699,17 @@ function ClinicRoomManagementContent() {
             }}
             pagination={{
               current: currentPage,
-              pageSize: PAGE_SIZE,
+              pageSize,
               total: filteredRooms.length,
-              showSizeChanger: false,
+              showSizeChanger: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              showQuickJumper: true,
               showTotal: (total, range) =>
                 `${ROOM_MESSAGES.PAGINATION_TOTAL_PREFIX} ${range[0]} - ${range[1]} ${ROOM_MESSAGES.PAGINATION_TOTAL_MIDDLE} ${total} ${ROOM_MESSAGES.PAGINATION_TOTAL_SUFFIX}`,
-              onChange: (page) => setCurrentPage(page),
+              onChange: (page, nextPageSize) => {
+                setCurrentPage(nextPageSize !== pageSize ? 1 : page);
+                setPageSize(nextPageSize);
+              },
             }}
           />
         </Card>

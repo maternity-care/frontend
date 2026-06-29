@@ -22,6 +22,7 @@ type BackendUsersPayload =
 
 function toQueryParams(params?: GetUsersParams) {
   const queryParams = {
+    search: params?.search?.trim() || undefined,
     name: params?.name?.trim() || undefined,
     email: params?.email?.trim() || undefined,
     phone: params?.phone?.trim() || undefined,

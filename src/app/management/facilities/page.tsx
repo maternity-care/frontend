@@ -6,19 +6,19 @@ import {
   Alert,
   Button,
   Card,
-  Input,
   Modal,
-  Select,
   Space,
   Statistic,
   Table,
   Tag,
   Typography,
 } from "antd";
-import { Building2, Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Building2, Eye, Pencil, Plus, Trash2, X } from "lucide-react";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
+import { TableFilter } from "@/management/components/ui/TableFilter";
+import { CopyText } from "@/management/components/ui/CopyText";
 import {
   createFacility,
   deleteFacilities,
@@ -35,11 +35,10 @@ import {
 } from "./components/FacilityFormModal";
 import { FacilityDetailModal } from "./components/FacilityDetailModal";
 import { FacilityUpdateModal } from "./components/FacilityUpdateModal";
+import { useAuthStore } from "@/features/auth/auth.store";
 
 const { Text } = Typography;
 const FACILITY_MESSAGES = RESPONSE_MESSAGES.FACILITY_MANAGEMENT;
-
-const PAGE_SIZE = 5;
 
 type DeleteConfirmState =
   | {
@@ -80,14 +79,18 @@ function getFacilityStatusText(status: FacilityStatus) {
 }
 
 export default function FacilityManagementPage() {
+  const isSuperAdmin = useAuthStore((state) =>
+    state.roles.includes("super_admin"),
+  );
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [query, setQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>();
   const [cityFilter, setCityFilter] = useState<string | undefined>();
-  const [serviceFilter, setServiceFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<
     FacilityStatus | undefined
   >();
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -106,16 +109,21 @@ export default function FacilityManagementPage() {
 
   useEffect(() => {
     let mounted = true;
-
-    async function loadFacilities() {
+    const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const data = await getFacilities();
+        const data = await getFacilities({
+          rawSearch: searchQuery,
+          search: query,
+          city: cityFilter,
+          status: statusFilter,
+        });
 
         if (mounted) {
           setFacilities(data);
+          setCurrentPage(1);
         }
       } catch (err) {
         if (mounted) {
@@ -126,38 +134,15 @@ export default function FacilityManagementPage() {
           setLoading(false);
         }
       }
-    }
-
-    void loadFacilities();
+    }, 300);
 
     return () => {
       mounted = false;
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [query, cityFilter, statusFilter, searchQuery]);
 
-  const filteredFacilities = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-
-    return facilities.filter((facility) => {
-      const matchKeyword =
-        !keyword ||
-        facility.name.toLowerCase().includes(keyword) ||
-        facility.address.toLowerCase().includes(keyword) ||
-        (facility.code ?? "").toLowerCase().includes(keyword);
-
-      const matchCity = !cityFilter || facility.city === cityFilter;
-
-      const matchService =
-        !serviceFilter ||
-        facility.featuredServices
-          .toLowerCase()
-          .includes(serviceFilter.toLowerCase());
-
-      const matchStatus = !statusFilter || facility.status === statusFilter;
-
-      return matchKeyword && matchCity && matchService && matchStatus;
-    });
-  }, [facilities, query, cityFilter, serviceFilter, statusFilter]);
+  const filteredFacilities = facilities;
 
   const activeFacilities = facilities.filter(
     (facility) => facility.status === "active",
@@ -176,25 +161,6 @@ export default function FacilityManagementPage() {
     }));
   }, [facilities]);
 
-  const serviceOptions = [
-    {
-      value: FACILITY_MESSAGES.SERVICES.ANTENATAL_CARE,
-      label: FACILITY_MESSAGES.SERVICES.ANTENATAL_CARE,
-    },
-    {
-      value: FACILITY_MESSAGES.SERVICES.ULTRASOUND,
-      label: FACILITY_MESSAGES.SERVICES.ULTRASOUND,
-    },
-    {
-      value: FACILITY_MESSAGES.SERVICES.TESTING,
-      label: FACILITY_MESSAGES.SERVICES.TESTING,
-    },
-    {
-      value: FACILITY_MESSAGES.SERVICES.CONSULTING,
-      label: FACILITY_MESSAGES.SERVICES.CONSULTING,
-    },
-  ];
-
   const statusOptions = [
     {
       value: "active",
@@ -205,14 +171,6 @@ export default function FacilityManagementPage() {
       label: FACILITY_MESSAGES.SUSPENDED,
     },
   ];
-
-  function clearFilters() {
-    setQuery("");
-    setCityFilter(undefined);
-    setServiceFilter(undefined);
-    setStatusFilter(undefined);
-    setCurrentPage(1);
-  }
 
   async function handleCreateFacility(values: FacilityFormValues) {
     setError(null);
@@ -421,7 +379,7 @@ export default function FacilityManagementPage() {
       width: 64,
       align: "center",
       render: (_value, _record, index) =>
-        (currentPage - 1) * PAGE_SIZE + index + 1,
+        (currentPage - 1) * pageSize + index + 1,
     },
     {
       title: FACILITY_MESSAGES.FACILITY_NAME,
@@ -462,7 +420,7 @@ export default function FacilityManagementPage() {
       width: 140,
       align: "center",
       render: (hotline: string) => (
-        <span className="text-slate-600">{hotline}</span>
+        <CopyText value={hotline} copiedMessage="Đã sao chép hotline" />
       ),
     },
     {
@@ -519,15 +477,17 @@ export default function FacilityManagementPage() {
             }}
           />
 
-          <Button
-            danger
-            title={FACILITY_MESSAGES.DELETE}
-            icon={<Trash2 className="h-4 w-4" />}
-            onClick={(event) => {
-              event.stopPropagation();
-              confirmDeleteFacility(record);
-            }}
-          />
+          {isSuperAdmin ? (
+            <Button
+              danger
+              title={FACILITY_MESSAGES.DELETE}
+              icon={<Trash2 className="h-4 w-4" />}
+              onClick={(event) => {
+                event.stopPropagation();
+                confirmDeleteFacility(record);
+              }}
+            />
+          ) : null}
         </Space>
       ),
     },
@@ -540,7 +500,7 @@ export default function FacilityManagementPage() {
         description={FACILITY_MESSAGES.PAGE_DESCRIPTION}
       />
 
-      <div className="mt-6 space-y-5">
+      <div className="mt-6 flex flex-col gap-5">
         {error ? (
           <Alert
             type="error"
@@ -551,63 +511,26 @@ export default function FacilityManagementPage() {
           />
         ) : null}
 
-        <Card className="border-slate-200 bg-white">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_190px_170px_170px_auto]">
-            <Input
-              size="large"
-              allowClear
-              value={query}
-              prefix={<Search className="h-4 w-4 text-slate-400" />}
-              placeholder={FACILITY_MESSAGES.SEARCH_PLACEHOLDER}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setCurrentPage(1);
-              }}
-            />
+        <div className="order-2">
+        <TableFilter
+          columns={[
+            { field: "name", label: FACILITY_MESSAGES.SEARCH_PLACEHOLDER, type: "text", contains: true },
+            { field: "province", label: FACILITY_MESSAGES.CITY_PLACEHOLDER, type: "select", options: cityOptions, width: 190 },
+            { field: "status", label: FACILITY_MESSAGES.STATUS_PLACEHOLDER, type: "select", options: statusOptions, width: 170 },
+          ]}
+          values={{ name: query, province: cityFilter, status: statusFilter }}
+          clearLabel={FACILITY_MESSAGES.CLEAR_FILTERS}
+          onChange={(values, search) => {
+            setSearchQuery(search);
+            setQuery(String(values.name ?? ""));
+            setCityFilter(values.province ? String(values.province) : undefined);
+            setStatusFilter(values.status as FacilityStatus | undefined);
+            setCurrentPage(1);
+          }}
+        />
+        </div>
 
-            <Select
-              size="large"
-              allowClear
-              value={cityFilter}
-              placeholder={FACILITY_MESSAGES.CITY_PLACEHOLDER}
-              onChange={(value) => {
-                setCityFilter(value);
-                setCurrentPage(1);
-              }}
-              options={cityOptions}
-            />
-
-            <Select
-              size="large"
-              allowClear
-              value={serviceFilter}
-              placeholder={FACILITY_MESSAGES.SERVICE_PLACEHOLDER}
-              onChange={(value) => {
-                setServiceFilter(value);
-                setCurrentPage(1);
-              }}
-              options={serviceOptions}
-            />
-
-            <Select
-              size="large"
-              allowClear
-              value={statusFilter}
-              placeholder={FACILITY_MESSAGES.STATUS_PLACEHOLDER}
-              onChange={(value) => {
-                setStatusFilter(value);
-                setCurrentPage(1);
-              }}
-              options={statusOptions}
-            />
-
-            <Button size="large" onClick={clearFilters}>
-              {FACILITY_MESSAGES.CLEAR_FILTERS}
-            </Button>
-          </div>
-        </Card>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="order-1 grid gap-4 md:grid-cols-3">
           <Card className="border-slate-200 bg-white">
             <Statistic
               title={
@@ -652,7 +575,7 @@ export default function FacilityManagementPage() {
         </div>
 
         <Card
-          className="overflow-hidden border-slate-200 bg-white"
+          className="order-3 overflow-hidden border-slate-200 bg-white"
           styles={{
             body: {
               padding: 0,
@@ -668,7 +591,7 @@ export default function FacilityManagementPage() {
               </p>
             </div>
           }
-          extra={
+          extra={isSuperAdmin ? (
             <Space wrap>
               <Button
                 danger
@@ -690,15 +613,17 @@ export default function FacilityManagementPage() {
                 {FACILITY_MESSAGES.ADD_FACILITY}
               </Button>
             </Space>
-          }
+          ) : null}
         >
           <Table
+            className="management-table"
             rowKey="id"
             size="middle"
             tableLayout="fixed"
             loading={loading || tableLoading}
             columns={columns}
             dataSource={filteredFacilities}
+            scroll={{ x: 920 }}
             onRow={(record) => ({
               className: "cursor-pointer",
               onClick: (event) => {
@@ -716,20 +641,29 @@ export default function FacilityManagementPage() {
                 setDetailFacility(record);
               },
             })}
-            rowSelection={{
-              selectedRowKeys: selectedFacilityIds,
-              onChange: (selectedRowKeys) => {
-                setSelectedFacilityIds(selectedRowKeys.map(String));
-              },
-            }}
+            rowSelection={
+              isSuperAdmin
+                ? {
+                    selectedRowKeys: selectedFacilityIds,
+                    onChange: (selectedRowKeys) => {
+                      setSelectedFacilityIds(selectedRowKeys.map(String));
+                    },
+                  }
+                : undefined
+            }
             pagination={{
               current: currentPage,
-              pageSize: PAGE_SIZE,
+              pageSize,
               total: filteredFacilities.length,
-              showSizeChanger: false,
+              showSizeChanger: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              showQuickJumper: true,
               showTotal: (total, range) =>
                 `${FACILITY_MESSAGES.PAGINATION_TOTAL_PREFIX} ${range[0]} - ${range[1]} ${FACILITY_MESSAGES.PAGINATION_TOTAL_MIDDLE} ${total} ${FACILITY_MESSAGES.PAGINATION_TOTAL_SUFFIX}`,
-              onChange: (page) => setCurrentPage(page),
+              onChange: (page, nextPageSize) => {
+                setCurrentPage(nextPageSize !== pageSize ? 1 : page);
+                setPageSize(nextPageSize);
+              },
             }}
           />
         </Card>
