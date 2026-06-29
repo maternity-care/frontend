@@ -1,4 +1,5 @@
 import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
+import { withSearchParams } from "@/lib/search-filter";
 import type {
   BackendFacility,
   CreateFacilityInput,
@@ -64,14 +65,16 @@ function toBackendPayload(input: CreateFacilityInput | UpdateFacilityInput) {
 }
 
 function toQueryParams(params?: GetFacilitiesParams) {
-  const queryParams = {
-    search: params?.search?.trim() || undefined,
-    city: params?.city?.trim() || undefined,
-    status: params?.status ? toBackendStatus(params.status) : undefined,
-  };
+  if (params?.rawSearch) return { search: params.rawSearch };
 
-  return Object.fromEntries(
-    Object.entries(queryParams).filter(([, value]) => value !== undefined),
+  return withSearchParams(
+    {},
+    {
+      name: params?.search,
+      province: params?.city,
+      status: params?.status ? toBackendStatus(params.status) : undefined,
+    },
+    { contains: ["name", "province"] },
   );
 }
 

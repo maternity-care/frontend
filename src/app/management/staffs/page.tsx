@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
   Alert,
@@ -25,7 +25,6 @@ import {
   Lock,
   Pencil,
   Plus,
-  Search,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -34,6 +33,8 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
+import { TableFilter } from "@/management/components/ui/TableFilter";
+import { CopyText } from "@/management/components/ui/CopyText";
 import {
   deleteUser,
   deleteUsers,
@@ -46,7 +47,6 @@ import type { User as BackendUser } from "@/management/features/users/users.type
 import type { StaffPosition } from "@/management/features/users/users.types";
 import {
   UserAccountFormModal,
-  accountTypeOptions,
   getAccountTypeLabel,
   getRoleColor,
   roleOptions,
@@ -84,7 +84,6 @@ const staffPositionOptions = [
   { value: "staff", label: "Nhân viên" },
 ];
 
-const PAGE_SIZE = 6;
 
 function getErrorMessage(error: unknown) {
   if (typeof error === "object" && error && "response" in error) {
@@ -186,25 +185,6 @@ function toUiRole(roleName?: string): UserRole {
   return "pregnant";
 }
 
-function toBackendRoleId(role?: UserRole) {
-  const roleIdMap: Record<UserRole, string> = {
-    admin: "2",
-    doctor: "3",
-    nurse: "4",
-    staff: "5",
-    pregnant: "6",
-    owner: "7",
-  };
-
-  return role ? roleIdMap[role] : undefined;
-}
-
-function toBackendStatus(status?: UserStatus) {
-  if (!status) return undefined;
-
-  return status === "active" ? "active" : "locked";
-}
-
 function toUiStatus(status: string): UserStatus {
   return status === "active" ? "active" : "locked";
 }
@@ -238,30 +218,6 @@ function normalizeUser(user: BackendUser): UserAccount {
     createdAt: user.createdAt,
     lastLogin: undefined,
     staffProfile: user.staffProfile,
-  };
-}
-
-function buildSearchParams(query: string) {
-  const keyword = query.trim();
-
-  if (!keyword) return {};
-
-  const onlyNumber = /^[0-9+\-\s]+$/.test(keyword);
-
-  if (keyword.includes("@")) {
-    return {
-      email: keyword,
-    };
-  }
-
-  if (onlyNumber) {
-    return {
-      phone: keyword,
-    };
-  }
-
-  return {
-    name: keyword,
   };
 }
 
@@ -313,13 +269,12 @@ export default function StaffsManagementPage() {
   const [totalUsers, setTotalUsers] = useState(0);
 
   const [query, setQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>();
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>();
   const [statusFilter, setStatusFilter] = useState<UserStatus | undefined>();
-  const [accountTypeFilter, setAccountTypeFilter] = useState<
-    AccountType | undefined
-  >();
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   const [detailUser, setDetailUser] = useState<UserAccount | null>(null);
@@ -355,11 +310,9 @@ export default function StaffsManagementPage() {
 
       try {
         const response = await getUsersPage({
-          ...buildSearchParams(query),
-          roleId: toBackendRoleId(roleFilter),
-          status: toBackendStatus(statusFilter),
-          page: 1,
-          limit: 1000,
+          search: searchQuery,
+          page: currentPage,
+          limit: pageSize,
         });
 
         if (!mounted) return;
@@ -386,13 +339,9 @@ export default function StaffsManagementPage() {
       mounted = false;
       window.clearTimeout(timer);
     };
-  }, [query, roleFilter, statusFilter]);
+  }, [searchQuery, currentPage, pageSize]);
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      return !accountTypeFilter || user.accountType === accountTypeFilter;
-    });
-  }, [users, accountTypeFilter]);
+  const filteredUsers = users;
 
   const activeUsers = users.filter((user) => user.status === "active").length;
   const lockedUsers = users.filter((user) => user.status === "locked").length;
@@ -406,14 +355,6 @@ export default function StaffsManagementPage() {
       createdDate.getFullYear() === now.getFullYear()
     );
   }).length;
-
-  function clearFilters() {
-    setQuery("");
-    setRoleFilter(undefined);
-    setStatusFilter(undefined);
-    setAccountTypeFilter(undefined);
-    setCurrentPage(1);
-  }
 
   function openCreateModal() {
     setEditingUser(null);
@@ -580,7 +521,7 @@ export default function StaffsManagementPage() {
       width: 64,
       align: "center",
       render: (_value, _record, index) =>
-        (currentPage - 1) * PAGE_SIZE + index + 1,
+        (currentPage - 1) * pageSize + index + 1,
     },
     {
       title: "Họ tên",
@@ -602,7 +543,7 @@ export default function StaffsManagementPage() {
       dataIndex: "email",
       ellipsis: true,
       render: (email: string) => (
-        <Text className="block truncate text-slate-600">{email}</Text>
+        <CopyText value={email} copiedMessage="Đã sao chép email" className="max-w-full" />
       ),
     },
     {
@@ -611,7 +552,13 @@ export default function StaffsManagementPage() {
       width: 128,
       align: "center",
       responsive: ["xl"],
-      render: (phone: string) => phone || "Chưa cập nhật",
+      render: (phone: string) => (
+        <CopyText
+          value={phone}
+          emptyText="Chưa cập nhật"
+          copiedMessage="Đã sao chép số điện thoại"
+        />
+      ),
     },
     {
       title: "Vai trò",
@@ -688,7 +635,7 @@ export default function StaffsManagementPage() {
         description="Quản lý tài khoản nhân viên nội bộ theo cơ sở."
       />
 
-      <div className="mt-6 space-y-5">
+      <div className="mt-6 flex flex-col gap-5">
         {error ? (
           <Alert
             type="error"
@@ -699,7 +646,7 @@ export default function StaffsManagementPage() {
           />
         ) : null}
 
-        <Card className="border-slate-200 bg-white">
+        <Card className="management-filter">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="mb-1 text-sm font-semibold uppercase text-sky-700">
@@ -725,63 +672,25 @@ export default function StaffsManagementPage() {
           </div>
         </Card>
 
-        <Card className="border-slate-200 bg-white">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_165px_165px_180px_auto]">
-            <Input
-              size="large"
-              allowClear
-              value={query}
-              prefix={<Search className="h-4 w-4 text-slate-400" />}
-              placeholder="Tìm theo tên/email/SĐT"
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setCurrentPage(1);
-              }}
-            />
+        <div className="order-2">
+        <TableFilter
+          columns={[
+            { field: "keyword", label: "Tìm theo tên/email/SĐT", type: "text", contains: true },
+            { field: "role", label: "Vai trò", type: "select", options: roleOptions, width: 165 },
+            { field: "status", label: "Trạng thái", type: "select", options: statusOptions, width: 165 },
+          ]}
+          values={{ keyword: query, role: roleFilter, status: statusFilter }}
+          onChange={(values, search) => {
+            setSearchQuery(search);
+            setQuery(String(values.keyword ?? ""));
+            setRoleFilter(values.role as UserRole | undefined);
+            setStatusFilter(values.status as UserStatus | undefined);
+            setCurrentPage(1);
+          }}
+        />
+        </div>
 
-            <Select
-              size="large"
-              allowClear
-              value={roleFilter}
-              placeholder="Vai trò"
-              options={roleOptions}
-              onChange={(value: UserRole | undefined) => {
-                setRoleFilter(value);
-                setCurrentPage(1);
-              }}
-            />
-
-            <Select
-              size="large"
-              allowClear
-              value={statusFilter}
-              placeholder="Trạng thái"
-              options={statusOptions}
-              onChange={(value: UserStatus | undefined) => {
-                setStatusFilter(value);
-                setCurrentPage(1);
-              }}
-            />
-
-            <Select
-              size="large"
-              allowClear
-              value={accountTypeFilter}
-              placeholder="Loại tài khoản"
-              options={accountTypeOptions}
-              onChange={(value: AccountType | undefined) => {
-                setAccountTypeFilter(value);
-                setCurrentPage(1);
-              }}
-            />
-
-            <Button size="large" onClick={clearFilters}>
-              Xóa bộ lọc
-            </Button>
-          </div>
-        </Card>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="order-1 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="border-slate-200 bg-white">
             <Statistic
               title={<span className="text-slate-500">Tổng tài khoản</span>}
@@ -824,7 +733,7 @@ export default function StaffsManagementPage() {
         </div>
 
         <Card
-          className="overflow-hidden border-slate-200 bg-white"
+          className="order-3 overflow-hidden border-slate-200 bg-white"
           styles={{ body: { padding: 0 } }}
           title={
             <div>
@@ -867,7 +776,8 @@ export default function StaffsManagementPage() {
             loading={loading || tableLoading}
             columns={columns}
             dataSource={filteredUsers}
-            className="[&_.ant-table-cell]:px-3"
+            className="management-table [&_.ant-table-cell]:px-3"
+            scroll={{ x: 980 }}
             rowSelection={{
               selectedRowKeys: selectedUserIds,
               onChange: (selectedRowKeys) => {
@@ -893,12 +803,17 @@ export default function StaffsManagementPage() {
             })}
             pagination={{
               current: currentPage,
-              pageSize: PAGE_SIZE,
+              pageSize,
               total: filteredUsers.length,
-              showSizeChanger: false,
+              showSizeChanger: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              showQuickJumper: true,
               showTotal: (total, range) =>
                 `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} tài khoản`,
-              onChange: (page) => setCurrentPage(page),
+              onChange: (page, nextPageSize) => {
+                setCurrentPage(nextPageSize !== pageSize ? 1 : page);
+                setPageSize(nextPageSize);
+              },
             }}
           />
         </Card>
