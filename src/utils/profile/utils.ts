@@ -40,6 +40,8 @@ export function formatDateTime(value?: string | null) {
   }).format(date);
 }
 
-export function getStatusText(status: number) {
-  return status === 1 ? "Đang hoạt động" : "Tạm khóa";
+export function getStatusText(status: "active" | "inactive" | "locked") {
+  if (status === "active") return "Đang hoạt động";
+  if (status === "locked") return "Tạm khóa";
+  return "Ngừng hoạt động";
 }

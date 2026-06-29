@@ -10,14 +10,13 @@ const navItems = [
   { href: "/management/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/management/users", label: "Users", icon: Users, roles: ["super_admin"] },
   { href: "/management/staffs", label: "Staffs", icon: UserCog, roles: ["super_admin", "admin"] },
+  { href: "/management/facilities", label: "Cơ sở", icon: Building2, roles: ["super_admin", "admin"] },
+  { href: "/management/rooms", label: "Phòng khám", icon: DoorOpen, roles: ["super_admin", "admin"] },
+  { href: "/management/roles", label: "Roles", icon: ShieldCheck, roles: ["super_admin"] },
+  { href: "/management/permissions", label: "Permissions", icon: KeyRound, roles: ["super_admin"] },
+  { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness, roles: ["super_admin"] },
+  { href: "/management/uploads", label: "Uploads", icon: Upload, roles: ["super_admin"] },
   { href: "/management/profile", label: "Hồ sơ cá nhân", icon: UserCog },
-  // { href: "/management/staffdoctormanagement", label: "Staff / Doctors Management", icon: Users },
-  // { href: "/management/facility-management", label: "Facility Management", icon: Building2 },
-  // { href: "/management/clinic-room-management", label: "Clinic Room Management", icon: DoorOpen },
-  // { href: "/management/roles", label: "Roles", icon: ShieldCheck },
-  // { href: "/management/permissions", label: "Permissions", icon: KeyRound },
-  // { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness },
-  // { href: "/management/uploads", label: "Uploads", icon: Upload },
 ];
 
 export function Sidebar() {

@@ -127,7 +127,7 @@ export default function RolesPage() {
   }
 
   return (
-    <AdminLayout permissions={["role.view"]}>
+    <AdminLayout roles={["super_admin"]} permissions={["role.view"]}>
       <PageHeader title="Roles" description="Gán permission cho role, sau đó user có thể override riêng ở màn Users." />
 
       {loading ? <StateBlock type="loading" title="Đang tải roles và permissions" /> : null}
