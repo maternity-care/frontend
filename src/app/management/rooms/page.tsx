@@ -1,4 +1,4 @@
-//src/app/management/clinic-room-management/page.tsx
+// src/app/management/rooms/page.tsx
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -526,7 +526,7 @@ function ClinicRoomManagementContent() {
   ];
 
   return (
-    <AdminLayout permissions={["user.view"]}>
+    <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
       <PageHeader
         title={ROOM_MESSAGES.PAGE_TITLE}
         description={ROOM_MESSAGES.PAGE_DESCRIPTION}

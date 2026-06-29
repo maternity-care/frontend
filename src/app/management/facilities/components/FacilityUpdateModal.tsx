@@ -1,4 +1,4 @@
-//src/app/management/facility-management/components/FacilityUpdateModal.tsx
+// src/app/management/facilities/components/FacilityUpdateModal.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

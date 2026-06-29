@@ -534,7 +534,7 @@ export default function FacilityManagementPage() {
   ];
 
   return (
-    <AdminLayout permissions={["user.view"]}>
+    <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
       <PageHeader
         title={FACILITY_MESSAGES.PAGE_TITLE}
         description={FACILITY_MESSAGES.PAGE_DESCRIPTION}

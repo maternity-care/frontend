@@ -1,4 +1,4 @@
-//src/app/management/clinic-room-management/components/ClinicRoomFormModal.tsx
+// src/app/management/rooms/components/ClinicRoomFormModal.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
