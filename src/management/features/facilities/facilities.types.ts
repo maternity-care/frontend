@@ -1,6 +1,7 @@
 export type FacilityStatus = "active" | "suspended";
 
 export interface GetFacilitiesParams {
+  rawSearch?: string;
   search?: string;
   city?: string;
   status?: FacilityStatus;

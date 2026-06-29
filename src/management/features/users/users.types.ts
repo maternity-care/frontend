@@ -79,6 +79,7 @@ export interface CreateStaffProfileInput {
 }
 
 export interface GetUsersParams {
+  search?: string;
   name?: string;
   email?: string;
   phone?: string;
