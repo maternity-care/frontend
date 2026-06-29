@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, Form, Input, Modal, Space, Table, Tag, Typography } from "antd";
-import { Plus, Search, UserRound } from "lucide-react";
+import { Plus, UserRound } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
+import { TableFilter } from "@/management/components/ui/TableFilter";
+import { CopyText } from "@/management/components/ui/CopyText";
 import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
 import type { User } from "@/management/features/users/users.types";
 
@@ -25,21 +27,26 @@ interface CreateUserValues {
 export default function UsersManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [query, setQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>();
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm<CreateUserValues>();
 
-  async function loadUsers(search = "") {
+  async function loadUsers(search?: string) {
     setLoading(true);
     setError(null);
     try {
       const data = await unwrapApiData<UsersPayload>(
         apiClient.get("/management/users", {
-          params: search.includes("@") ? { email: search } : { name: search },
+          params: { search, page: currentPage, limit: pageSize },
         }),
       );
       setUsers(data.users ?? []);
+      setTotalUsers(data.total ?? 0);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không tải được người dùng.");
     } finally {
@@ -48,8 +55,9 @@ export default function UsersManagementPage() {
   }
 
   useEffect(() => {
-    void loadUsers();
-  }, []);
+    const timer = window.setTimeout(() => void loadUsers(searchQuery), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, currentPage, pageSize]);
 
   async function createUser(values: CreateUserValues) {
     try {
@@ -61,7 +69,7 @@ export default function UsersManagementPage() {
       );
       setOpen(false);
       form.resetFields();
-      await loadUsers(query);
+      await loadUsers(searchQuery);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Không tạo được người dùng.");
     }
@@ -70,7 +78,7 @@ export default function UsersManagementPage() {
   async function lockUser(id: string) {
     try {
       await unwrapApiResponse<null>(apiClient.delete(`/management/users/${id}`));
-      await loadUsers(query);
+      await loadUsers(searchQuery);
     } catch (lockError) {
       setError(lockError instanceof Error ? lockError.message : "Không khóa được tài khoản.");
     }
@@ -84,7 +92,7 @@ export default function UsersManagementPage() {
       />
       <div className="mt-6 space-y-4">
         {error ? <Alert type="error" message={error} showIcon closable onClose={() => setError(null)} /> : null}
-        <Card>
+        <Card className="management-filter">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Space>
               <UserRound className="h-5 w-5 text-slate-500" />
@@ -94,25 +102,54 @@ export default function UsersManagementPage() {
               Thêm người dùng
             </Button>
           </div>
-          <Input
-            className="mt-4 max-w-md"
-            prefix={<Search className="h-4 w-4 text-slate-400" />}
-            placeholder="Tìm theo tên hoặc email"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onPressEnter={() => void loadUsers(query)}
-            allowClear
-          />
         </Card>
-        <Table<User>
-          rowKey="id"
-          loading={loading}
-          dataSource={users}
-          pagination={{ pageSize: 10 }}
+        <TableFilter
           columns={[
+            { field: "keyword", label: "Tìm theo tên hoặc email", type: "text", contains: true },
+          ]}
+          values={{ keyword: query }}
+          onChange={(values, search) => {
+            const keyword = String(values.keyword ?? "");
+            setQuery(keyword);
+            setSearchQuery(search);
+            setCurrentPage(1);
+          }}
+        />
+        <Card className="overflow-hidden border-slate-200 bg-white" styles={{ body: { padding: 0 } }}>
+          <Table<User>
+            className="management-table"
+            rowKey="id"
+            loading={loading}
+            dataSource={users}
+            scroll={{ x: 760 }}
+            pagination={{
+              current: currentPage,
+              pageSize,
+              total: totalUsers,
+              showSizeChanger: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              showQuickJumper: true,
+              showTotal: (total, range) =>
+                `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} người dùng`,
+              onChange: (page, size) => {
+                setCurrentPage(size !== pageSize ? 1 : page);
+                setPageSize(size);
+              },
+            }}
+            columns={[
             { title: "Họ tên", dataIndex: "name" },
-            { title: "Email", dataIndex: "email" },
-            { title: "Điện thoại", dataIndex: "phone", render: (value) => value || "-" },
+            {
+              title: "Email",
+              dataIndex: "email",
+              render: (value) => <CopyText value={value} copiedMessage="Đã sao chép email" />,
+            },
+            {
+              title: "Điện thoại",
+              dataIndex: "phone",
+              render: (value) => (
+                <CopyText value={value} copiedMessage="Đã sao chép số điện thoại" />
+              ),
+            },
             {
               title: "Role",
               render: (_, user) => (
@@ -134,8 +171,9 @@ export default function UsersManagementPage() {
                 </Button>
               ),
             },
-          ]}
-        />
+            ]}
+          />
+        </Card>
       </div>
       <Modal
         open={open}

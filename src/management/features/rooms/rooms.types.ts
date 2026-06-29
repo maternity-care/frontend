@@ -2,6 +2,7 @@ export type RoomStatus = "active" | "suspended";
 
 export interface BackendRoom {
   id: string;
+  facilityId: string;
   name: string;
 
   // Backend có thể trả một trong các field này
@@ -41,6 +42,7 @@ export interface BackendRoomsByFacility {
 
 export interface ClinicRoom {
   id: string;
+  facilityId: string;
   roomName: string;
   roomType: string;
   floor: number;
@@ -59,6 +61,7 @@ export interface RoomFormValues {
 }
 
 export interface GetRoomsByFacilityParams {
+  rawSearch?: string;
   search?: string;
   floor?: string;
   status?: RoomStatus;
