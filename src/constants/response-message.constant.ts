@@ -65,6 +65,7 @@ export const RESPONSE_MESSAGES = {
   AUTH: {
     LOGIN: "Đăng nhập",
     LOGOUT: "Đăng xuất",
+    LOGIN_FOR_MANAGEMENT: "Đăng nhập quản trị",
     REGISTER: "Đăng ký tài khoản",
     REGISTER_NOW: "Đăng ký ngay",
     LOGIN_ACCOUNT: "Đăng nhập tài khoản",
