@@ -12,6 +12,7 @@ import { useAuthStore } from "@/features/auth/auth.store";
 import { Button } from "@/management/components/ui/Button";
 import { Card } from "@/management/components/ui/Card";
 import { Input } from "@/management/components/ui/Input";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 const loginSchema = z.object({
   email: z.string().email("Email không hợp lệ"),
@@ -66,7 +67,7 @@ function LoginForm() {
           </div>
           <h1 className="text-2xl font-semibold text-slate-950">Admin Login</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Đăng nhập để quản trị hệ thống Maternity Care.
+            {RESPONSE_MESSAGES.AUTH.LOGIN_FOR_MANAGEMENT}
           </p>
         </div>
 
@@ -93,13 +94,13 @@ function LoginForm() {
                 className="h-4 w-4 rounded border-slate-300"
                 {...register("rememberMe")}
               />
-              Ghi nhớ đăng nhập
+              {RESPONSE_MESSAGES.AUTH.REMEMBER_LOGIN}
             </label>
             <Link
               href="/management/forgot-password"
               className="text-sm font-medium text-slate-700 hover:text-slate-950 hover:underline"
             >
-              Quên mật khẩu?
+              {RESPONSE_MESSAGES.AUTH.FORGOT_PASSWORD}
             </Link>
           </div>
 
@@ -110,7 +111,7 @@ function LoginForm() {
           ) : null}
 
           <Button className="w-full" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Đang đăng nhập..." : "Login"}
+            {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
           </Button>
         </form>
       </Card>
