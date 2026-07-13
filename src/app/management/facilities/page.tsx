@@ -17,7 +17,7 @@ import { Building2, Eye, Pencil, Plus, Trash2, X } from "lucide-react";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
-import { TableFilter } from "@/management/components/ui/TableFilter";
+import { TableFilter } from "@/fe/components/ui/TableFilter";
 import { CopyText } from "@/management/components/ui/CopyText";
 import {
   createFacility,
