@@ -28,7 +28,16 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { accessToken, refreshToken, roles, permissions, clearSession, setUser } = useAuthStore();
+  const {
+    accessToken,
+    accountType,
+    refreshToken,
+    roles,
+    permissions,
+    activeFacilityId,
+    clearSession,
+    setUser,
+  } = useAuthStore();
   const [localUser, saveLocalUser, removeLocalUser] = useLocalStorage<UserProfile>(USER_CACHE_KEY);
 
   const {
@@ -42,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     revalidateIfStale: false,
-    revalidateOnMount: !localUser,
+    revalidateOnMount: true,
     dedupingInterval: 1000 * 60,
     fallbackData: localUser,
     fetcher: getCurrentUser,
@@ -59,29 +68,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     try {
       if (refreshToken) {
-        await logoutApi(refreshToken);
+        await logoutApi(refreshToken, accountType);
       }
     } finally {
       clearSession();
       removeLocalUser();
       await mutate(undefined, { revalidate: false });
     }
-  }, [clearSession, mutate, refreshToken, removeLocalUser]);
+  }, [accountType, clearSession, mutate, refreshToken, removeLocalUser]);
+
+  const effectiveRoles = useMemo(
+    () => {
+      if (!currentUser) return roles;
+      const facility = currentUser.facilities?.find(
+        (facility) => String(facility.id) === String(activeFacilityId),
+      );
+      const facilityRoles = facility?.roles?.length
+        ? facility.roles
+        : facility?.role
+          ? [facility.role]
+          : [];
+      return [
+        ...new Set([
+          ...currentUser.roles.map((role) => role.name),
+          ...facilityRoles.map((role) => role.name),
+        ]),
+      ];
+    },
+    [activeFacilityId, currentUser, roles],
+  );
+  const effectivePermissions = useMemo(
+    () =>
+      currentUser?.roles
+        ? [
+            ...new Set(
+              [
+                ...currentUser.roles,
+                ...(currentUser.facilities?.find(
+                  (facility) =>
+                    String(facility.id) === String(activeFacilityId),
+                )?.roles ??
+                  (currentUser.facilities?.find(
+                    (facility) =>
+                      String(facility.id) === String(activeFacilityId),
+                  )?.role
+                    ? [
+                        currentUser.facilities.find(
+                          (facility) =>
+                            String(facility.id) === String(activeFacilityId),
+                        )!.role,
+                      ]
+                    : [])),
+              ].flatMap(
+                (role) =>
+                  role.permissions?.map((permission) => permission.name) ?? [],
+              ),
+            ),
+          ]
+        : permissions,
+    [activeFacilityId, currentUser, permissions],
+  );
 
   const hasRole = useCallback(
     (...requiredRoles: string[]) =>
-      roles.some((role) => requiredRoles.includes(role)) ||
-      (currentUser?.roles?.some((role) => requiredRoles.includes(role.name)) ?? false),
-    [currentUser, roles],
+      effectiveRoles.some((role) => requiredRoles.includes(role)),
+    [effectiveRoles],
   );
 
   const hasPermission = useCallback(
     (...requiredPermissions: string[]) =>
-      permissions.some((permission) => requiredPermissions.includes(permission)) ||
-      (currentUser?.roles?.some((role) =>
-        role.permissions?.some((permission) => requiredPermissions.includes(permission.name)),
-      ) ?? false),
-    [currentUser, permissions],
+      effectivePermissions.some((permission) =>
+        requiredPermissions.includes(permission),
+      ),
+    [effectivePermissions],
   );
 
   const loading = Boolean(accessToken) && (firstLoading || isValidating);
@@ -94,8 +153,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       firstLoading,
       isValidating,
       isAuthenticated: Boolean(accessToken && currentUser),
-      roles,
-      permissions,
+      roles: effectiveRoles,
+      permissions: effectivePermissions,
       logout,
       mutate,
       hasRole,
@@ -111,8 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       logout,
       mutate,
-      permissions,
-      roles,
+      effectivePermissions,
+      effectiveRoles,
     ],
   );
 

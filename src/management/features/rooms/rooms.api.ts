@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/axios";
+import { withSearchParams } from "@/lib/search-filter";
 import type {
   BackendRoom,
   BackendRoomsByFacility,
@@ -72,7 +73,7 @@ function normalizeStatus(status: string): RoomStatus {
 function toBackendStatus(status?: RoomStatus) {
   if (!status) return undefined;
 
-  return status === "active" ? "Hoạt động" : "Tạm ngưng";
+  return status === "active" ? "active" : "inactive";
 }
 
 function getBackendRoomType(room: BackendRoom) {
@@ -89,6 +90,7 @@ function getBackendRoomType(room: BackendRoom) {
 function normalizeRoom(room: BackendRoom, capacity = 1): ClinicRoom {
   return {
     id: room.id,
+    facilityId: room.facilityId,
     roomName: room.name,
     roomType: getBackendRoomType(room),
     floor: Number(room.floor) || 1,
@@ -114,20 +116,23 @@ function toBackendPayload(input: CreateRoomInput | UpdateRoomInput) {
 }
 
 function toQueryParams(params?: GetRoomsByFacilityParams) {
-  const queryParams = {
-    search: params?.search?.trim() || undefined,
-    floor: params?.floor?.trim() || undefined,
-    status: params?.status ? toBackendStatus(params.status) : undefined,
-  };
+  if (params?.rawSearch) return { search: params.rawSearch };
 
-  return Object.fromEntries(
-    Object.entries(queryParams).filter(([, value]) => value !== undefined),
+  return withSearchParams(
+    {},
+    {
+      name: params?.search,
+      floor: params?.floor,
+      status: params?.status ? toBackendStatus(params.status) : undefined,
+    },
+    { contains: ["name"] },
   );
 }
 
-export async function getRooms() {
+export async function getRooms(params?: GetRoomsByFacilityParams) {
   const response = await apiClient.get<ApiEnvelope<BackendRoom[]>>(
     "/management/rooms",
+    { params: toQueryParams(params) },
   );
 
   const data = unwrapData<BackendRoom[]>(response.data);

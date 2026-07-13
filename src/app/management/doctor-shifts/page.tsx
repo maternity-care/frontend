@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
-import { TableFilter } from "@/management/components/ui/TableFilter";
+import { TableFilter } from "@/fe/components/ui/TableFilter";
 import { managementCatalogApi } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type {
   BulkCreateDoctorShiftsInput,

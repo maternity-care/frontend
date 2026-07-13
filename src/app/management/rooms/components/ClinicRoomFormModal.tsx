@@ -1,3 +1,4 @@
+// src/app/management/rooms/components/ClinicRoomFormModal.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -26,12 +27,14 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import type {
   ClinicRoom,
   RoomFormValues,
 } from "@/management/features/rooms/rooms.types";
 
 const { Text, Title } = Typography;
+const ROOM_MESSAGES = RESPONSE_MESSAGES.CLINIC_ROOM_MANAGEMENT;
 
 type ClinicRoomFormModalProps = {
   open: boolean;
@@ -41,16 +44,31 @@ type ClinicRoomFormModalProps = {
 };
 
 const roomTypeOptions = [
-  { value: "Siêu âm", label: "Siêu âm" },
-  { value: "Xét nghiệm", label: "Xét nghiệm" },
-  { value: "Tư vấn", label: "Tư vấn" },
-  { value: "Khám thai", label: "Khám thai" },
-  { value: "Cấp cứu", label: "Cấp cứu" },
+  {
+    value: ROOM_MESSAGES.ROOM_TYPES.ULTRASOUND,
+    label: ROOM_MESSAGES.ROOM_TYPES.ULTRASOUND,
+  },
+  {
+    value: ROOM_MESSAGES.ROOM_TYPES.TESTING,
+    label: ROOM_MESSAGES.ROOM_TYPES.TESTING,
+  },
+  {
+    value: ROOM_MESSAGES.ROOM_TYPES.CONSULTING,
+    label: ROOM_MESSAGES.ROOM_TYPES.CONSULTING,
+  },
+  {
+    value: ROOM_MESSAGES.ROOM_TYPES.ANTENATAL_CARE,
+    label: ROOM_MESSAGES.ROOM_TYPES.ANTENATAL_CARE,
+  },
+  {
+    value: ROOM_MESSAGES.ROOM_TYPES.EMERGENCY,
+    label: ROOM_MESSAGES.ROOM_TYPES.EMERGENCY,
+  },
 ];
 
 const statusOptions = [
-  { value: "active", label: "Đang hoạt động" },
-  { value: "suspended", label: "Tạm ngưng" },
+  { value: "active", label: ROOM_MESSAGES.ACTIVE },
+  { value: "suspended", label: ROOM_MESSAGES.SUSPENDED },
 ];
 
 const initialValues: RoomFormValues = {
@@ -80,7 +98,7 @@ function PreviewLine({
         </p>
 
         <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">
-          {value || "Chưa nhập"}
+          {value || ROOM_MESSAGES.NOT_ENTERED}
         </div>
       </div>
     </div>
@@ -125,14 +143,18 @@ export function ClinicRoomFormModal({
     form.setFieldsValue(initialValues);
   }, [open, editingRoom, form]);
 
-  const modalTitle = editingRoom ? "Cập nhật phòng khám" : "Thêm phòng khám";
+  const modalTitle = editingRoom
+    ? ROOM_MESSAGES.UPDATE_ROOM_TITLE
+    : ROOM_MESSAGES.ADD_ROOM_TITLE;
 
   const modalDescription = editingRoom
-    ? "Chỉnh sửa thông tin phòng khám, loại phòng, tầng, sức chứa và trạng thái."
-    : "Tạo phòng khám mới trong cơ sở.";
+    ? ROOM_MESSAGES.UPDATE_ROOM_DESCRIPTION
+    : ROOM_MESSAGES.ADD_ROOM_DESCRIPTION;
 
   const previewRoomName = useMemo(() => {
-    if (!roomName) return editingRoom ? editingRoom.roomName : "Phòng khám mới";
+    if (!roomName) {
+      return editingRoom ? editingRoom.roomName : ROOM_MESSAGES.NEW_ROOM;
+    }
 
     return roomName;
   }, [roomName, editingRoom]);
@@ -249,10 +271,10 @@ export function ClinicRoomFormModal({
 
                     <span>
                       <p className="mb-0 text-base font-semibold text-slate-950">
-                        Thông tin phòng khám
+                        {ROOM_MESSAGES.ROOM_INFO}
                       </p>
                       <p className="mb-0 text-xs font-normal text-slate-500">
-                        Nhập tên phòng, loại phòng và trạng thái hoạt động.
+                        {ROOM_MESSAGES.ROOM_INFO_DESCRIPTION}
                       </p>
                     </span>
                   </Space>
@@ -262,27 +284,33 @@ export function ClinicRoomFormModal({
                   <Col xs={24} md={8}>
                     <Form.Item
                       name="roomName"
-                      label="Tên phòng"
+                      label={ROOM_MESSAGES.ROOM_NAME}
                       className="!mb-1"
                       rules={[
-                        { required: true, message: "Vui lòng nhập tên phòng" },
+                        {
+                          required: true,
+                          message: ROOM_MESSAGES.VALIDATION.ROOM_NAME_REQUIRED,
+                        },
                       ]}
                     >
-                      <Input placeholder="Ví dụ: P101" />
+                      <Input placeholder={ROOM_MESSAGES.PLACEHOLDERS.ROOM_NAME} />
                     </Form.Item>
                   </Col>
 
                   <Col xs={24} md={8}>
                     <Form.Item
                       name="roomType"
-                      label="Loại phòng"
+                      label={ROOM_MESSAGES.ROOM_TYPE}
                       className="!mb-1"
                       rules={[
-                        { required: true, message: "Vui lòng chọn loại phòng" },
+                        {
+                          required: true,
+                          message: ROOM_MESSAGES.VALIDATION.ROOM_TYPE_REQUIRED,
+                        },
                       ]}
                     >
                       <Select
-                        placeholder="Chọn loại phòng"
+                        placeholder={ROOM_MESSAGES.PLACEHOLDERS.ROOM_TYPE}
                         options={roomTypeOptions}
                       />
                     </Form.Item>
@@ -291,14 +319,17 @@ export function ClinicRoomFormModal({
                   <Col xs={24} md={8}>
                     <Form.Item
                       name="status"
-                      label="Trạng thái"
+                      label={ROOM_MESSAGES.STATUS}
                       className="!mb-1"
                       rules={[
-                        { required: true, message: "Vui lòng chọn trạng thái" },
+                        {
+                          required: true,
+                          message: ROOM_MESSAGES.VALIDATION.STATUS_REQUIRED,
+                        },
                       ]}
                     >
                       <Select
-                        placeholder="Chọn trạng thái"
+                        placeholder={ROOM_MESSAGES.PLACEHOLDERS.STATUS}
                         options={statusOptions}
                       />
                     </Form.Item>
@@ -326,10 +357,10 @@ export function ClinicRoomFormModal({
 
                     <span>
                       <p className="mb-0 text-base font-semibold text-slate-950">
-                        Thiết lập phòng
+                        {ROOM_MESSAGES.ROOM_SETTINGS}
                       </p>
                       <p className="mb-0 text-xs font-normal text-slate-500">
-                        Cập nhật tầng và sức chứa của phòng khám.
+                        {ROOM_MESSAGES.ROOM_SETTINGS_DESCRIPTION}
                       </p>
                     </span>
                   </Space>
@@ -339,16 +370,19 @@ export function ClinicRoomFormModal({
                   <Col xs={24} md={6}>
                     <Form.Item
                       name="floor"
-                      label="Tầng"
+                      label={ROOM_MESSAGES.FLOOR}
                       className="!mb-1"
                       rules={[
-                        { required: true, message: "Vui lòng nhập tầng" },
+                        {
+                          required: true,
+                          message: ROOM_MESSAGES.VALIDATION.FLOOR_REQUIRED,
+                        },
                       ]}
                     >
                       <InputNumber
                         min={1}
                         className="w-[112px]"
-                        placeholder="Ví dụ: 1"
+                        placeholder={ROOM_MESSAGES.PLACEHOLDERS.FLOOR}
                       />
                     </Form.Item>
                   </Col>
@@ -356,16 +390,19 @@ export function ClinicRoomFormModal({
                   <Col xs={24} md={6}>
                     <Form.Item
                       name="capacity"
-                      label="Sức chứa"
+                      label={ROOM_MESSAGES.CAPACITY}
                       className="!mb-1"
                       rules={[
-                        { required: true, message: "Vui lòng nhập sức chứa" },
+                        {
+                          required: true,
+                          message: ROOM_MESSAGES.VALIDATION.CAPACITY_REQUIRED,
+                        },
                       ]}
                     >
                       <InputNumber
                         min={1}
                         className="w-[112px]"
-                        placeholder="Ví dụ: 2"
+                        placeholder={ROOM_MESSAGES.PLACEHOLDERS.CAPACITY}
                       />
                     </Form.Item>
                   </Col>
@@ -385,40 +422,46 @@ export function ClinicRoomFormModal({
                   </p>
 
                   <p className="mb-0 text-sm text-slate-500">
-                    {roomType || "Chưa chọn loại phòng"}
+                    {roomType || ROOM_MESSAGES.NOT_SELECTED_ROOM_TYPE}
                   </p>
                 </div>
               </div>
 
               <div className="mt-4">
                 <Tag color={status === "suspended" ? "default" : "green"}>
-                  {status === "suspended" ? "Tạm ngưng" : "Đang hoạt động"}
+                  {status === "suspended"
+                    ? ROOM_MESSAGES.SUSPENDED
+                    : ROOM_MESSAGES.ACTIVE}
                 </Tag>
               </div>
 
               <div className="mt-4 space-y-2.5">
                 <PreviewLine
                   icon={<DoorOpen className="h-4 w-4" />}
-                  label="Tên phòng"
+                  label={ROOM_MESSAGES.ROOM_NAME}
                   value={roomName}
                 />
 
                 <PreviewLine
                   icon={<BedDouble className="h-4 w-4" />}
-                  label="Loại phòng"
+                  label={ROOM_MESSAGES.ROOM_TYPE}
                   value={roomType}
                 />
 
                 <PreviewLine
                   icon={<Layers className="h-4 w-4" />}
-                  label="Tầng"
-                  value={floor ? `Tầng ${floor}` : ""}
+                  label={ROOM_MESSAGES.FLOOR}
+                  value={floor ? `${ROOM_MESSAGES.FLOOR_PREFIX} ${floor}` : ""}
                 />
 
                 <PreviewLine
                   icon={<Users className="h-4 w-4" />}
-                  label="Sức chứa"
-                  value={capacity ? `${capacity} người` : ""}
+                  label={ROOM_MESSAGES.CAPACITY}
+                  value={
+                    capacity
+                      ? `${capacity} ${ROOM_MESSAGES.PERSON_SUFFIX}`
+                      : ""
+                  }
                 />
               </div>
             </aside>
@@ -427,7 +470,7 @@ export function ClinicRoomFormModal({
           <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-4">
             <Button onClick={handleCancel} disabled={submitting}>
               <X className="mr-1 h-4 w-4" />
-              Hủy
+              {ROOM_MESSAGES.CANCEL}
             </Button>
 
             <Button type="primary" htmlType="submit" loading={submitting}>
@@ -437,7 +480,7 @@ export function ClinicRoomFormModal({
                 <Save className="mr-1 h-4 w-4" />
               )}
 
-              {editingRoom ? "Cập nhật phòng" : "Lưu phòng"}
+              {editingRoom ? ROOM_MESSAGES.UPDATE_ROOM : ROOM_MESSAGES.SAVE_ROOM}
             </Button>
           </div>
         </Form>
@@ -462,7 +505,7 @@ export function ClinicRoomFormModal({
         <div className="relative px-6 pb-6 pt-7 text-center">
           <button
             type="button"
-            aria-label="Đóng"
+            aria-label={ROOM_MESSAGES.DETAIL_CLOSE}
             onClick={handleCloseConfirm}
             disabled={submitting}
             className="absolute right-3 top-3 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -475,11 +518,11 @@ export function ClinicRoomFormModal({
           </div>
 
           <h3 className="mt-5 text-lg font-bold text-slate-950">
-            Xác nhận cập nhật phòng
+            {ROOM_MESSAGES.CONFIRM_UPDATE_TITLE}
           </h3>
 
           <p className="mt-2 text-sm text-slate-500">
-            Bạn có chắc chắn muốn cập nhật thông tin phòng khám này không?
+            {ROOM_MESSAGES.CONFIRM_UPDATE_DESCRIPTION}
           </p>
 
           {editingRoom ? (
@@ -495,7 +538,7 @@ export function ClinicRoomFormModal({
               disabled={submitting}
               className="h-11 rounded-lg font-semibold"
             >
-              Hủy
+              {ROOM_MESSAGES.CANCEL}
             </Button>
 
             <Button
@@ -505,7 +548,7 @@ export function ClinicRoomFormModal({
               onClick={handleConfirmUpdate}
               className="h-11 rounded-lg font-semibold"
             >
-              Cập nhật
+              {ROOM_MESSAGES.UPDATE_ROOM}
             </Button>
           </div>
         </div>

@@ -16,6 +16,7 @@ import {
 import { HeartPulse } from "lucide-react";
 import { login } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type LoginFormValues = {
   email: string;
@@ -54,6 +55,7 @@ function LoginForm() {
       const session = await login({
         email: values.email,
         password: values.password,
+        rememberMe: Boolean(values.rememberMe),
       });
 
       setSession(session, Boolean(values.rememberMe));
@@ -96,19 +98,19 @@ function LoginForm() {
           className="mb-6 inline-flex items-center gap-2 font-semibold text-teal-900"
         >
           <HeartPulse className="h-5 w-5" />
-          Maternity Care
+          {RESPONSE_MESSAGES.COMMON.DEFAULT_NAME}
         </Link>
 
         <Typography.Title level={3} className="!mb-2">
-          Đăng nhập tài khoản
+          {RESPONSE_MESSAGES.AUTH.LOGIN_ACCOUNT}
         </Typography.Title>
 
         <Typography.Text type="secondary">
-          Dùng tài khoản của bạn để truy cập hồ sơ và uploads.
+          {RESPONSE_MESSAGES.AUTH.LOGIN_DESCRIPTION}
         </Typography.Text>
 
         {formError ? (
-          <Alert className="mt-5" type="error" message={formError} showIcon />
+          <Alert className="mt-5" type="error" title={formError} showIcon />
         ) : null}
 
         <Form<LoginFormValues>
@@ -123,27 +125,27 @@ function LoginForm() {
           onFinish={onFinish}
         >
           <Form.Item
-            label="Email"
+            label={RESPONSE_MESSAGES.COMMON.EMAIL}
             name="email"
             rules={[
-              { required: true, message: "Vui lòng nhập email" },
-              { type: "email", message: "Email không hợp lệ" },
+              { required: true, message: RESPONSE_MESSAGES.AUTH.emailRequired },
+              { type: "email", message: RESPONSE_MESSAGES.AUTH.emailInvalid },
             ]}
           >
-            <Input autoComplete="email" placeholder="Nhập email" />
+            <Input autoComplete="email" placeholder={RESPONSE_MESSAGES.AUTH.ENTER_EMAIL} />
           </Form.Item>
 
           <Form.Item
-            label="Password"
+            label={RESPONSE_MESSAGES.COMMON.PASSWORD}
             name="password"
             rules={[
-              { required: true, message: "Vui lòng nhập mật khẩu" },
-              { min: 6, message: "Mật khẩu tối thiểu 6 ký tự" },
+              { required: true, message: RESPONSE_MESSAGES.AUTH.passwordRequired },
+              { min: 6, message: RESPONSE_MESSAGES.AUTH.passwordMinLength },
             ]}
           >
             <Input.Password
               autoComplete="current-password"
-              placeholder="Nhập mật khẩu"
+              placeholder={RESPONSE_MESSAGES.AUTH.ENTER_PASSWORD}
             />
           </Form.Item>
 
@@ -152,7 +154,7 @@ function LoginForm() {
             valuePropName="checked"
             className="!mb-4"
           >
-            <Checkbox>Ghi nhớ đăng nhập</Checkbox>
+            <Checkbox>{RESPONSE_MESSAGES.AUTH.REMEMBER_ME}</Checkbox>
           </Form.Item>
 
           <div className="-mt-2 mb-4 text-right text-sm">
@@ -160,7 +162,7 @@ function LoginForm() {
               href="/forgot-password"
               className="font-medium text-teal-700 hover:text-teal-900 hover:underline"
             >
-              Quên mật khẩu?
+              {RESPONSE_MESSAGES.AUTH.FORGOT_PASSWORD}
             </Link>
           </div>
 
@@ -171,17 +173,17 @@ function LoginForm() {
               loading={isSubmitting}
               block
             >
-              Login
+              {RESPONSE_MESSAGES.AUTH.LOGIN}
             </Button>
           </Form.Item>
 
           <p className="text-center text-sm text-slate-600">
-            Bạn chưa có tài khoản?{" "}
+            {RESPONSE_MESSAGES.AUTH.DONT_HAVE_ACCOUNT}{" "}
             <Link
               href="/register"
               className="font-medium text-teal-700 hover:text-teal-900 hover:underline"
             >
-              Click vào để đăng ký
+              {RESPONSE_MESSAGES.AUTH.REGISTER_NOW}
             </Link>
           </p>
         </Form>
