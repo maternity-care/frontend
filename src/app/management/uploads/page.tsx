@@ -57,7 +57,7 @@ export default function UploadsPage() {
   };
 
   return (
-    <AdminLayout>
+    <AdminLayout roles={["super_admin"]}>
       <PageHeader title="Uploads" description="Tạo management presigned upload qua POST /management/uploads/presign." />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">

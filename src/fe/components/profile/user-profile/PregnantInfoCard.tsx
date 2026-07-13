@@ -1,3 +1,4 @@
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { PregnantProfile } from "@/features/profile/profile.types";
 import { displayValue } from "@/utils/profile/utils";
 import { Card, Descriptions } from "antd";
@@ -54,7 +55,7 @@ export function PregnantInfoCard({ profile }: PregnantInfoCardProps) {
       title={
         <div className="flex items-center gap-2">
           <HeartPulse className="h-5 w-5 text-rose-500" />
-          <span>Thông tin thai phụ</span>
+          <span>{RESPONSE_MESSAGES.PROFILE.PREGNANT_INFO}</span>
         </div>
       }
     >

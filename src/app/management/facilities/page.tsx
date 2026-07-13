@@ -1,4 +1,3 @@
-//src/app/management/facility-management/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -7,18 +6,19 @@ import {
   Alert,
   Button,
   Card,
-  Input,
   Modal,
-  Select,
   Space,
   Statistic,
   Table,
   Tag,
   Typography,
 } from "antd";
-import { Building2, Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Building2, Eye, Pencil, Plus, Trash2, X } from "lucide-react";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
+import { TableFilter } from "@/fe/components/ui/TableFilter";
+import { CopyText } from "@/management/components/ui/CopyText";
 import {
   createFacility,
   deleteFacilities,
@@ -35,10 +35,10 @@ import {
 } from "./components/FacilityFormModal";
 import { FacilityDetailModal } from "./components/FacilityDetailModal";
 import { FacilityUpdateModal } from "./components/FacilityUpdateModal";
+import { useAuthStore } from "@/features/auth/auth.store";
 
 const { Text } = Typography;
-
-const PAGE_SIZE = 5;
+const FACILITY_MESSAGES = RESPONSE_MESSAGES.FACILITY_MANAGEMENT;
 
 type DeleteConfirmState =
   | {
@@ -59,28 +59,38 @@ type DeleteConfirmState =
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) {
     if (err.message.includes("Facility code already exists")) {
-      return "Mã cơ sở đã tồn tại. Vui lòng nhập mã cơ sở khác.";
+      return FACILITY_MESSAGES.FACILITY_CODE_EXISTS;
     }
 
     if (err.message.includes("Validation failed")) {
-      return "Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại các trường bắt buộc.";
+      return FACILITY_MESSAGES.VALIDATION_FAILED;
     }
 
     return err.message;
   }
 
-  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
+  return FACILITY_MESSAGES.DEFAULT_ERROR;
+}
+
+function getFacilityStatusText(status: FacilityStatus) {
+  return status === "active"
+    ? FACILITY_MESSAGES.ACTIVE_DISPLAY
+    : FACILITY_MESSAGES.SUSPENDED;
 }
 
 export default function FacilityManagementPage() {
+  const isSuperAdmin = useAuthStore((state) =>
+    state.roles.includes("super_admin"),
+  );
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [query, setQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>();
   const [cityFilter, setCityFilter] = useState<string | undefined>();
-  const [serviceFilter, setServiceFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<
     FacilityStatus | undefined
   >();
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -99,16 +109,21 @@ export default function FacilityManagementPage() {
 
   useEffect(() => {
     let mounted = true;
-
-    async function loadFacilities() {
+    const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const data = await getFacilities();
+        const data = await getFacilities({
+          rawSearch: searchQuery,
+          search: query,
+          city: cityFilter,
+          status: statusFilter,
+        });
 
         if (mounted) {
           setFacilities(data);
+          setCurrentPage(1);
         }
       } catch (err) {
         if (mounted) {
@@ -119,38 +134,15 @@ export default function FacilityManagementPage() {
           setLoading(false);
         }
       }
-    }
-
-    loadFacilities();
+    }, 300);
 
     return () => {
       mounted = false;
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [query, cityFilter, statusFilter, searchQuery]);
 
-  const filteredFacilities = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-
-    return facilities.filter((facility) => {
-      const matchKeyword =
-        !keyword ||
-        facility.name.toLowerCase().includes(keyword) ||
-        facility.address.toLowerCase().includes(keyword) ||
-        facility.code.toLowerCase().includes(keyword);
-
-      const matchCity = !cityFilter || facility.city === cityFilter;
-
-      const matchService =
-        !serviceFilter ||
-        facility.featuredServices
-          .toLowerCase()
-          .includes(serviceFilter.toLowerCase());
-
-      const matchStatus = !statusFilter || facility.status === statusFilter;
-
-      return matchKeyword && matchCity && matchService && matchStatus;
-    });
-  }, [facilities, query, cityFilter, serviceFilter, statusFilter]);
+  const filteredFacilities = facilities;
 
   const activeFacilities = facilities.filter(
     (facility) => facility.status === "active",
@@ -169,13 +161,16 @@ export default function FacilityManagementPage() {
     }));
   }, [facilities]);
 
-  function clearFilters() {
-    setQuery("");
-    setCityFilter(undefined);
-    setServiceFilter(undefined);
-    setStatusFilter(undefined);
-    setCurrentPage(1);
-  }
+  const statusOptions = [
+    {
+      value: "active",
+      label: FACILITY_MESSAGES.ACTIVE_DISPLAY,
+    },
+    {
+      value: "suspended",
+      label: FACILITY_MESSAGES.SUSPENDED,
+    },
+  ];
 
   async function handleCreateFacility(values: FacilityFormValues) {
     setError(null);
@@ -184,7 +179,7 @@ export default function FacilityManagementPage() {
       const workingHours =
         values.openTime && values.closeTime
           ? `${values.openTime}-${values.closeTime}`
-          : "Chưa cập nhật";
+          : FACILITY_MESSAGES.NOT_UPDATED;
 
       const response = await createFacility({
         name: values.name,
@@ -201,7 +196,7 @@ export default function FacilityManagementPage() {
         openTime: values.openTime,
         closeTime: values.closeTime,
         workingHours,
-        featuredServices: values.description || "Chưa cập nhật",
+        featuredServices: values.description || FACILITY_MESSAGES.NOT_UPDATED,
         description: values.description,
         internalNote: values.internalNote,
         status: values.status,
@@ -210,7 +205,7 @@ export default function FacilityManagementPage() {
       const createdFacility: Facility = {
         ...response.data,
         workingHours,
-        featuredServices: values.description || "Chưa cập nhật",
+        featuredServices: values.description || FACILITY_MESSAGES.NOT_UPDATED,
       };
 
       setFacilities((current) => [createdFacility, ...current]);
@@ -260,9 +255,9 @@ export default function FacilityManagementPage() {
       setCurrentPage(1);
 
       Modal.success({
-        title: "Xóa cơ sở thành công",
-        content: "Cơ sở đã được xóa khỏi danh sách.",
-        okText: "Đóng",
+        title: FACILITY_MESSAGES.DELETE_SUCCESS_TITLE,
+        content: FACILITY_MESSAGES.DELETE_SINGLE_SUCCESS_CONTENT,
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
         centered: true,
       });
     } catch (err) {
@@ -270,9 +265,9 @@ export default function FacilityManagementPage() {
       setError(message);
 
       Modal.error({
-        title: "Xóa cơ sở thất bại",
+        title: FACILITY_MESSAGES.DELETE_ERROR_TITLE,
         content: message,
-        okText: "Đóng",
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
         centered: true,
       });
 
@@ -307,9 +302,9 @@ export default function FacilityManagementPage() {
       setCurrentPage(1);
 
       Modal.success({
-        title: "Xóa cơ sở thành công",
-        content: "Các cơ sở đã chọn đã được xóa khỏi danh sách.",
-        okText: "Đóng",
+        title: FACILITY_MESSAGES.DELETE_SUCCESS_TITLE,
+        content: FACILITY_MESSAGES.DELETE_SELECTED_SUCCESS_CONTENT,
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
         centered: true,
       });
     } catch (err) {
@@ -317,9 +312,9 @@ export default function FacilityManagementPage() {
       setError(message);
 
       Modal.error({
-        title: "Xóa cơ sở thất bại",
+        title: FACILITY_MESSAGES.DELETE_ERROR_TITLE,
         content: message,
-        okText: "Đóng",
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
         centered: true,
       });
 
@@ -380,14 +375,14 @@ export default function FacilityManagementPage() {
 
   const columns: ColumnsType<Facility> = [
     {
-      title: "STT",
+      title: FACILITY_MESSAGES.STT,
       width: 64,
       align: "center",
       render: (_value, _record, index) =>
-        (currentPage - 1) * PAGE_SIZE + index + 1,
+        (currentPage - 1) * pageSize + index + 1,
     },
     {
-      title: "Tên cơ sở",
+      title: FACILITY_MESSAGES.FACILITY_NAME,
       dataIndex: "name",
       width: 210,
       render: (name: string, record) => (
@@ -409,7 +404,7 @@ export default function FacilityManagementPage() {
       ),
     },
     {
-      title: "Địa chỉ",
+      title: FACILITY_MESSAGES.ADDRESS,
       dataIndex: "address",
       render: (address: string, record) => (
         <span className="whitespace-normal break-words text-slate-600">
@@ -420,16 +415,16 @@ export default function FacilityManagementPage() {
       ),
     },
     {
-      title: "Hotline",
+      title: FACILITY_MESSAGES.HOTLINE,
       dataIndex: "hotline",
       width: 140,
       align: "center",
       render: (hotline: string) => (
-        <span className="text-slate-600">{hotline}</span>
+        <CopyText value={hotline} copiedMessage="Đã sao chép hotline" />
       ),
     },
     {
-      title: "Giờ hoạt động",
+      title: FACILITY_MESSAGES.WORKING_HOURS,
       dataIndex: "workingHours",
       width: 130,
       align: "center",
@@ -438,7 +433,7 @@ export default function FacilityManagementPage() {
       ),
     },
     {
-      title: "Dịch vụ nổi bật",
+      title: FACILITY_MESSAGES.FEATURED_SERVICES,
       dataIndex: "featuredServices",
       render: (featuredServices: string) => (
         <span className="whitespace-normal break-words text-slate-600">
@@ -447,26 +442,25 @@ export default function FacilityManagementPage() {
       ),
     },
     {
-      title: "Trạng thái",
+      title: FACILITY_MESSAGES.STATUS,
       dataIndex: "status",
       width: 140,
       align: "center",
-      render: (status: FacilityStatus) =>
-        status === "active" ? (
-          <Tag color="green">Đang hoạt động</Tag>
-        ) : (
-          <Tag color="default">Tạm ngưng</Tag>
-        ),
+      render: (status: FacilityStatus) => (
+        <Tag color={status === "active" ? "green" : "default"}>
+          {getFacilityStatusText(status)}
+        </Tag>
+      ),
     },
     {
-      title: "Thao tác",
+      title: FACILITY_MESSAGES.ACTIONS,
       key: "actions",
       width: 160,
       align: "center",
       render: (_value, record) => (
         <Space size={8}>
           <Button
-            title="Xem chi tiết"
+            title={FACILITY_MESSAGES.VIEW_DETAIL}
             icon={<Eye className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
@@ -475,7 +469,7 @@ export default function FacilityManagementPage() {
           />
 
           <Button
-            title="Sửa"
+            title={FACILITY_MESSAGES.EDIT}
             icon={<Pencil className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
@@ -483,28 +477,30 @@ export default function FacilityManagementPage() {
             }}
           />
 
-          <Button
-            danger
-            title="Xóa"
-            icon={<Trash2 className="h-4 w-4" />}
-            onClick={(event) => {
-              event.stopPropagation();
-              confirmDeleteFacility(record);
-            }}
-          />
+          {isSuperAdmin ? (
+            <Button
+              danger
+              title={FACILITY_MESSAGES.DELETE}
+              icon={<Trash2 className="h-4 w-4" />}
+              onClick={(event) => {
+                event.stopPropagation();
+                confirmDeleteFacility(record);
+              }}
+            />
+          ) : null}
         </Space>
       ),
     },
   ];
 
   return (
-    <AdminLayout permissions={["user.view"]}>
+    <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
       <PageHeader
-        title="Facility Management"
-        description="Quản lý danh sách cơ sở khám trong hệ thống."
+        title={FACILITY_MESSAGES.PAGE_TITLE}
+        description={FACILITY_MESSAGES.PAGE_DESCRIPTION}
       />
 
-      <div className="mt-6 space-y-5">
+      <div className="mt-6 flex flex-col gap-5">
         {error ? (
           <Alert
             type="error"
@@ -515,74 +511,33 @@ export default function FacilityManagementPage() {
           />
         ) : null}
 
-        <Card className="border-slate-200 bg-white">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_190px_170px_170px_auto]">
-            <Input
-              size="large"
-              allowClear
-              value={query}
-              prefix={<Search className="h-4 w-4 text-slate-400" />}
-              placeholder="Tìm theo tên/địa chỉ/mã cơ sở"
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setCurrentPage(1);
-              }}
-            />
+        <div className="order-2">
+        <TableFilter
+          columns={[
+            { field: "name", label: FACILITY_MESSAGES.SEARCH_PLACEHOLDER, type: "text", contains: true },
+            { field: "province", label: FACILITY_MESSAGES.CITY_PLACEHOLDER, type: "select", options: cityOptions, width: 190 },
+            { field: "status", label: FACILITY_MESSAGES.STATUS_PLACEHOLDER, type: "select", options: statusOptions, width: 170 },
+          ]}
+          values={{ name: query, province: cityFilter, status: statusFilter }}
+          clearLabel={FACILITY_MESSAGES.CLEAR_FILTERS}
+          onChange={(values, search) => {
+            setSearchQuery(search);
+            setQuery(String(values.name ?? ""));
+            setCityFilter(values.province ? String(values.province) : undefined);
+            setStatusFilter(values.status as FacilityStatus | undefined);
+            setCurrentPage(1);
+          }}
+        />
+        </div>
 
-            <Select
-              size="large"
-              allowClear
-              value={cityFilter}
-              placeholder="Tỉnh/Thành phố"
-              onChange={(value) => {
-                setCityFilter(value);
-                setCurrentPage(1);
-              }}
-              options={cityOptions}
-            />
-
-            <Select
-              size="large"
-              allowClear
-              value={serviceFilter}
-              placeholder="Dịch vụ"
-              onChange={(value) => {
-                setServiceFilter(value);
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: "Khám thai", label: "Khám thai" },
-                { value: "Siêu âm", label: "Siêu âm" },
-                { value: "Xét nghiệm", label: "Xét nghiệm" },
-                { value: "Tư vấn", label: "Tư vấn" },
-              ]}
-            />
-
-            <Select
-              size="large"
-              allowClear
-              value={statusFilter}
-              placeholder="Trạng thái"
-              onChange={(value) => {
-                setStatusFilter(value);
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: "active", label: "Đang hoạt động" },
-                { value: "suspended", label: "Tạm ngưng" },
-              ]}
-            />
-
-            <Button size="large" onClick={clearFilters}>
-              Xóa bộ lọc
-            </Button>
-          </div>
-        </Card>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="order-1 grid gap-4 md:grid-cols-3">
           <Card className="border-slate-200 bg-white">
             <Statistic
-              title={<span className="text-slate-500">Tổng cơ sở</span>}
+              title={
+                <span className="text-slate-500">
+                  {FACILITY_MESSAGES.TOTAL_FACILITIES}
+                </span>
+              }
               value={facilities.length}
               formatter={(value) => (
                 <span className="text-slate-950">{value}</span>
@@ -592,7 +547,11 @@ export default function FacilityManagementPage() {
 
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title={<span className="text-emerald-700">Đang hoạt động</span>}
+              title={
+                <span className="text-emerald-700">
+                  {FACILITY_MESSAGES.ACTIVE_FACILITIES}
+                </span>
+              }
               value={activeFacilities}
               formatter={(value) => (
                 <span className="text-emerald-950">{value}</span>
@@ -602,7 +561,11 @@ export default function FacilityManagementPage() {
 
           <Card className="border-red-100 bg-red-50/60">
             <Statistic
-              title={<span className="text-red-700">Tạm ngưng</span>}
+              title={
+                <span className="text-red-700">
+                  {FACILITY_MESSAGES.SUSPENDED_FACILITIES}
+                </span>
+              }
               value={suspendedFacilities}
               formatter={(value) => (
                 <span className="text-red-950">{value}</span>
@@ -612,7 +575,7 @@ export default function FacilityManagementPage() {
         </div>
 
         <Card
-          className="overflow-hidden border-slate-200 bg-white"
+          className="order-3 overflow-hidden border-slate-200 bg-white"
           styles={{
             body: {
               padding: 0,
@@ -621,14 +584,14 @@ export default function FacilityManagementPage() {
           title={
             <div>
               <p className="mb-0 text-base font-semibold text-slate-950">
-                Danh sách cơ sở khám
+                {FACILITY_MESSAGES.FACILITY_LIST_TITLE}
               </p>
               <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Click vào một dòng để xem chi tiết cơ sở khám.
+                {FACILITY_MESSAGES.FACILITY_LIST_DESCRIPTION}
               </p>
             </div>
           }
-          extra={
+          extra={isSuperAdmin ? (
             <Space wrap>
               <Button
                 danger
@@ -636,7 +599,7 @@ export default function FacilityManagementPage() {
                 icon={<Trash2 className="h-4 w-4" />}
                 onClick={confirmDeleteSelected}
               >
-                Xóa đã chọn
+                {FACILITY_MESSAGES.DELETE_SELECTED}
                 {selectedFacilityIds.length > 0
                   ? ` (${selectedFacilityIds.length})`
                   : ""}
@@ -647,18 +610,20 @@ export default function FacilityManagementPage() {
                 icon={<Plus className="h-4 w-4" />}
                 onClick={() => setCreateModalOpen(true)}
               >
-                Thêm cơ sở
+                {FACILITY_MESSAGES.ADD_FACILITY}
               </Button>
             </Space>
-          }
+          ) : null}
         >
           <Table
+            className="management-table"
             rowKey="id"
             size="middle"
             tableLayout="fixed"
             loading={loading || tableLoading}
             columns={columns}
             dataSource={filteredFacilities}
+            scroll={{ x: 920 }}
             onRow={(record) => ({
               className: "cursor-pointer",
               onClick: (event) => {
@@ -676,20 +641,29 @@ export default function FacilityManagementPage() {
                 setDetailFacility(record);
               },
             })}
-            rowSelection={{
-              selectedRowKeys: selectedFacilityIds,
-              onChange: (selectedRowKeys) => {
-                setSelectedFacilityIds(selectedRowKeys.map(String));
-              },
-            }}
+            rowSelection={
+              isSuperAdmin
+                ? {
+                    selectedRowKeys: selectedFacilityIds,
+                    onChange: (selectedRowKeys) => {
+                      setSelectedFacilityIds(selectedRowKeys.map(String));
+                    },
+                  }
+                : undefined
+            }
             pagination={{
               current: currentPage,
-              pageSize: PAGE_SIZE,
+              pageSize,
               total: filteredFacilities.length,
-              showSizeChanger: false,
+              showSizeChanger: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              showQuickJumper: true,
               showTotal: (total, range) =>
-                `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} cơ sở`,
-              onChange: (page) => setCurrentPage(page),
+                `${FACILITY_MESSAGES.PAGINATION_TOTAL_PREFIX} ${range[0]} - ${range[1]} ${FACILITY_MESSAGES.PAGINATION_TOTAL_MIDDLE} ${total} ${FACILITY_MESSAGES.PAGINATION_TOTAL_SUFFIX}`,
+              onChange: (page, nextPageSize) => {
+                setCurrentPage(nextPageSize !== pageSize ? 1 : page);
+                setPageSize(nextPageSize);
+              },
             }}
           />
         </Card>
@@ -733,7 +707,7 @@ export default function FacilityManagementPage() {
         <div className="relative px-6 pb-6 pt-7 text-center">
           <button
             type="button"
-            aria-label="Đóng"
+            aria-label={RESPONSE_MESSAGES.COMMON.CLOSE}
             onClick={closeDeleteConfirm}
             disabled={deleteConfirmLoading}
             className="absolute right-1 top-1 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -747,14 +721,14 @@ export default function FacilityManagementPage() {
 
           <h3 className="mt-5 text-lg font-bold text-slate-950">
             {deleteConfirm.open && deleteConfirm.mode === "selected"
-              ? "Xóa cơ sở đã chọn"
-              : "Xóa cơ sở"}
+              ? FACILITY_MESSAGES.DELETE_SELECTED_FACILITIES
+              : FACILITY_MESSAGES.DELETE_FACILITY}
           </h3>
 
           <p className="mt-2 text-sm text-slate-500">
             {deleteConfirm.open && deleteConfirm.mode === "selected"
-              ? `Bạn có chắc chắn muốn xóa ${deleteConfirm.count} cơ sở đã chọn không?`
-              : "Bạn có chắc chắn muốn xóa cơ sở này không?"}
+              ? `${FACILITY_MESSAGES.DELETE_SELECTED_CONFIRM_PREFIX} ${deleteConfirm.count} ${FACILITY_MESSAGES.DELETE_SELECTED_CONFIRM_SUFFIX}`
+              : FACILITY_MESSAGES.DELETE_SINGLE_CONFIRM}
           </p>
 
           {deleteConfirm.open && deleteConfirm.mode === "single" ? (
@@ -770,7 +744,7 @@ export default function FacilityManagementPage() {
               disabled={deleteConfirmLoading}
               className="h-11 rounded-lg font-semibold"
             >
-              Hủy
+              {RESPONSE_MESSAGES.COMMON.CANCEL}
             </Button>
 
             <Button
@@ -781,7 +755,7 @@ export default function FacilityManagementPage() {
               onClick={handleConfirmDelete}
               className="h-11 rounded-lg font-semibold"
             >
-              Xóa
+              {RESPONSE_MESSAGES.COMMON.DELETE}
             </Button>
           </div>
         </div>

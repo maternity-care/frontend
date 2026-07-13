@@ -3,13 +3,18 @@
 import { useState } from "react";
 import { Alert, Button, Card } from "antd";
 import { Pencil, UserRound, X } from "lucide-react";
-import { FeedbackState, PregnantProfile, ProfileUpdateHandler } from "@/features/profile/profile.types";
+
+import type {
+  FeedbackState,
+  ProfileUpdateHandler,
+  UserProfile,
+} from "@/features/profile/profile.types";
 import { PersonalInfoForm } from "./PersonalInfoForm";
 import { PersonalInfoView } from "./ProfileInfoView";
-
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type ProfileEditCardProps = {
-  profile: PregnantProfile;
+  profile: UserProfile;
   feedback: FeedbackState;
   onClearFeedback: () => void;
   onUpdated: ProfileUpdateHandler;
@@ -46,7 +51,7 @@ export function ProfileEditCard({
       title={
         <div className="flex items-center gap-2">
           <UserRound className="h-5 w-5 text-pink-500" />
-          <span>Thông tin cá nhân</span>
+          <span>{RESPONSE_MESSAGES.PROFILE.PERSONAL_INFO}</span>
         </div>
       }
       extra={
@@ -57,7 +62,7 @@ export function ProfileEditCard({
             icon={<X className="h-4 w-4" />}
             onClick={cancelEditing}
           >
-            Hủy
+            {RESPONSE_MESSAGES.COMMON.CANCEL}
           </Button>
         ) : (
           <Button
@@ -66,18 +71,18 @@ export function ProfileEditCard({
             icon={<Pencil className="h-4 w-4" />}
             onClick={startEditing}
           >
-            Chỉnh sửa
+            {RESPONSE_MESSAGES.COMMON.EDIT}
           </Button>
         )
       }
     >
       <div className="mb-5 grid gap-3">
         {feedback.message ? (
-          <Alert type="success" showIcon message={feedback.message} />
+          <Alert type="success" showIcon title={feedback.message} />
         ) : null}
 
         {feedback.error ? (
-          <Alert type="error" showIcon message={feedback.error} />
+          <Alert type="error" showIcon title={feedback.error} />
         ) : null}
       </div>
 

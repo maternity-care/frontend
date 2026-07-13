@@ -4,13 +4,14 @@ import { Baby } from "lucide-react";
 import { InfoIconBox } from "./InfoIconBox";
 import { PregnantProfile } from "@/features/profile/profile.types";
 import { displayValue, EMPTY_TEXT, getInitials, getRoleText } from "@/utils/profile/utils";
+import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type ProfileSummaryCardProps = {
   profile: PregnantProfile;
 };
 
 export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
-  const isActive = profile.status === 1;
+  const isActive = profile.status === "active";
   const roleText = getRoleText(profile.roles);
 
   return (
@@ -51,9 +52,9 @@ export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
           </InfoIconBox>
 
           <div>
-            <p className="text-sm font-medium text-slate-950">Hồ sơ thai kỳ</p>
+            <p className="text-sm font-medium text-slate-950">{RESPONSE_MESSAGES.SCHEDULE.Pregnancy_records}</p>
             <p className="text-xs text-slate-500">
-              Theo dõi thông tin chăm sóc mẹ và bé
+              {RESPONSE_MESSAGES.PROFILE.FOLLOW_MOM_AND_BABY}
             </p>
           </div>
         </div>
