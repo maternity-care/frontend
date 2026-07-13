@@ -16,6 +16,7 @@ const navItems = [
   { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness },
   { href: "/management/uploads", label: "Uploads", icon: Upload },
   { href: "/management/profile", label: "Profile", icon: UserCog },
+  { href: "/management/doctor-shifts", label: "Ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"],},
 ];
 
 export function Sidebar() {
