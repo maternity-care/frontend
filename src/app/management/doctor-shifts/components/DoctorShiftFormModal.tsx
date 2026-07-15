@@ -48,7 +48,7 @@ const STATUS_OPTIONS = [
 type DoctorShiftFormFields = {
   doctorId: string;
   facilityId: string;
-  roomId: number;
+  roomId: string;
   shiftDate: Dayjs;
   startTime: Dayjs;
   endTime: Dayjs;
@@ -131,7 +131,7 @@ export function DoctorShiftFormModal({
       form.setFieldsValue({
         doctorId: shift.doctorId,
         facilityId: shift.facilityId,
-        roomId: shift.roomId ? Number(shift.roomId) : undefined,
+        roomId: shift.roomId ? String(shift.roomId) : "",
         shiftDate: dayjs(shift.shiftDate),
         startTime: dayjs(`2000-01-01T${shift.startTime}:00`),
         endTime: dayjs(`2000-01-01T${shift.endTime}:00`),
@@ -144,7 +144,7 @@ export function DoctorShiftFormModal({
     form.setFieldsValue({
       doctorId: "",
       facilityId: "",
-      roomId: undefined,
+      roomId: "",
       shiftDate: dayjs(),
       startTime: dayjs("2000-01-01T08:00:00"),
       endTime: dayjs("2000-01-01T12:00:00"),
@@ -193,9 +193,9 @@ export function DoctorShiftFormModal({
 
     try {
       await onSubmit({
-        doctorId: values.doctorId.trim(),
-        facilityId: values.facilityId.trim(),
-        roomId: values.roomId,
+        doctorId: String(values.doctorId).trim(),
+        facilityId: String(values.facilityId).trim(),
+        roomId: String(values.roomId).trim(),
         shiftDate: values.shiftDate.format("YYYY-MM-DD"),
         startTime: values.startTime.format("HH:mm"),
         endTime: values.endTime.format("HH:mm"),
@@ -306,15 +306,10 @@ export function DoctorShiftFormModal({
                     label="Room ID"
                     rules={[
                       { required: true, message: "Vui lòng nhập Room ID." },
+                      { whitespace: true, message: "Room ID không hợp lệ." },
                     ]}
                   >
-                    <InputNumber
-                      size="large"
-                      min={1}
-                      precision={0}
-                      className="w-full"
-                      placeholder="Ví dụ: 2"
-                    />
+                    <Input size="large" placeholder="Ví dụ: 2" />
                   </Form.Item>
                 </Col>
 
