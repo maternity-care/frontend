@@ -4,7 +4,7 @@ export interface BackendDoctorShift {
   id: string | number;
   doctorId: string | number;
   facilityId: string | number;
-  roomId: string | number | null;
+  roomId: string | null;
   shiftDate: string;
   startTime: string;
   endTime: string;
@@ -49,7 +49,7 @@ export interface DoctorShiftListResult {
 export interface CreateDoctorShiftInput {
   doctorId: string;
   facilityId: string;
-  roomId: string | number;
+  roomId: string;
   shiftDate: string;
   startTime: string;
   endTime: string;
@@ -62,7 +62,7 @@ export type UpdateDoctorShiftInput = Partial<CreateDoctorShiftInput>;
 export interface CheckDoctorShiftConflictsInput {
   doctorId: string;
   facilityId: string;
-  roomId: string | number;
+  roomId: string;
   shiftDate: string;
   startTime: string;
   endTime: string;
@@ -84,7 +84,7 @@ export type DoctorShiftWorkingDay =
 export interface BulkCreateDoctorShiftsInput {
   doctorId: string;
   facilityId: string;
-  roomId: string | number;
+  roomId: string;
   fromDate: string;
   toDate: string;
   workingDays: DoctorShiftWorkingDay[];

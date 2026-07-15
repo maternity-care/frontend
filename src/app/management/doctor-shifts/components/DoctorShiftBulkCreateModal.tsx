@@ -46,7 +46,7 @@ const STATUS_OPTIONS = [
 type BulkCreateFields = {
   doctorId: string;
   facilityId: string;
-  roomId: number;
+  roomId: string;
   dateRange: [Dayjs, Dayjs];
   workingDays: DoctorShiftWorkingDay[];
   startTime: Dayjs;
@@ -90,9 +90,9 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
 
     try {
       await onSubmit({
-        doctorId: values.doctorId.trim(),
-        facilityId: values.facilityId.trim(),
-        roomId: values.roomId,
+        doctorId: String(values.doctorId).trim(),
+        facilityId: String(values.facilityId).trim(),
+        roomId: String(values.roomId).trim(),
         fromDate: values.dateRange[0].format("YYYY-MM-DD"),
         toDate: values.dateRange[1].format("YYYY-MM-DD"),
         workingDays: values.workingDays,
@@ -186,14 +186,12 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
             <Form.Item
               name="roomId"
               label="Room ID"
-              rules={[{ required: true, message: "Vui lòng nhập Room ID." }]}
+              rules={[
+                { required: true, message: "Vui lòng nhập Room ID." },
+                { whitespace: true, message: "Room ID không hợp lệ." },
+              ]}
             >
-              <InputNumber
-                min={1}
-                precision={0}
-                size="large"
-                className="w-full"
-              />
+              <Input size="large" placeholder="Ví dụ: 2" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
