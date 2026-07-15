@@ -54,10 +54,7 @@ function normalizeDoctorShift(shift: BackendDoctorShift): DoctorShiftItem {
     id: String(shift.id),
     doctorId: String(shift.doctorId),
     facilityId: String(shift.facilityId),
-    roomId:
-      shift.roomId === null || shift.roomId === undefined
-        ? undefined
-        : String(shift.roomId),
+    roomId: normalizeStringId(shift.roomId),
     shiftDate: shift.shiftDate,
     startTime: normalizeTime(shift.startTime),
     endTime: normalizeTime(shift.endTime),
@@ -71,20 +68,22 @@ function normalizeDoctorShift(shift: BackendDoctorShift): DoctorShiftItem {
   };
 }
 
-function normalizeRoomId(value: string | number | undefined) {
-  if (value === undefined || value === "") return undefined;
+function normalizeStringId(
+  value: string | number | null | undefined,
+): string | undefined {
+  if (value === null || value === undefined) return undefined;
 
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : value;
+  const normalized = String(value).trim();
+  return normalized || undefined;
 }
 
 function toShiftPayload(
   input: CreateDoctorShiftInput | UpdateDoctorShiftInput,
 ) {
   return compactObject({
-    doctorId: input.doctorId?.trim(),
-    facilityId: input.facilityId?.trim(),
-    roomId: normalizeRoomId(input.roomId),
+    doctorId: normalizeStringId(input.doctorId),
+    facilityId: normalizeStringId(input.facilityId),
+    roomId: normalizeStringId(input.roomId),
     shiftDate: input.shiftDate,
     startTime: input.startTime ? normalizeTime(input.startTime) : undefined,
     endTime: input.endTime ? normalizeTime(input.endTime) : undefined,
@@ -195,7 +194,7 @@ export async function checkDoctorShiftConflicts(
       `${ENDPOINT}/check-conflicts`,
       compactObject({
         ...toShiftPayload(input),
-        excludeShiftId: input.excludeShiftId,
+        excludeShiftId: normalizeStringId(input.excludeShiftId),
       }),
     ),
   );
@@ -253,9 +252,9 @@ export async function bulkCreateDoctorShifts(
     apiClient.post(
       `${ENDPOINT}/bulk-create`,
       compactObject({
-        doctorId: input.doctorId.trim(),
-        facilityId: input.facilityId.trim(),
-        roomId: normalizeRoomId(input.roomId),
+        doctorId: normalizeStringId(input.doctorId),
+        facilityId: normalizeStringId(input.facilityId),
+        roomId: normalizeStringId(input.roomId),
         fromDate: input.fromDate,
         toDate: input.toDate,
         workingDays: input.workingDays,
