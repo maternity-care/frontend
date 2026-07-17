@@ -71,6 +71,8 @@ function InfoItem({
 type DoctorShiftDetailModalProps = {
   open: boolean;
   shift: DoctorShiftItem | null;
+  facilityName?: string;
+  roomName?: string;
   onClose: () => void;
   onEdit?: (shift: DoctorShiftItem) => void;
 };
@@ -78,6 +80,8 @@ type DoctorShiftDetailModalProps = {
 export function DoctorShiftDetailModal({
   open,
   shift,
+  facilityName,
+  roomName,
   onClose,
   onEdit,
 }: DoctorShiftDetailModalProps) {
@@ -148,15 +152,18 @@ export function DoctorShiftDetailModal({
               <Col xs={24} md={8}>
                 <InfoItem
                   icon={<Building2 className="h-4 w-4" />}
-                  label="Facility ID"
-                  value={shift.facilityId}
+                  label="Cơ sở"
+                  value={facilityName ?? `Cơ sở #${shift.facilityId}`}
                 />
               </Col>
               <Col xs={24} md={8}>
                 <InfoItem
                   icon={<DoorOpen className="h-4 w-4" />}
-                  label="Room ID"
-                  value={shift.roomId}
+                  label="Phòng"
+                  value={
+                    roomName ??
+                    (shift.roomId ? `Phòng #${shift.roomId}` : undefined)
+                  }
                 />
               </Col>
               <Col xs={24} md={8}>

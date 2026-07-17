@@ -30,6 +30,8 @@ import {
   Users,
   X,
 } from "lucide-react";
+import type { Facility } from "@/management/features/facilities/facilities.types";
+import type { ClinicRoom } from "@/management/features/rooms/rooms.types";
 import type {
   CreateDoctorShiftInput,
   DoctorShiftItem,
@@ -59,6 +61,9 @@ type DoctorShiftFormFields = {
 type DoctorShiftFormModalProps = {
   open: boolean;
   shift?: DoctorShiftItem | null;
+  facilities: Facility[];
+  rooms: ClinicRoom[];
+  catalogsLoading?: boolean;
   onClose: () => void;
   onSubmit: (values: CreateDoctorShiftInput) => Promise<void>;
 };
@@ -98,7 +103,7 @@ function PreviewItem({
           {label}
         </p>
         <div className="mt-0.5 break-words text-sm font-semibold text-slate-900">
-          {value || "Chưa nhập"}
+          {value || "Chưa chọn"}
         </div>
       </div>
     </div>
@@ -108,6 +113,9 @@ function PreviewItem({
 export function DoctorShiftFormModal({
   open,
   shift,
+  facilities,
+  rooms,
+  catalogsLoading = false,
   onClose,
   onSubmit,
 }: DoctorShiftFormModalProps) {
@@ -129,8 +137,8 @@ export function DoctorShiftFormModal({
 
     if (shift) {
       form.setFieldsValue({
-        doctorId: shift.doctorId,
-        facilityId: shift.facilityId,
+        doctorId: String(shift.doctorId),
+        facilityId: String(shift.facilityId),
         roomId: shift.roomId ? String(shift.roomId) : "",
         shiftDate: dayjs(shift.shiftDate),
         startTime: dayjs(`2000-01-01T${shift.startTime}:00`),
@@ -152,6 +160,42 @@ export function DoctorShiftFormModal({
       status: "available",
     });
   }, [open, shift, form]);
+
+  const facilityOptions = useMemo(
+    () =>
+      facilities.map((facility) => ({
+        value: facility.id,
+        label:
+          facility.status === "suspended"
+            ? `${facility.name} (Tạm ngưng)`
+            : facility.name,
+      })),
+    [facilities],
+  );
+
+  const roomOptions = useMemo(
+    () =>
+      rooms
+        .filter((room) => !facilityId || room.facilityId === facilityId)
+        .map((room) => ({
+          value: room.id,
+          label:
+            room.status === "suspended"
+              ? `${room.roomName} (Tạm ngưng)`
+              : room.roomName,
+        })),
+    [facilityId, rooms],
+  );
+
+  const selectedFacilityName = useMemo(
+    () => facilities.find((facility) => facility.id === facilityId)?.name,
+    [facilities, facilityId],
+  );
+
+  const selectedRoomName = useMemo(
+    () => rooms.find((room) => room.id === roomId)?.roomName,
+    [rooms, roomId],
+  );
 
   const durationText = useMemo(() => {
     if (!startTime || !endTime) return "";
@@ -287,29 +331,44 @@ export function DoctorShiftFormModal({
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="facilityId"
-                    label="Facility ID"
+                    label="Cơ sở"
                     rules={[
-                      { required: true, message: "Vui lòng nhập Facility ID." },
-                      {
-                        whitespace: true,
-                        message: "Facility ID không hợp lệ.",
-                      },
+                      { required: true, message: "Vui lòng chọn cơ sở." },
                     ]}
                   >
-                    <Input size="large" placeholder="Ví dụ: 1" />
+                    <Select
+                      size="large"
+                      showSearch
+                      optionFilterProp="label"
+                      loading={catalogsLoading}
+                      placeholder="Chọn cơ sở"
+                      options={facilityOptions}
+                      onChange={() => {
+                        form.setFieldValue("roomId", "");
+                      }}
+                    />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="roomId"
-                    label="Room ID"
+                    label="Phòng"
                     rules={[
-                      { required: true, message: "Vui lòng nhập Room ID." },
-                      { whitespace: true, message: "Room ID không hợp lệ." },
+                      { required: true, message: "Vui lòng chọn phòng." },
                     ]}
                   >
-                    <Input size="large" placeholder="Ví dụ: 2" />
+                    <Select
+                      size="large"
+                      showSearch
+                      optionFilterProp="label"
+                      loading={catalogsLoading}
+                      disabled={!facilityId}
+                      placeholder={
+                        facilityId ? "Chọn phòng" : "Vui lòng chọn cơ sở trước"
+                      }
+                      options={roomOptions}
+                    />
                   </Form.Item>
                 </Col>
 
@@ -392,7 +451,8 @@ export function DoctorShiftFormModal({
                       ({ getFieldValue }) => ({
                         validator(_, value?: Dayjs) {
                           const start = getFieldValue("startTime") as
-                            Dayjs | undefined;
+                            | Dayjs
+                            | undefined;
                           if (!start || !value || value.isAfter(start)) {
                             return Promise.resolve();
                           }
@@ -461,12 +521,12 @@ export function DoctorShiftFormModal({
               <PreviewItem
                 icon={<Building2 className="h-4 w-4" />}
                 label="Cơ sở"
-                value={facilityId ? `Cơ sở #${facilityId}` : undefined}
+                value={selectedFacilityName}
               />
               <PreviewItem
                 icon={<DoorOpen className="h-4 w-4" />}
                 label="Phòng"
-                value={roomId ? `Phòng #${roomId}` : undefined}
+                value={selectedRoomName}
               />
               <PreviewItem
                 icon={<Clock3 className="h-4 w-4" />}
