@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Dayjs } from "dayjs";
 import {
   Alert,
@@ -11,9 +11,11 @@ import {
   Input,
   Modal,
   Row,
+  Select,
   Typography,
 } from "antd";
 import { Copy, X } from "lucide-react";
+import type { Facility } from "@/management/features/facilities/facilities.types";
 import type { CopyDoctorShiftWeekInput } from "@/management/features/doctor-shifts/doctor-shifts.types";
 
 const { Text, Title } = Typography;
@@ -27,14 +29,34 @@ type CopyWeekFields = {
 
 type Props = {
   open: boolean;
+  facilities: Facility[];
+  catalogsLoading?: boolean;
   onClose: () => void;
   onSubmit: (values: CopyDoctorShiftWeekInput) => Promise<void>;
 };
 
-export function DoctorShiftCopyWeekModal({ open, onClose, onSubmit }: Props) {
+export function DoctorShiftCopyWeekModal({
+  open,
+  facilities,
+  catalogsLoading = false,
+  onClose,
+  onSubmit,
+}: Props) {
   const [form] = Form.useForm<CopyWeekFields>();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const facilityOptions = useMemo(
+    () =>
+      facilities.map((facility) => ({
+        value: facility.id,
+        label:
+          facility.status === "suspended"
+            ? `${facility.name} (Tạm ngưng)`
+            : facility.name,
+      })),
+    [facilities],
+  );
 
   function close() {
     if (submitting) return;
@@ -119,14 +141,20 @@ export function DoctorShiftCopyWeekModal({ open, onClose, onSubmit }: Props) {
           <Col xs={24} md={12}>
             <Form.Item
               name="facilityId"
-              label="Facility ID"
-              rules={[
-                { required: true, message: "Vui lòng nhập Facility ID." },
-              ]}
+              label="Cơ sở"
+              rules={[{ required: true, message: "Vui lòng chọn cơ sở." }]}
             >
-              <Input size="large" placeholder="Ví dụ: 1" />
+              <Select
+                size="large"
+                showSearch
+                optionFilterProp="label"
+                loading={catalogsLoading}
+                placeholder="Chọn cơ sở"
+                options={facilityOptions}
+              />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={12}>
             <Form.Item
               name="doctorId"
@@ -136,6 +164,7 @@ export function DoctorShiftCopyWeekModal({ open, onClose, onSubmit }: Props) {
               <Input size="large" placeholder="Ví dụ: 1" />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={12}>
             <Form.Item
               name="sourceWeekStart"
@@ -146,6 +175,7 @@ export function DoctorShiftCopyWeekModal({ open, onClose, onSubmit }: Props) {
               <DatePicker size="large" format="DD/MM/YYYY" className="w-full" />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={12}>
             <Form.Item
               name="targetWeekStart"

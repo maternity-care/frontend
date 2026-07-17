@@ -26,7 +26,11 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
-import { TableFilter } from "@/fe/components/ui/TableFilter";
+import { TableFilter } from "@/management/components/ui/TableFilter";
+import { getFacilities } from "@/management/features/facilities/facilities.api";
+import type { Facility } from "@/management/features/facilities/facilities.types";
+import { getRoomsGroupedByFacilities } from "@/management/features/rooms/rooms.api";
+import type { ClinicRoom } from "@/management/features/rooms/rooms.types";
 import { managementCatalogApi } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type {
   BulkCreateDoctorShiftsInput,
@@ -96,10 +100,14 @@ async function fetchDoctorShiftItems(params: GetDoctorShiftsParams) {
 export default function DoctorShiftsManagementPage() {
   const [modal, modalContextHolder] = Modal.useModal();
   const [items, setItems] = useState<DoctorShiftItem[]>([]);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [rooms, setRooms] = useState<ClinicRoom[]>([]);
   const [filters, setFilters] = useState<GetDoctorShiftsParams>({});
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
+  const [catalogsLoading, setCatalogsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -112,6 +120,43 @@ export default function DoctorShiftsManagementPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [copyWeekOpen, setCopyWeekOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCatalogs() {
+      try {
+        const [facilityItems, groupedRoomItems] = await Promise.all([
+          getFacilities(),
+          getRoomsGroupedByFacilities(),
+        ]);
+
+        if (cancelled) return;
+
+        setFacilities(facilityItems);
+        setRooms(groupedRoomItems.flatMap((group) => group.rooms));
+        setCatalogError(null);
+      } catch (loadError) {
+        if (!cancelled) {
+          setCatalogError(
+            `Không tải được danh sách cơ sở và phòng: ${getErrorMessage(
+              loadError,
+            )}`,
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCatalogsLoading(false);
+        }
+      }
+    }
+
+    void loadCatalogs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function reload() {
     setTableLoading(true);
@@ -156,6 +201,38 @@ export default function DoctorShiftsManagementPage() {
       cancelled = true;
     };
   }, [filters]);
+
+  const facilityNameById = useMemo(
+    () => new Map(facilities.map((facility) => [facility.id, facility.name])),
+    [facilities],
+  );
+
+  const roomNameById = useMemo(
+    () => new Map(rooms.map((room) => [room.id, room.roomName])),
+    [rooms],
+  );
+
+  const facilityOptions = useMemo(
+    () =>
+      facilities.map((facility) => ({
+        value: facility.id,
+        label: facility.name,
+      })),
+    [facilities],
+  );
+
+  const roomOptions = useMemo(
+    () =>
+      rooms
+        .filter(
+          (room) => !filters.facilityId || room.facilityId === filters.facilityId,
+        )
+        .map((room) => ({
+          value: room.id,
+          label: room.roomName,
+        })),
+    [filters.facilityId, rooms],
+  );
 
   const stats = useMemo(() => {
     return {
@@ -257,13 +334,15 @@ export default function DoctorShiftsManagementPage() {
   async function confirmDelete() {
     if (!deleteShift) return;
 
+    const deletingShift = deleteShift;
+
     setDeleteLoading(true);
     setError(null);
 
     try {
-      await managementCatalogApi.deleteDoctorShift(deleteShift.id);
+      await managementCatalogApi.deleteDoctorShift(deletingShift.id);
       setDetailShift((current) =>
-        current?.id === deleteShift.id ? null : current,
+        current?.id === deletingShift.id ? null : current,
       );
       setDeleteShift(null);
       setCurrentPage(1);
@@ -319,14 +398,17 @@ export default function DoctorShiftsManagementPage() {
     },
     {
       title: "Cơ sở / Phòng",
-      width: 170,
+      width: 220,
       render: (_value, record) => (
         <div>
           <p className="mb-0 font-medium text-slate-800">
-            Cơ sở #{record.facilityId}
+            {facilityNameById.get(record.facilityId) ??
+              `Cơ sở #${record.facilityId}`}
           </p>
           <p className="mb-0 mt-0.5 text-xs text-slate-500">
-            {record.roomId ? `Phòng #${record.roomId}` : "Chưa gán phòng"}
+            {record.roomId
+              ? (roomNameById.get(record.roomId) ?? `Phòng #${record.roomId}`)
+              : "Chưa gán phòng"}
           </p>
         </div>
       ),
@@ -414,6 +496,8 @@ export default function DoctorShiftsManagementPage() {
     },
   ];
 
+  const displayedError = error ?? catalogError;
+
   return (
     <AdminLayout>
       {modalContextHolder}
@@ -424,13 +508,16 @@ export default function DoctorShiftsManagementPage() {
       />
 
       <div className="mt-6 flex flex-col gap-5">
-        {error ? (
+        {displayedError ? (
           <Alert
             type="error"
-            title={error}
+            title={displayedError}
             showIcon
             closable
-            onClose={() => setError(null)}
+            onClose={() => {
+              setError(null);
+              setCatalogError(null);
+            }}
           />
         ) : null}
 
@@ -445,15 +532,17 @@ export default function DoctorShiftsManagementPage() {
               },
               {
                 field: "facilityId",
-                label: "Facility ID",
-                type: "text",
-                width: 150,
+                label: "Cơ sở",
+                type: "select",
+                options: facilityOptions,
+                width: 220,
               },
               {
                 field: "roomId",
-                label: "Room ID",
-                type: "text",
-                width: 130,
+                label: "Phòng",
+                type: "select",
+                options: roomOptions,
+                width: 190,
               },
               {
                 field: "dateFrom",
@@ -485,18 +574,31 @@ export default function DoctorShiftsManagementPage() {
             }}
             clearLabel="Xóa bộ lọc"
             onChange={(values) => {
+              const nextFacilityId = values.facilityId
+                ? String(values.facilityId).trim()
+                : undefined;
+              const requestedRoomId = values.roomId
+                ? String(values.roomId).trim()
+                : undefined;
+              const nextRoomId =
+                requestedRoomId &&
+                (!nextFacilityId ||
+                  rooms.some(
+                    (room) =>
+                      room.id === requestedRoomId &&
+                      room.facilityId === nextFacilityId,
+                  ))
+                  ? requestedRoomId
+                  : undefined;
+
               setTableLoading(true);
               setError(null);
               setFilters({
                 doctorId: values.doctorId
                   ? String(values.doctorId).trim()
                   : undefined,
-                facilityId: values.facilityId
-                  ? String(values.facilityId).trim()
-                  : undefined,
-                roomId: values.roomId
-                  ? String(values.roomId).trim()
-                  : undefined,
+                facilityId: nextFacilityId,
+                roomId: nextRoomId,
                 dateFrom: values.dateFrom
                   ? String(values.dateFrom).trim()
                   : undefined,
@@ -520,6 +622,7 @@ export default function DoctorShiftsManagementPage() {
               )}
             />
           </Card>
+
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
               title={<span className="text-emerald-700">Còn trống</span>}
@@ -529,6 +632,7 @@ export default function DoctorShiftsManagementPage() {
               )}
             />
           </Card>
+
           <Card className="border-amber-100 bg-amber-50/60">
             <Statistic
               title={<span className="text-amber-700">Đã đầy</span>}
@@ -538,6 +642,7 @@ export default function DoctorShiftsManagementPage() {
               )}
             />
           </Card>
+
           <Card className="border-red-100 bg-red-50/60">
             <Statistic
               title={<span className="text-red-700">Hủy / Nghỉ</span>}
@@ -595,7 +700,7 @@ export default function DoctorShiftsManagementPage() {
             loading={loading || tableLoading}
             columns={columns}
             dataSource={items}
-            scroll={{ x: 1120 }}
+            scroll={{ x: 1180 }}
             locale={{
               emptyText: (
                 <div className="py-10 text-center">
@@ -613,6 +718,7 @@ export default function DoctorShiftsManagementPage() {
               className: "cursor-pointer",
               onClick: (event) => {
                 const target = event.target as HTMLElement;
+
                 if (
                   target.closest("button") ||
                   target.closest("a") ||
@@ -620,6 +726,7 @@ export default function DoctorShiftsManagementPage() {
                 ) {
                   return;
                 }
+
                 setDetailShift(record);
               },
             })}
@@ -644,6 +751,9 @@ export default function DoctorShiftsManagementPage() {
       <DoctorShiftFormModal
         open={formOpen}
         shift={editingShift}
+        facilities={facilities}
+        rooms={rooms}
+        catalogsLoading={catalogsLoading}
         onClose={() => {
           setFormOpen(false);
           setEditingShift(null);
@@ -654,18 +764,33 @@ export default function DoctorShiftsManagementPage() {
       <DoctorShiftDetailModal
         open={Boolean(detailShift)}
         shift={detailShift}
+        facilityName={
+          detailShift
+            ? facilityNameById.get(detailShift.facilityId)
+            : undefined
+        }
+        roomName={
+          detailShift?.roomId
+            ? roomNameById.get(detailShift.roomId)
+            : undefined
+        }
         onClose={() => setDetailShift(null)}
         onEdit={openEdit}
       />
 
       <DoctorShiftBulkCreateModal
         open={bulkOpen}
+        facilities={facilities}
+        rooms={rooms}
+        catalogsLoading={catalogsLoading}
         onClose={() => setBulkOpen(false)}
         onSubmit={createBulk}
       />
 
       <DoctorShiftCopyWeekModal
         open={copyWeekOpen}
+        facilities={facilities}
+        catalogsLoading={catalogsLoading}
         onClose={() => setCopyWeekOpen(false)}
         onSubmit={copyWeek}
       />
@@ -675,7 +800,9 @@ export default function DoctorShiftsManagementPage() {
         shift={deleteShift}
         loading={deleteLoading}
         onClose={() => {
-          if (!deleteLoading) setDeleteShift(null);
+          if (!deleteLoading) {
+            setDeleteShift(null);
+          }
         }}
         onConfirm={confirmDelete}
       />
