@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
-import { TableFilter } from "@/fe/components/ui/TableFilter";
+import { TableFilter } from "@/management/components/ui/TableFilter";
 import { CopyText } from "@/management/components/ui/CopyText";
 import {
   deleteUser,
