@@ -5,7 +5,7 @@ import { Alert, Button, Card, Form, Input, Modal, Space, Table, Tag, Typography 
 import { Plus, UserRound } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
-import { TableFilter } from "@/fe/components/ui/TableFilter";
+import { TableFilter } from "@/management/components/ui/TableFilter";
 import { CopyText } from "@/management/components/ui/CopyText";
 import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
 import type { User } from "@/management/features/users/users.types";

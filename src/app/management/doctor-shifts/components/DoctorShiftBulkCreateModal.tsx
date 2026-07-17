@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Dayjs } from "dayjs";
 import {
   Alert,
@@ -18,6 +18,8 @@ import {
   Typography,
 } from "antd";
 import { CalendarPlus, Layers3, X } from "lucide-react";
+import type { Facility } from "@/management/features/facilities/facilities.types";
+import type { ClinicRoom } from "@/management/features/rooms/rooms.types";
 import type {
   BulkCreateDoctorShiftsInput,
   DoctorShiftStatus,
@@ -57,14 +59,51 @@ type BulkCreateFields = {
 
 type Props = {
   open: boolean;
+  facilities: Facility[];
+  rooms: ClinicRoom[];
+  catalogsLoading?: boolean;
   onClose: () => void;
   onSubmit: (values: BulkCreateDoctorShiftsInput) => Promise<void>;
 };
 
-export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
+export function DoctorShiftBulkCreateModal({
+  open,
+  facilities,
+  rooms,
+  catalogsLoading = false,
+  onClose,
+  onSubmit,
+}: Props) {
   const [form] = Form.useForm<BulkCreateFields>();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const facilityId = Form.useWatch("facilityId", form);
+
+  const facilityOptions = useMemo(
+    () =>
+      facilities.map((facility) => ({
+        value: facility.id,
+        label:
+          facility.status === "suspended"
+            ? `${facility.name} (Tạm ngưng)`
+            : facility.name,
+      })),
+    [facilities],
+  );
+
+  const roomOptions = useMemo(
+    () =>
+      rooms
+        .filter((room) => !facilityId || room.facilityId === facilityId)
+        .map((room) => ({
+          value: room.id,
+          label:
+            room.status === "suspended"
+              ? `${room.roomName} (Tạm ngưng)`
+              : room.roomName,
+        })),
+    [facilityId, rooms],
+  );
 
   function close() {
     if (submitting) return;
@@ -171,29 +210,47 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
               <Input size="large" placeholder="Ví dụ: 1" />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={12}>
             <Form.Item
               name="facilityId"
-              label="Facility ID"
-              rules={[
-                { required: true, message: "Vui lòng nhập Facility ID." },
-              ]}
+              label="Cơ sở"
+              rules={[{ required: true, message: "Vui lòng chọn cơ sở." }]}
             >
-              <Input size="large" placeholder="Ví dụ: 1" />
+              <Select
+                size="large"
+                showSearch
+                optionFilterProp="label"
+                loading={catalogsLoading}
+                placeholder="Chọn cơ sở"
+                options={facilityOptions}
+                onChange={() => {
+                  form.setFieldValue("roomId", "");
+                }}
+              />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={12}>
             <Form.Item
               name="roomId"
-              label="Room ID"
-              rules={[
-                { required: true, message: "Vui lòng nhập Room ID." },
-                { whitespace: true, message: "Room ID không hợp lệ." },
-              ]}
+              label="Phòng"
+              rules={[{ required: true, message: "Vui lòng chọn phòng." }]}
             >
-              <Input size="large" placeholder="Ví dụ: 2" />
+              <Select
+                size="large"
+                showSearch
+                optionFilterProp="label"
+                loading={catalogsLoading}
+                disabled={!facilityId}
+                placeholder={
+                  facilityId ? "Chọn phòng" : "Vui lòng chọn cơ sở trước"
+                }
+                options={roomOptions}
+              />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={12}>
             <Form.Item
               name="dateRange"
@@ -209,6 +266,7 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
               />
             </Form.Item>
           </Col>
+
           <Col xs={24}>
             <Form.Item
               name="workingDays"
@@ -225,6 +283,7 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
               <Checkbox.Group options={WORKING_DAY_OPTIONS} />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={8}>
             <Form.Item
               name="startTime"
@@ -241,6 +300,7 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
               />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={8}>
             <Form.Item
               name="endTime"
@@ -251,7 +311,8 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
                 ({ getFieldValue }) => ({
                   validator(_, value?: Dayjs) {
                     const start = getFieldValue("startTime") as
-                      Dayjs | undefined;
+                      | Dayjs
+                      | undefined;
                     if (!start || !value || value.isAfter(start)) {
                       return Promise.resolve();
                     }
@@ -270,6 +331,7 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
               />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={8}>
             <Form.Item
               name="maxAppointments"
@@ -287,6 +349,7 @@ export function DoctorShiftBulkCreateModal({ open, onClose, onSubmit }: Props) {
               />
             </Form.Item>
           </Col>
+
           <Col xs={24} md={12}>
             <Form.Item
               name="status"
