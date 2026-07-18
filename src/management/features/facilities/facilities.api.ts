@@ -78,10 +78,49 @@ function toQueryParams(params?: GetFacilitiesParams) {
   );
 }
 
+function toPublicQueryParams(
+  params?: GetFacilitiesParams,
+) {
+  const query = {
+    search: params?.search?.trim() || undefined,
+    city: params?.city?.trim() || undefined,
+    status: params?.status
+      ? toBackendStatus(params.status)
+      : undefined,
+    page: params?.page,
+    limit: params?.limit,
+  };
+
+  return Object.fromEntries(
+    Object.entries(query).filter(
+      ([, value]) => value !== undefined,
+    ),
+  );
+}
+
 export async function getFacilities(params?: GetFacilitiesParams) {
   const data = await unwrapApiData<BackendFacility[]>(
     apiClient.get("/management/facilities", {
       params: toQueryParams(params),
+    }),
+  );
+
+  return data.map(normalizeFacility);
+}
+
+// ============================================================
+// Public facilities
+// Dùng cho select chọn cơ sở đang hoạt động
+// ============================================================
+
+export async function getPublicFacilities(
+  params?: GetFacilitiesParams,
+) {
+  const data = await unwrapApiData<
+    BackendFacility[]
+  >(
+    apiClient.get("/public/facilities", {
+      params: toPublicQueryParams(params),
     }),
   );
 
