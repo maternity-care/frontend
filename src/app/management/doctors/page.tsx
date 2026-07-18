@@ -22,18 +22,25 @@ import {
   CalendarClock,
   Eye,
   Pencil,
+  Plus,
   Search,
   Stethoscope,
+  Trash2,
   X,
 } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
+import { getFacilities } from "@/management/features/facilities/facilities.api";
+import type { Facility } from "@/management/features/facilities/facilities.types";
 import {
+  createDoctor,
+  deleteDoctor,
   getDoctor,
   getDoctors,
   updateDoctor,
 } from "@/management/features/doctors/doctors.api";
 import type {
+  CreateDoctorInput,
   Doctor,
   DoctorStatus,
   UpdateDoctorInput,
@@ -41,7 +48,22 @@ import type {
 
 const { Text, Title } = Typography;
 
-type DoctorFormValues = {
+const DEFAULT_DOCTOR_ROLE_ID = "3";
+
+type CreateDoctorFormValues = {
+  name: string;
+  personalEmail: string;
+  phone: string;
+  roleIds: string[];
+  facilityIds: string[];
+  licenseNo: string;
+  title: string;
+  specialty: string;
+  yearsOfExperience: number;
+  bio?: string;
+};
+
+type UpdateDoctorFormValues = {
   staffId: string;
   licenseNo: string;
   title: string;
@@ -63,14 +85,26 @@ function getErrorMessage(error: unknown) {
         response?: {
           data?: {
             message?: string | string[];
+            errors?: {
+              fields?: string[];
+            };
           };
         };
       }
     ).response;
 
+    const fields = response?.data?.errors?.fields;
+
+    if (Array.isArray(fields) && fields.length > 0) {
+      return fields.join(", ");
+    }
+
     const message = response?.data?.message;
 
-    if (Array.isArray(message)) return message.join(", ");
+    if (Array.isArray(message)) {
+      return message.join(", ");
+    }
+
     if (message) return message;
   }
 
@@ -105,9 +139,11 @@ function renderStatus(status: DoctorStatus) {
 
 export default function DoctorManagementPage() {
   const [modal, modalContextHolder] = Modal.useModal();
-  const [form] = Form.useForm<DoctorFormValues>();
+  const [createForm] = Form.useForm<CreateDoctorFormValues>();
+  const [updateForm] = Form.useForm<UpdateDoctorFormValues>();
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] =
     useState<DoctorStatus | undefined>();
@@ -116,10 +152,15 @@ export default function DoctorManagementPage() {
     useState<Doctor | null>(null);
   const [editingDoctor, setEditingDoctor] =
     useState<Doctor | null>(null);
+  const [deletingDoctor, setDeletingDoctor] =
+    useState<Doctor | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [updateSubmitting, setUpdateSubmitting] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -128,11 +169,14 @@ export default function DoctorManagementPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void getDoctors()
-      .then((data) => {
+    void Promise.all([getDoctors(), getFacilities()])
+      .then(([doctorData, facilityData]) => {
         if (cancelled) return;
 
-        setDoctors(data);
+        setDoctors(doctorData);
+        setFacilities(
+          facilityData.filter((facility) => facility.status === "active"),
+        );
         setError(null);
       })
       .catch((loadError) => {
@@ -150,6 +194,15 @@ export default function DoctorManagementPage() {
       cancelled = true;
     };
   }, []);
+
+  const facilityOptions = useMemo(
+    () =>
+      facilities.map((facility) => ({
+        value: facility.id,
+        label: `${facility.name} (${facility.code})`,
+      })),
+    [facilities],
+  );
 
   const filteredDoctors = useMemo(() => {
     const search = keyword.trim().toLowerCase();
@@ -209,10 +262,27 @@ export default function DoctorManagementPage() {
     }
   }
 
+  function openCreate() {
+    createForm.resetFields();
+    createForm.setFieldsValue({
+      roleIds: [DEFAULT_DOCTOR_ROLE_ID],
+      facilityIds: [],
+      yearsOfExperience: 0,
+    });
+    setCreateModalOpen(true);
+  }
+
+  function closeCreate() {
+    if (createSubmitting) return;
+
+    setCreateModalOpen(false);
+    createForm.resetFields();
+  }
+
   function openEdit(doctor: Doctor) {
     setEditingDoctor(doctor);
 
-    form.setFieldsValue({
+    updateForm.setFieldsValue({
       staffId: doctor.staffId,
       licenseNo: doctor.licenseNo,
       title: doctor.title,
@@ -224,16 +294,72 @@ export default function DoctorManagementPage() {
   }
 
   function closeEdit() {
-    if (submitting) return;
+    if (updateSubmitting) return;
 
     setEditingDoctor(null);
-    form.resetFields();
+    updateForm.resetFields();
   }
 
-  async function submitDoctor(values: DoctorFormValues) {
+  async function submitCreate(values: CreateDoctorFormValues) {
+    setCreateSubmitting(true);
+    setError(null);
+
+    const payload: CreateDoctorInput = {
+      name: values.name.trim(),
+      personalEmail: values.personalEmail.trim(),
+      phone: values.phone.trim(),
+      roleIds: values.roleIds.map((roleId) => roleId.trim()),
+      facilityAssignments: values.facilityIds.map((facilityId) => ({
+        facilityId,
+        roles: ["doctor"],
+      })),
+      licenseNo: values.licenseNo.trim(),
+      title: values.title.trim(),
+      specialty: values.specialty.trim(),
+      yearsOfExperience: values.yearsOfExperience,
+      bio: values.bio?.trim() || undefined,
+      permissionOverrides: [],
+    };
+
+    try {
+      const response = await createDoctor(payload);
+
+      setDoctors((current: Doctor[]) => [
+        response.data,
+        ...current,
+      ]);
+      setCurrentPage(1);
+      setCreateModalOpen(false);
+      createForm.resetFields();
+
+      modal.success({
+        centered: true,
+        title: "Tạo bác sĩ thành công",
+        content:
+          response.message ||
+          "Hồ sơ bác sĩ mới đã được tạo.",
+        okText: "Đóng",
+      });
+    } catch (createError) {
+      const message = getErrorMessage(createError);
+
+      setError(message);
+
+      modal.error({
+        centered: true,
+        title: "Không thể tạo bác sĩ",
+        content: message,
+        okText: "Đóng",
+      });
+    } finally {
+      setCreateSubmitting(false);
+    }
+  }
+
+  async function submitUpdate(values: UpdateDoctorFormValues) {
     if (!editingDoctor) return;
 
-    setSubmitting(true);
+    setUpdateSubmitting(true);
     setError(null);
 
     const payload: UpdateDoctorInput = {
@@ -249,18 +375,18 @@ export default function DoctorManagementPage() {
     try {
       const response = await updateDoctor(editingDoctor.id, payload);
 
-      setDoctors((current) =>
-        current.map((doctor) =>
+      setDoctors((current: Doctor[]) =>
+        current.map((doctor: Doctor) =>
           doctor.id === response.data.id ? response.data : doctor,
         ),
       );
 
-      setDetailDoctor((current) =>
+      setDetailDoctor((current: Doctor | null) =>
         current?.id === response.data.id ? response.data : current,
       );
 
       setEditingDoctor(null);
-      form.resetFields();
+      updateForm.resetFields();
 
       modal.success({
         centered: true,
@@ -282,7 +408,50 @@ export default function DoctorManagementPage() {
         okText: "Đóng",
       });
     } finally {
-      setSubmitting(false);
+      setUpdateSubmitting(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deletingDoctor) return;
+
+    const doctor = deletingDoctor;
+
+    setDeleteLoading(true);
+    setError(null);
+
+    try {
+      await deleteDoctor(doctor.id);
+
+      setDoctors((current: Doctor[]) =>
+        current.filter((item: Doctor) => item.id !== doctor.id),
+      );
+
+      setDetailDoctor((current: Doctor | null) =>
+        current?.id === doctor.id ? null : current,
+      );
+
+      setDeletingDoctor(null);
+
+      modal.success({
+        centered: true,
+        title: "Xóa bác sĩ thành công",
+        content: "Hồ sơ bác sĩ đã được xóa khỏi danh sách.",
+        okText: "Đóng",
+      });
+    } catch (deleteError) {
+      const message = getErrorMessage(deleteError);
+
+      setError(message);
+
+      modal.error({
+        centered: true,
+        title: "Không thể xóa bác sĩ",
+        content: message,
+        okText: "Đóng",
+      });
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -357,7 +526,7 @@ export default function DoctorManagementPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 108,
+      width: 150,
       align: "center",
       fixed: "right",
       render: (_value, doctor) => (
@@ -377,6 +546,16 @@ export default function DoctorManagementPage() {
             onClick={(event) => {
               event.stopPropagation();
               openEdit(doctor);
+            }}
+          />
+
+          <Button
+            danger
+            title="Xóa bác sĩ"
+            icon={<Trash2 className="h-4 w-4" />}
+            onClick={(event) => {
+              event.stopPropagation();
+              setDeletingDoctor(doctor);
             }}
           />
         </Space>
@@ -426,7 +605,7 @@ export default function DoctorManagementPage() {
               value={statusFilter}
               options={statusOptions}
               placeholder="Lọc theo trạng thái"
-              onChange={(value) => {
+              onChange={(value: DoctorStatus | undefined) => {
                 setStatusFilter(value);
                 setCurrentPage(1);
               }}
@@ -469,6 +648,15 @@ export default function DoctorManagementPage() {
               </p>
             </div>
           }
+          extra={
+            <Button
+              type="primary"
+              icon={<Plus className="h-4 w-4" />}
+              onClick={openCreate}
+            >
+              Thêm bác sĩ
+            </Button>
+          }
         >
           <Table
             rowKey="id"
@@ -478,13 +666,16 @@ export default function DoctorManagementPage() {
             columns={columns}
             dataSource={filteredDoctors}
             className="management-table [&_.ant-table-cell]:px-3"
-            scroll={{ x: 1150 }}
+            scroll={{ x: 1180 }}
             onRow={(doctor) => ({
               className: "cursor-pointer",
               onClick: (event) => {
                 const target = event.target as HTMLElement;
 
-                if (target.closest("button") || target.closest("a")) {
+                if (
+                  target.closest("button") ||
+                  target.closest("a")
+                ) {
                   return;
                 }
 
@@ -639,22 +830,218 @@ export default function DoctorManagementPage() {
       </Modal>
 
       <Modal
+        open={createModalOpen}
+        width={820}
+        centered
+        title="Thêm bác sĩ"
+        okText="Tạo bác sĩ"
+        cancelText="Hủy"
+        confirmLoading={createSubmitting}
+        onOk={() => createForm.submit()}
+        onCancel={closeCreate}
+        mask={{ closable: !createSubmitting }}
+        destroyOnHidden
+      >
+        <Form
+          form={createForm}
+          layout="vertical"
+          onFinish={(values) => void submitCreate(values)}
+          className="mt-4"
+          initialValues={{
+            roleIds: [DEFAULT_DOCTOR_ROLE_ID],
+            facilityIds: [],
+            yearsOfExperience: 0,
+          }}
+        >
+          <div className="grid gap-x-4 md:grid-cols-2">
+            <Form.Item
+              name="name"
+              label="Họ tên"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập họ tên.",
+                },
+                {
+                  whitespace: true,
+                  message: "Họ tên không hợp lệ.",
+                },
+              ]}
+            >
+              <Input placeholder="Nguyễn Văn An" />
+            </Form.Item>
+
+            <Form.Item
+              name="personalEmail"
+              label="Email cá nhân"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập email.",
+                },
+                {
+                  type: "email",
+                  message: "Email không hợp lệ.",
+                },
+              ]}
+            >
+              <Input placeholder="doctor@example.com" />
+            </Form.Item>
+
+            <Form.Item
+              name="phone"
+              label="Số điện thoại"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập số điện thoại.",
+                },
+                {
+                  pattern: /^(?:\+84|0)[35789]\d{8}$/,
+                  message: "Số điện thoại Việt Nam không hợp lệ.",
+                },
+              ]}
+            >
+              <Input placeholder="0901234567" inputMode="tel" />
+            </Form.Item>
+
+            <Form.Item
+              name="roleIds"
+              label="Role ID"
+              extra="Mặc định 3 là role bác sĩ. Có thể sửa nếu backend sử dụng ID khác."
+              rules={[
+                {
+                  required: true,
+                  type: "array",
+                  min: 1,
+                  message: "Vui lòng nhập ít nhất một Role ID.",
+                },
+              ]}
+            >
+              <Select
+                mode="tags"
+                tokenSeparators={[","]}
+                placeholder="Ví dụ: 3"
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="facilityIds"
+              label="Cơ sở làm việc"
+              className="md:col-span-2"
+              rules={[
+                {
+                  required: true,
+                  type: "array",
+                  min: 1,
+                  message: "Vui lòng chọn ít nhất một cơ sở.",
+                },
+              ]}
+            >
+              <Select
+                mode="multiple"
+                options={facilityOptions}
+                optionFilterProp="label"
+                placeholder="Chọn cơ sở làm việc"
+                maxTagCount="responsive"
+                loading={loading}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="licenseNo"
+              label="Số giấy phép hành nghề"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập số giấy phép.",
+                },
+                {
+                  whitespace: true,
+                  message: "Số giấy phép không hợp lệ.",
+                },
+              ]}
+            >
+              <Input placeholder="Nhập số giấy phép" />
+            </Form.Item>
+
+            <Form.Item
+              name="title"
+              label="Học hàm / chức danh"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập chức danh.",
+                },
+              ]}
+            >
+              <Input placeholder="BS. CKI, ThS.BS..." />
+            </Form.Item>
+
+            <Form.Item
+              name="specialty"
+              label="Chuyên khoa"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập chuyên khoa.",
+                },
+              ]}
+            >
+              <Input placeholder="Sản phụ khoa" />
+            </Form.Item>
+
+            <Form.Item
+              name="yearsOfExperience"
+              label="Số năm kinh nghiệm"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập số năm kinh nghiệm.",
+                },
+              ]}
+            >
+              <InputNumber
+                min={0}
+                max={80}
+                precision={0}
+                className="w-full"
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="bio"
+              label="Giới thiệu chuyên môn"
+              className="md:col-span-2"
+            >
+              <Input.TextArea
+                rows={4}
+                placeholder="Mô tả kinh nghiệm và thế mạnh chuyên môn của bác sĩ"
+                showCount
+                maxLength={1000}
+              />
+            </Form.Item>
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
         open={Boolean(editingDoctor)}
         width={720}
         centered
         title="Cập nhật hồ sơ bác sĩ"
         okText="Lưu thay đổi"
         cancelText="Hủy"
-        confirmLoading={submitting}
-        onOk={() => form.submit()}
+        confirmLoading={updateSubmitting}
+        onOk={() => updateForm.submit()}
         onCancel={closeEdit}
-        mask={{ closable: !submitting }}
+        mask={{ closable: !updateSubmitting }}
         destroyOnHidden
       >
         <Form
-          form={form}
+          form={updateForm}
           layout="vertical"
-          onFinish={(values) => void submitDoctor(values)}
+          onFinish={(values) => void submitUpdate(values)}
           className="mt-4"
         >
           <div className="grid gap-x-4 md:grid-cols-2">
@@ -724,8 +1111,7 @@ export default function DoctorManagementPage() {
               rules={[
                 {
                   required: true,
-                  message:
-                    "Vui lòng nhập số năm kinh nghiệm.",
+                  message: "Vui lòng nhập số năm kinh nghiệm.",
                 },
               ]}
             >
@@ -764,6 +1150,83 @@ export default function DoctorManagementPage() {
             </Form.Item>
           </div>
         </Form>
+      </Modal>
+
+      <Modal
+        open={Boolean(deletingDoctor)}
+        centered
+        width={456}
+        title={null}
+        footer={null}
+        closable={false}
+        onCancel={() => {
+          if (!deleteLoading) {
+            setDeletingDoctor(null);
+          }
+        }}
+        mask={{ closable: !deleteLoading }}
+        className="[&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-[14px] [&_.ant-modal-content]:p-0"
+        styles={{
+          body: {
+            padding: 0,
+          },
+        }}
+      >
+        <div className="relative px-6 pb-6 pt-7 text-center">
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={() => setDeletingDoctor(null)}
+            disabled={deleteLoading}
+            className="absolute right-3 top-3 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+            <Trash2 className="h-7 w-7 text-red-600" />
+          </div>
+
+          <h3 className="mt-5 text-lg font-bold text-slate-950">
+            Xóa bác sĩ?
+          </h3>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Hồ sơ bác sĩ sẽ bị xóa khỏi hệ thống. Thao tác này không thể hoàn tác.
+          </p>
+
+          {deletingDoctor ? (
+            <div className="mx-auto mt-4 max-w-[350px] rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+              <p className="mb-0 font-semibold">
+                {deletingDoctor.title || "Bác sĩ"} ·{" "}
+                {deletingDoctor.specialty || "Chưa cập nhật chuyên khoa"}
+              </p>
+              <p className="mb-0 mt-1">
+                Staff ID: {deletingDoctor.staffId}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button
+              size="large"
+              onClick={() => setDeletingDoctor(null)}
+              disabled={deleteLoading}
+            >
+              Hủy
+            </Button>
+
+            <Button
+              danger
+              type="primary"
+              size="large"
+              loading={deleteLoading}
+              onClick={() => void confirmDelete()}
+            >
+              Xóa bác sĩ
+            </Button>
+          </div>
+        </div>
       </Modal>
     </AdminLayout>
   );

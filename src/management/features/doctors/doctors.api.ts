@@ -10,7 +10,7 @@ import type {
   DoctorApiResponse,
   DoctorStatus,
   UpdateDoctorInput,
-} from "./doctors.type";
+} from "./doctors.types";
 
 const ENDPOINT = "/management/doctors";
 
