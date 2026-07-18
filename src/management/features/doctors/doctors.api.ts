@@ -5,10 +5,12 @@ import {
 } from "@/lib/axios";
 import type {
   BackendDoctor,
+  CreateDoctorInput,
   Doctor,
+  DoctorApiResponse,
   DoctorStatus,
   UpdateDoctorInput,
-} from "./doctors.types";
+} from "./doctors.type";
 
 const ENDPOINT = "/management/doctors";
 
@@ -38,6 +40,25 @@ function normalizeDoctor(doctor: BackendDoctor): Doctor {
   };
 }
 
+function toCreatePayload(input: CreateDoctorInput) {
+  return {
+    name: input.name.trim(),
+    personalEmail: input.personalEmail.trim(),
+    phone: input.phone.trim(),
+    roleIds: input.roleIds,
+    facilityAssignments: input.facilityAssignments.map((assignment) => ({
+      facilityId: assignment.facilityId.trim(),
+      roles: assignment.roles,
+    })),
+    licenseNo: input.licenseNo.trim(),
+    title: input.title.trim(),
+    specialty: input.specialty.trim(),
+    yearsOfExperience: input.yearsOfExperience,
+    bio: input.bio?.trim() || undefined,
+    permissionOverrides: input.permissionOverrides ?? [],
+  };
+}
+
 function toUpdatePayload(input: UpdateDoctorInput) {
   const payload = {
     staffId: input.staffId?.trim(),
@@ -62,6 +83,19 @@ export async function getDoctors(): Promise<Doctor[]> {
   return Array.isArray(data) ? data.map(normalizeDoctor) : [];
 }
 
+export async function createDoctor(
+  input: CreateDoctorInput,
+): Promise<DoctorApiResponse<Doctor>> {
+  const response = await unwrapApiResponse<BackendDoctor>(
+    apiClient.post(ENDPOINT, toCreatePayload(input)),
+  );
+
+  return {
+    ...response,
+    data: normalizeDoctor(response.data),
+  };
+}
+
 export async function getDoctor(id: string): Promise<Doctor> {
   const data = await unwrapApiData<BackendDoctor>(
     apiClient.get(`${ENDPOINT}/${id}`),
@@ -73,7 +107,7 @@ export async function getDoctor(id: string): Promise<Doctor> {
 export async function updateDoctor(
   id: string,
   input: UpdateDoctorInput,
-) {
+): Promise<DoctorApiResponse<Doctor>> {
   const response = await unwrapApiResponse<BackendDoctor>(
     apiClient.patch(`${ENDPOINT}/${id}`, toUpdatePayload(input)),
   );
@@ -84,8 +118,16 @@ export async function updateDoctor(
   };
 }
 
+export function deleteDoctor(id: string) {
+  return unwrapApiResponse<null>(
+    apiClient.delete(`${ENDPOINT}/${id}`),
+  );
+}
+
 export const doctorsApi = {
   getDoctors,
+  createDoctor,
   getDoctor,
   updateDoctor,
+  deleteDoctor,
 };
