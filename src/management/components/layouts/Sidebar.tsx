@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BriefcaseBusiness, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2, DoorOpen } from "lucide-react";
+import { BriefcaseBusiness, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2, DoorOpen, Stethoscope } from "lucide-react";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/management/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/management/users", label: "Users", icon: Users, roles: ["super_admin"] },
   { href: "/management/staffs", label: "Staffs", icon: UserCog, roles: ["super_admin", "admin"] },
+  { href: "/management/doctors", label: "Doctors", icon: Stethoscope, roles: ["super_admin", "admin"] },
   { href: "/management/facilities", label: "Cơ sở", icon: Building2, roles: ["super_admin", "admin"] },
   { href: "/management/rooms", label: "Phòng khám", icon: DoorOpen, roles: ["super_admin", "admin"] },
   { href: "/management/services", label: "Dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
