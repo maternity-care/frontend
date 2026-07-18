@@ -91,7 +91,8 @@ export async function createDoctor(
   );
 
   return {
-    ...response,
+    success: response.success ?? true,
+    message: response.message ?? "Tạo bác sĩ thành công",
     data: normalizeDoctor(response.data),
   };
 }
@@ -113,15 +114,24 @@ export async function updateDoctor(
   );
 
   return {
-    ...response,
+    success: response.success ?? true,
+    message: response.message ?? "Cập nhật bác sĩ thành công",
     data: normalizeDoctor(response.data),
   };
 }
 
-export function deleteDoctor(id: string) {
-  return unwrapApiResponse<null>(
+export async function deleteDoctor(
+  id: string,
+): Promise<DoctorApiResponse<null>> {
+  const response = await unwrapApiResponse<null>(
     apiClient.delete(`${ENDPOINT}/${id}`),
   );
+
+  return {
+    success: response.success ?? true,
+    message: response.message ?? "Xóa bác sĩ thành công",
+    data: response.data ?? null,
+  };
 }
 
 export const doctorsApi = {
