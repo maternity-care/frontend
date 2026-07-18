@@ -5,6 +5,8 @@ export interface GetFacilitiesParams {
   search?: string;
   city?: string;
   status?: FacilityStatus;
+  page?: number;
+  limit?: number;
 }
 
 export interface BackendFacility {
