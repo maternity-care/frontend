@@ -18,13 +18,13 @@ import {
 
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
-import { TableFilter } from "@/fe/components/ui/TableFilter";
 import { FacilityService, FacilityServiceFormValues, FacilityServiceStatus, GetFacilityServicesParams } from "@/management/features/services/services.types";
 import { useFacilityServices } from "@/utils/profile/services/useFacilityServices";
 import { createFacilityService, deleteFacilityService, getFacilityService, updateFacilityService } from "@/management/features/services/services.api";
 import { FacilityServicesTable } from "@/fe/components/services/FacilityServicesTable";
 import { FacilityServiceFormModal } from "@/fe/components/services/FacilityServiceFormModal";
 import { FacilityServiceDetailModal } from "@/fe/components/services/FacilityServiceDetailModal";
+import { TableFilter } from "@/management/components/ui/TableFilter";
 
 interface FacilityServiceFilters {
   search: string;
