@@ -850,7 +850,6 @@ import {
   Stethoscope,
   Trash2,
   UserPlus,
-  Users,
   X,
 } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
@@ -861,12 +860,6 @@ const MOCK_TODAY = "2026-07-21";
 
 type ViewMode = "day" | "week" | "month";
 type ShiftType = "morning" | "afternoon" | "evening";
-type ShiftStatus =
-  | "available"
-  | "assigned"
-  | "full"
-  | "cancelled"
-  | "off";
 
 type Facility = {
   id: string;
@@ -904,20 +897,20 @@ type DoctorShift = {
   roomId: string;
   maxAppointments: number;
   bookedAppointments: number;
-  status: ShiftStatus;
   notes: string;
+};
+
+type ShiftAssignmentFormValue = {
+  doctorId?: string;
+  roomId: string;
+  maxAppointments: number;
+  shiftType: ShiftType;
 };
 
 type ShiftFormValues = {
   shiftDate: string;
-  startTime: string;
-  endTime: string;
-  shiftType: ShiftType;
-  doctorId?: string;
   facilityId: string;
-  roomId: string;
-  maxAppointments: number;
-  status: ShiftStatus;
+  assignments: ShiftAssignmentFormValue[];
   notes?: string;
 };
 
@@ -1057,7 +1050,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-1",
     maxAppointments: 8,
     bookedAppointments: 6,
-    status: "assigned",
     notes: "Khám thai định kỳ và tư vấn kết quả xét nghiệm.",
   },
   {
@@ -1065,14 +1057,13 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     code: "CT-2007-02",
     shiftDate: "2026-07-20",
     startTime: "08:00",
-    endTime: "11:30",
+    endTime: "12:00",
     shiftType: "morning",
     doctorId: "doctor-3",
     facilityId: "facility-1",
     roomId: "room-2",
     maxAppointments: 7,
     bookedAppointments: 7,
-    status: "full",
     notes: "Siêu âm thai và đo độ mờ da gáy.",
   },
   {
@@ -1087,7 +1078,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-3",
     maxAppointments: 8,
     bookedAppointments: 0,
-    status: "available",
     notes: "Ca đang chờ phân công bác sĩ.",
   },
   {
@@ -1102,7 +1092,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-1",
     maxAppointments: 8,
     bookedAppointments: 5,
-    status: "assigned",
     notes: "Khám thai lần đầu.",
   },
   {
@@ -1117,7 +1106,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-2",
     maxAppointments: 6,
     bookedAppointments: 4,
-    status: "assigned",
     notes: "Siêu âm hình thái thai.",
   },
   {
@@ -1132,7 +1120,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-3",
     maxAppointments: 6,
     bookedAppointments: 6,
-    status: "full",
     notes: "Ưu tiên hồ sơ thai kỳ nguy cơ cao.",
   },
   {
@@ -1147,7 +1134,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-4",
     maxAppointments: 6,
     bookedAppointments: 0,
-    status: "available",
     notes: "Cần phân công bác sĩ trực tối.",
   },
   {
@@ -1162,14 +1148,13 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-4",
     maxAppointments: 8,
     bookedAppointments: 3,
-    status: "assigned",
     notes: "Khám thai định kỳ.",
   },
   {
     id: "shift-09",
     code: "CT-2207-02",
     shiftDate: "2026-07-22",
-    startTime: "08:30",
+    startTime: "08:00",
     endTime: "12:00",
     shiftType: "morning",
     doctorId: "doctor-3",
@@ -1177,7 +1162,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-5",
     maxAppointments: 7,
     bookedAppointments: 5,
-    status: "assigned",
     notes: "Siêu âm thai.",
   },
   {
@@ -1192,7 +1176,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-4",
     maxAppointments: 8,
     bookedAppointments: 2,
-    status: "assigned",
     notes: "Khám và tư vấn kế hoạch theo dõi thai kỳ.",
   },
   {
@@ -1207,7 +1190,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-1",
     maxAppointments: 8,
     bookedAppointments: 0,
-    status: "available",
     notes: "Ca trống chưa có bác sĩ phụ trách.",
   },
   {
@@ -1215,14 +1197,13 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     code: "CT-2307-02",
     shiftDate: "2026-07-23",
     startTime: "08:00",
-    endTime: "11:30",
+    endTime: "12:00",
     shiftType: "morning",
     doctorId: "doctor-6",
     facilityId: "facility-1",
     roomId: "room-2",
     maxAppointments: 6,
     bookedAppointments: 6,
-    status: "full",
     notes: "Danh sách lịch hẹn đã đầy.",
   },
   {
@@ -1237,7 +1218,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-3",
     maxAppointments: 8,
     bookedAppointments: 4,
-    status: "assigned",
     notes: "Khám thai định kỳ.",
   },
   {
@@ -1252,7 +1232,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-1",
     maxAppointments: 6,
     bookedAppointments: 3,
-    status: "assigned",
     notes: "Theo dõi thai kỳ nguy cơ cao.",
   },
   {
@@ -1260,14 +1239,13 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     code: "CT-2407-02",
     shiftDate: "2026-07-24",
     startTime: "08:00",
-    endTime: "11:30",
+    endTime: "12:00",
     shiftType: "morning",
     doctorId: null,
     facilityId: "facility-1",
     roomId: "room-2",
     maxAppointments: 7,
     bookedAppointments: 0,
-    status: "available",
     notes: "Chờ phân công bác sĩ siêu âm.",
   },
   {
@@ -1282,7 +1260,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-4",
     maxAppointments: 8,
     bookedAppointments: 7,
-    status: "assigned",
     notes: "Khám thai và đọc kết quả xét nghiệm.",
   },
   {
@@ -1297,7 +1274,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-4",
     maxAppointments: 8,
     bookedAppointments: 8,
-    status: "full",
     notes: "Lịch khám cuối tuần đã đầy.",
   },
   {
@@ -1305,14 +1281,13 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     code: "CT-2507-02",
     shiftDate: "2026-07-25",
     startTime: "08:00",
-    endTime: "11:30",
+    endTime: "12:00",
     shiftType: "morning",
     doctorId: "doctor-3",
     facilityId: "facility-2",
     roomId: "room-5",
     maxAppointments: 7,
     bookedAppointments: 6,
-    status: "assigned",
     notes: "Siêu âm thai cuối tuần.",
   },
   {
@@ -1320,14 +1295,13 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     code: "CT-2507-03",
     shiftDate: "2026-07-25",
     startTime: "13:30",
-    endTime: "17:00",
+    endTime: "17:30",
     shiftType: "afternoon",
     doctorId: null,
     facilityId: "facility-2",
     roomId: "room-4",
     maxAppointments: 6,
     bookedAppointments: 0,
-    status: "cancelled",
     notes: "Ca tạm hủy do bảo trì phòng khám.",
   },
   {
@@ -1342,7 +1316,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-4",
     maxAppointments: 6,
     bookedAppointments: 2,
-    status: "assigned",
     notes: "Ca trực Chủ nhật.",
   },
   {
@@ -1350,14 +1323,13 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     code: "CT-2607-02",
     shiftDate: "2026-07-26",
     startTime: "08:00",
-    endTime: "11:30",
+    endTime: "12:00",
     shiftType: "morning",
     doctorId: "doctor-6",
     facilityId: "facility-2",
     roomId: "room-5",
     maxAppointments: 6,
     bookedAppointments: 1,
-    status: "assigned",
     notes: "Siêu âm theo lịch cuối tuần.",
   },
   {
@@ -1365,14 +1337,13 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     code: "CT-2607-03",
     shiftDate: "2026-07-26",
     startTime: "13:30",
-    endTime: "17:00",
+    endTime: "17:30",
     shiftType: "afternoon",
     doctorId: null,
     facilityId: "facility-1",
     roomId: "room-3",
     maxAppointments: 6,
     bookedAppointments: 0,
-    status: "off",
     notes: "Không tổ chức ca chiều Chủ nhật.",
   },
   {
@@ -1387,7 +1358,6 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-1",
     maxAppointments: 8,
     bookedAppointments: 2,
-    status: "assigned",
     notes: "Dữ liệu bổ sung để xem lịch tháng.",
   },
   {
@@ -1402,23 +1372,38 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     roomId: "room-4",
     maxAppointments: 8,
     bookedAppointments: 0,
-    status: "available",
     notes: "Dữ liệu bổ sung để xem lịch tháng.",
   },
 ];
 
-const SHIFT_TYPE_OPTIONS = [
-  { value: "morning", label: "Ca sáng" },
-  { value: "afternoon", label: "Ca chiều" },
-  { value: "evening", label: "Ca tối" },
-];
-
-const SHIFT_STATUS_OPTIONS = [
-  { value: "available", label: "Còn trống" },
-  { value: "assigned", label: "Đã phân công" },
-  { value: "full", label: "Đã đầy lịch" },
-  { value: "cancelled", label: "Đã hủy" },
-  { value: "off", label: "Nghỉ" },
+const SHIFT_TYPE_OPTIONS: Array<{
+  value: ShiftType;
+  label: string;
+  shortLabel: string;
+  startTime: string;
+  endTime: string;
+}> = [
+  {
+    value: "morning",
+    label: "Ca sáng (08:00 - 12:00)",
+    shortLabel: "Ca sáng",
+    startTime: "08:00",
+    endTime: "12:00",
+  },
+  {
+    value: "afternoon",
+    label: "Ca chiều (13:30 - 17:30)",
+    shortLabel: "Ca chiều",
+    startTime: "13:30",
+    endTime: "17:30",
+  },
+  {
+    value: "evening",
+    label: "Ca tối (18:00 - 21:00)",
+    shortLabel: "Ca tối",
+    startTime: "18:00",
+    endTime: "21:00",
+  },
 ];
 
 const WEEKDAY_LABELS = [
@@ -1510,28 +1495,16 @@ function getPeriodTitle(viewMode: ViewMode, selectedDate: string) {
   }).format(parseDateKey(selectedDate));
 }
 
+function getShiftDefinition(value: ShiftType) {
+  return SHIFT_TYPE_OPTIONS.find((option) => option.value === value) ?? SHIFT_TYPE_OPTIONS[0];
+}
+
 function getShiftTypeLabel(value: ShiftType) {
-  return (
-    SHIFT_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value
-  );
+  return getShiftDefinition(value).label;
 }
 
-function getShiftStatusLabel(value: ShiftStatus) {
-  return (
-    SHIFT_STATUS_OPTIONS.find((option) => option.value === value)?.label ?? value
-  );
-}
-
-function renderShiftStatus(status: ShiftStatus) {
-  const colorMap: Record<ShiftStatus, string> = {
-    available: "gold",
-    assigned: "blue",
-    full: "green",
-    cancelled: "red",
-    off: "default",
-  };
-
-  return <Tag color={colorMap[status]}>{getShiftStatusLabel(status)}</Tag>;
+function getShiftTypeShortLabel(value: ShiftType) {
+  return getShiftDefinition(value).shortLabel;
 }
 
 function getDoctor(doctorId: string | null) {
@@ -1583,52 +1556,42 @@ function isDoctorBusy({
       shift.id !== excludeShiftId &&
       shift.doctorId === doctorId &&
       shift.shiftDate === shiftDate &&
-      shift.status !== "cancelled" &&
-      shift.status !== "off" &&
       shiftsOverlap(shift.startTime, shift.endTime, startTime, endTime),
   );
 }
 
-function getAvailableDoctors({
+function isRoomBusy({
   shifts,
-  facilityId,
+  roomId,
   shiftDate,
   startTime,
   endTime,
   excludeShiftId,
 }: {
   shifts: DoctorShift[];
-  facilityId: string;
+  roomId: string;
   shiftDate: string;
   startTime: string;
   endTime: string;
   excludeShiftId?: string;
 }) {
-  return DOCTORS.filter(
-    (doctor) =>
-      doctor.status === "active" &&
-      doctor.facilityIds.includes(facilityId) &&
-      !isDoctorBusy({
-        shifts,
-        doctorId: doctor.id,
-        shiftDate,
-        startTime,
-        endTime,
-        excludeShiftId,
-      }),
+  return shifts.some(
+    (shift) =>
+      shift.id !== excludeShiftId &&
+      shift.roomId === roomId &&
+      shift.shiftDate === shiftDate &&
+      shiftsOverlap(shift.startTime, shift.endTime, startTime, endTime),
   );
 }
 
-function getShiftAccent(status: ShiftStatus) {
-  const accents: Record<ShiftStatus, string> = {
-    available: "border-amber-200 bg-amber-50 text-amber-900",
-    assigned: "border-blue-200 bg-blue-50 text-blue-900",
-    full: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    cancelled: "border-red-200 bg-red-50 text-red-900",
-    off: "border-slate-200 bg-slate-100 text-slate-600",
+function getShiftAccent(shiftType: ShiftType) {
+  const accents: Record<ShiftType, string> = {
+    morning: "border-blue-200 bg-blue-50 text-blue-900",
+    afternoon: "border-amber-200 bg-amber-50 text-amber-900",
+    evening: "border-violet-200 bg-violet-50 text-violet-900",
   };
 
-  return accents[status];
+  return accents[shiftType];
 }
 
 function ShiftFormModal({
@@ -1644,16 +1607,15 @@ function ShiftFormModal({
   selectedDate: string;
   shifts: DoctorShift[];
   onClose: () => void;
-  onSaved: (shift: DoctorShift, mode: "create" | "update") => void;
+  onSaved: (savedShifts: DoctorShift[], mode: "create" | "update") => void;
 }) {
   const [form] = Form.useForm<ShiftFormValues>();
 
   const watchedDate = Form.useWatch("shiftDate", form) ?? selectedDate;
-  const watchedStartTime = Form.useWatch("startTime", form) ?? "08:00";
-  const watchedEndTime = Form.useWatch("endTime", form) ?? "12:00";
   const watchedFacilityId =
     Form.useWatch("facilityId", form) ?? FACILITIES[0].id;
-  const watchedDoctorId = Form.useWatch("doctorId", form);
+  const watchedAssignments =
+    Form.useWatch("assignments", form) ?? [];
 
   useEffect(() => {
     if (!open) return;
@@ -1662,14 +1624,15 @@ function ShiftFormModal({
       if (editingShift) {
         form.setFieldsValue({
           shiftDate: editingShift.shiftDate,
-          startTime: editingShift.startTime,
-          endTime: editingShift.endTime,
-          shiftType: editingShift.shiftType,
-          doctorId: editingShift.doctorId ?? undefined,
           facilityId: editingShift.facilityId,
-          roomId: editingShift.roomId,
-          maxAppointments: editingShift.maxAppointments,
-          status: editingShift.status,
+          assignments: [
+            {
+              doctorId: editingShift.doctorId ?? undefined,
+              roomId: editingShift.roomId,
+              maxAppointments: editingShift.maxAppointments,
+              shiftType: editingShift.shiftType,
+            },
+          ],
           notes: editingShift.notes,
         });
         return;
@@ -1678,14 +1641,16 @@ function ShiftFormModal({
       form.resetFields();
       form.setFieldsValue({
         shiftDate: selectedDate,
-        startTime: "08:00",
-        endTime: "12:00",
-        shiftType: "morning",
-        doctorId: undefined,
         facilityId: FACILITIES[0].id,
-        roomId: ROOMS.find((room) => room.facilityId === FACILITIES[0].id)?.id,
-        maxAppointments: 8,
-        status: "available",
+        assignments: [
+          {
+            doctorId: undefined,
+            roomId:
+              ROOMS.find((room) => room.facilityId === FACILITIES[0].id)?.id ?? "",
+            maxAppointments: 8,
+            shiftType: "morning",
+          },
+        ],
         notes: "",
       });
     }, 0);
@@ -1704,105 +1669,147 @@ function ShiftFormModal({
     [watchedFacilityId],
   );
 
-  const doctorOptions = useMemo(
-    () =>
-      DOCTORS.filter((doctor) => doctor.status === "active")
-        .filter((doctor) => doctor.facilityIds.includes(watchedFacilityId))
-        .map((doctor) => {
-          const busy = isDoctorBusy({
-            shifts,
-            doctorId: doctor.id,
-            shiftDate: watchedDate,
-            startTime: watchedStartTime,
-            endTime: watchedEndTime,
-            excludeShiftId: editingShift?.id,
-          });
+  function getDoctorOptions(rowIndex: number) {
+    const row = watchedAssignments[rowIndex];
+    const shiftDefinition = getShiftDefinition(row?.shiftType ?? "morning");
 
-          return {
-            value: doctor.id,
-            disabled: busy && doctor.id !== watchedDoctorId,
-            label: `${doctor.title} ${doctor.name} · ${doctor.specialty}${
-              busy && doctor.id !== watchedDoctorId ? " · Đang bận" : " · Còn trống"
-            }`,
-          };
-        }),
-    [
-      editingShift?.id,
-      shifts,
-      watchedDate,
-      watchedDoctorId,
-      watchedEndTime,
-      watchedFacilityId,
-      watchedStartTime,
-    ],
-  );
+    return DOCTORS.filter((doctor) => doctor.status === "active")
+      .filter((doctor) => doctor.facilityIds.includes(watchedFacilityId))
+      .map((doctor) => {
+        const busyInSavedSchedule = isDoctorBusy({
+          shifts,
+          doctorId: doctor.id,
+          shiftDate: watchedDate,
+          startTime: shiftDefinition.startTime,
+          endTime: shiftDefinition.endTime,
+          excludeShiftId: editingShift?.id,
+        });
 
-  const previewAvailableDoctors = useMemo(
-    () =>
-      getAvailableDoctors({
-        shifts,
-        facilityId: watchedFacilityId,
-        shiftDate: watchedDate,
-        startTime: watchedStartTime,
-        endTime: watchedEndTime,
-        excludeShiftId: editingShift?.id,
-      }),
-    [
-      editingShift?.id,
-      shifts,
-      watchedDate,
-      watchedEndTime,
-      watchedFacilityId,
-      watchedStartTime,
-    ],
-  );
+        const duplicatedInCurrentForm = watchedAssignments.some(
+          (assignment, assignmentIndex) =>
+            assignmentIndex !== rowIndex &&
+            assignment?.doctorId === doctor.id &&
+            assignment?.shiftType === row?.shiftType,
+        );
+
+        const unavailable = busyInSavedSchedule || duplicatedInCurrentForm;
+
+        return {
+          value: doctor.id,
+          disabled: unavailable && row?.doctorId !== doctor.id,
+          label: `${doctor.title} ${doctor.name} · ${doctor.specialty}${
+            unavailable && row?.doctorId !== doctor.id ? " · Trùng ca" : ""
+          }`,
+        };
+      });
+  }
 
   function handleFinish(values: ShiftFormValues) {
-    if (timeToMinutes(values.endTime) <= timeToMinutes(values.startTime)) {
-      form.setFields([
-        {
-          name: "endTime",
-          errors: ["Giờ kết thúc phải sau giờ bắt đầu."],
-        },
-      ]);
-      return;
-    }
+    const duplicateDoctorKeys = new Set<string>();
+    const duplicateRoomKeys = new Set<string>();
 
-    let normalizedStatus = values.status;
+    for (let index = 0; index < values.assignments.length; index += 1) {
+      const assignment = values.assignments[index];
+      const shiftDefinition = getShiftDefinition(assignment.shiftType);
 
-    if (values.doctorId && normalizedStatus === "available") {
-      normalizedStatus = "assigned";
-    }
+      if (assignment.doctorId) {
+        const duplicateDoctorKey = `${assignment.doctorId}-${assignment.shiftType}`;
 
-    if (!values.doctorId && normalizedStatus === "assigned") {
-      normalizedStatus = "available";
-    }
-
-    const savedShift: DoctorShift = editingShift
-      ? {
-          ...editingShift,
-          ...values,
-          doctorId: values.doctorId ?? null,
-          status: normalizedStatus,
-          notes: values.notes?.trim() ?? "",
-          bookedAppointments: Math.min(
-            editingShift.bookedAppointments,
-            values.maxAppointments,
-          ),
+        if (duplicateDoctorKeys.has(duplicateDoctorKey)) {
+          form.setFields([
+            {
+              name: ["assignments", index, "doctorId"],
+              errors: ["Bác sĩ này đã được chọn cho cùng một ca trực."],
+            },
+          ]);
+          return;
         }
-      : {
-          id: `shift-${Date.now()}`,
-          code: `CT-${values.shiftDate.replaceAll("-", "").slice(4)}-${String(
-            Date.now(),
-          ).slice(-4)}`,
-          ...values,
-          doctorId: values.doctorId ?? null,
-          status: normalizedStatus,
-          notes: values.notes?.trim() ?? "",
-          bookedAppointments: 0,
-        };
 
-    onSaved(savedShift, editingShift ? "update" : "create");
+        duplicateDoctorKeys.add(duplicateDoctorKey);
+
+        const doctorBusy = isDoctorBusy({
+          shifts,
+          doctorId: assignment.doctorId,
+          shiftDate: values.shiftDate,
+          startTime: shiftDefinition.startTime,
+          endTime: shiftDefinition.endTime,
+          excludeShiftId: editingShift?.id,
+        });
+
+        if (doctorBusy) {
+          form.setFields([
+            {
+              name: ["assignments", index, "doctorId"],
+              errors: ["Bác sĩ đã có lịch trong ca trực này."],
+            },
+          ]);
+          return;
+        }
+      }
+
+      const duplicateRoomKey = `${assignment.roomId}-${assignment.shiftType}`;
+
+      if (duplicateRoomKeys.has(duplicateRoomKey)) {
+        form.setFields([
+          {
+            name: ["assignments", index, "roomId"],
+            errors: ["Phòng khám này đã được chọn cho cùng một ca trực."],
+          },
+        ]);
+        return;
+      }
+
+      duplicateRoomKeys.add(duplicateRoomKey);
+
+      const roomBusy = isRoomBusy({
+        shifts,
+        roomId: assignment.roomId,
+        shiftDate: values.shiftDate,
+        startTime: shiftDefinition.startTime,
+        endTime: shiftDefinition.endTime,
+        excludeShiftId: editingShift?.id,
+      });
+
+      if (roomBusy) {
+        form.setFields([
+          {
+            name: ["assignments", index, "roomId"],
+            errors: ["Phòng khám đã được sử dụng trong ca trực này."],
+          },
+        ]);
+        return;
+      }
+    }
+
+    const now = Date.now();
+    const savedShifts = values.assignments.map((assignment, index) => {
+      const shiftDefinition = getShiftDefinition(assignment.shiftType);
+      const baseShift = editingShift && index === 0 ? editingShift : null;
+
+      return {
+        ...(baseShift ?? {}),
+        id: baseShift?.id ?? `shift-${now}-${index}`,
+        code:
+          baseShift?.code ??
+          `CT-${values.shiftDate.replaceAll("-", "").slice(4)}-${String(
+            now + index,
+          ).slice(-4)}`,
+        shiftDate: values.shiftDate,
+        startTime: shiftDefinition.startTime,
+        endTime: shiftDefinition.endTime,
+        shiftType: assignment.shiftType,
+        doctorId: assignment.doctorId ?? null,
+        facilityId: values.facilityId,
+        roomId: assignment.roomId,
+        maxAppointments: assignment.maxAppointments,
+        bookedAppointments: baseShift
+          ? Math.min(baseShift.bookedAppointments, assignment.maxAppointments)
+          : 0,
+        notes: values.notes?.trim() ?? "",
+      } satisfies DoctorShift;
+    });
+
+    onSaved(savedShifts, editingShift ? "update" : "create");
     form.resetFields();
     onClose();
   }
@@ -1811,13 +1818,20 @@ function ShiftFormModal({
     <Modal
       open={open}
       centered
-      width={920}
+      width={980}
       title={null}
-      okText={editingShift ? "Lưu thay đổi" : "Tạo ca trực"}
+      okText={editingShift ? "Lưu thay đổi" : "Tạo lịch trực"}
       cancelText="Hủy"
       onOk={() => form.submit()}
       onCancel={onClose}
       mask={{ closable: false }}
+      styles={{
+        body: {
+          height: "min(620px, 70vh)",
+          overflowY: "auto",
+          paddingRight: 8,
+        },
+      }}
     >
       <div className="mb-5 border-b border-slate-200 pb-4">
         <div className="flex items-start gap-3">
@@ -1827,10 +1841,10 @@ function ShiftFormModal({
 
           <div>
             <Title level={4} className="!mb-1 !text-slate-950">
-              {editingShift ? "Cập nhật ca trực" : "Thêm ca trực mới"}
+              {editingShift ? "Cập nhật ca trực" : "Thêm lịch trực mới"}
             </Title>
             <Text type="secondary">
-              Thiết lập thời gian, phòng khám, sức chứa và phân công bác sĩ phù hợp.
+              Chọn ngày, cơ sở và thêm một hoặc nhiều dòng phân công bác sĩ theo ca trực.
             </Text>
           </div>
         </div>
@@ -1844,51 +1858,31 @@ function ShiftFormModal({
         onValuesChange={(changedValues) => {
           if ("facilityId" in changedValues) {
             const facilityId = changedValues.facilityId as string;
+            const assignments = form.getFieldValue("assignments") ?? [];
+
+            const defaultRoomId =
+              ROOMS.find((room) => room.facilityId === facilityId)?.id ?? "";
+
             form.setFieldsValue({
-              roomId: ROOMS.find((room) => room.facilityId === facilityId)?.id,
-              doctorId: undefined,
+              assignments: assignments.map(
+                (assignment: ShiftAssignmentFormValue) => ({
+                  ...assignment,
+                  doctorId: undefined,
+                  roomId: defaultRoomId,
+                }),
+              ),
             });
           }
         }}
       >
         <Row gutter={[16, 0]}>
-          <Col xs={24} md={8}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="shiftDate"
               label="Ngày trực"
               rules={[{ required: true, message: "Vui lòng chọn ngày trực." }]}
             >
               <Input type="date" />
-            </Form.Item>
-          </Col>
-
-          <Col xs={12} md={5}>
-            <Form.Item
-              name="startTime"
-              label="Bắt đầu"
-              rules={[{ required: true, message: "Chọn giờ bắt đầu." }]}
-            >
-              <Input type="time" />
-            </Form.Item>
-          </Col>
-
-          <Col xs={12} md={5}>
-            <Form.Item
-              name="endTime"
-              label="Kết thúc"
-              rules={[{ required: true, message: "Chọn giờ kết thúc." }]}
-            >
-              <Input type="time" />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={6}>
-            <Form.Item
-              name="shiftType"
-              label="Loại ca"
-              rules={[{ required: true, message: "Chọn loại ca." }]}
-            >
-              <Select options={SHIFT_TYPE_OPTIONS} />
             </Form.Item>
           </Col>
 
@@ -1907,94 +1901,150 @@ function ShiftFormModal({
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
-            <Form.Item
-              name="roomId"
-              label="Phòng khám"
-              rules={[{ required: true, message: "Chọn phòng khám." }]}
-            >
-              <Select options={roomOptions} />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Form.Item
-              name="doctorId"
-              label="Bác sĩ phụ trách"
-              extra="Các bác sĩ trùng thời gian hoặc không thuộc cơ sở sẽ không thể chọn."
-            >
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                placeholder="Chưa phân công bác sĩ"
-                options={doctorOptions}
-              />
-            </Form.Item>
-          </Col>
-
-          <Col xs={12} md={6}>
-            <Form.Item
-              name="maxAppointments"
-              label="Số lịch tối đa"
-              rules={[{ required: true, message: "Nhập sức chứa ca trực." }]}
-            >
-              <InputNumber min={1} max={30} className="w-full" />
-            </Form.Item>
-          </Col>
-
-          <Col xs={12} md={6}>
-            <Form.Item
-              name="status"
-              label="Trạng thái"
-              rules={[{ required: true, message: "Chọn trạng thái." }]}
-            >
-              <Select options={SHIFT_STATUS_OPTIONS} />
-            </Form.Item>
-          </Col>
-
-          <Col span={24}>
-            <Form.Item name="notes" label="Ghi chú">
-              <Input.TextArea
-                rows={3}
-                maxLength={300}
-                showCount
-                placeholder="Ví dụ: ưu tiên thai phụ tái khám, yêu cầu phòng siêu âm..."
-              />
-            </Form.Item>
-          </Col>
         </Row>
-      </Form>
 
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="mb-1 font-semibold text-emerald-950">
-              Bác sĩ có thể nhận khung giờ này
-            </p>
-            <p className="mb-0 text-sm text-emerald-800">
-              {previewAvailableDoctors.length} bác sĩ đang hoạt động, thuộc cơ sở và không bị trùng ca.
+            <p className="mb-0 font-semibold text-slate-950">Phân công ca trực</p>
+            <p className="mb-0 mt-1 text-sm text-slate-500">
+              Mỗi dòng gồm bác sĩ phụ trách, phòng khám, số lịch tối đa và ca trực đã có sẵn thời gian.
             </p>
           </div>
-          <Badge
-            count={previewAvailableDoctors.length}
-            showZero
-            className="shrink-0"
-          />
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {previewAvailableDoctors.length > 0 ? (
-            previewAvailableDoctors.slice(0, 5).map((doctor) => (
-              <Tag key={doctor.id} color="green">
-                {doctor.title} {doctor.name}
-              </Tag>
-            ))
-          ) : (
-            <Text type="secondary">Chưa có bác sĩ phù hợp với khung giờ đã chọn.</Text>
+        <Form.List
+          name="assignments"
+          rules={[
+            {
+              validator: async (_, assignments: ShiftAssignmentFormValue[]) => {
+                if (!assignments || assignments.length === 0) {
+                  throw new Error("Cần ít nhất một ca trực.");
+                }
+              },
+            },
+          ]}
+        >
+          {(fields, { add, remove }, { errors }) => (
+            <div className="flex flex-col gap-3">
+              {fields.map((field, index) => (
+                <div
+                  key={field.key}
+                  className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+                        {index + 1}
+                      </span>
+                      <Text strong>Thông tin phân công</Text>
+                    </div>
+
+                    {!editingShift && fields.length > 1 ? (
+                      <Button
+                        danger
+                        type="text"
+                        icon={<Trash2 className="h-4 w-4" />}
+                        onClick={() => remove(field.name)}
+                      >
+                        Xóa dòng
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <Row gutter={[16, 0]} align="top">
+                    <Col xs={24} md={12} xl={8}>
+                      <Form.Item
+                        name={[field.name, "doctorId"]}
+                        label="Bác sĩ phụ trách"
+                        rules={[
+                          { required: true, message: "Chọn bác sĩ phụ trách." },
+                        ]}
+                      >
+                        <Select
+                          allowClear
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="Chọn bác sĩ"
+                          options={getDoctorOptions(index)}
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} md={12} xl={6}>
+                      <Form.Item
+                        name={[field.name, "roomId"]}
+                        label="Phòng khám"
+                        rules={[{ required: true, message: "Chọn phòng khám." }]}
+                      >
+                        <Select
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="Chọn phòng khám"
+                          options={roomOptions}
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} sm={10} xl={4}>
+                      <Form.Item
+                        name={[field.name, "maxAppointments"]}
+                        label="Số lịch tối đa"
+                        rules={[
+                          { required: true, message: "Nhập số lịch tối đa." },
+                        ]}
+                      >
+                        <InputNumber min={1} max={30} className="w-full" />
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} sm={14} xl={6}>
+                      <Form.Item
+                        name={[field.name, "shiftType"]}
+                        label="Ca trực"
+                        rules={[{ required: true, message: "Chọn ca trực." }]}
+                      >
+                        <Select options={SHIFT_TYPE_OPTIONS} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </div>
+              ))}
+
+              {!editingShift ? (
+                <Button
+                  type="dashed"
+                  block
+                  size="large"
+                  icon={<Plus className="h-4 w-4" />}
+                  onClick={() =>
+                    add({
+                      doctorId: undefined,
+                      roomId:
+                        ROOMS.find((room) => room.facilityId === watchedFacilityId)
+                          ?.id ?? "",
+                      maxAppointments: 8,
+                      shiftType: "morning",
+                    })
+                  }
+                >
+                  Thêm bác sĩ và ca trực
+                </Button>
+              ) : null}
+
+              <Form.ErrorList errors={errors} />
+            </div>
           )}
-        </div>
-      </div>
+        </Form.List>
+
+        <Form.Item name="notes" label="Ghi chú" className="!mt-4">
+          <Input.TextArea
+            rows={3}
+            maxLength={300}
+            showCount
+            placeholder="Ví dụ: ưu tiên thai phụ tái khám, yêu cầu phòng siêu âm..."
+          />
+        </Form.Item>
+      </Form>
     </Modal>
   );
 }
@@ -2008,7 +2058,6 @@ export default function DoctorShiftPage() {
   const [facilityFilter, setFacilityFilter] = useState<string>();
   const [roomFilter, setRoomFilter] = useState<string>();
   const [doctorFilter, setDoctorFilter] = useState<string>();
-  const [statusFilter, setStatusFilter] = useState<ShiftStatus>();
   const [shiftTypeFilter, setShiftTypeFilter] = useState<ShiftType>();
 
   const [detailShift, setDetailShift] = useState<DoctorShift | null>(null);
@@ -2016,13 +2065,6 @@ export default function DoctorShiftPage() {
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [deletingShift, setDeletingShift] = useState<DoctorShift | null>(null);
 
-  const [availabilityOpen, setAvailabilityOpen] = useState(false);
-  const [availabilityDate, setAvailabilityDate] = useState(MOCK_TODAY);
-  const [availabilityStart, setAvailabilityStart] = useState("08:00");
-  const [availabilityEnd, setAvailabilityEnd] = useState("12:00");
-  const [availabilityFacility, setAvailabilityFacility] = useState(
-    FACILITIES[0].id,
-  );
 
   const filteredShifts = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -2050,7 +2092,6 @@ export default function DoctorShiftPage() {
         (!facilityFilter || shift.facilityId === facilityFilter) &&
         (!roomFilter || shift.roomId === roomFilter) &&
         (!doctorFilter || shift.doctorId === doctorFilter) &&
-        (!statusFilter || shift.status === statusFilter) &&
         (!shiftTypeFilter || shift.shiftType === shiftTypeFilter)
       );
     });
@@ -2061,7 +2102,6 @@ export default function DoctorShiftPage() {
     roomFilter,
     shiftTypeFilter,
     shifts,
-    statusFilter,
   ]);
 
   const scopedShifts = useMemo(() => {
@@ -2100,22 +2140,19 @@ export default function DoctorShiftPage() {
   );
 
   const stats = useMemo(() => {
-    const activeShifts = scopedShifts.filter(
-      (shift) => shift.status !== "cancelled" && shift.status !== "off",
-    );
-    const bookedAppointments = activeShifts.reduce(
+    const bookedAppointments = scopedShifts.reduce(
       (total, shift) => total + shift.bookedAppointments,
       0,
     );
-    const maxAppointments = activeShifts.reduce(
+    const maxAppointments = scopedShifts.reduce(
       (total, shift) => total + shift.maxAppointments,
       0,
     );
 
     return {
       total: scopedShifts.length,
-      assigned: activeShifts.filter((shift) => Boolean(shift.doctorId)).length,
-      vacant: activeShifts.filter((shift) => !shift.doctorId).length,
+      assigned: scopedShifts.filter((shift) => Boolean(shift.doctorId)).length,
+      vacant: scopedShifts.filter((shift) => !shift.doctorId).length,
       utilization:
         maxAppointments === 0
           ? 0
@@ -2124,113 +2161,6 @@ export default function DoctorShiftPage() {
   }, [scopedShifts]);
 
   const monthGrid = useMemo(() => getMonthGrid(selectedDate), [selectedDate]);
-
-  const detailAvailableDoctors = useMemo(() => {
-    if (!detailShift) return [];
-
-    return getAvailableDoctors({
-      shifts,
-      facilityId: detailShift.facilityId,
-      shiftDate: detailShift.shiftDate,
-      startTime: detailShift.startTime,
-      endTime: detailShift.endTime,
-      excludeShiftId: detailShift.id,
-    });
-  }, [detailShift, shifts]);
-
-  const availabilityRows = useMemo(
-    () =>
-      DOCTORS.filter((doctor) => doctor.status === "active").map((doctor) => {
-        const belongsToFacility = doctor.facilityIds.includes(availabilityFacility);
-        const busyShifts = shifts.filter(
-          (shift) =>
-            shift.doctorId === doctor.id &&
-            shift.shiftDate === availabilityDate &&
-            shift.status !== "cancelled" &&
-            shift.status !== "off" &&
-            shiftsOverlap(
-              shift.startTime,
-              shift.endTime,
-              availabilityStart,
-              availabilityEnd,
-            ),
-        );
-
-        return {
-          ...doctor,
-          belongsToFacility,
-          busyShifts,
-          available: belongsToFacility && busyShifts.length === 0,
-        };
-      }),
-    [
-      availabilityDate,
-      availabilityEnd,
-      availabilityFacility,
-      availabilityStart,
-      shifts,
-    ],
-  );
-
-  const availabilityColumns: ColumnsType<(typeof availabilityRows)[number]> = [
-    {
-      title: "Bác sĩ",
-      width: 230,
-      render: (_value, doctor) => (
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
-            <Stethoscope className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <Text strong className="block truncate">
-              {doctor.title} {doctor.name}
-            </Text>
-            <Text type="secondary" className="block truncate text-xs">
-              {doctor.specialty}
-            </Text>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Cơ sở",
-      width: 140,
-      align: "center",
-      render: (_value, doctor) =>
-        doctor.belongsToFacility ? (
-          <Tag color="blue">Có phân công</Tag>
-        ) : (
-          <Tag>Không thuộc cơ sở</Tag>
-        ),
-    },
-    {
-      title: "Ca bị trùng",
-      width: 210,
-      render: (_value, doctor) =>
-        doctor.busyShifts.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {doctor.busyShifts.map((shift) => (
-              <Tag key={shift.id} color="red">
-                {shift.startTime} - {shift.endTime}
-              </Tag>
-            ))}
-          </div>
-        ) : (
-          <Text type="secondary">Không có</Text>
-        ),
-    },
-    {
-      title: "Khả dụng",
-      width: 130,
-      align: "center",
-      render: (_value, doctor) =>
-        doctor.available ? (
-          <Tag color="green">Còn trống</Tag>
-        ) : (
-          <Tag color="red">Không khả dụng</Tag>
-        ),
-    },
-  ];
 
   function openCreate(date = selectedDate) {
     setSelectedDate(date);
@@ -2248,17 +2178,27 @@ export default function DoctorShiftPage() {
     setFormModalOpen(false);
   }
 
-  function handleShiftSaved(shift: DoctorShift, mode: "create" | "update") {
+  function handleShiftSaved(
+    savedShifts: DoctorShift[],
+    mode: "create" | "update",
+  ) {
     if (mode === "create") {
-      setShifts((current) => [...current, shift]);
-      setSelectedDate(shift.shiftDate);
+      setShifts((current) => [...current, ...savedShifts]);
+      setSelectedDate(savedShifts[0]?.shiftDate ?? selectedDate);
       return;
     }
 
+    const updatedShift = savedShifts[0];
+    if (!updatedShift) return;
+
     setShifts((current) =>
-      current.map((item) => (item.id === shift.id ? shift : item)),
+      current.map((item) =>
+        item.id === updatedShift.id ? updatedShift : item,
+      ),
     );
-    setDetailShift((current) => (current?.id === shift.id ? shift : current));
+    setDetailShift((current) =>
+      current?.id === updatedShift.id ? updatedShift : current,
+    );
   }
 
   function confirmDelete() {
@@ -2276,13 +2216,6 @@ export default function DoctorShiftPage() {
     const updatedShift: DoctorShift = {
       ...detailShift,
       doctorId: doctorId ?? null,
-      status: doctorId
-        ? detailShift.status === "available"
-          ? "assigned"
-          : detailShift.status
-        : detailShift.status === "assigned"
-          ? "available"
-          : detailShift.status,
     };
 
     setShifts((current) =>
@@ -2313,7 +2246,6 @@ export default function DoctorShiftPage() {
     setFacilityFilter(undefined);
     setRoomFilter(undefined);
     setDoctorFilter(undefined);
-    setStatusFilter(undefined);
     setShiftTypeFilter(undefined);
   }
 
@@ -2326,14 +2258,14 @@ export default function DoctorShiftPage() {
     },
     {
       title: "Ca trực",
-      width: 170,
+      width: 235,
       render: (_value, shift) => (
         <div>
           <Text strong className="block text-slate-950">
-            {shift.code}
+            {getShiftTypeShortLabel(shift.shiftType)}
           </Text>
-          <Text type="secondary" className="text-xs">
-            {getShiftTypeLabel(shift.shiftType)}
+          <Text type="secondary" className="block text-xs">
+            {shift.startTime} - {shift.endTime} · {shift.code}
           </Text>
         </div>
       ),
@@ -2352,16 +2284,6 @@ export default function DoctorShiftPage() {
             )}
           </Text>
         </div>
-      ),
-    },
-    {
-      title: "Thời gian",
-      width: 130,
-      align: "center",
-      render: (_value, shift) => (
-        <Tag icon={<Clock className="h-3.5 w-3.5" />}>
-          {shift.startTime} - {shift.endTime}
-        </Tag>
       ),
     },
     {
@@ -2444,13 +2366,6 @@ export default function DoctorShiftPage() {
       },
     },
     {
-      title: "Trạng thái",
-      dataIndex: "status",
-      width: 140,
-      align: "center",
-      render: (status: ShiftStatus) => renderShiftStatus(status),
-    },
-    {
       title: "Thao tác",
       key: "actions",
       width: 150,
@@ -2495,7 +2410,7 @@ export default function DoctorShiftPage() {
     <AdminLayout>
       <PageHeader
         title="Doctor Shift Management"
-        description="Quản lý ca trực theo ngày, tuần, tháng; phân công bác sĩ và kiểm tra lịch trống."
+        description="Quản lý ca trực theo ngày, tuần, tháng và phân công một hoặc nhiều bác sĩ."
       />
 
       <div className="mt-6 flex flex-col gap-5">
@@ -2559,15 +2474,6 @@ export default function DoctorShiftPage() {
                   Tháng
                 </Button>
                 <Button
-                  icon={<Users className="h-4 w-4" />}
-                  onClick={() => {
-                    setAvailabilityDate(selectedDate);
-                    setAvailabilityOpen(true);
-                  }}
-                >
-                  Xem bác sĩ trống
-                </Button>
-                <Button
                   type="primary"
                   icon={<Plus className="h-4 w-4" />}
                   onClick={() => openCreate()}
@@ -2577,7 +2483,7 @@ export default function DoctorShiftPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
               <Input
                 allowClear
                 value={keyword}
@@ -2632,19 +2538,15 @@ export default function DoctorShiftPage() {
                 onChange={setShiftTypeFilter}
               />
 
-              <div className="flex gap-2">
-                <Select
-                  allowClear
-                  className="min-w-0 flex-1"
-                  value={statusFilter}
-                  placeholder="Trạng thái"
-                  options={SHIFT_STATUS_OPTIONS}
-                  onChange={setStatusFilter}
-                />
-                <Tooltip title="Xóa bộ lọc">
-                  <Button icon={<X className="h-4 w-4" />} onClick={resetFilters} />
-                </Tooltip>
-              </div>
+              <Tooltip title="Xóa bộ lọc">
+                <Button
+                  block
+                  icon={<X className="h-4 w-4" />}
+                  onClick={resetFilters}
+                >
+                  Xóa bộ lọc
+                </Button>
+              </Tooltip>
             </div>
           </div>
         </Card>
@@ -2729,7 +2631,7 @@ export default function DoctorShiftPage() {
                             key={shift.id}
                             type="button"
                             className={`w-full truncate rounded-md border px-2 py-1.5 text-left text-[11px] font-medium ${getShiftAccent(
-                              shift.status,
+                              shift.shiftType,
                             )}`}
                             title={`${shift.startTime} - ${shift.endTime} · ${
                               doctor?.name ?? "Chưa phân công"
@@ -2841,7 +2743,7 @@ export default function DoctorShiftPage() {
                     <Title level={3} className="!mb-0 !text-slate-950">
                       {detailShift.code}
                     </Title>
-                    {renderShiftStatus(detailShift.status)}
+                    <Tag color="blue">{getShiftTypeLabel(detailShift.shiftType)}</Tag>
                   </div>
                   <Text type="secondary" className="mt-1 block">
                     {formatLongDate(detailShift.shiftDate)} · {detailShift.startTime} -{" "}
@@ -2938,7 +2840,7 @@ export default function DoctorShiftPage() {
                   optionFilterProp="label"
                   className="w-full"
                   value={detailShift.doctorId ?? undefined}
-                  placeholder="Chọn bác sĩ còn trống"
+                  placeholder="Chọn bác sĩ phụ trách"
                   options={DOCTORS.filter((doctor) => doctor.status === "active")
                     .filter((doctor) => doctor.facilityIds.includes(detailShift.facilityId))
                     .map((doctor) => {
@@ -2955,29 +2857,13 @@ export default function DoctorShiftPage() {
                         value: doctor.id,
                         disabled: busy,
                         label: `${doctor.title} ${doctor.name} · ${doctor.specialty}${
-                          busy ? " · Trùng ca" : " · Còn trống"
+                          busy ? " · Trùng ca" : ""
                         }`,
                       };
                     })}
                   onChange={assignDoctor}
                 />
 
-                <div className="mt-4">
-                  <p className="mb-2 text-sm font-semibold text-slate-700">
-                    Bác sĩ có thể nhận ca này
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {detailAvailableDoctors.length > 0 ? (
-                      detailAvailableDoctors.map((doctor) => (
-                        <Tag key={doctor.id} color="green">
-                          {doctor.title} {doctor.name}
-                        </Tag>
-                      ))
-                    ) : (
-                      <Text type="secondary">Không còn bác sĩ phù hợp.</Text>
-                    )}
-                  </div>
-                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 p-4">
@@ -3034,87 +2920,6 @@ export default function DoctorShiftPage() {
             </div>
           </div>
         ) : null}
-      </Modal>
-
-      <Modal
-        open={availabilityOpen}
-        centered
-        width={900}
-        title="Kiểm tra bác sĩ còn trống"
-        footer={
-          <Button type="primary" onClick={() => setAvailabilityOpen(false)}>
-            Đóng
-          </Button>
-        }
-        onCancel={() => setAvailabilityOpen(false)}
-      >
-        <div className="mb-4 grid gap-3 md:grid-cols-4">
-          <div>
-            <Text strong className="mb-1 block text-sm">
-              Ngày
-            </Text>
-            <Input
-              type="date"
-              value={availabilityDate}
-              onChange={(event) => setAvailabilityDate(event.target.value)}
-            />
-          </div>
-          <div>
-            <Text strong className="mb-1 block text-sm">
-              Bắt đầu
-            </Text>
-            <Input
-              type="time"
-              value={availabilityStart}
-              onChange={(event) => setAvailabilityStart(event.target.value)}
-            />
-          </div>
-          <div>
-            <Text strong className="mb-1 block text-sm">
-              Kết thúc
-            </Text>
-            <Input
-              type="time"
-              value={availabilityEnd}
-              onChange={(event) => setAvailabilityEnd(event.target.value)}
-            />
-          </div>
-          <div>
-            <Text strong className="mb-1 block text-sm">
-              Cơ sở
-            </Text>
-            <Select
-              className="w-full"
-              value={availabilityFacility}
-              options={FACILITIES.map((facility) => ({
-                value: facility.id,
-                label: facility.name,
-              }))}
-              onChange={setAvailabilityFacility}
-            />
-          </div>
-        </div>
-
-        <Alert
-          type="success"
-          showIcon
-          className="mb-4"
-          title={`${availabilityRows.filter((doctor) => doctor.available).length} bác sĩ có thể nhận ca`}
-          description={`Khung giờ ${availabilityStart} - ${availabilityEnd}, ${formatShortDate(
-            availabilityDate,
-          )}.`}
-        />
-
-        <Table
-          rowKey="id"
-          size="middle"
-          columns={availabilityColumns}
-          dataSource={[...availabilityRows].sort(
-            (first, second) => Number(second.available) - Number(first.available),
-          )}
-          pagination={false}
-          scroll={{ x: 760 }}
-        />
       </Modal>
 
       <Modal
