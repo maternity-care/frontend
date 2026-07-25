@@ -7,7 +7,10 @@ import type {
   ForgotPasswordResponse,
   LoginInput,
   RegisterInput,
+  RegisterResponse,
+  ResendOtpInput,
   ResetPasswordInput,
+  VerifyOtpInput,
 } from "./auth.types";
 
 function normalizeAuthResponse(
@@ -109,10 +112,26 @@ export function resetPassword(input: ResetPasswordInput) {
   return unwrapApiResponse<null>(apiClient.post("/auth/reset-password", input));
 }
 
-export async function register(input: RegisterInput) {
-  const response = await unwrapApiResponse<BackendAuthResponse>(
+export function register(input: RegisterInput) {
+  return unwrapApiResponse<RegisterResponse>(
     apiClient.post("/auth/register", input),
   );
+}
 
-  return normalizeAuthResponse(response.data, "user", response.message);
+export function resendOtp(input: ResendOtpInput) {
+  return unwrapApiResponse<unknown>(
+    apiClient.post("/auth/resend-otp", input),
+  );
+}
+
+export async function verifyOtp(input: VerifyOtpInput) {
+  const response = await unwrapApiResponse<BackendAuthResponse>(
+    apiClient.post("/auth/verify-otp", input),
+  );
+
+  return normalizeAuthResponse(
+    response.data,
+    "user",
+    response.message,
+  );
 }
