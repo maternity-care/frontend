@@ -209,14 +209,35 @@ export function RoomTypeManagementModal({
     onChanged();
   }
 
+  useEffect(() => {
+    if (!formOpen) return;
+
+    const timer = window.setTimeout(() => {
+      if (editing) {
+        form.setFieldsValue({
+          name: editing.name,
+          description:
+            editing.description,
+          status: editing.status,
+        });
+        return;
+      }
+
+      form.resetFields();
+      form.setFieldsValue({
+        name: "",
+        description: "",
+        status: "active",
+      });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [editing, form, formOpen]);
+
   function openCreate() {
     setEditing(null);
-    form.resetFields();
-    form.setFieldsValue({
-      name: "",
-      description: "",
-      status: "active",
-    });
     setFormOpen(true);
   }
 
@@ -230,12 +251,6 @@ export function RoomTypeManagementModal({
         );
 
       setEditing(detail);
-      form.setFieldsValue({
-        name: detail.name,
-        description:
-          detail.description,
-        status: detail.status,
-      });
       setFormOpen(true);
     } catch (loadError) {
       messageApi.error(
@@ -249,7 +264,6 @@ export function RoomTypeManagementModal({
 
     setFormOpen(false);
     setEditing(null);
-    form.resetFields();
   }
 
   async function handleSubmit(

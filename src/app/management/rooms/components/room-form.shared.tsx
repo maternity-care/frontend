@@ -238,7 +238,7 @@ export function RoomFormModalBase({
 
       void getRoomTypeLookup({
         status: "active",
-        limit: 100,
+        limit: 30,
       })
         .then((data) => {
           const next = [...data];
