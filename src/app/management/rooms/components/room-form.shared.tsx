@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import type { ReactNode } from "react";
 import {
   Alert,
   App,
@@ -111,6 +112,34 @@ function getErrorMessage(error: unknown) {
   }
 
   return "Đã có lỗi xảy ra. Vui lòng thử lại.";
+}
+
+function PreviewLine({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value?: ReactNode;
+}) {
+  return (
+    <div className="flex gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+      <div className="mt-0.5 text-slate-400">
+        {icon}
+      </div>
+
+      <div className="min-w-0">
+        <p className="mb-0 text-[11px] font-semibold uppercase text-slate-400">
+          {label}
+        </p>
+
+        <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">
+          {value || "Chưa nhập"}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function hasChanges(
