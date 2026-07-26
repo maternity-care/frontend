@@ -531,41 +531,12 @@ function ClinicRoomManagementContent() {
           />
         ) : null}
 
-        <Card className="management-filter">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
-              <Building2 className="h-5 w-5" />
-            </div>
-
-            <div>
-              <p className="mb-1 text-sm font-semibold uppercase text-sky-700">
-                {ROOM_MESSAGES.FACILITY}
-              </p>
-
-              <Title level={3} className="!mb-0 !text-slate-950">
-                {isFacilityFiltered
-                  ? `${ROOM_MESSAGES.ROOMS_AT_FACILITY_PREFIX} ${
-                      facilityNameFromQuery ||
-                      ROOM_MESSAGES.SELECTED_FACILITY_FALLBACK
-                    }`
-                  : ROOM_MESSAGES.ALL_ROOMS_TITLE}
-              </Title>
-
-              <Text className="text-slate-500">
-                {isFacilityFiltered
-                  ? ROOM_MESSAGES.FILTERED_FACILITY_DESCRIPTION
-                  : ROOM_MESSAGES.ALL_ROOMS_DESCRIPTION}
-              </Text>
-            </div>
-          </div>
-        </Card>
-
         <div className="order-2">
         <TableFilter
           columns={[
-            { field: "name", label: ROOM_MESSAGES.SEARCH_PLACEHOLDER, type: "text", contains: true },
-            { field: "roomType", label: ROOM_MESSAGES.ROOM_TYPE_PLACEHOLDER, type: "select", options: roomTypeOptions, width: 180 },
-            { field: "status", label: ROOM_MESSAGES.STATUS_PLACEHOLDER, type: "select", options: statusOptions, width: 180 },
+            { field: "name", label: ROOM_MESSAGES.SEARCH_PLACEHOLDER, type: "text", contains: true, width: 420 },
+            { field: "roomType", label: ROOM_MESSAGES.ROOM_TYPE_PLACEHOLDER, type: "select", options: roomTypeOptions, width: 300 },
+            { field: "status", label: ROOM_MESSAGES.STATUS_PLACEHOLDER, type: "select", options: statusOptions, width: 300 },
           ]}
           values={{ name: query, roomType: roomTypeFilter, status: statusFilter }}
           clearLabel={ROOM_MESSAGES.CLEAR_FILTERS}
