@@ -10,9 +10,9 @@ import {
   Button,
   Empty,
   Input,
-  List,
   Modal,
   Select,
+  Spin,
   Tag,
   Typography,
 } from "antd";
@@ -234,76 +234,77 @@ export function RoomQuickLookupModal({
       ) : null}
 
       <div className="mt-4 max-h-[440px] overflow-y-auto rounded-xl border border-slate-200">
-        <List
-          loading={loading}
-          dataSource={items}
-          locale={{
-            emptyText: (
+        <Spin spinning={loading}>
+          {items.length === 0 && !loading ? (
+            <div className="flex min-h-[220px] items-center justify-center px-4 py-8">
               <Empty
                 image={
                   Empty.PRESENTED_IMAGE_SIMPLE
                 }
                 description="Không có phòng phù hợp."
               />
-            ),
-          }}
-          renderItem={(room) => (
-            <List.Item
-              className="cursor-pointer px-4 transition hover:bg-slate-50"
-              onClick={() => {
-                onSelectRoom(room.id);
-                handleClose();
-              }}
-            >
-              <div className="flex w-full items-start justify-between gap-4">
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
-                    <DoorOpen className="h-4 w-4" />
-                  </span>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200">
+              {items.map((room) => (
+                <button
+                  key={room.id}
+                  type="button"
+                  className="flex w-full items-start justify-between gap-4 px-4 py-3 text-left transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                  onClick={() => {
+                    onSelectRoom(room.id);
+                    handleClose();
+                  }}
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                      <DoorOpen className="h-4 w-4" />
+                    </span>
 
-                  <div className="min-w-0">
-                    <Text
-                      strong
-                      className="block truncate"
-                    >
-                      {room.name}
-                    </Text>
+                    <div className="min-w-0">
+                      <Text
+                        strong
+                        className="block truncate"
+                      >
+                        {room.name}
+                      </Text>
 
-                    <Text
-                      type="secondary"
-                      className="block truncate text-xs"
-                    >
-                      {room.roomTypeName} ·{" "}
-                      {room.floor}
-                    </Text>
+                      <Text
+                        type="secondary"
+                        className="block truncate text-xs"
+                      >
+                        {room.roomTypeName} ·{" "}
+                        {room.floor}
+                      </Text>
 
-                    <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                      <Building2 className="h-3.5 w-3.5" />
+                      <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                        <Building2 className="h-3.5 w-3.5" />
 
-                      <span className="truncate">
-                        {room.facilityName ||
-                          facilityById.get(
-                            room.facilityId,
-                          )?.name ||
-                          room.facilityId}
-                      </span>
+                        <span className="truncate">
+                          {room.facilityName ||
+                            facilityById.get(
+                              room.facilityId,
+                            )?.name ||
+                            room.facilityId}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {room.status === "active" ? (
-                  <Tag color="green">
-                    Hoạt động
-                  </Tag>
-                ) : (
-                  <Tag>
-                    Ngừng hoạt động
-                  </Tag>
-                )}
-              </div>
-            </List.Item>
+                  {room.status === "active" ? (
+                    <Tag color="green">
+                      Hoạt động
+                    </Tag>
+                  ) : (
+                    <Tag>
+                      Ngừng hoạt động
+                    </Tag>
+                  )}
+                </button>
+              ))}
+            </div>
           )}
-        />
+        </Spin>
       </div>
 
       <div className="mt-4 flex justify-end">
