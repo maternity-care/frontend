@@ -32,7 +32,14 @@ type DoctorShiftEditModalProps = {
   ) => void;
 };
 
-export function DoctorShiftEditModal({
+type DoctorShiftEditModalContentProps = Omit<
+  DoctorShiftEditModalProps,
+  "shift"
+> & {
+  shift: DoctorShiftItem;
+};
+
+function DoctorShiftEditModalContent({
   open,
   shift,
   shifts,
@@ -41,16 +48,18 @@ export function DoctorShiftEditModal({
   doctors,
   onClose,
   onUpdated,
-}: DoctorShiftEditModalProps) {
-  const editingShift = shift;
-
-  if (!editingShift) return null;
-
+}: DoctorShiftEditModalContentProps) {
   async function handleUpdate({
     payloads,
     slotById,
   }: ValidatedShiftForm) {
     const firstPayload = payloads[0];
+
+    if (!firstPayload) {
+      throw new Error(
+        "Không tìm thấy dữ liệu ca trực cần cập nhật.",
+      );
+    }
 
     const updatePayload: UpdateDoctorShiftInput = {
       doctorId: firstPayload.doctorId,
@@ -63,7 +72,7 @@ export function DoctorShiftEditModal({
     };
 
     const response = await updateDoctorShift(
-      editingShift.id,
+      shift.id,
       updatePayload,
     );
 
@@ -71,11 +80,11 @@ export function DoctorShiftEditModal({
 
     try {
       const detail = await getDoctorShift(
-        response.data.id || editingShift.id,
+        response.data.id || shift.id,
       );
 
       updatedShift = mergeShiftDisplayData({
-        original: editingShift,
+        original: shift,
         response: response.data,
         detail,
         payload: firstPayload,
@@ -86,7 +95,7 @@ export function DoctorShiftEditModal({
       });
     } catch {
       updatedShift = mergeShiftDisplayData({
-        original: editingShift,
+        original: shift,
         response: response.data,
         payload: firstPayload,
         doctors,
@@ -105,13 +114,28 @@ export function DoctorShiftEditModal({
     <DoctorShiftFormModalBase
       mode="edit"
       open={open}
-      editingShift={editingShift}
+      editingShift={shift}
       shifts={shifts}
       facilities={facilities}
       rooms={rooms}
       doctors={doctors}
       onClose={onClose}
       onSubmitValidated={handleUpdate}
+    />
+  );
+}
+
+export function DoctorShiftEditModal(
+  props: DoctorShiftEditModalProps,
+) {
+  if (!props.shift) {
+    return null;
+  }
+
+  return (
+    <DoctorShiftEditModalContent
+      {...props}
+      shift={props.shift}
     />
   );
 }
