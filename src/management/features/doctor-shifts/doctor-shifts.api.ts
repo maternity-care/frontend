@@ -336,7 +336,10 @@ export function getDoctorAvailability(
 export async function getWeeklyDoctorShifts(
   params?: GetWeeklyDoctorShiftsParams,
 ): Promise<DoctorShiftItem[]> {
-  const data = await unwrapApiData<BackendDoctorShift[]>(
+  const data = await unwrapApiData<
+    | BackendDoctorShift[]
+    | { days?: Array<{ shifts?: BackendDoctorShift[] }> }
+  >(
     apiClient.get(`${ENDPOINT}/weekly`, {
       params: compactObject({
         facilityId: params?.facilityId?.trim(),
@@ -346,9 +349,13 @@ export async function getWeeklyDoctorShifts(
     }),
   );
 
-  return Array.isArray(data)
-    ? data.map(normalizeDoctorShift)
-    : [];
+  if (Array.isArray(data)) {
+    return data.map(normalizeDoctorShift);
+  }
+
+  return (data.days ?? [])
+    .flatMap((day) => day.shifts ?? [])
+    .map(normalizeDoctorShift);
 }
 
 export const doctorShiftsApi = {
