@@ -10,7 +10,6 @@ import {
   Modal,
   Row,
   Select,
-  Switch,
   Typography,
 } from "antd";
 import {
@@ -37,7 +36,6 @@ export type ShiftSlotFormValues = {
   name: string;
   startTime: string;
   endTime: string;
-  isOvernight: boolean;
   status: ShiftSlotStatus;
 };
 
@@ -101,17 +99,33 @@ function timeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
+function isOvernightTime(
+  startTime: string,
+  endTime: string,
+) {
+  return (
+    Boolean(startTime) &&
+    Boolean(endTime) &&
+    timeToMinutes(endTime) <=
+      timeToMinutes(startTime)
+  );
+}
+
 function hasSlotChanges(
   values: ShiftSlotFormValues,
   editingSlot: ShiftSlot,
 ) {
+  const isOvernight = isOvernightTime(
+    values.startTime,
+    values.endTime,
+  );
+
   return (
     values.facilityId !== editingSlot.facilityId ||
     values.name.trim() !== editingSlot.name ||
     values.startTime !== editingSlot.startTime ||
     values.endTime !== editingSlot.endTime ||
-    values.isOvernight !==
-      editingSlot.isOvernight ||
+    isOvernight !== editingSlot.isOvernight ||
     values.status !== editingSlot.status
   );
 }
@@ -136,6 +150,15 @@ export function ShiftSlotFormModalBase({
     string | null
   >(null);
 
+  const watchedStartTime =
+    Form.useWatch("startTime", form) ?? "";
+  const watchedEndTime =
+    Form.useWatch("endTime", form) ?? "";
+  const isOvernight = isOvernightTime(
+    watchedStartTime,
+    watchedEndTime,
+  );
+
   useEffect(() => {
     if (!open) return;
 
@@ -148,8 +171,6 @@ export function ShiftSlotFormModalBase({
           name: editingSlot.name,
           startTime: editingSlot.startTime,
           endTime: editingSlot.endTime,
-          isOvernight:
-            editingSlot.isOvernight,
           status: editingSlot.status,
         });
         return;
@@ -157,7 +178,6 @@ export function ShiftSlotFormModalBase({
 
       form.resetFields();
       form.setFieldsValue({
-        isOvernight: false,
         status: "active",
       });
     }, 0);
@@ -171,22 +191,6 @@ export function ShiftSlotFormModalBase({
     values: ShiftSlotFormValues,
   ) {
     setError(null);
-
-    if (
-      !values.isOvernight &&
-      timeToMinutes(values.endTime) <=
-        timeToMinutes(values.startTime)
-    ) {
-      form.setFields([
-        {
-          name: "endTime",
-          errors: [
-            "Giờ kết thúc phải sau giờ bắt đầu khi không phải ca qua đêm.",
-          ],
-        },
-      ]);
-      return;
-    }
 
     if (
       mode === "edit" &&
@@ -249,8 +253,10 @@ export function ShiftSlotFormModalBase({
           name: values.name.trim(),
           startTime: values.startTime,
           endTime: values.endTime,
-          isOvernight:
-            values.isOvernight,
+          isOvernight: isOvernightTime(
+            values.startTime,
+            values.endTime,
+          ),
           status: values.status,
         });
 
@@ -432,20 +438,7 @@ export function ShiftSlotFormModalBase({
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
-            <Form.Item
-              name="isOvernight"
-              label="Ca qua đêm"
-              valuePropName="checked"
-            >
-              <Switch
-                checkedChildren="Có"
-                unCheckedChildren="Không"
-              />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={12}>
+         <Col xs={24} md={12}>
             <Form.Item
               name="status"
               label="Trạng thái"
@@ -471,6 +464,37 @@ export function ShiftSlotFormModalBase({
               />
             </Form.Item>
           </Col>
+
+          <Col xs={24}>
+            <div className="mb-6">
+              <Text className="mb-2 block text-sm font-medium text-slate-700">
+                Loại khung ca
+              </Text>
+
+              <Alert
+                type={
+                  isOvernight
+                    ? "warning"
+                    : "info"
+                }
+                showIcon
+                title={
+                  isOvernight
+                    ? "Ca qua đêm"
+                    : "Ca trong ngày"
+                }
+                description={
+                  watchedStartTime &&
+                  watchedEndTime
+                    ? isOvernight
+                      ? `Khung ca bắt đầu lúc ${watchedStartTime} và kết thúc lúc ${watchedEndTime} của ngày hôm sau.`
+                      : `Khung ca bắt đầu lúc ${watchedStartTime} và kết thúc lúc ${watchedEndTime} trong cùng ngày.`
+                    : "Chọn giờ bắt đầu và giờ kết thúc để hệ thống tự xác định."
+                }
+              />
+            </div>
+          </Col>
+
         </Row>
       </Form>
     </Modal>
