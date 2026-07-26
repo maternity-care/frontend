@@ -25,7 +25,7 @@ import {
   createFacility,
   deleteFacilities,
   deleteFacility,
-  getFacilities,
+  getFacilitiesPage,
 } from "@/management/features/facilities/facilities.api";
 import type {
   Facility,
@@ -85,6 +85,11 @@ export default function FacilityManagementPage() {
   );
 
   const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalFacilities, setTotalFacilities] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<
@@ -108,27 +113,44 @@ export default function FacilityManagementPage() {
   const [tableLoading, setTableLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reloadFacilities = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const reloadFacilities = useCallback(
+    async (page = currentPage, limit = pageSize) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const data = await getFacilities({
-        search: query,
-        city: cityFilter,
-        status: statusFilter,
-      });
+      try {
+        const result = await getFacilitiesPage({
+          search: query,
+          city: cityFilter,
+          status: statusFilter,
+          page,
+          limit,
+        });
 
-      setFacilities(data);
-      setSelectedFacilityIds((current) =>
-        current.filter((id) => data.some((facility) => facility.id === id)),
-      );
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [query, cityFilter, statusFilter]);
+        setFacilities(result.items);
+        setTotalFacilities(result.total);
+        setTotalPages(result.totalPages);
+        setCurrentPage(result.page);
+        setPageSize(result.limit);
+        setSelectedFacilityIds((current) =>
+          current.filter((id) =>
+            result.items.some((facility) => facility.id === id),
+          ),
+        );
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      cityFilter,
+      currentPage,
+      pageSize,
+      query,
+      statusFilter,
+    ],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -185,7 +207,8 @@ export default function FacilityManagementPage() {
         status: values.status,
       });
 
-      await reloadFacilities();
+      setCurrentPage(1);
+      await reloadFacilities(1, pageSize);
     } catch (err) {
       setError(getErrorMessage(err));
       throw err;
@@ -251,15 +274,12 @@ export default function FacilityManagementPage() {
     setError(null);
 
     try {
+      const deletedCount =
+        target.mode === "single" ? 1 : target.ids.length;
+
       if (target.mode === "single") {
         await deleteFacility(target.facility.id, reason);
 
-        setFacilities((current) =>
-          current.filter((facility) => facility.id !== target.facility.id),
-        );
-        setSelectedFacilityIds((current) =>
-          current.filter((id) => id !== target.facility.id),
-        );
         setDetailFacility((current) =>
           current?.id === target.facility.id ? null : current,
         );
@@ -269,10 +289,6 @@ export default function FacilityManagementPage() {
       } else {
         await deleteFacilities(target.ids, reason);
 
-        setFacilities((current) =>
-          current.filter((facility) => !target.ids.includes(facility.id)),
-        );
-        setSelectedFacilityIds([]);
         setDetailFacility((current) =>
           current && target.ids.includes(current.id) ? null : current,
         );
@@ -281,9 +297,23 @@ export default function FacilityManagementPage() {
         );
       }
 
+      const remainingTotal = Math.max(
+        0,
+        totalFacilities - deletedCount,
+      );
+      const lastAvailablePage = Math.max(
+        1,
+        Math.ceil(remainingTotal / pageSize),
+      );
+      const nextPage = Math.min(currentPage, lastAvailablePage);
+
+      setSelectedFacilityIds([]);
+      setCurrentPage(nextPage);
       setDeleteConfirm({ open: false });
       setDeleteReason("");
       setDeleteReasonTouched(false);
+
+      await reloadFacilities(nextPage, pageSize);
 
       modal.success({
         title: FACILITY_MESSAGES.DELETE_SUCCESS_TITLE,
@@ -315,7 +345,8 @@ export default function FacilityManagementPage() {
       title: FACILITY_MESSAGES.STT,
       width: 64,
       align: "center",
-      render: (_value, _record, index) => index + 1,
+      render: (_value, _record, index) =>
+        (currentPage - 1) * pageSize + index + 1,
     },
     {
       title: FACILITY_MESSAGES.FACILITY_NAME,
@@ -507,6 +538,8 @@ export default function FacilityManagementPage() {
             }}
             clearLabel={FACILITY_MESSAGES.CLEAR_FILTERS}
             onChange={(values) => {
+              setCurrentPage(1);
+              setSelectedFacilityIds([]);
               setQuery(String(values.name ?? ""));
               setCityFilter(
                 values.province ? String(values.province) : undefined,
@@ -520,23 +553,26 @@ export default function FacilityManagementPage() {
           <Card className="border-slate-200 bg-white">
             <Statistic
               title={FACILITY_MESSAGES.TOTAL_FACILITIES}
-              value={facilities.length}
+              value={totalFacilities}
             />
           </Card>
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title={FACILITY_MESSAGES.ACTIVE_FACILITIES}
+              title={`${FACILITY_MESSAGES.ACTIVE_FACILITIES} (trang hiện tại)`}
               value={activeFacilities}
             />
           </Card>
           <Card className="border-red-100 bg-red-50/60">
             <Statistic
-              title={FACILITY_MESSAGES.SUSPENDED_FACILITIES}
+              title={`${FACILITY_MESSAGES.SUSPENDED_FACILITIES} (trang hiện tại)`}
               value={suspendedFacilities}
             />
           </Card>
           <Card className="border-blue-100 bg-blue-50/60">
-            <Statistic title="Đang mở cửa" value={openFacilities} />
+            <Statistic
+              title="Đang mở cửa (trang hiện tại)"
+              value={openFacilities}
+            />
           </Card>
         </div>
 
@@ -549,7 +585,7 @@ export default function FacilityManagementPage() {
                 {FACILITY_MESSAGES.FACILITY_LIST_TITLE}
               </p>
               <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Tạm thời tải toàn bộ danh sách; chưa sử dụng phân trang server.
+                Phân trang từ máy chủ · Trang {currentPage}/{Math.max(totalPages, 1)}.
               </p>
             </div>
           }
@@ -587,7 +623,27 @@ export default function FacilityManagementPage() {
             columns={columns}
             dataSource={facilities}
             scroll={{ x: 1500 }}
-            pagination={false}
+            pagination={{
+              current: currentPage,
+              pageSize,
+              total: totalFacilities,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              showTotal: (total, range) =>
+                `${range[0]}-${range[1]} / ${total} cơ sở`,
+              onChange: (page, nextPageSize) => {
+                setSelectedFacilityIds([]);
+
+                if (nextPageSize !== pageSize) {
+                  setPageSize(nextPageSize);
+                  setCurrentPage(1);
+                  return;
+                }
+
+                setCurrentPage(page);
+              },
+            }}
             onRow={(record) => ({
               className: "cursor-pointer",
               onClick: (event) => {

@@ -120,6 +120,14 @@ export interface BackendFacility {
   updatedAt: string;
 }
 
+export interface BackendFacilityListResponse {
+  items: BackendFacility[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface Facility {
   id: string;
   name: string;
@@ -150,11 +158,18 @@ export interface Facility {
   operatingHourGroups: BackendOperatingHourGroup[];
   closureDays: BackendFacilityClosureDay[];
 
-  /** Chuỗi tổng hợp để hiển thị nhanh trong bảng. */
   workingHours: string;
 
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface FacilityListResult {
+  items: Facility[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface CreateFacilityInput {

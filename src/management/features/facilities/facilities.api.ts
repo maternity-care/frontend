@@ -1,11 +1,13 @@
 import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
 import type {
   BackendFacility,
+  BackendFacilityListResponse,
   BackendFacilityLookupItem,
   BackendOperatingHour,
   BackendOperatingHourGroup,
   CreateFacilityInput,
   Facility,
+  FacilityListResult,
   FacilityLookupItem,
   FacilityOperatingHoursPreview,
   FacilityOperatingHoursResult,
@@ -19,11 +21,10 @@ import type {
   UpdateFacilityOperatingHoursInput,
 } from "./facilities.types";
 
-/**
- * BE giới hạn tối đa 100 bản ghi mỗi request.
- * Frontend tạm thời tự tải tuần tự các trang cho tới khi nhận trang cuối,
- * chờ BE bổ sung metadata phân trang.
- */
+/** Số bản ghi mặc định trên một trang của màn quản lý cơ sở. */
+export const DEFAULT_FACILITY_PAGE_SIZE = 20;
+
+/** Giới hạn tối đa backend cho phép trong một request. */
 export const FACILITY_PAGE_LIMIT = 100;
 const MAX_FACILITY_PAGES = 1000;
 
@@ -196,17 +197,28 @@ function toUpdatePayload(input: UpdateFacilityInput) {
   });
 }
 
-function clampLimit(limit?: number) {
-  if (!limit || limit < 1) return FACILITY_PAGE_LIMIT;
+function clampLimit(
+  limit?: number,
+  fallback = FACILITY_PAGE_LIMIT,
+) {
+  const normalizedLimit = Math.trunc(limit ?? fallback);
 
-  return Math.min(limit, FACILITY_PAGE_LIMIT);
+  if (!Number.isFinite(normalizedLimit) || normalizedLimit < 1) {
+    return fallback;
+  }
+
+  return Math.min(normalizedLimit, FACILITY_PAGE_LIMIT);
 }
 
-function toQueryParams(
-  params: GetFacilitiesParams | undefined,
-  page: number,
-  limit = FACILITY_PAGE_LIMIT,
-) {
+function normalizePage(page?: number) {
+  const normalizedPage = Math.trunc(page ?? 1);
+
+  return Number.isFinite(normalizedPage) && normalizedPage > 0
+    ? normalizedPage
+    : 1;
+}
+
+function toQueryParams(params?: GetFacilitiesParams) {
   const search =
     params?.rawSearch?.trim() || params?.search?.trim() || undefined;
 
@@ -215,53 +227,97 @@ function toQueryParams(
     city: params?.city?.trim() || undefined,
     ownerId: params?.ownerId?.trim() || undefined,
     status: params?.status ? toBackendStatus(params.status) : undefined,
-    page,
-    limit: clampLimit(limit),
+    page: normalizePage(params?.page),
+    limit: clampLimit(params?.limit, DEFAULT_FACILITY_PAGE_SIZE),
   });
 }
 
-const FACILITY_LIST_KEYS = [
-  "data",
+const FACILITY_ITEM_KEYS = [
   "items",
   "facilities",
   "results",
   "rows",
+  "data",
 ] as const;
 
-/**
- * unwrapApiData của project có thể trả về mảng trực tiếp hoặc một object
- * chứa danh sách, tùy theo cấu trúc response thực tế của BE.
- * Hàm này chuẩn hóa các dạng response phổ biến về BackendFacility[].
- */
-function extractFacilityList(value: unknown, depth = 0): BackendFacility[] {
-  if (Array.isArray(value)) {
-    return value as BackendFacility[];
+const FACILITY_CONTAINER_KEYS = ["data", "result", "payload"] as const;
+
+function toNonNegativeInteger(value: unknown, fallback: number) {
+  const normalizedValue =
+    typeof value === "number" ? value : Number(value);
+
+  if (!Number.isFinite(normalizedValue) || normalizedValue < 0) {
+    return fallback;
   }
 
-  if (!value || typeof value !== "object" || depth > 3) {
+  return Math.trunc(normalizedValue);
+}
+
+
+function extractFacilityPage(
+  value: unknown,
+  fallbackPage: number,
+  fallbackLimit: number,
+  depth = 0,
+): BackendFacilityListResponse {
+  if (Array.isArray(value)) {
+    const total = value.length;
+
+    return {
+      items: value as BackendFacility[],
+      total,
+      page: fallbackPage,
+      limit: fallbackLimit,
+      totalPages: total === 0 ? 0 : Math.ceil(total / fallbackLimit),
+    };
+  }
+
+  if (!value || typeof value !== "object" || depth > 4) {
     throw new Error("Dữ liệu danh sách cơ sở từ máy chủ không đúng định dạng.");
   }
 
   const record = value as Record<string, unknown>;
 
-  for (const key of FACILITY_LIST_KEYS) {
+  for (const key of FACILITY_ITEM_KEYS) {
     const candidate = record[key];
 
-    if (Array.isArray(candidate)) {
-      return candidate as BackendFacility[];
-    }
+    if (!Array.isArray(candidate)) continue;
+
+    const items = candidate as BackendFacility[];
+    const total = toNonNegativeInteger(record.total, items.length);
+    const page = Math.max(1, toNonNegativeInteger(record.page, fallbackPage));
+    const limit = Math.max(
+      1,
+      toNonNegativeInteger(record.limit, fallbackLimit),
+    );
+    const calculatedTotalPages =
+      total === 0 ? 0 : Math.ceil(total / limit);
+    const totalPages = toNonNegativeInteger(
+      record.totalPages,
+      calculatedTotalPages,
+    );
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
-  // Hỗ trợ response lồng nhiều lớp, ví dụ:
-  // AxiosResponse -> data -> ApiResponse -> data -> Facility[].
-  for (const key of FACILITY_LIST_KEYS) {
+  for (const key of FACILITY_CONTAINER_KEYS) {
     const candidate = record[key];
 
     if (candidate && typeof candidate === "object") {
       try {
-        return extractFacilityList(candidate, depth + 1);
+        return extractFacilityPage(
+          candidate,
+          fallbackPage,
+          fallbackLimit,
+          depth + 1,
+        );
       } catch {
-        // Thử tiếp key kế tiếp.
       }
     }
   }
@@ -309,45 +365,78 @@ function normalizeOperatingHoursPayload(
   };
 }
 
+export async function getFacilitiesPage(
+  params?: GetFacilitiesParams,
+): Promise<FacilityListResult> {
+  const requestedPage = normalizePage(params?.page);
+  const requestedLimit = clampLimit(
+    params?.limit,
+    DEFAULT_FACILITY_PAGE_SIZE,
+  );
+
+  const rawData = await unwrapApiData<unknown>(
+    apiClient.get("/management/facilities", {
+      params: toQueryParams({
+        ...params,
+        page: requestedPage,
+        limit: requestedLimit,
+      }),
+    }),
+  );
+
+  const pageData = extractFacilityPage(
+    rawData,
+    requestedPage,
+    requestedLimit,
+  );
+
+  return {
+    items: pageData.items.map(normalizeFacility),
+    total: pageData.total,
+    page: pageData.page,
+    limit: pageData.limit,
+    totalPages: pageData.totalPages,
+  };
+}
+
 export async function getFacilities(params?: GetFacilitiesParams) {
-  const facilities: BackendFacility[] = [];
+  const facilities: Facility[] = [];
   const loadedFacilityIds = new Set<string>();
 
-  for (let page = 1; page <= MAX_FACILITY_PAGES; page += 1) {
-    const rawPageData = await unwrapApiData<unknown>(
-      apiClient.get("/management/facilities", {
-        params: toQueryParams(params, page),
-      }),
-    );
+  const firstPage = await getFacilitiesPage({
+    ...params,
+    page: 1,
+    limit: FACILITY_PAGE_LIMIT,
+  });
 
-    const pageData = extractFacilityList(rawPageData);
-    let addedCount = 0;
-
-    for (const facility of pageData) {
+  const appendItems = (items: Facility[]) => {
+    for (const facility of items) {
       if (loadedFacilityIds.has(facility.id)) continue;
 
       loadedFacilityIds.add(facility.id);
       facilities.push(facility);
-      addedCount += 1;
     }
+  };
 
-    // Trang cuối có ít hơn 100 bản ghi hoặc BE không áp dụng page và
-    // trả lại đúng dữ liệu của trang trước đó.
-    if (
-      pageData.length < FACILITY_PAGE_LIMIT ||
-      (pageData.length > 0 && addedCount === 0)
-    ) {
-      break;
-    }
+  appendItems(firstPage.items);
 
-    if (page === MAX_FACILITY_PAGES) {
-      throw new Error(
-        "Không thể tải hết danh sách cơ sở vì vượt quá giới hạn an toàn.",
-      );
-    }
+  if (firstPage.totalPages > MAX_FACILITY_PAGES) {
+    throw new Error(
+      "Không thể tải hết danh sách cơ sở vì vượt quá giới hạn an toàn.",
+    );
   }
 
-  return facilities.map(normalizeFacility);
+  for (let page = 2; page <= firstPage.totalPages; page += 1) {
+    const pageData = await getFacilitiesPage({
+      ...params,
+      page,
+      limit: FACILITY_PAGE_LIMIT,
+    });
+
+    appendItems(pageData.items);
+  }
+
+  return facilities;
 }
 
 export async function getFacility(id: string) {
