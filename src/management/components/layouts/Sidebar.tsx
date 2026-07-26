@@ -26,6 +26,12 @@ const navItems = [
     icon: BriefcaseBusiness,
     roles: ["super_admin", "admin", "staff", "doctor", "nurse"],
   },
+  {
+    href: "/management/shift-slots",
+    label: "Khung ca",
+    icon: BriefcaseBusiness,
+    roles: ["super_admin", "admin"],
+  },
 ];
 
 export function Sidebar() {

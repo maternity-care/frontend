@@ -1,126 +1,388 @@
 import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
-import { withSearchParams } from "@/lib/search-filter";
 import type {
   BackendFacility,
+  BackendFacilityLookupItem,
+  BackendOperatingHour,
+  BackendOperatingHourGroup,
   CreateFacilityInput,
   Facility,
+  FacilityLookupItem,
+  FacilityOperatingHoursPreview,
+  FacilityOperatingHoursResult,
+  FacilityRoomType,
+  FacilityScheduleInput,
+  FacilityStatus,
   GetFacilitiesParams,
+  GetFacilityRoomTypesParams,
+  GetFacilityLookupParams,
   UpdateFacilityInput,
+  UpdateFacilityOperatingHoursInput,
 } from "./facilities.types";
 
-function normalizeStatus(status: string): Facility["status"] {
-  const normalizedStatus = status.trim().toLowerCase();
+/**
+ * BE giới hạn tối đa 100 bản ghi mỗi request.
+ * Frontend tạm thời tự tải tuần tự các trang cho tới khi nhận trang cuối,
+ * chờ BE bổ sung metadata phân trang.
+ */
+export const FACILITY_PAGE_LIMIT = 100;
+const MAX_FACILITY_PAGES = 1000;
 
-  return normalizedStatus === "hoạt động" ||
+function normalizeStatus(status?: string): FacilityStatus {
+  const normalizedStatus = status?.trim().toLowerCase();
+
+  return normalizedStatus === "active" ||
+    normalizedStatus === "hoạt động" ||
     normalizedStatus === "hoat dong" ||
-    normalizedStatus === "1" ||
-    normalizedStatus === "active"
+    normalizedStatus === "1"
     ? "active"
     : "suspended";
 }
 
-function toBackendStatus(status: Facility["status"]) {
+function toBackendStatus(status: FacilityStatus) {
   return status === "active" ? "active" : "inactive";
 }
 
+function trimTime(value?: string | null) {
+  return value ? value.slice(0, 5) : null;
+}
+
+function normalizeOperatingHour(
+  item: BackendOperatingHour,
+): BackendOperatingHour {
+  return {
+    dayOfWeek: item.dayOfWeek,
+    openTime: trimTime(item.openTime),
+    closeTime: trimTime(item.closeTime),
+    isClosed: Boolean(item.isClosed),
+  };
+}
+
+function normalizeOperatingHourGroup(
+  item: BackendOperatingHourGroup,
+): BackendOperatingHourGroup {
+  const openTime = trimTime(item.openTime);
+  const closeTime = trimTime(item.closeTime);
+
+  return {
+    days: item.days ?? [],
+    dayLabel: item.dayLabel ?? "",
+    openTime,
+    closeTime,
+    isClosed: Boolean(item.isClosed),
+    displayTime:
+      item.displayTime ||
+      (item.isClosed
+        ? "Đóng cửa"
+        : `${openTime ?? "--:--"} - ${closeTime ?? "--:--"}`),
+  };
+}
+
+function buildWorkingHours(groups: BackendOperatingHourGroup[]) {
+  if (groups.length === 0) return "Chưa cập nhật";
+
+  return groups
+    .map((group) => `${group.dayLabel}: ${group.displayTime}`)
+    .join("; ");
+}
+
 function normalizeFacility(facility: BackendFacility): Facility {
+  const operatingHours = (facility.operatingHours ?? []).map(
+    normalizeOperatingHour,
+  );
+  const operatingHourGroups = (facility.operatingHourGroups ?? []).map(
+    normalizeOperatingHourGroup,
+  );
+
   return {
     id: facility.id,
     name: facility.name,
     code: facility.code,
+    ownerId: facility.ownerId,
+    ownerName: facility.ownerName ?? "Chưa cập nhật",
+    ownerEmail: facility.ownerEmail || undefined,
+    ownerPhone: facility.ownerPhone || undefined,
+    hotline: facility.phone,
+    email: facility.email || undefined,
     address: facility.address,
     city: facility.province,
-    district: facility.district,
     ward: facility.ward,
-    hotline: facility.phone,
-    email: facility.email,
-    latitude: facility.latitude,
-    longitude: facility.longitude,
-    workingHours: "Chưa cập nhật",
-    featuredServices: "Chưa cập nhật",
+    latitude: facility.latitude || undefined,
+    longitude: facility.longitude || undefined,
     status: normalizeStatus(facility.status),
+    operatingStatus: facility.operatingStatus ?? "closed_today",
+    operatingStatusLabel:
+      facility.operatingStatusLabel ?? "Chưa cập nhật trạng thái",
+    isOpenNow: Boolean(facility.isOpenNow),
+    todayOperatingHour: facility.todayOperatingHour
+      ? normalizeOperatingHour(facility.todayOperatingHour)
+      : null,
+    operatingHours,
+    operatingHourGroups,
+    closureDays: facility.closureDays ?? [],
+    workingHours: buildWorkingHours(operatingHourGroups),
     createdAt: facility.createdAt,
     updatedAt: facility.updatedAt,
   };
 }
 
-function toBackendPayload(input: CreateFacilityInput | UpdateFacilityInput) {
-  const payload = {
-    name: input.name?.trim(),
-    code: input.code?.trim(),
-    phone: input.hotline?.trim(),
+function normalizeLookupItem(
+  item: BackendFacilityLookupItem,
+): FacilityLookupItem {
+  return {
+    id: item.id,
+    name: item.name,
+    code: item.code,
+    address: item.address,
+    city: item.province,
+    ward: item.ward,
+    status: normalizeStatus(item.status),
+    ownerName: item.ownerName,
+  };
+}
+
+function removeUndefined<T extends Record<string, unknown>>(value: T) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined),
+  ) as Partial<T>;
+}
+
+function normalizeSchedules(schedules: FacilityScheduleInput[]) {
+  return schedules.map((schedule) => {
+    if (schedule.isClosed) {
+      return {
+        days: schedule.days,
+        isClosed: true,
+      };
+    }
+
+    return {
+      days: schedule.days,
+      isClosed: false,
+      openTime: schedule.openTime?.slice(0, 5),
+      closeTime: schedule.closeTime?.slice(0, 5),
+    };
+  });
+}
+
+function toCreatePayload(input: CreateFacilityInput) {
+  return removeUndefined({
+    name: input.name.trim(),
+    ownerId: input.ownerId.trim(),
+    phone: input.hotline.trim(),
     email: input.email?.trim() || "",
-    address: input.address?.trim(),
-    province: input.city?.trim(),
-    district: input.district?.trim(),
-    ward: input.ward?.trim(),
+    schedules: normalizeSchedules(input.schedules),
+    address: input.address.trim(),
+    province: input.city.trim(),
+    ward: input.ward.trim(),
     latitude: input.latitude?.trim() || "0",
     longitude: input.longitude?.trim() || "0",
-    status: input.status === undefined ? undefined : toBackendStatus(input.status),
-  };
-
-  return Object.fromEntries(
-    Object.entries(payload).filter(([, value]) => value !== undefined),
-  );
+    status: toBackendStatus(input.status),
+  });
 }
 
-function toQueryParams(params?: GetFacilitiesParams) {
-  if (params?.rawSearch) return { search: params.rawSearch };
-
-  return withSearchParams(
-    {},
-    {
-      name: params?.search,
-      province: params?.city,
-      status: params?.status ? toBackendStatus(params.status) : undefined,
-    },
-    { contains: ["name", "province"] },
-  );
+function toUpdatePayload(input: UpdateFacilityInput) {
+  return removeUndefined({
+    name: input.name?.trim(),
+    ownerId: input.ownerId?.trim(),
+    phone: input.hotline?.trim(),
+    email: input.email === undefined ? undefined : input.email.trim(),
+    address: input.address?.trim(),
+    province: input.city?.trim(),
+    ward: input.ward?.trim(),
+    latitude: input.latitude?.trim(),
+    longitude: input.longitude?.trim(),
+    status:
+      input.status === undefined ? undefined : toBackendStatus(input.status),
+  });
 }
 
-function toPublicQueryParams(
-  params?: GetFacilitiesParams,
+function clampLimit(limit?: number) {
+  if (!limit || limit < 1) return FACILITY_PAGE_LIMIT;
+
+  return Math.min(limit, FACILITY_PAGE_LIMIT);
+}
+
+function toQueryParams(
+  params: GetFacilitiesParams | undefined,
+  page: number,
+  limit = FACILITY_PAGE_LIMIT,
 ) {
-  const query = {
-    search: params?.search?.trim() || undefined,
-    city: params?.city?.trim() || undefined,
-    status: params?.status
-      ? toBackendStatus(params.status)
-      : undefined,
-    page: params?.page,
-    limit: params?.limit,
-  };
+  const search =
+    params?.rawSearch?.trim() || params?.search?.trim() || undefined;
 
-  return Object.fromEntries(
-    Object.entries(query).filter(
-      ([, value]) => value !== undefined,
+  return removeUndefined({
+    search,
+    city: params?.city?.trim() || undefined,
+    ownerId: params?.ownerId?.trim() || undefined,
+    status: params?.status ? toBackendStatus(params.status) : undefined,
+    page,
+    limit: clampLimit(limit),
+  });
+}
+
+const FACILITY_LIST_KEYS = [
+  "data",
+  "items",
+  "facilities",
+  "results",
+  "rows",
+] as const;
+
+/**
+ * unwrapApiData của project có thể trả về mảng trực tiếp hoặc một object
+ * chứa danh sách, tùy theo cấu trúc response thực tế của BE.
+ * Hàm này chuẩn hóa các dạng response phổ biến về BackendFacility[].
+ */
+function extractFacilityList(value: unknown, depth = 0): BackendFacility[] {
+  if (Array.isArray(value)) {
+    return value as BackendFacility[];
+  }
+
+  if (!value || typeof value !== "object" || depth > 3) {
+    throw new Error("Dữ liệu danh sách cơ sở từ máy chủ không đúng định dạng.");
+  }
+
+  const record = value as Record<string, unknown>;
+
+  for (const key of FACILITY_LIST_KEYS) {
+    const candidate = record[key];
+
+    if (Array.isArray(candidate)) {
+      return candidate as BackendFacility[];
+    }
+  }
+
+  // Hỗ trợ response lồng nhiều lớp, ví dụ:
+  // AxiosResponse -> data -> ApiResponse -> data -> Facility[].
+  for (const key of FACILITY_LIST_KEYS) {
+    const candidate = record[key];
+
+    if (candidate && typeof candidate === "object") {
+      try {
+        return extractFacilityList(candidate, depth + 1);
+      } catch {
+        // Thử tiếp key kế tiếp.
+      }
+    }
+  }
+
+  throw new Error("Dữ liệu danh sách cơ sở từ máy chủ không đúng định dạng.");
+}
+
+type BackendOperatingHoursResponse =
+  | BackendFacility
+  | BackendOperatingHour[]
+  | BackendOperatingHourGroup[]
+  | {
+      operatingHours?: BackendOperatingHour[];
+      operatingHourGroups?: BackendOperatingHourGroup[];
+    };
+
+function normalizeOperatingHoursPayload(
+  data: BackendOperatingHoursResponse,
+): FacilityOperatingHoursResult {
+  if (Array.isArray(data)) {
+    const firstItem = data[0];
+
+    if (firstItem && "days" in firstItem) {
+      return {
+        operatingHours: [],
+        operatingHourGroups: (data as BackendOperatingHourGroup[]).map(
+          normalizeOperatingHourGroup,
+        ),
+      };
+    }
+
+    return {
+      operatingHours: (data as BackendOperatingHour[]).map(
+        normalizeOperatingHour,
+      ),
+      operatingHourGroups: [],
+    };
+  }
+
+  return {
+    operatingHours: (data.operatingHours ?? []).map(normalizeOperatingHour),
+    operatingHourGroups: (data.operatingHourGroups ?? []).map(
+      normalizeOperatingHourGroup,
     ),
-  );
+  };
 }
 
 export async function getFacilities(params?: GetFacilitiesParams) {
-  const data = await unwrapApiData<BackendFacility[]>(
-    apiClient.get("/management/facilities", {
-      params: toQueryParams(params),
+  const facilities: BackendFacility[] = [];
+  const loadedFacilityIds = new Set<string>();
+
+  for (let page = 1; page <= MAX_FACILITY_PAGES; page += 1) {
+    const rawPageData = await unwrapApiData<unknown>(
+      apiClient.get("/management/facilities", {
+        params: toQueryParams(params, page),
+      }),
+    );
+
+    const pageData = extractFacilityList(rawPageData);
+    let addedCount = 0;
+
+    for (const facility of pageData) {
+      if (loadedFacilityIds.has(facility.id)) continue;
+
+      loadedFacilityIds.add(facility.id);
+      facilities.push(facility);
+      addedCount += 1;
+    }
+
+    // Trang cuối có ít hơn 100 bản ghi hoặc BE không áp dụng page và
+    // trả lại đúng dữ liệu của trang trước đó.
+    if (
+      pageData.length < FACILITY_PAGE_LIMIT ||
+      (pageData.length > 0 && addedCount === 0)
+    ) {
+      break;
+    }
+
+    if (page === MAX_FACILITY_PAGES) {
+      throw new Error(
+        "Không thể tải hết danh sách cơ sở vì vượt quá giới hạn an toàn.",
+      );
+    }
+  }
+
+  return facilities.map(normalizeFacility);
+}
+
+export async function getFacility(id: string) {
+  const data = await unwrapApiData<BackendFacility>(
+    apiClient.get(`/management/facilities/${id}`),
+  );
+
+  return normalizeFacility(data);
+}
+
+export async function lookupFacilities(params?: GetFacilityLookupParams) {
+  const data = await unwrapApiData<BackendFacilityLookupItem[]>(
+    apiClient.get("/management/facilities/lookup", {
+      params: removeUndefined({
+        search: params?.search?.trim() || undefined,
+        status: params?.status,
+        limit: clampLimit(params?.limit ?? 20),
+      }),
     }),
   );
 
-  return data.map(normalizeFacility);
+  return data.map(normalizeLookupItem);
 }
 
-// ============================================================
-// Public facilities
-// Dùng cho select chọn cơ sở đang hoạt động
-// ============================================================
-
-export async function getPublicFacilities(
-  params?: GetFacilitiesParams,
-) {
-  const data = await unwrapApiData<
-    BackendFacility[]
-  >(
+export async function getPublicFacilities(params?: GetFacilitiesParams) {
+  const data = await unwrapApiData<BackendFacility[]>(
     apiClient.get("/public/facilities", {
-      params: toPublicQueryParams(params),
+      params: removeUndefined({
+        search:
+          params?.rawSearch?.trim() || params?.search?.trim() || undefined,
+        city: params?.city?.trim() || undefined,
+        status: params?.status ? toBackendStatus(params.status) : undefined,
+        page: params?.page,
+        limit: clampLimit(params?.limit),
+      }),
     }),
   );
 
@@ -129,32 +391,98 @@ export async function getPublicFacilities(
 
 export async function createFacility(input: CreateFacilityInput) {
   const response = await unwrapApiResponse<BackendFacility>(
-    apiClient.post("/management/facilities", toBackendPayload(input)),
+    apiClient.post("/management/facilities", toCreatePayload(input)),
   );
 
-  return {
-    ...response,
+  return Object.assign({}, response, {
     data: normalizeFacility(response.data),
-  };
+  });
 }
 
 export async function updateFacility(id: string, input: UpdateFacilityInput) {
   const response = await unwrapApiResponse<BackendFacility>(
-    apiClient.patch(`/management/facilities/${id}`, toBackendPayload(input)),
+    apiClient.patch(
+      `/management/facilities/${id}`,
+      toUpdatePayload(input),
+    ),
   );
 
-  return {
-    ...response,
+  return Object.assign({}, response, {
     data: normalizeFacility(response.data),
-  };
+  });
 }
 
-export function deleteFacility(id: string) {
-  return unwrapApiResponse<null>(
-    apiClient.delete(`/management/facilities/${id}`),
+export async function getFacilityOperatingHours(id: string) {
+  const data = await unwrapApiData<BackendOperatingHoursResponse>(
+    apiClient.get(`/management/facilities/${id}/operating-hours`),
+  );
+
+  return normalizeOperatingHoursPayload(data);
+}
+
+export async function updateFacilityOperatingHours(
+  id: string,
+  input: UpdateFacilityOperatingHoursInput,
+) {
+  const data = await unwrapApiData<BackendOperatingHoursResponse>(
+    apiClient.patch(`/management/facilities/${id}/operating-hours`, {
+      schedules: normalizeSchedules(input.schedules),
+    }),
+  );
+
+  return normalizeOperatingHoursPayload(data);
+}
+
+export function previewFacilityOperatingHours(
+  id: string,
+  input: UpdateFacilityOperatingHoursInput,
+) {
+  return unwrapApiData<FacilityOperatingHoursPreview>(
+    apiClient.post(`/management/facilities/${id}/operating-hours/preview`, {
+      schedules: normalizeSchedules(input.schedules),
+    }),
   );
 }
 
-export async function deleteFacilities(ids: string[]) {
-  await Promise.all(ids.map((id) => deleteFacility(id)));
+export async function deactivateFacility(id: string) {
+  const response = await unwrapApiResponse<BackendFacility>(
+    apiClient.patch(`/management/facilities/${id}/deactivate`, {}),
+  );
+
+  return Object.assign({}, response, {
+    data: normalizeFacility(response.data),
+  });
+}
+
+export function deleteFacility(id: string, reason: string) {
+  const normalizedReason = reason.trim();
+
+  if (!normalizedReason) {
+    return Promise.reject(new Error("Vui lòng nhập lý do xóa cơ sở."));
+  }
+
+  return unwrapApiResponse<null>(
+    apiClient.delete(`/management/facilities/${id}`, {
+      params: { reason: normalizedReason },
+    }),
+  );
+}
+
+export async function deleteFacilities(ids: string[], reason: string) {
+  await Promise.all(ids.map((id) => deleteFacility(id, reason)));
+}
+
+export async function getFacilityRoomTypes(
+  facilityId: string,
+  params?: GetFacilityRoomTypesParams,
+) {
+  return unwrapApiData<FacilityRoomType[]>(
+    apiClient.get(`/management/facilities/${facilityId}/room-types`, {
+      params: removeUndefined({
+        search: params?.search?.trim() || undefined,
+        status: params?.status,
+        limit: clampLimit(params?.limit ?? 20),
+      }),
+    }),
+  );
 }

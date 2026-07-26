@@ -62,9 +62,15 @@ export interface AuthState {
 
 export interface RegisterInput {
   name: string;
+  phone: string;
   email: string;
   phone: string;
   password: string;
+}
+
+export interface VerifyOtpInput {
+  email: string;
+  otp: string;
 }
 
 export interface ApiResponse<T> {
