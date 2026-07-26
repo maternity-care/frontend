@@ -20,10 +20,12 @@ import type {
 } from "./facilities.types";
 
 /**
- * Tạm thời lấy toàn bộ dữ liệu cho tới khi BE bổ sung metadata phân trang.
- * Điều chỉnh giá trị này nếu môi trường thực tế có nhiều hơn 1000 cơ sở.
+ * BE giới hạn tối đa 100 bản ghi mỗi request.
+ * Frontend tạm thời tự tải tuần tự các trang cho tới khi nhận trang cuối,
+ * chờ BE bổ sung metadata phân trang.
  */
-export const FACILITY_FETCH_ALL_LIMIT = 1000;
+export const FACILITY_PAGE_LIMIT = 100;
+const MAX_FACILITY_PAGES = 1000;
 
 function normalizeStatus(status?: string): FacilityStatus {
   const normalizedStatus = status?.trim().toLowerCase();
@@ -194,7 +196,17 @@ function toUpdatePayload(input: UpdateFacilityInput) {
   });
 }
 
-function toQueryParams(params?: GetFacilitiesParams) {
+function clampLimit(limit?: number) {
+  if (!limit || limit < 1) return FACILITY_PAGE_LIMIT;
+
+  return Math.min(limit, FACILITY_PAGE_LIMIT);
+}
+
+function toQueryParams(
+  params: GetFacilitiesParams | undefined,
+  page: number,
+  limit = FACILITY_PAGE_LIMIT,
+) {
   const search =
     params?.rawSearch?.trim() || params?.search?.trim() || undefined;
 
@@ -203,9 +215,58 @@ function toQueryParams(params?: GetFacilitiesParams) {
     city: params?.city?.trim() || undefined,
     ownerId: params?.ownerId?.trim() || undefined,
     status: params?.status ? toBackendStatus(params.status) : undefined,
-    page: params?.page,
-    limit: params?.limit ?? FACILITY_FETCH_ALL_LIMIT,
+    page,
+    limit: clampLimit(limit),
   });
+}
+
+const FACILITY_LIST_KEYS = [
+  "data",
+  "items",
+  "facilities",
+  "results",
+  "rows",
+] as const;
+
+/**
+ * unwrapApiData của project có thể trả về mảng trực tiếp hoặc một object
+ * chứa danh sách, tùy theo cấu trúc response thực tế của BE.
+ * Hàm này chuẩn hóa các dạng response phổ biến về BackendFacility[].
+ */
+function extractFacilityList(value: unknown, depth = 0): BackendFacility[] {
+  if (Array.isArray(value)) {
+    return value as BackendFacility[];
+  }
+
+  if (!value || typeof value !== "object" || depth > 3) {
+    throw new Error("Dữ liệu danh sách cơ sở từ máy chủ không đúng định dạng.");
+  }
+
+  const record = value as Record<string, unknown>;
+
+  for (const key of FACILITY_LIST_KEYS) {
+    const candidate = record[key];
+
+    if (Array.isArray(candidate)) {
+      return candidate as BackendFacility[];
+    }
+  }
+
+  // Hỗ trợ response lồng nhiều lớp, ví dụ:
+  // AxiosResponse -> data -> ApiResponse -> data -> Facility[].
+  for (const key of FACILITY_LIST_KEYS) {
+    const candidate = record[key];
+
+    if (candidate && typeof candidate === "object") {
+      try {
+        return extractFacilityList(candidate, depth + 1);
+      } catch {
+        // Thử tiếp key kế tiếp.
+      }
+    }
+  }
+
+  throw new Error("Dữ liệu danh sách cơ sở từ máy chủ không đúng định dạng.");
 }
 
 type BackendOperatingHoursResponse =
@@ -249,13 +310,44 @@ function normalizeOperatingHoursPayload(
 }
 
 export async function getFacilities(params?: GetFacilitiesParams) {
-  const data = await unwrapApiData<BackendFacility[]>(
-    apiClient.get("/management/facilities", {
-      params: toQueryParams(params),
-    }),
-  );
+  const facilities: BackendFacility[] = [];
+  const loadedFacilityIds = new Set<string>();
 
-  return data.map(normalizeFacility);
+  for (let page = 1; page <= MAX_FACILITY_PAGES; page += 1) {
+    const rawPageData = await unwrapApiData<unknown>(
+      apiClient.get("/management/facilities", {
+        params: toQueryParams(params, page),
+      }),
+    );
+
+    const pageData = extractFacilityList(rawPageData);
+    let addedCount = 0;
+
+    for (const facility of pageData) {
+      if (loadedFacilityIds.has(facility.id)) continue;
+
+      loadedFacilityIds.add(facility.id);
+      facilities.push(facility);
+      addedCount += 1;
+    }
+
+    // Trang cuối có ít hơn 100 bản ghi hoặc BE không áp dụng page và
+    // trả lại đúng dữ liệu của trang trước đó.
+    if (
+      pageData.length < FACILITY_PAGE_LIMIT ||
+      (pageData.length > 0 && addedCount === 0)
+    ) {
+      break;
+    }
+
+    if (page === MAX_FACILITY_PAGES) {
+      throw new Error(
+        "Không thể tải hết danh sách cơ sở vì vượt quá giới hạn an toàn.",
+      );
+    }
+  }
+
+  return facilities.map(normalizeFacility);
 }
 
 export async function getFacility(id: string) {
@@ -272,7 +364,7 @@ export async function lookupFacilities(params?: GetFacilityLookupParams) {
       params: removeUndefined({
         search: params?.search?.trim() || undefined,
         status: params?.status,
-        limit: params?.limit ?? 20,
+        limit: clampLimit(params?.limit ?? 20),
       }),
     }),
   );
@@ -289,7 +381,7 @@ export async function getPublicFacilities(params?: GetFacilitiesParams) {
         city: params?.city?.trim() || undefined,
         status: params?.status ? toBackendStatus(params.status) : undefined,
         page: params?.page,
-        limit: params?.limit,
+        limit: clampLimit(params?.limit),
       }),
     }),
   );
@@ -302,10 +394,9 @@ export async function createFacility(input: CreateFacilityInput) {
     apiClient.post("/management/facilities", toCreatePayload(input)),
   );
 
-  return {
-    ...response,
+  return Object.assign({}, response, {
     data: normalizeFacility(response.data),
-  };
+  });
 }
 
 export async function updateFacility(id: string, input: UpdateFacilityInput) {
@@ -316,10 +407,9 @@ export async function updateFacility(id: string, input: UpdateFacilityInput) {
     ),
   );
 
-  return {
-    ...response,
+  return Object.assign({}, response, {
     data: normalizeFacility(response.data),
-  };
+  });
 }
 
 export async function getFacilityOperatingHours(id: string) {
@@ -359,10 +449,9 @@ export async function deactivateFacility(id: string) {
     apiClient.patch(`/management/facilities/${id}/deactivate`, {}),
   );
 
-  return {
-    ...response,
+  return Object.assign({}, response, {
     data: normalizeFacility(response.data),
-  };
+  });
 }
 
 export function deleteFacility(id: string, reason: string) {
@@ -392,7 +481,7 @@ export async function getFacilityRoomTypes(
       params: removeUndefined({
         search: params?.search?.trim() || undefined,
         status: params?.status,
-        limit: params?.limit ?? 20,
+        limit: clampLimit(params?.limit ?? 20),
       }),
     }),
   );

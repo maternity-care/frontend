@@ -152,16 +152,19 @@ export function FacilityFormModal({
 
     try {
       await onSubmit({
-        ...values,
         name: values.name.trim(),
         ownerId: values.ownerId.trim(),
         hotline: values.hotline.trim(),
         email: values.email?.trim() ?? "",
+        status: values.status,
         address: values.address.trim(),
         city: values.city.trim(),
         ward: values.ward.trim(),
         latitude: values.latitude?.trim() ?? "",
         longitude: values.longitude?.trim() ?? "",
+        schedules: Array.isArray(values.schedules)
+          ? values.schedules
+          : [],
       });
 
       form.resetFields();

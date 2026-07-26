@@ -20,6 +20,10 @@ const DAY_OPTIONS: Array<{ value: DayOfWeek; label: string }> = [
   { value: "SUN", label: "Chủ nhật" },
 ];
 
+const VALID_DAYS = new Set<DayOfWeek>(
+  DAY_OPTIONS.map((option) => option.value),
+);
+
 export const DEFAULT_FACILITY_SCHEDULES: FacilityScheduleInput[] = [
   {
     days: ["MON", "TUE", "WED", "THU", "FRI"],
@@ -41,13 +45,52 @@ export const DEFAULT_FACILITY_SCHEDULES: FacilityScheduleInput[] = [
 
 function parseTime(value?: string) {
   if (!value) return null;
-  return dayjs(`2000-01-01T${value.slice(0, 5)}:00`);
+
+  const parsed = dayjs(`2000-01-01T${value.slice(0, 5)}:00`);
+  return parsed.isValid() ? parsed : null;
 }
 
-export function validateFacilitySchedules(
-  schedules?: FacilityScheduleInput[],
-) {
-  if (!schedules || schedules.length === 0) {
+function isDayOfWeek(value: unknown): value is DayOfWeek {
+  return typeof value === "string" && VALID_DAYS.has(value as DayOfWeek);
+}
+
+/**
+ * Ant Design Form có thể truyền undefined, null hoặc dữ liệu chưa đúng cấu trúc
+ * trong một số lần render đầu. Luôn chuẩn hóa về một mảng lịch hợp lệ trước khi
+ * map, filter, concat hoặc đọc group.days.
+ */
+function normalizeScheduleValue(value: unknown): FacilityScheduleInput[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter(
+      (item): item is Record<string, unknown> =>
+        Boolean(item) && typeof item === "object",
+    )
+    .map((item) => {
+      const days = Array.isArray(item.days)
+        ? item.days.filter(isDayOfWeek)
+        : [];
+
+      return {
+        days,
+        isClosed: Boolean(item.isClosed),
+        openTime:
+          typeof item.openTime === "string"
+            ? item.openTime.slice(0, 5)
+            : undefined,
+        closeTime:
+          typeof item.closeTime === "string"
+            ? item.closeTime.slice(0, 5)
+            : undefined,
+      };
+    });
+}
+
+export function validateFacilitySchedules(value?: unknown) {
+  const schedules = normalizeScheduleValue(value);
+
+  if (schedules.length === 0) {
     return Promise.reject(new Error("Vui lòng thiết lập giờ hoạt động."));
   }
 
@@ -65,7 +108,9 @@ export function validateFacilitySchedules(
 
   for (const schedule of schedules) {
     if (schedule.days.length === 0) {
-      return Promise.reject(new Error("Mỗi nhóm lịch phải có ít nhất một ngày."));
+      return Promise.reject(
+        new Error("Mỗi nhóm lịch phải có ít nhất một ngày."),
+      );
     }
 
     if (schedule.isClosed) continue;
@@ -87,48 +132,53 @@ export function validateFacilitySchedules(
 }
 
 type FacilityScheduleEditorProps = {
-  value?: FacilityScheduleInput[];
+  value?: FacilityScheduleInput[] | null;
   onChange?: (value: FacilityScheduleInput[]) => void;
   disabled?: boolean;
 };
 
 export function FacilityScheduleEditor({
-  value = [],
+  value,
   onChange,
   disabled = false,
 }: FacilityScheduleEditorProps) {
+  const schedules = normalizeScheduleValue(value);
+
   function updateGroup(
     index: number,
     patch: Partial<FacilityScheduleInput>,
   ) {
-    const nextValue = value.map((group, groupIndex) =>
-      groupIndex === index ? { ...group, ...patch } : group,
+    const nextValue = schedules.map((group, groupIndex) =>
+      groupIndex === index
+        ? Object.assign({}, group, patch)
+        : group,
     );
 
     onChange?.(nextValue);
   }
 
   function addGroup() {
-    onChange?.([
-      ...value,
-      {
-        days: [],
-        isClosed: false,
-        openTime: "08:00",
-        closeTime: "17:00",
-      },
-    ]);
+    const nextGroup: FacilityScheduleInput = {
+      days: [],
+      isClosed: false,
+      openTime: "08:00",
+      closeTime: "17:00",
+    };
+
+    onChange?.(schedules.concat(nextGroup));
   }
 
   function removeGroup(index: number) {
-    onChange?.(value.filter((_, groupIndex) => groupIndex !== index));
+    onChange?.(
+      schedules.filter((_, groupIndex) => groupIndex !== index),
+    );
   }
 
   return (
     <div className="space-y-3">
-      {value.map((group, index) => {
+      {schedules.map((group, index) => {
         const usedByOtherGroups = new Set(
-          value
+          schedules
             .filter((_, groupIndex) => groupIndex !== index)
             .flatMap((item) => item.days),
         );
@@ -143,6 +193,7 @@ export function FacilityScheduleEditor({
                 <Text className="mb-1 block text-xs font-semibold uppercase text-slate-500">
                   Ngày áp dụng
                 </Text>
+
                 <Select<DayOfWeek[]>
                   mode="multiple"
                   value={group.days}
@@ -150,10 +201,17 @@ export function FacilityScheduleEditor({
                   placeholder="Chọn ngày"
                   className="w-full"
                   options={DAY_OPTIONS.map((option) => ({
-                    ...option,
+                    value: option.value,
+                    label: option.label,
                     disabled: usedByOtherGroups.has(option.value),
                   }))}
-                  onChange={(days) => updateGroup(index, { days })}
+                  onChange={(days) =>
+                    updateGroup(index, {
+                      days: Array.isArray(days)
+                        ? days.filter(isDayOfWeek)
+                        : [],
+                    })
+                  }
                 />
               </div>
 
@@ -161,6 +219,7 @@ export function FacilityScheduleEditor({
                 <Text className="mb-1 block text-xs font-semibold uppercase text-slate-500">
                   Giờ mở cửa
                 </Text>
+
                 <TimePicker
                   value={parseTime(group.openTime)}
                   format="HH:mm"
@@ -179,6 +238,7 @@ export function FacilityScheduleEditor({
                 <Text className="mb-1 block text-xs font-semibold uppercase text-slate-500">
                   Giờ đóng cửa
                 </Text>
+
                 <TimePicker
                   value={parseTime(group.closeTime)}
                   format="HH:mm"
@@ -196,17 +256,19 @@ export function FacilityScheduleEditor({
               <Checkbox
                 checked={group.isClosed}
                 disabled={disabled}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const isClosed = event.target.checked;
+
                   updateGroup(index, {
-                    isClosed: event.target.checked,
-                    openTime: event.target.checked
+                    isClosed,
+                    openTime: isClosed
                       ? undefined
                       : group.openTime || "08:00",
-                    closeTime: event.target.checked
+                    closeTime: isClosed
                       ? undefined
                       : group.closeTime || "17:00",
-                  })
-                }
+                  });
+                }}
               >
                 Đóng cửa
               </Checkbox>
@@ -214,7 +276,7 @@ export function FacilityScheduleEditor({
               <Button
                 danger
                 title="Xóa nhóm lịch"
-                disabled={disabled || value.length <= 1}
+                disabled={disabled || schedules.length <= 1}
                 icon={<Trash2 className="h-4 w-4" />}
                 onClick={() => removeGroup(index)}
               />
@@ -232,6 +294,7 @@ export function FacilityScheduleEditor({
         >
           Thêm nhóm ngày
         </Button>
+
         <Text type="secondary">
           Mỗi ngày chỉ được nằm trong một nhóm lịch.
         </Text>
