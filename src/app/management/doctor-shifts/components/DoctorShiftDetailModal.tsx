@@ -1,217 +1,395 @@
-// "use client";
+"use client";
 
-// import dayjs from "dayjs";
-// import { Button, Card, Col, Modal, Row, Space, Tag, Typography } from "antd";
-// import {
-//   Building2,
-//   CalendarClock,
-//   CalendarDays,
-//   Clock3,
-//   DoorOpen,
-//   Hash,
-//   Stethoscope,
-//   Users,
-//   X,
-// } from "lucide-react";
-// import type {
-//   DoctorShiftItem,
-//   DoctorShiftStatus,
-// } from "@/management/features/doctor-shifts/doctor-shifts.types";
+import { useMemo } from "react";
+import {
+  Button,
+  Modal,
+  Select,
+  Space,
+  Typography,
+} from "antd";
+import {
+  Building2,
+  Calendar,
+  Clock,
+  MapPin,
+  Pencil,
+  Stethoscope,
+  Trash2,
+  X,
+} from "lucide-react";
+import type {
+  DoctorShiftItem,
+} from "@/management/features/doctor-shifts/doctor-shifts.types";
+import {
+  formatLongDate,
+  getShiftLabel,
+  renderDoctorShiftStatus,
+  shiftsOverlap,
+} from "./doctor-shift-modal.shared";
+import type {
+  DoctorOption,
+  FacilityOption,
+  RoomOption,
+} from "./doctor-shift-modal.shared";
 
-// const { Title } = Typography;
+const { Text, Title } = Typography;
 
-// const STATUS_TEXT: Record<DoctorShiftStatus, string> = {
-//   available: "Còn trống",
-//   full: "Đã đầy",
-//   cancelled: "Đã hủy",
-//   off: "Nghỉ",
-// };
+type DoctorShiftDetailModalProps = {
+  open: boolean;
+  shift: DoctorShiftItem | null;
+  loading: boolean;
+  shifts: DoctorShiftItem[];
+  facilities: FacilityOption[];
+  rooms: RoomOption[];
+  doctors: DoctorOption[];
+  onClose: () => void;
+  onEdit: (shift: DoctorShiftItem) => void;
+  onDelete: (shift: DoctorShiftItem) => void;
+  onAssignDoctor: (
+    doctorId: string,
+  ) => Promise<void> | void;
+};
 
-// function statusColor(status: DoctorShiftStatus) {
-//   if (status === "available") return "green";
-//   if (status === "full") return "orange";
-//   if (status === "cancelled") return "red";
-//   return "default";
-// }
+export function DoctorShiftDetailModal({
+  open,
+  shift,
+  loading,
+  shifts,
+  facilities,
+  rooms,
+  doctors,
+  onClose,
+  onEdit,
+  onDelete,
+  onAssignDoctor,
+}: DoctorShiftDetailModalProps) {
+  const facilityById = useMemo(
+    () =>
+      new Map(
+        facilities.map((facility) => [
+          facility.id,
+          facility,
+        ]),
+      ),
+    [facilities],
+  );
 
-// function formatDateTime(value?: string) {
-//   if (!value) return "Chưa cập nhật";
-//   const date = dayjs(value);
-//   return date.isValid() ? date.format("HH:mm DD/MM/YYYY") : value;
-// }
+  const roomById = useMemo(
+    () =>
+      new Map(
+        rooms.map((room) => [room.id, room]),
+      ),
+    [rooms],
+  );
 
-// function InfoItem({
-//   icon,
-//   label,
-//   value,
-// }: {
-//   icon: React.ReactNode;
-//   label: string;
-//   value?: React.ReactNode;
-// }) {
-//   return (
-//     <div className="h-full rounded-lg border border-slate-200 bg-white p-3">
-//       <div className="flex items-start gap-3">
-//         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-//           {icon}
-//         </div>
-//         <div className="min-w-0">
-//           <p className="mb-1 text-xs font-semibold uppercase text-slate-400">
-//             {label}
-//           </p>
-//           <div className="break-words text-sm font-medium text-slate-900">
-//             {value || "Chưa cập nhật"}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
+  const doctorById = useMemo(
+    () =>
+      new Map(
+        doctors.map((doctor) => [
+          doctor.id,
+          doctor,
+        ]),
+      ),
+    [doctors],
+  );
 
-// type DoctorShiftDetailModalProps = {
-//   open: boolean;
-//   shift: DoctorShiftItem | null;
-//   facilityName?: string;
-//   roomName?: string;
-//   onClose: () => void;
-//   onEdit?: (shift: DoctorShiftItem) => void;
-// };
+  return (
+    <Modal
+      open={open}
+      centered
+      width={900}
+      title={null}
+      footer={null}
+      onCancel={onClose}
+      mask={{
+        closable: !loading,
+      }}
+    >
+      {shift ? (
+        <div>
+          <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 pr-10 sm:flex-row sm:items-start sm:pr-12">
+            <div className="flex items-start gap-4">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                <Calendar className="h-6 w-6" />
+              </span>
 
-// export function DoctorShiftDetailModal({
-//   open,
-//   shift,
-//   facilityName,
-//   roomName,
-//   onClose,
-//   onEdit,
-// }: DoctorShiftDetailModalProps) {
-//   return (
-//     <Modal
-//       open={open}
-//       width={860}
-//       centered
-//       title={null}
-//       closable={false}
-//       onCancel={onClose}
-//       footer={
-//         <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
-//           {shift && onEdit ? (
-//             <Button
-//               onClick={() => {
-//                 onClose();
-//                 onEdit(shift);
-//               }}
-//             >
-//               Chỉnh sửa
-//             </Button>
-//           ) : null}
-//           <Button
-//             type="primary"
-//             icon={<X className="h-4 w-4" />}
-//             onClick={onClose}
-//           >
-//             Đóng
-//           </Button>
-//         </div>
-//       }
-//     >
-//       {shift ? (
-//         <div className="space-y-4">
-//           <div className="border-b border-slate-200 pb-4">
-//             <div className="flex min-w-0 items-start gap-4">
-//               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
-//                 <Clock3 className="h-6 w-6" />
-//               </div>
-//               <div className="min-w-0">
-//                 <Title level={3} className="!mb-1 !text-slate-950">
-//                   Ca trực bác sĩ #{shift.doctorId}
-//                 </Title>
-//                 <Space size={8} wrap>
-//                   <Tag color="blue">#{shift.id}</Tag>
-//                   <Tag color={statusColor(shift.status)}>
-//                     {STATUS_TEXT[shift.status]}
-//                   </Tag>
-//                 </Space>
-//               </div>
-//             </div>
-//           </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Title
+                    level={3}
+                    className="!mb-0 !text-slate-950"
+                  >
+                    {shift.slotName ||
+                      shift.slotCode ||
+                      `Ca trực #${shift.id}`}
+                  </Title>
 
-//           <Card
-//             size="small"
-//             className="border-slate-200"
-//             title="Thông tin ca trực"
-//           >
-//             <Row gutter={[12, 12]}>
-//               <Col xs={24} md={8}>
-//                 <InfoItem
-//                   icon={<Stethoscope className="h-4 w-4" />}
-//                   label="Doctor ID"
-//                   value={shift.doctorId}
-//                 />
-//               </Col>
-//               <Col xs={24} md={8}>
-//                 <InfoItem
-//                   icon={<Building2 className="h-4 w-4" />}
-//                   label="Cơ sở"
-//                   value={facilityName ?? `Cơ sở #${shift.facilityId}`}
-//                 />
-//               </Col>
-//               <Col xs={24} md={8}>
-//                 <InfoItem
-//                   icon={<DoorOpen className="h-4 w-4" />}
-//                   label="Phòng"
-//                   value={
-//                     roomName ??
-//                     (shift.roomId ? `Phòng #${shift.roomId}` : undefined)
-//                   }
-//                 />
-//               </Col>
-//               <Col xs={24} md={8}>
-//                 <InfoItem
-//                   icon={<CalendarDays className="h-4 w-4" />}
-//                   label="Ngày trực"
-//                   value={dayjs(shift.shiftDate).format("DD/MM/YYYY")}
-//                 />
-//               </Col>
-//               <Col xs={24} md={8}>
-//                 <InfoItem
-//                   icon={<Clock3 className="h-4 w-4" />}
-//                   label="Thời gian"
-//                   value={`${shift.startTime} - ${shift.endTime}`}
-//                 />
-//               </Col>
-//               <Col xs={24} md={8}>
-//                 <InfoItem
-//                   icon={<Users className="h-4 w-4" />}
-//                   label="Số lịch tối đa"
-//                   value={shift.maxAppointments}
-//                 />
-//               </Col>
-//               <Col xs={24} md={12}>
-//                 <InfoItem
-//                   icon={<CalendarClock className="h-4 w-4" />}
-//                   label="Ngày tạo"
-//                   value={formatDateTime(shift.createdAt)}
-//                 />
-//               </Col>
-//               <Col xs={24} md={12}>
-//                 <InfoItem
-//                   icon={<CalendarClock className="h-4 w-4" />}
-//                   label="Cập nhật lần cuối"
-//                   value={formatDateTime(shift.updatedAt)}
-//                 />
-//               </Col>
-//               <Col xs={24}>
-//                 <InfoItem
-//                   icon={<Hash className="h-4 w-4" />}
-//                   label="Mã ca trực"
-//                   value={shift.id}
-//                 />
-//               </Col>
-//             </Row>
-//           </Card>
-//         </div>
-//       ) : null}
-//     </Modal>
-//   );
-// }
+                  {renderDoctorShiftStatus(
+                    shift.status,
+                  )}
+                </div>
+
+                <Text
+                  type="secondary"
+                  className="mt-1 block"
+                >
+                  {formatLongDate(
+                    shift.shiftDate,
+                  )}{" "}
+                  · {shift.startTime} -{" "}
+                  {shift.endTime}
+                </Text>
+              </div>
+            </div>
+
+            <Space size={8} wrap>
+              <Button
+                icon={
+                  <Pencil className="h-4 w-4" />
+                }
+                onClick={() => onEdit(shift)}
+              >
+                Cập nhật
+              </Button>
+
+              <Button
+                danger
+                icon={
+                  <Trash2 className="h-4 w-4" />
+                }
+                onClick={() => onDelete(shift)}
+              >
+                Xóa
+              </Button>
+            </Space>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-1 text-xs font-semibold uppercase text-slate-500">
+                Thời gian
+              </p>
+
+              <p className="mb-0 font-semibold text-slate-950">
+                {getShiftLabel(
+                  shift.startTime,
+                  shift.endTime,
+                )}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-1 text-xs font-semibold uppercase text-slate-500">
+                Số lịch tối đa
+              </p>
+
+              <p className="mb-0 font-semibold text-slate-950">
+                {shift.maxAppointments} lịch
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-1 text-xs font-semibold uppercase text-slate-500">
+                Slot
+              </p>
+
+              <p className="mb-0 font-semibold text-slate-950">
+                {shift.slotName ||
+                  shift.slotCode ||
+                  shift.slotId}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-1 text-xs font-semibold uppercase text-slate-500">
+                Trạng thái
+              </p>
+
+              <div className="mt-1">
+                {renderDoctorShiftStatus(
+                  shift.status,
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
+            <div className="rounded-xl border border-slate-200 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <Stethoscope className="h-5 w-5 text-slate-500" />
+
+                <p className="mb-0 font-semibold text-slate-950">
+                  Bác sĩ phụ trách
+                </p>
+              </div>
+
+              <div className="mb-4 flex items-center gap-3 rounded-xl bg-blue-50 p-4">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                  <Stethoscope className="h-5 w-5" />
+                </span>
+
+                <div className="min-w-0">
+                  <Text
+                    strong
+                    className="block truncate text-blue-950"
+                  >
+                    {shift.doctorTitle ||
+                      doctorById.get(
+                        shift.doctorId,
+                      )?.title ||
+                      "Bác sĩ"}{" "}
+                    {shift.doctorName ||
+                      doctorById.get(
+                        shift.doctorId,
+                      )?.name ||
+                      `#${shift.doctorId}`}
+                  </Text>
+
+                  <Text className="block truncate text-sm text-blue-700">
+                    {shift.doctorSpecialty ||
+                      doctorById.get(
+                        shift.doctorId,
+                      )?.specialty ||
+                      "Chưa cập nhật"}
+                  </Text>
+                </div>
+              </div>
+
+              <Select
+                showSearch
+                optionFilterProp="label"
+                className="w-full"
+                value={shift.doctorId}
+                loading={loading}
+                placeholder="Chọn bác sĩ phụ trách"
+                options={doctors
+                  .filter(
+                    (doctor) =>
+                      doctor.status === "active",
+                  )
+                  .filter((doctor) =>
+                    doctor.facilityIds.includes(
+                      shift.facilityId,
+                    ),
+                  )
+                  .map((doctor) => {
+                    const busy = shifts.some(
+                      (item) =>
+                        item.id !== shift.id &&
+                        item.doctorId ===
+                          doctor.id &&
+                        item.shiftDate ===
+                          shift.shiftDate &&
+                        shiftsOverlap(
+                          item.startTime,
+                          item.endTime,
+                          shift.startTime,
+                          shift.endTime,
+                        ),
+                    );
+
+                    return {
+                      value: doctor.id,
+                      disabled:
+                        busy &&
+                        doctor.id !==
+                          shift.doctorId,
+                      label: `${doctor.title} ${doctor.name} · ${doctor.specialty}${
+                        busy &&
+                        doctor.id !==
+                          shift.doctorId
+                          ? " · Trùng ca"
+                          : ""
+                      }`,
+                    };
+                  })}
+                onChange={(value) =>
+                  void onAssignDoctor(value)
+                }
+              />
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4">
+              <p className="mb-3 font-semibold text-slate-950">
+                Cơ sở và phòng
+              </p>
+
+              <div className="flex flex-col gap-3 text-sm">
+                <div className="flex gap-3">
+                  <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+
+                  <div>
+                    <p className="mb-0 font-medium text-slate-800">
+                      {shift.facilityName ||
+                        facilityById.get(
+                          shift.facilityId,
+                        )?.name ||
+                        "Chưa cập nhật"}
+                    </p>
+
+                    <p className="mb-0 text-slate-500">
+                      {shift.facilityCode ||
+                        facilityById.get(
+                          shift.facilityId,
+                        )?.code}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+
+                  <p className="mb-0 text-slate-600">
+                    {facilityById.get(
+                      shift.facilityId,
+                    )?.address ||
+                      "Chưa cập nhật địa chỉ"}
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+
+                  <p className="mb-0 text-slate-600">
+                    {shift.roomName ||
+                      roomById.get(
+                        shift.roomId,
+                      )?.name ||
+                      "Chưa cập nhật"}
+                    {shift.roomTypeName
+                      ? ` · ${shift.roomTypeName}`
+                      : shift.roomType
+                        ? ` · ${shift.roomType}`
+                        : ""}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-lg bg-slate-50 p-3">
+                <p className="mb-1 text-xs font-semibold uppercase text-slate-500">
+                  Ghi chú
+                </p>
+
+                <p className="mb-0 whitespace-pre-wrap text-sm text-slate-700">
+                  {shift.note ||
+                    "Không có ghi chú."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <Button
+              type="primary"
+              icon={<X className="h-4 w-4" />}
+              onClick={onClose}
+            >
+              Đóng
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </Modal>
+  );
+}
