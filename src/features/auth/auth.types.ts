@@ -64,7 +64,6 @@ export interface RegisterInput {
   name: string;
   phone: string;
   email: string;
-  phone: string;
   password: string;
 }
 
