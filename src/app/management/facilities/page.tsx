@@ -1,4 +1,3 @@
-// src/app/management/facilities/page.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -80,6 +79,7 @@ function getFacilityStatusText(status: FacilityStatus) {
 }
 
 export default function FacilityManagementPage() {
+  const [modal, modalContextHolder] = Modal.useModal();
   const isSuperAdmin = useAuthStore((state) =>
     state.roles.includes("super_admin"),
   );
@@ -285,7 +285,7 @@ export default function FacilityManagementPage() {
       setDeleteReason("");
       setDeleteReasonTouched(false);
 
-      Modal.success({
+      modal.success({
         title: FACILITY_MESSAGES.DELETE_SUCCESS_TITLE,
         content:
           target.mode === "single"
@@ -298,7 +298,7 @@ export default function FacilityManagementPage() {
       const message = getErrorMessage(err);
       setError(message);
 
-      Modal.error({
+      modal.error({
         title: FACILITY_MESSAGES.DELETE_ERROR_TITLE,
         content: message,
         okText: RESPONSE_MESSAGES.COMMON.CLOSE,
@@ -458,6 +458,7 @@ export default function FacilityManagementPage() {
 
   return (
     <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
+      {modalContextHolder}
       <PageHeader
         title={FACILITY_MESSAGES.PAGE_TITLE}
         description={FACILITY_MESSAGES.PAGE_DESCRIPTION}

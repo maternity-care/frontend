@@ -396,7 +396,7 @@ export const RESPONSE_MESSAGES = {
   },
 
   FACILITY_MANAGEMENT: {
-    PAGE_TITLE: "Facility Management",
+    PAGE_TITLE: "Quản lý cơ sở khám",
     PAGE_DESCRIPTION: "Quản lý danh sách cơ sở khám trong hệ thống.",
 
     DEFAULT_ERROR: "Đã có lỗi xảy ra. Vui lòng thử lại.",
