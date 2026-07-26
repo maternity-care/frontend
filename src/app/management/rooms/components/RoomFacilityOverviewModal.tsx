@@ -114,9 +114,21 @@ export function RoomFacilityOverviewModal({
       mask={{
         closable: !loading,
       }}
+      className="room-facility-overview-modal [&_.ant-modal-content]:overflow-hidden"
+      style={{
+        maxWidth: "calc(100vw - 32px)",
+      }}
+      styles={{
+        body: {
+          width: "100%",
+          minWidth: 0,
+          overflowX: "hidden",
+        },
+      }}
     >
-      <div className="mb-4 flex flex-wrap gap-3">
-        <div className="rounded-lg bg-slate-100 px-4 py-2 text-sm">
+      <div className="w-full min-w-0">
+        <div className="mb-4 flex flex-wrap gap-3">
+          <div className="rounded-lg bg-slate-100 px-4 py-2 text-sm">
           <span className="text-slate-500">
             Cơ sở:
           </span>{" "}
@@ -130,10 +142,10 @@ export function RoomFacilityOverviewModal({
             Phòng:
           </span>{" "}
           <strong>{totals.rooms}</strong>
+          </div>
         </div>
-      </div>
 
-      {error ? (
+        {error ? (
         <Alert
           type="error"
           title={error}
@@ -150,10 +162,17 @@ export function RoomFacilityOverviewModal({
           }
           description="Chưa có dữ liệu phòng theo cơ sở."
         />
-      ) : (
-        <Collapse
-          items={groups.map((group) => ({
-            key: group.facility.id,
+        ) : (
+          <div
+            className="max-h-[520px] w-full min-w-0 overflow-y-auto overflow-x-hidden pr-1"
+          style={{
+            scrollbarGutter: "stable",
+          }}
+        >
+            <Collapse
+              className="w-full min-w-0"
+              items={groups.map((group) => ({
+                key: group.facility.id,
             label: (
               <div className="flex items-center justify-between gap-3 pr-3">
                 <div className="flex min-w-0 items-center gap-2">
@@ -180,12 +199,12 @@ export function RoomFacilityOverviewModal({
               </div>
             ),
             children: (
-              <div className="grid gap-2">
+              <div className="grid min-w-0 gap-2 overflow-hidden">
                 {group.rooms.map((room) => (
                   <button
                     key={room.id}
                     type="button"
-                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    className="flex w-full min-w-0 items-center justify-between gap-3 overflow-hidden rounded-lg border border-slate-200 px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
                     onClick={() =>
                       onSelectRoom(room.id)
                     }
@@ -219,9 +238,11 @@ export function RoomFacilityOverviewModal({
                 ))}
               </div>
             ),
-          }))}
-        />
-      )}
+              }))}
+            />
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }
