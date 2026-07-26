@@ -483,20 +483,21 @@ export default function FacilityManagementPage() {
                 label: FACILITY_MESSAGES.SEARCH_PLACEHOLDER,
                 type: "text",
                 contains: true,
+                width: 420,
               },
               {
                 field: "province",
                 label: FACILITY_MESSAGES.CITY_PLACEHOLDER,
                 type: "select",
                 options: cityOptions,
-                width: 190,
+                width: 300,
               },
               {
                 field: "status",
                 label: FACILITY_MESSAGES.STATUS_PLACEHOLDER,
                 type: "select",
                 options: statusOptions,
-                width: 170,
+                width: 300,
               },
             ]}
             values={{
