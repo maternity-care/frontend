@@ -1,31 +1,42 @@
-// src/app/management/rooms/page.tsx
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import type { ColumnsType } from "antd/es/table";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import type {
+  ColumnsType,
+} from "antd/es/table";
 import {
   Alert,
+  App,
   Button,
   Card,
   Descriptions,
+  Empty,
+  Input,
   Modal,
   Space,
   Statistic,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from "antd";
 import {
   Building2,
   DoorOpen,
   Eye,
+  MapPin,
   Pencil,
   Plus,
+  Shapes,
   Trash2,
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
@@ -34,19 +45,22 @@ import {
   createRoom,
   deleteRoom,
   deleteRooms,
+  getRoomById,
   getRooms,
   getRoomsByFacility,
+  getRoomTypeLookup,
   updateRoom,
 } from "@/management/features/rooms/rooms.api";
 import type {
   ClinicRoom,
   RoomFormValues,
   RoomStatus,
+  RoomType,
 } from "@/management/features/rooms/rooms.types";
 import { ClinicRoomFormModal } from "./components/ClinicRoomFormModal";
 
 const { Text, Title } = Typography;
-const ROOM_MESSAGES = RESPONSE_MESSAGES.CLINIC_ROOM_MANAGEMENT;
+const { TextArea } = Input;
 
 type DeleteConfirmState =
   | {
@@ -64,145 +78,302 @@ type DeleteConfirmState =
       count: number;
     };
 
-const roomTypeOptions = [
-  {
-    value: ROOM_MESSAGES.ROOM_TYPES.ULTRASOUND,
-    label: ROOM_MESSAGES.ROOM_TYPES.ULTRASOUND,
-  },
-  {
-    value: ROOM_MESSAGES.ROOM_TYPES.TESTING,
-    label: ROOM_MESSAGES.ROOM_TYPES.TESTING,
-  },
-  {
-    value: ROOM_MESSAGES.ROOM_TYPES.CONSULTING,
-    label: ROOM_MESSAGES.ROOM_TYPES.CONSULTING,
-  },
-  {
-    value: ROOM_MESSAGES.ROOM_TYPES.ANTENATAL_CARE,
-    label: ROOM_MESSAGES.ROOM_TYPES.ANTENATAL_CARE,
-  },
-  {
-    value: ROOM_MESSAGES.ROOM_TYPES.EMERGENCY,
-    label: ROOM_MESSAGES.ROOM_TYPES.EMERGENCY,
-  },
-];
+function getErrorMessage(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error &&
+    "response" in error
+  ) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string | string[];
+            errors?: {
+              fields?: string[];
+            };
+          };
+        };
+      }
+    ).response;
 
-const statusOptions = [
-  { value: "active", label: ROOM_MESSAGES.ACTIVE },
-  { value: "suspended", label: ROOM_MESSAGES.SUSPENDED },
-];
+    const fields =
+      response?.data?.errors?.fields;
 
-function getErrorMessage(err: unknown) {
-  if (err instanceof Error) {
-    if (err.message.includes("Validation failed")) {
-      return ROOM_MESSAGES.VALIDATION_FAILED;
+    if (
+      Array.isArray(fields) &&
+      fields.length > 0
+    ) {
+      return fields.join(", ");
     }
 
-    return err.message;
+    const message =
+      response?.data?.message;
+
+    if (Array.isArray(message)) {
+      return message.join(", ");
+    }
+
+    if (message) return message;
   }
 
-  return ROOM_MESSAGES.DEFAULT_ERROR;
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
 }
 
 function formatDateTime(value?: string) {
-  if (!value) return ROOM_MESSAGES.NOT_UPDATED;
+  if (!value) return "Chưa cập nhật";
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return value;
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
 
-  return date.toLocaleString(ROOM_MESSAGES.DATE_TIME_LOCALE, {
+  return new Intl.DateTimeFormat("vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  });
+  }).format(date);
+}
+
+function renderStatus(
+  status: RoomStatus,
+) {
+  return status === "active" ? (
+    <Tag color="green">Hoạt động</Tag>
+  ) : (
+    <Tag>Ngừng hoạt động</Tag>
+  );
 }
 
 function ClinicRoomManagementContent() {
   const searchParams = useSearchParams();
+  const {
+    message: messageApi,
+    modal: modalApi,
+  } = App.useApp();
 
-  const facilityIdFromQuery = searchParams.get("facilityId");
-  const facilityNameFromQuery = searchParams.get("facilityName");
-  const sessionFacilityId = useAuthStore((state) => state.activeFacilityId);
+  const facilityIdFromQuery =
+    searchParams.get("facilityId");
+  const facilityNameFromQuery =
+    searchParams.get("facilityName");
+  const sessionFacilityId = useAuthStore(
+    (state) => state.activeFacilityId,
+  );
 
-  const activeFacilityId = facilityIdFromQuery || sessionFacilityId;
-  const isFacilityFiltered = Boolean(activeFacilityId);
+  const activeFacilityId =
+    facilityIdFromQuery ||
+    sessionFacilityId ||
+    undefined;
+  const isFacilityFiltered = Boolean(
+    activeFacilityId,
+  );
 
-  const [rooms, setRooms] = useState<ClinicRoom[]>([]);
+  const [rooms, setRooms] = useState<
+    ClinicRoom[]
+  >([]);
+  const [roomTypes, setRoomTypes] =
+    useState<RoomType[]>([]);
+
   const [query, setQuery] = useState("");
-  const [searchQuery, setSearchQuery] = useState<string>();
-  const [roomTypeFilter, setRoomTypeFilter] = useState<string | undefined>();
-  const [statusFilter, setStatusFilter] = useState<RoomStatus | undefined>();
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] =
+    useState<string>();
+  const [floorFilter, setFloorFilter] =
+    useState<string>();
+  const [
+    roomTypeIdFilter,
+    setRoomTypeIdFilter,
+  ] = useState<string>();
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] = useState<RoomStatus>();
 
-  const [roomModalOpen, setRoomModalOpen] = useState(false);
-  const [editingRoom, setEditingRoom] = useState<ClinicRoom | null>(null);
-  const [detailRoom, setDetailRoom] = useState<ClinicRoom | null>(null);
+  const [currentPage, setCurrentPage] =
+    useState(1);
+  const [pageSize, setPageSize] =
+    useState(20);
+  const [totalRooms, setTotalRooms] =
+    useState(0);
+  const [
+    selectedRoomIds,
+    setSelectedRoomIds,
+  ] = useState<string[]>([]);
 
-  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>({
+  const [
+    roomModalOpen,
+    setRoomModalOpen,
+  ] = useState(false);
+  const [editingRoom, setEditingRoom] =
+    useState<ClinicRoom | null>(null);
+  const [detailRoom, setDetailRoom] =
+    useState<ClinicRoom | null>(null);
+
+  const [
+    deleteConfirm,
+    setDeleteConfirm,
+  ] = useState<DeleteConfirmState>({
     open: false,
   });
+  const [
+    deleteReason,
+    setDeleteReason,
+  ] = useState("");
 
-  const [loading, setLoading] = useState(true);
-  const [tableLoading, setTableLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] =
+    useState(true);
+  const [
+    detailLoading,
+    setDetailLoading,
+  ] = useState(false);
+  const [
+    deleteLoading,
+    setDeleteLoading,
+  ] = useState(false);
+  const [error, setError] = useState<
+    string | null
+  >(null);
+  const [reloadKey, setReloadKey] =
+    useState(0);
 
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
 
-    async function loadRooms() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data = isFacilityFiltered
-          ? await getRoomsByFacility(activeFacilityId!, {
-              rawSearch: searchQuery,
-            })
-          : await getRooms({ rawSearch: searchQuery });
-
-        if (mounted) {
-          setRooms(data);
-          setSelectedRoomIds([]);
-          setCurrentPage(1);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(getErrorMessage(err));
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadRooms();
+    const timer = window.setTimeout(() => {
+      void getRoomTypeLookup({
+        status: "active",
+        limit: 100,
+      })
+        .then((data) => {
+          if (!cancelled) {
+            setRoomTypes(data);
+          }
+        })
+        .catch((loadError) => {
+          if (!cancelled) {
+            setError(
+              getErrorMessage(loadError),
+            );
+          }
+        });
+    }, 0);
 
     return () => {
-      mounted = false;
+      cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [activeFacilityId, isFacilityFiltered, searchQuery]);
+  }, []);
 
-  const filteredRooms = rooms;
+  useEffect(() => {
+    let cancelled = false;
 
-  const activeRooms = rooms.filter((room) => room.status === "active").length;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setLoading(true);
 
-  const suspendedRooms = rooms.filter(
-    (room) => room.status === "suspended",
+        try {
+          const params = {
+            search: searchQuery,
+            floor: floorFilter,
+            roomTypeId:
+              roomTypeIdFilter,
+            status: statusFilter,
+            page: currentPage,
+            limit: pageSize,
+          };
+
+          const result =
+            isFacilityFiltered &&
+            activeFacilityId
+              ? await getRoomsByFacility(
+                  activeFacilityId,
+                  params,
+                )
+              : await getRooms(params);
+
+          if (cancelled) return;
+
+          setRooms(result.items);
+          setTotalRooms(result.total);
+          setSelectedRoomIds([]);
+          setError(null);
+        } catch (loadError) {
+          if (cancelled) return;
+
+          setError(
+            getErrorMessage(loadError),
+          );
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      })();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    activeFacilityId,
+    currentPage,
+    floorFilter,
+    isFacilityFiltered,
+    pageSize,
+    reloadKey,
+    roomTypeIdFilter,
+    searchQuery,
+    statusFilter,
+  ]);
+
+  const activeRoomsOnPage = rooms.filter(
+    (room) => room.status === "active",
   ).length;
 
+  const inactiveRoomsOnPage =
+    rooms.length - activeRoomsOnPage;
+
+  const roomTypeOptions = useMemo(
+    () =>
+      roomTypes.map((roomType) => ({
+        value: roomType.id,
+        label: roomType.name,
+      })),
+    [roomTypes],
+  );
+
+  function refreshRooms() {
+    setReloadKey(
+      (current) => current + 1,
+    );
+  }
+
   function openCreateModal() {
+    if (!activeFacilityId) {
+      modalApi.warning({
+        centered: true,
+        title: "Chưa chọn cơ sở",
+        content:
+          "Vui lòng chọn cơ sở trước khi thêm phòng mới.",
+        okText: "Đóng",
+      });
+      return;
+    }
+
     setEditingRoom(null);
     setRoomModalOpen(true);
   }
 
-  function openEditModal(room: ClinicRoom) {
+  function openEditModal(
+    room: ClinicRoom,
+  ) {
     setEditingRoom(room);
     setRoomModalOpen(true);
   }
@@ -212,120 +383,128 @@ function ClinicRoomManagementContent() {
     setEditingRoom(null);
   }
 
-  function openDetailModal(room: ClinicRoom) {
+  async function openDetailModal(
+    room: ClinicRoom,
+  ) {
     setDetailRoom(room);
-  }
+    setDetailLoading(true);
 
-  function closeDetailModal() {
-    setDetailRoom(null);
-  }
+    try {
+      const detail = await getRoomById(
+        room.id,
+      );
 
-  async function handleSubmitRoom(values: RoomFormValues) {
-    setError(null);
+      setDetailRoom(detail);
+    } catch (detailError) {
+      const message =
+        getErrorMessage(detailError);
 
-    if (!activeFacilityId) {
-      const message = "Vui lòng chọn cơ sở trước khi quản lý phòng.";
       setError(message);
-      Modal.warning({
-        title: "Chưa chọn cơ sở",
-        content: message,
-        centered: true,
-      });
-      return;
+      messageApi.error(message);
+    } finally {
+      setDetailLoading(false);
     }
+  }
+
+  async function handleSubmitRoom(
+    values: RoomFormValues,
+  ) {
+    setError(null);
 
     if (editingRoom) {
       try {
-        const response = await updateRoom(editingRoom.id, {
-          facilityId: activeFacilityId,
-          name: values.roomName.trim(),
-          roomType: values.roomType,
-          floor: String(values.floor),
-          status: values.status,
-          capacity: values.capacity,
-        });
-
-        const updatedRoom: ClinicRoom = {
-          ...response.data,
-          capacity: values.capacity,
-        };
-
-        setRooms((current) =>
-          current.map((room) =>
-            room.id === editingRoom.id ? updatedRoom : room,
-          ),
+        const response = await updateRoom(
+          editingRoom.id,
+          {
+            name: values.roomName,
+            roomTypeId:
+              values.roomTypeId,
+            floor: values.floor,
+            status: values.status,
+          },
         );
 
+        let updatedRoom = {
+          ...editingRoom,
+          ...response.data,
+        };
+
+        try {
+          updatedRoom =
+            await getRoomById(
+              response.data.id ||
+                editingRoom.id,
+            );
+        } catch {
+          // Giữ dữ liệu PATCH khi endpoint chi tiết
+          // chưa phản hồi ngay sau cập nhật.
+        }
+
         setDetailRoom((current) =>
-          current?.id === editingRoom.id ? updatedRoom : current,
+          current?.id === updatedRoom.id
+            ? updatedRoom
+            : current,
         );
 
         closeRoomModal();
-
-        Modal.success({
-          title: ROOM_MESSAGES.UPDATE_SUCCESS_TITLE,
-          content: ROOM_MESSAGES.UPDATE_SUCCESS_CONTENT,
-          okText: ROOM_MESSAGES.DETAIL_CLOSE,
-          centered: true,
-        });
-
+        refreshRooms();
+        messageApi.success(
+          response.message ||
+            "Cập nhật phòng thành công.",
+        );
         return;
-      } catch (err) {
-        const message = getErrorMessage(err);
+      } catch (updateError) {
+        const message =
+          getErrorMessage(updateError);
+
         setError(message);
-
-        Modal.error({
-          title: ROOM_MESSAGES.UPDATE_ERROR_TITLE,
-          content: message,
-          okText: ROOM_MESSAGES.DETAIL_CLOSE,
-          centered: true,
-        });
-
-        throw err;
+        messageApi.error(message);
+        throw updateError;
       }
+    }
+
+    if (!activeFacilityId) {
+      const noFacilityError = new Error(
+        "Vui lòng chọn cơ sở trước khi thêm phòng.",
+      );
+
+      setError(noFacilityError.message);
+      messageApi.error(
+        noFacilityError.message,
+      );
+      throw noFacilityError;
     }
 
     try {
       const response = await createRoom({
         facilityId: activeFacilityId,
-        name: values.roomName.trim(),
-        roomType: values.roomType,
-        floor: String(values.floor),
+        name: values.roomName,
+        roomTypeId: values.roomTypeId,
+        floor: values.floor,
         status: values.status,
-        capacity: values.capacity,
       });
 
-      const createdRoom: ClinicRoom = {
-        ...response.data,
-        capacity: values.capacity,
-      };
-
-      setRooms((current) => [createdRoom, ...current]);
-      setCurrentPage(1);
       closeRoomModal();
+      setCurrentPage(1);
+      refreshRooms();
+      messageApi.success(
+        response.message ||
+          "Tạo phòng thành công.",
+      );
+    } catch (createError) {
+      const message =
+        getErrorMessage(createError);
 
-      Modal.success({
-        title: ROOM_MESSAGES.CREATE_SUCCESS_TITLE,
-        content: ROOM_MESSAGES.CREATE_SUCCESS_CONTENT,
-        okText: ROOM_MESSAGES.DETAIL_CLOSE,
-        centered: true,
-      });
-    } catch (err) {
-      const message = getErrorMessage(err);
       setError(message);
-
-      Modal.error({
-        title: ROOM_MESSAGES.CREATE_ERROR_TITLE,
-        content: message,
-        okText: ROOM_MESSAGES.DETAIL_CLOSE,
-        centered: true,
-      });
-
-      throw err;
+      messageApi.error(message);
+      throw createError;
     }
   }
 
-  function confirmDeleteRoom(room: ClinicRoom) {
+  function confirmDeleteRoom(
+    room: ClinicRoom,
+  ) {
+    setDeleteReason("");
     setDeleteConfirm({
       open: true,
       mode: "single",
@@ -334,8 +513,11 @@ function ClinicRoomManagementContent() {
   }
 
   function confirmDeleteSelected() {
-    if (selectedRoomIds.length === 0) return;
+    if (selectedRoomIds.length === 0) {
+      return;
+    }
 
+    setDeleteReason("");
     setDeleteConfirm({
       open: true,
       mode: "selected",
@@ -347,6 +529,7 @@ function ClinicRoomManagementContent() {
   function closeDeleteConfirm() {
     if (deleteLoading) return;
 
+    setDeleteReason("");
     setDeleteConfirm({
       open: false,
     });
@@ -355,169 +538,246 @@ function ClinicRoomManagementContent() {
   async function handleConfirmDelete() {
     if (!deleteConfirm.open) return;
 
+    const reason =
+      deleteReason.trim();
+
+    if (!reason) {
+      messageApi.warning(
+        "Vui lòng nhập lý do xóa phòng.",
+      );
+      return;
+    }
+
     setDeleteLoading(true);
-    setTableLoading(true);
     setError(null);
 
     try {
-      if (deleteConfirm.mode === "single") {
-        const roomId = deleteConfirm.room.id;
-
-        await deleteRoom(roomId);
-
-        setRooms((current) => current.filter((room) => room.id !== roomId));
-
-        setSelectedRoomIds((current) => current.filter((id) => id !== roomId));
-
-        setDetailRoom((current) => (current?.id === roomId ? null : current));
-
-        Modal.success({
-          title: ROOM_MESSAGES.DELETE_SUCCESS_TITLE,
-          content: ROOM_MESSAGES.DELETE_SINGLE_SUCCESS_CONTENT,
-          okText: ROOM_MESSAGES.DETAIL_CLOSE,
-          centered: true,
-        });
-      } else {
-        const ids = deleteConfirm.ids;
-
-        await deleteRooms(ids);
-
-        setRooms((current) => current.filter((room) => !ids.includes(room.id)));
-
-        setDetailRoom((current) =>
-          current && ids.includes(current.id) ? null : current,
+      if (
+        deleteConfirm.mode === "single"
+      ) {
+        await deleteRoom(
+          deleteConfirm.room.id,
+          reason,
         );
-
-        setSelectedRoomIds([]);
-        setCurrentPage(1);
-
-        Modal.success({
-          title: ROOM_MESSAGES.DELETE_SUCCESS_TITLE,
-          content: ROOM_MESSAGES.DELETE_SELECTED_SUCCESS_CONTENT,
-          okText: ROOM_MESSAGES.DETAIL_CLOSE,
-          centered: true,
-        });
+      } else {
+        await deleteRooms(
+          deleteConfirm.ids,
+          reason,
+        );
       }
+
+      const deletedCount =
+        deleteConfirm.mode === "single"
+          ? 1
+          : deleteConfirm.count;
+
+      setDetailRoom((current) => {
+        if (!current) return current;
+
+        if (
+          deleteConfirm.mode === "single"
+        ) {
+          return current.id ===
+            deleteConfirm.room.id
+            ? null
+            : current;
+        }
+
+        return deleteConfirm.ids.includes(
+          current.id,
+        )
+          ? null
+          : current;
+      });
 
       setDeleteConfirm({
         open: false,
       });
-    } catch (err) {
-      const message = getErrorMessage(err);
-      setError(message);
+      setDeleteReason("");
+      setSelectedRoomIds([]);
 
-      Modal.error({
-        title: ROOM_MESSAGES.DELETE_ERROR_TITLE,
-        content: message,
-        okText: ROOM_MESSAGES.DETAIL_CLOSE,
-        centered: true,
-      });
+      if (
+        rooms.length <= deletedCount &&
+        currentPage > 1
+      ) {
+        setCurrentPage(
+          (current) =>
+            Math.max(1, current - 1),
+        );
+      } else {
+        refreshRooms();
+      }
+
+      messageApi.success(
+        deletedCount > 1
+          ? `Đã xóa ${deletedCount} phòng.`
+          : "Xóa phòng thành công.",
+      );
+    } catch (deleteError) {
+      const message =
+        getErrorMessage(deleteError);
+
+      setError(message);
+      messageApi.error(message);
     } finally {
       setDeleteLoading(false);
-      setTableLoading(false);
     }
   }
 
   const columns: ColumnsType<ClinicRoom> = [
     {
-      title: ROOM_MESSAGES.STT,
+      title: "STT",
       width: 70,
       align: "center",
-      render: (_value, _record, index) =>
-        (currentPage - 1) * pageSize + index + 1,
+      render: (
+        _value,
+        _record,
+        index,
+      ) =>
+        (currentPage - 1) *
+          pageSize +
+        index +
+        1,
     },
     {
-      title: <div className="text-center">{ROOM_MESSAGES.ROOM_NAME}</div>,
+      title: "Tên phòng",
       dataIndex: "roomName",
-      render: (roomName: string) => (
-        <div className="flex items-center justify-start gap-3 pl-4">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-white">
-            <DoorOpen className="h-4 w-4" />
-          </span>
+      width: 230,
+      render: (
+        roomName: string,
+        room,
+      ) => (
+        <div className="min-w-0">
+          <Text
+            strong
+            className="block truncate text-slate-950"
+          >
+            {roomName}
+          </Text>
 
-          <Text strong>{roomName}</Text>
+          <Text
+            type="secondary"
+            className="block truncate text-xs"
+          >
+            {room.code ||
+              `ID: ${room.id}`}
+          </Text>
         </div>
       ),
     },
     {
-      title: ROOM_MESSAGES.ROOM_TYPE,
-      dataIndex: "roomType",
-      align: "center",
-      render: (roomType: string) => (
-        <Tag color="blue">{roomType || ROOM_MESSAGES.NOT_UPDATED}</Tag>
+      title: "Loại phòng",
+      dataIndex: "roomTypeName",
+      width: 190,
+      render: (
+        roomTypeName: string,
+      ) => (
+        <Tag color="blue">
+          {roomTypeName ||
+            "Chưa cập nhật"}
+        </Tag>
       ),
     },
     {
-      title: ROOM_MESSAGES.FLOOR,
-      dataIndex: "floor",
-      width: 100,
-      align: "center",
+      title: "Cơ sở",
+      width: 250,
+      render: (_value, room) => (
+        <div className="min-w-0">
+          <Text
+            strong
+            className="block truncate"
+          >
+            {room.facilityName ||
+              "Chưa cập nhật"}
+          </Text>
+
+          <Text
+            type="secondary"
+            className="block truncate text-xs"
+          >
+            {room.facilityCode ||
+              room.facilityId}
+          </Text>
+        </div>
+      ),
     },
     {
-      title: ROOM_MESSAGES.CAPACITY,
-      dataIndex: "capacity",
+      title: "Tầng",
+      dataIndex: "floor",
       width: 120,
       align: "center",
-      render: (capacity: number) => (
-        <span className="font-medium text-slate-700">{capacity}</span>
-      ),
+      render: (floor: string) =>
+        floor || "Chưa cập nhật",
     },
     {
-      title: ROOM_MESSAGES.STATUS,
+      title: "Trạng thái",
       dataIndex: "status",
-      width: 160,
+      width: 155,
       align: "center",
       render: (status: RoomStatus) =>
-        status === "active" ? (
-          <Tag color="green">{ROOM_MESSAGES.ACTIVE}</Tag>
-        ) : (
-          <Tag color="default">{ROOM_MESSAGES.SUSPENDED}</Tag>
-        ),
+        renderStatus(status),
     },
     {
-      title: ROOM_MESSAGES.ACTIONS,
+      title: "Thao tác",
       key: "actions",
-      width: 180,
+      width: 160,
       align: "center",
-      render: (_value, record) => (
-        <Space size={8}>
-          <Button
-            title={ROOM_MESSAGES.VIEW_DETAIL}
-            icon={<Eye className="h-4 w-4" />}
-            onClick={(event) => {
-              event.stopPropagation();
-              openDetailModal(record);
-            }}
-          />
+      fixed: "right",
+      render: (_value, room) => (
+        <Space size={6}>
+          <Tooltip title="Xem chi tiết">
+            <Button
+              icon={
+                <Eye className="h-4 w-4" />
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                void openDetailModal(
+                  room,
+                );
+              }}
+            />
+          </Tooltip>
 
-          <Button
-            title={ROOM_MESSAGES.EDIT}
-            icon={<Pencil className="h-4 w-4" />}
-            onClick={(event) => {
-              event.stopPropagation();
-              openEditModal(record);
-            }}
-          />
+          <Tooltip title="Cập nhật">
+            <Button
+              icon={
+                <Pencil className="h-4 w-4" />
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                openEditModal(room);
+              }}
+            />
+          </Tooltip>
 
-          <Button
-            danger
-            title={ROOM_MESSAGES.DELETE}
-            icon={<Trash2 className="h-4 w-4" />}
-            onClick={(event) => {
-              event.stopPropagation();
-              confirmDeleteRoom(record);
-            }}
-          />
+          <Tooltip title="Xóa">
+            <Button
+              danger
+              icon={
+                <Trash2 className="h-4 w-4" />
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                confirmDeleteRoom(
+                  room,
+                );
+              }}
+            />
+          </Tooltip>
         </Space>
       ),
     },
   ];
 
   return (
-    <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
+    <AdminLayout
+      roles={["super_admin", "admin"]}
+      permissions={["user.view"]}
+    >
       <PageHeader
-        title={ROOM_MESSAGES.PAGE_TITLE}
-        description={ROOM_MESSAGES.PAGE_DESCRIPTION}
+        title="Quản lý phòng"
+        description="Quản lý phòng khám theo cơ sở và loại phòng."
       />
 
       <div className="mt-6 flex flex-col gap-5">
@@ -532,64 +792,107 @@ function ClinicRoomManagementContent() {
         ) : null}
 
         <div className="order-2">
-        <TableFilter
-          columns={[
-            { field: "name", label: ROOM_MESSAGES.SEARCH_PLACEHOLDER, type: "text", contains: true, width: 420 },
-            { field: "roomType", label: ROOM_MESSAGES.ROOM_TYPE_PLACEHOLDER, type: "select", options: roomTypeOptions, width: 300 },
-            { field: "status", label: ROOM_MESSAGES.STATUS_PLACEHOLDER, type: "select", options: statusOptions, width: 300 },
-          ]}
-          values={{ name: query, roomType: roomTypeFilter, status: statusFilter }}
-          clearLabel={ROOM_MESSAGES.CLEAR_FILTERS}
-          onChange={(values, search) => {
-            setSearchQuery(search);
-            setQuery(String(values.name ?? ""));
-            setRoomTypeFilter(values.roomType ? String(values.roomType) : undefined);
-            setStatusFilter(values.status as RoomStatus | undefined);
-            setCurrentPage(1);
-          }}
-        />
+          <TableFilter
+            columns={[
+              {
+                field: "name",
+                label:
+                  "Tìm theo tên phòng, cơ sở hoặc loại phòng",
+                type: "text",
+                contains: true,
+                width: 320,
+              },
+              {
+                field: "floor",
+                label: "Tầng",
+                type: "text",
+                width: 180,
+              },
+              {
+                field: "roomTypeId",
+                label: "Loại phòng",
+                type: "select",
+                options: roomTypeOptions,
+                width: 240,
+              },
+              {
+                field: "status",
+                label: "Trạng thái",
+                type: "select",
+                options: [
+                  {
+                    value: "active",
+                    label: "Hoạt động",
+                  },
+                  {
+                    value: "inactive",
+                    label:
+                      "Ngừng hoạt động",
+                  },
+                ],
+                width: 220,
+              },
+            ]}
+            values={{
+              name: query,
+              floor: floorFilter,
+              roomTypeId:
+                roomTypeIdFilter,
+              status: statusFilter,
+            }}
+            clearLabel="Xóa bộ lọc"
+            onChange={(values) => {
+              setQuery(
+                String(
+                  values.name ?? "",
+                ),
+              );
+              setSearchQuery(
+                values.name
+                  ? String(values.name)
+                  : undefined,
+              );
+              setFloorFilter(
+                values.floor
+                  ? String(values.floor)
+                  : undefined,
+              );
+              setRoomTypeIdFilter(
+                values.roomTypeId
+                  ? String(
+                      values.roomTypeId,
+                    )
+                  : undefined,
+              );
+              setStatusFilter(
+                values.status as
+                  | RoomStatus
+                  | undefined,
+              );
+              setCurrentPage(1);
+            }}
+          />
         </div>
 
         <div className="order-1 grid gap-4 md:grid-cols-3">
           <Card className="border-slate-200 bg-white">
             <Statistic
-              title={
-                <span className="text-slate-500">
-                  {ROOM_MESSAGES.TOTAL_ROOMS}
-                </span>
-              }
-              value={rooms.length}
-              formatter={(value) => (
-                <span className="text-slate-950">{value}</span>
-              )}
+              title="Tổng số phòng"
+              value={totalRooms}
             />
           </Card>
 
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title={
-                <span className="text-emerald-700">
-                  {ROOM_MESSAGES.ACTIVE_ROOMS}
-                </span>
-              }
-              value={activeRooms}
-              formatter={(value) => (
-                <span className="text-emerald-950">{value}</span>
-              )}
+              title="Hoạt động trên trang"
+              value={activeRoomsOnPage}
             />
           </Card>
 
-          <Card className="border-red-100 bg-red-50/60">
+          <Card className="border-slate-200 bg-slate-50/70">
             <Statistic
-              title={
-                <span className="text-red-700">
-                  {ROOM_MESSAGES.SUSPENDED_ROOMS}
-                </span>
-              }
-              value={suspendedRooms}
-              formatter={(value) => (
-                <span className="text-red-950">{value}</span>
-              )}
+              title="Ngừng hoạt động trên trang"
+              value={inactiveRoomsOnPage}
             />
           </Card>
         </div>
@@ -604,11 +907,11 @@ function ClinicRoomManagementContent() {
           title={
             <div>
               <p className="mb-0 text-base font-semibold text-slate-950">
-                {ROOM_MESSAGES.ROOM_LIST_TITLE}
+                Danh sách phòng
               </p>
 
               <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                {ROOM_MESSAGES.ROOM_LIST_DESCRIPTION}
+                Danh sách được tải theo bộ lọc và phân trang từ API.
               </p>
             </div>
           }
@@ -616,11 +919,18 @@ function ClinicRoomManagementContent() {
             <Space wrap>
               <Button
                 danger
-                disabled={selectedRoomIds.length === 0}
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={confirmDeleteSelected}
+                disabled={
+                  selectedRoomIds.length ===
+                  0
+                }
+                icon={
+                  <Trash2 className="h-4 w-4" />
+                }
+                onClick={
+                  confirmDeleteSelected
+                }
               >
-                {ROOM_MESSAGES.DELETE_SELECTED}
+                Xóa đã chọn
                 {selectedRoomIds.length > 0
                   ? ` (${selectedRoomIds.length})`
                   : ""}
@@ -628,10 +938,12 @@ function ClinicRoomManagementContent() {
 
               <Button
                 type="primary"
-                icon={<Plus className="h-4 w-4" />}
+                icon={
+                  <Plus className="h-4 w-4" />
+                }
                 onClick={openCreateModal}
               >
-                {ROOM_MESSAGES.ADD_ROOM}
+                Thêm phòng
               </Button>
             </Space>
           }
@@ -641,46 +953,91 @@ function ClinicRoomManagementContent() {
             rowKey="id"
             size="middle"
             tableLayout="fixed"
-            loading={loading || tableLoading}
+            loading={loading}
             columns={columns}
-            dataSource={filteredRooms}
-            scroll={{ x: 860 }}
-            onRow={(record) => ({
-              className: "cursor-pointer",
+            dataSource={rooms}
+            scroll={{
+              x: 1175,
+            }}
+            rowSelection={{
+              selectedRowKeys:
+                selectedRoomIds,
+              onChange: (
+                selectedRowKeys,
+              ) => {
+                setSelectedRoomIds(
+                  selectedRowKeys.map(
+                    String,
+                  ),
+                );
+              },
+            }}
+            onRow={(room) => ({
+              className:
+                "cursor-pointer",
               onClick: (event) => {
-                const target = event.target as HTMLElement;
+                const target =
+                  event.target as HTMLElement;
 
                 if (
-                  target.closest("button") ||
+                  target.closest(
+                    "button",
+                  ) ||
                   target.closest("a") ||
-                  target.closest(".ant-checkbox") ||
-                  target.closest(".ant-checkbox-wrapper")
+                  target.closest(
+                    ".ant-checkbox",
+                  ) ||
+                  target.closest(
+                    ".ant-checkbox-wrapper",
+                  )
                 ) {
                   return;
                 }
 
-                openDetailModal(record);
+                void openDetailModal(room);
               },
             })}
-            rowSelection={{
-              selectedRowKeys: selectedRoomIds,
-              onChange: (selectedRowKeys) => {
-                setSelectedRoomIds(selectedRowKeys.map(String));
-              },
-            }}
             pagination={{
               current: currentPage,
               pageSize,
-              total: filteredRooms.length,
+              total: totalRooms,
               showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50, 100],
+              pageSizeOptions: [
+                10,
+                20,
+                50,
+                100,
+              ],
               showQuickJumper: true,
-              showTotal: (total, range) =>
-                `${ROOM_MESSAGES.PAGINATION_TOTAL_PREFIX} ${range[0]} - ${range[1]} ${ROOM_MESSAGES.PAGINATION_TOTAL_MIDDLE} ${total} ${ROOM_MESSAGES.PAGINATION_TOTAL_SUFFIX}`,
-              onChange: (page, nextPageSize) => {
-                setCurrentPage(nextPageSize !== pageSize ? 1 : page);
-                setPageSize(nextPageSize);
+              showTotal: (
+                total,
+                range,
+              ) =>
+                `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} phòng`,
+              onChange: (
+                page,
+                nextPageSize,
+              ) => {
+                setCurrentPage(
+                  nextPageSize !==
+                    pageSize
+                    ? 1
+                    : page,
+                );
+                setPageSize(
+                  nextPageSize,
+                );
               },
+            }}
+            locale={{
+              emptyText: (
+                <Empty
+                  image={
+                    Empty.PRESENTED_IMAGE_SIMPLE
+                  }
+                  description="Không có phòng phù hợp."
+                />
+              ),
             }}
           />
         </Card>
@@ -689,44 +1046,62 @@ function ClinicRoomManagementContent() {
       <ClinicRoomFormModal
         open={roomModalOpen}
         editingRoom={editingRoom}
+        roomTypes={roomTypes}
+        facilityName={
+          facilityNameFromQuery ||
+          editingRoom?.facilityName
+        }
         onClose={closeRoomModal}
         onSubmit={handleSubmitRoom}
       />
 
       <Modal
         open={Boolean(detailRoom)}
-        width={720}
+        width={780}
         centered
         title={null}
         footer={
           <div className="flex justify-end">
-            <Button type="primary" onClick={closeDetailModal}>
-              {ROOM_MESSAGES.DETAIL_CLOSE}
+            <Button
+              type="primary"
+              onClick={() =>
+                setDetailRoom(null)
+              }
+            >
+              Đóng
             </Button>
           </div>
         }
-        onCancel={closeDetailModal}
-        mask={{ closable: true }}
+        confirmLoading={detailLoading}
+        onCancel={() =>
+          setDetailRoom(null)
+        }
+        mask={{
+          closable: !detailLoading,
+        }}
       >
         {detailRoom ? (
           <div>
-            <div className="mb-5 flex items-start gap-4 border-b border-slate-200 pb-4">
+            <div className="mb-5 flex items-start gap-4 border-b border-slate-200 pb-4 pr-10 sm:pr-12">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
                 <DoorOpen className="h-6 w-6" />
               </div>
 
-              <div>
-                <Title level={3} className="!mb-1 !text-slate-950">
+              <div className="min-w-0">
+                <Title
+                  level={3}
+                  className="!mb-1 truncate !text-slate-950"
+                >
                   {detailRoom.roomName}
                 </Title>
 
                 <Space size={8} wrap>
-                  <Tag color="blue">{detailRoom.roomType}</Tag>
+                  <Tag color="blue">
+                    {detailRoom.roomTypeName}
+                  </Tag>
 
-                  {detailRoom.status === "active" ? (
-                    <Tag color="green">{ROOM_MESSAGES.ACTIVE}</Tag>
-                  ) : (
-                    <Tag color="default">{ROOM_MESSAGES.SUSPENDED}</Tag>
+                  {renderStatus(
+                    detailRoom.status,
                   )}
                 </Space>
               </div>
@@ -738,45 +1113,116 @@ function ClinicRoomManagementContent() {
               size="middle"
               styles={{
                 label: {
-                  width: 160,
+                  width: 170,
                   fontWeight: 600,
                 },
               }}
             >
-              <Descriptions.Item label={ROOM_MESSAGES.ROOM_NAME} span={1}>
-                {detailRoom.roomName}
+              <Descriptions.Item
+                label="Mã phòng"
+                span={1}
+              >
+                {detailRoom.code ||
+                  detailRoom.id}
               </Descriptions.Item>
 
-              <Descriptions.Item label={ROOM_MESSAGES.ROOM_TYPE} span={1}>
-                {detailRoom.roomType}
-              </Descriptions.Item>
-
-              <Descriptions.Item label={ROOM_MESSAGES.FLOOR} span={1}>
+              <Descriptions.Item
+                label="Tầng"
+                span={1}
+              >
                 {detailRoom.floor}
               </Descriptions.Item>
 
-              <Descriptions.Item label={ROOM_MESSAGES.CAPACITY} span={1}>
-                {detailRoom.capacity} {ROOM_MESSAGES.PERSON_SUFFIX}
+              <Descriptions.Item
+                label="Loại phòng"
+                span={1}
+              >
+                <div className="flex items-center gap-2">
+                  <Shapes className="h-4 w-4 text-slate-400" />
+                  {
+                    detailRoom.roomTypeName
+                  }
+                </div>
               </Descriptions.Item>
 
-              <Descriptions.Item label={ROOM_MESSAGES.STATUS} span={1}>
-                {detailRoom.status === "active" ? (
-                  <Tag color="green">{ROOM_MESSAGES.ACTIVE}</Tag>
-                ) : (
-                  <Tag color="default">{ROOM_MESSAGES.SUSPENDED}</Tag>
+              <Descriptions.Item
+                label="Mã loại phòng"
+                span={1}
+              >
+                {detailRoom.roomTypeCode ||
+                  detailRoom.roomTypeId}
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Cơ sở"
+                span={2}
+              >
+                <div className="flex items-start gap-2">
+                  <Building2 className="mt-0.5 h-4 w-4 text-slate-400" />
+
+                  <div>
+                    <Text strong>
+                      {
+                        detailRoom.facilityName
+                      }
+                    </Text>
+
+                    <Text
+                      type="secondary"
+                      className="ml-2"
+                    >
+                      {
+                        detailRoom.facilityCode
+                      }
+                    </Text>
+                  </div>
+                </div>
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Địa chỉ"
+                span={2}
+              >
+                <div className="flex items-start gap-2">
+                  <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
+
+                  <span>
+                    {[
+                      detailRoom.facilityAddress,
+                      detailRoom.facilityWard,
+                      detailRoom.facilityProvince,
+                    ]
+                      .filter(Boolean)
+                      .join(", ") ||
+                      "Chưa cập nhật"}
+                  </span>
+                </div>
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Mô tả loại phòng"
+                span={2}
+              >
+                {detailRoom.roomTypeDescription ||
+                  "Chưa cập nhật"}
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Ngày tạo"
+                span={1}
+              >
+                {formatDateTime(
+                  detailRoom.createdAt,
                 )}
               </Descriptions.Item>
 
-              <Descriptions.Item label={ROOM_MESSAGES.ROOM_CODE} span={1}>
-                {detailRoom.id}
-              </Descriptions.Item>
-
-              <Descriptions.Item label={ROOM_MESSAGES.CREATED_AT} span={1}>
-                {formatDateTime(detailRoom.createdAt)}
-              </Descriptions.Item>
-
-              <Descriptions.Item label={ROOM_MESSAGES.UPDATED_AT} span={1}>
-                {formatDateTime(detailRoom.updatedAt)}
+              <Descriptions.Item
+                label="Cập nhật lần cuối"
+                span={1}
+              >
+                {formatDateTime(
+                  detailRoom.updatedAt,
+                )}
               </Descriptions.Item>
             </Descriptions>
           </div>
@@ -786,12 +1232,14 @@ function ClinicRoomManagementContent() {
       <Modal
         open={deleteConfirm.open}
         centered
-        width={456}
+        width={480}
         title={null}
         footer={null}
         closable={false}
         onCancel={closeDeleteConfirm}
-        mask={{ closable: !deleteLoading }}
+        mask={{
+          closable: !deleteLoading,
+        }}
         className="[&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-[14px] [&_.ant-modal-content]:p-0"
         styles={{
           body: {
@@ -802,7 +1250,7 @@ function ClinicRoomManagementContent() {
         <div className="relative px-6 pb-6 pt-7 text-center">
           <button
             type="button"
-            aria-label={ROOM_MESSAGES.DETAIL_CLOSE}
+            aria-label="Đóng"
             onClick={closeDeleteConfirm}
             disabled={deleteLoading}
             className="absolute right-3 top-3 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -815,22 +1263,60 @@ function ClinicRoomManagementContent() {
           </div>
 
           <h3 className="mt-5 text-lg font-bold text-slate-950">
-            {deleteConfirm.open && deleteConfirm.mode === "selected"
-              ? ROOM_MESSAGES.DELETE_SELECTED_ROOMS
-              : ROOM_MESSAGES.DELETE_ROOM}
+            {deleteConfirm.open &&
+            deleteConfirm.mode ===
+              "selected"
+              ? "Xóa các phòng đã chọn?"
+              : "Xóa phòng?"}
           </h3>
 
           <p className="mt-2 text-sm text-slate-500">
-            {deleteConfirm.open && deleteConfirm.mode === "selected"
-              ? `${ROOM_MESSAGES.DELETE_SELECTED_CONFIRM_PREFIX} ${deleteConfirm.count} ${ROOM_MESSAGES.DELETE_SELECTED_CONFIRM_SUFFIX}`
-              : ROOM_MESSAGES.DELETE_SINGLE_CONFIRM}
+            {deleteConfirm.open &&
+            deleteConfirm.mode ===
+              "selected"
+              ? `Bạn đang xóa ${deleteConfirm.count} phòng.`
+              : "Phòng bị xóa sẽ không còn xuất hiện trong danh sách hoạt động."}
           </p>
 
-          {deleteConfirm.open && deleteConfirm.mode === "single" ? (
-            <p className="mx-auto mt-2 max-w-[340px] truncate text-sm font-semibold text-slate-800">
-              {deleteConfirm.room.roomName} - {deleteConfirm.room.roomType}
+          {deleteConfirm.open &&
+          deleteConfirm.mode ===
+            "single" ? (
+            <p className="mx-auto mt-2 max-w-[360px] truncate text-sm font-semibold text-slate-800">
+              {
+                deleteConfirm.room
+                  .roomName
+              }{" "}
+              -{" "}
+              {
+                deleteConfirm.room
+                  .roomTypeName
+              }
             </p>
           ) : null}
+
+          <div className="mt-5 text-left">
+            <label
+              htmlFor="room-delete-reason"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Lý do xóa
+            </label>
+
+            <TextArea
+              id="room-delete-reason"
+              value={deleteReason}
+              rows={3}
+              maxLength={500}
+              showCount
+              disabled={deleteLoading}
+              placeholder="Nhập lý do xóa phòng..."
+              onChange={(event) =>
+                setDeleteReason(
+                  event.target.value,
+                )
+              }
+            />
+          </div>
 
           <div className="mt-6 grid grid-cols-2 gap-3">
             <Button
@@ -839,7 +1325,7 @@ function ClinicRoomManagementContent() {
               disabled={deleteLoading}
               className="h-11 rounded-lg font-semibold"
             >
-              {ROOM_MESSAGES.CANCEL}
+              Hủy
             </Button>
 
             <Button
@@ -847,10 +1333,15 @@ function ClinicRoomManagementContent() {
               type="primary"
               size="large"
               loading={deleteLoading}
-              onClick={handleConfirmDelete}
+              disabled={
+                !deleteReason.trim()
+              }
+              onClick={() =>
+                void handleConfirmDelete()
+              }
               className="h-11 rounded-lg font-semibold"
             >
-              {ROOM_MESSAGES.DELETE}
+              Xóa phòng
             </Button>
           </div>
         </div>
@@ -864,7 +1355,7 @@ export default function ClinicRoomManagementPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
-          {ROOM_MESSAGES.LOADING_ROOMS}
+          Đang tải danh sách phòng...
         </div>
       }
     >
