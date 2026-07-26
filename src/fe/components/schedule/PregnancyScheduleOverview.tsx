@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Progress, Row, Statistic, Typography } from "antd";
-import { CalendarPlus, CalendarDays, Clock, Hospital } from "lucide-react";
-import dayjs from "dayjs";
+import { CalendarPlus, CalendarDays, Clock, Download, Hospital } from "lucide-react";
+import dayjs, { type Dayjs } from "dayjs";
 
 import type { PregnancyScheduleItem } from "@/features/schedule/schedule.types";
+import {
+  buildGoogleCalendarUrl,
+  downloadSchedulesIcs,
+  readStoredSchedules,
+  writeStoredSchedules,
+} from "@/features/schedule/schedule.utils";
 import { CreateScheduleModal } from "./CreateScheduleModal";
 import { ScheduleList } from "./ScheduleList";
 import { ScheduleCalendar } from "./ScheduleCalendar";
@@ -25,7 +31,29 @@ export function PregnancyScheduleOverview({
   initialSchedules,
 }: PregnancyScheduleOverviewProps) {
   const [schedules, setSchedules] = useState<PregnancyScheduleItem[]>(initialSchedules);
+  const [storageReady, setStorageReady] = useState(false);
   const [openCreateModal, setOpenCreateModal] = useState(false);
+  const [createScheduleDate, setCreateScheduleDate] = useState<Dayjs | undefined>();
+
+  useEffect(() => {
+    const storedSchedules = readStoredSchedules();
+
+    setSchedules((current) => {
+      const currentIds = new Set(current.map((schedule) => schedule.id));
+      const missingStoredSchedules = storedSchedules.filter(
+        (schedule) => !currentIds.has(schedule.id),
+      );
+
+      return [...current, ...missingStoredSchedules];
+    });
+    setStorageReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!storageReady) return;
+
+    writeStoredSchedules(schedules);
+  }, [schedules, storageReady]);
 
   const sortedSchedules = useMemo(() => {
     return [...schedules].sort((a, b) => {
@@ -51,6 +79,23 @@ export function PregnancyScheduleOverview({
   const handleCreateSchedule = (newSchedule: PregnancyScheduleItem) => {
     setSchedules((prev) => [...prev, newSchedule]);
     setOpenCreateModal(false);
+  };
+
+  const handleOpenCreateModal = (date?: Dayjs) => {
+    setCreateScheduleDate(date);
+    setOpenCreateModal(true);
+  };
+
+  const handleDeleteSchedule = (scheduleId: string) => {
+    setSchedules((prev) => prev.filter((schedule) => schedule.id !== scheduleId));
+  };
+
+  const handleOpenGoogleCalendar = (schedule: PregnancyScheduleItem) => {
+    window.open(buildGoogleCalendarUrl(schedule), "_blank", "noopener,noreferrer");
+  };
+
+  const handleImportAllToCalendar = () => {
+    downloadSchedulesIcs(sortedSchedules);
   };
 
   return (
@@ -135,32 +180,52 @@ export function PregnancyScheduleOverview({
             {RESPONSE_MESSAGES.SCHEDULE.MANAGE_SCHEDULE}
           </Title>
           <Text type="secondary">
-            {RESPONSE_MESSAGES.SCHEDULE.MANAGE_SCHEDULE_DESCRIPTION}
+            {RESPONSE_MESSAGES.SCHEDULE.MANAGE_SCHEDULE_DESCRIPTION} Chọn một ngày trên lịch để tạo nhanh.
           </Text>
         </div>
 
-        <Button
-          type="primary"
-          size="large"
-          icon={<CalendarPlus className="h-4 w-4" />}
-          onClick={() => setOpenCreateModal(true)}
-        >
-          {RESPONSE_MESSAGES.SCHEDULE.CREATE_SCHEDULE}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="large"
+            icon={<Download className="h-4 w-4" />}
+            disabled={!sortedSchedules.length}
+            onClick={handleImportAllToCalendar}
+          >
+            Import tất cả
+          </Button>
+
+          <Button
+            type="primary"
+            size="large"
+            icon={<CalendarPlus className="h-4 w-4" />}
+            onClick={() => handleOpenCreateModal()}
+          >
+            {RESPONSE_MESSAGES.SCHEDULE.CREATE_SCHEDULE}
+          </Button>
+        </div>
       </div>
 
       <Row gutter={[24, 24]}>
         <Col xs={24} xl={8}>
-          <ScheduleList schedules={upcomingSchedules} />
+          <ScheduleList
+            schedules={upcomingSchedules}
+            onDelete={handleDeleteSchedule}
+            onOpenGoogleCalendar={handleOpenGoogleCalendar}
+          />
         </Col>
 
         <Col xs={24} xl={16}>
-          <ScheduleCalendar schedules={sortedSchedules} />
+          <ScheduleCalendar
+            schedules={sortedSchedules}
+            onCreateSchedule={handleOpenCreateModal}
+            onOpenGoogleCalendar={handleOpenGoogleCalendar}
+          />
         </Col>
       </Row>
 
       <CreateScheduleModal
         open={openCreateModal}
+        initialDate={createScheduleDate}
         onCancel={() => setOpenCreateModal(false)}
         onCreate={handleCreateSchedule}
       />

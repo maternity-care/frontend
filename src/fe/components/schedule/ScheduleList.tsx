@@ -1,7 +1,7 @@
 "use client";
 
-import { Card, Empty, Tag, Typography } from "antd";
-import { Clock, Hospital, Stethoscope } from "lucide-react";
+import { Button, Card, Empty, Popconfirm, Space, Tag, Typography } from "antd";
+import { CalendarPlus, Clock, Hospital, Stethoscope, Trash2 } from "lucide-react";
 import dayjs from "dayjs";
 
 import type {
@@ -36,11 +36,20 @@ const typeText: Record<PregnancyScheduleType, string> = {
 
 type ScheduleListProps = {
   schedules: PregnancyScheduleItem[];
+  onDelete?: (scheduleId: string) => void;
+  onOpenGoogleCalendar?: (schedule: PregnancyScheduleItem) => void;
 };
 
-export function ScheduleList({ schedules }: ScheduleListProps) {
+export function ScheduleList({
+  schedules,
+  onDelete,
+  onOpenGoogleCalendar,
+}: ScheduleListProps) {
   return (
-    <Card title={RESPONSE_MESSAGES.SCHEDULE.UPCOMING_APPOINTMENTS_CARE} className="h-full shadow-sm">
+    <Card
+      title={RESPONSE_MESSAGES.SCHEDULE.UPCOMING_APPOINTMENTS_CARE}
+      className="h-full shadow-sm"
+    >
       {schedules.length ? (
         <div className="divide-y divide-slate-100">
           {schedules.map((item) => (
@@ -48,9 +57,7 @@ export function ScheduleList({ schedules }: ScheduleListProps) {
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <Text strong>{item.title}</Text>
 
-                <Tag color={statusColor[item.status]}>
-                  {statusText[item.status]}
-                </Tag>
+                <Tag color={statusColor[item.status]}>{statusText[item.status]}</Tag>
 
                 <Tag color={item.createdByUser ? "pink" : undefined}>
                   {typeText[item.type]}
@@ -79,12 +86,35 @@ export function ScheduleList({ schedules }: ScheduleListProps) {
                   </div>
                 ) : null}
 
-                {item.note ? (
-                  <div className="text-slate-500">
-                    Ghi chú: {item.note}
-                  </div>
-                ) : null}
+                {item.note ? <div className="text-slate-500">Ghi chú: {item.note}</div> : null}
               </div>
+
+              <Space className="mt-3" wrap>
+                <Button
+                  size="small"
+                  icon={<CalendarPlus className="h-3.5 w-3.5" />}
+                  onClick={() => onOpenGoogleCalendar?.(item)}
+                >
+                  Google Calendar
+                </Button>
+
+                {item.createdByUser ? (
+                  <Popconfirm
+                    title="Xóa lịch này?"
+                    okText="Xóa"
+                    cancelText="Hủy"
+                    onConfirm={() => onDelete?.(item.id)}
+                  >
+                    <Button
+                      danger
+                      size="small"
+                      icon={<Trash2 className="h-3.5 w-3.5" />}
+                    >
+                      Xóa
+                    </Button>
+                  </Popconfirm>
+                ) : null}
+              </Space>
             </div>
           ))}
         </div>

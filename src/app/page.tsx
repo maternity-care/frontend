@@ -30,6 +30,7 @@ import {
 
 import { AppShell } from "@/fe/components/layout/AppShell";
 import { SiteFooter } from "@/fe/components/layout/SiteFooter";
+import { QuickAppointmentCard } from "@/fe/components/home/QuickAppointmentCard";
 import useSetting from "@/hooks/useSetting";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
@@ -263,6 +264,8 @@ export default function HomePage() {
 
               {/* Quick appointment */}
               <Col xs={24} lg={10}>
+                <QuickAppointmentCard />
+                {false ? (
                 <Card
                   className="relative z-10 !rounded-[28px] !border-pink-100 !shadow-xl !shadow-pink-100/70"
                   styles={{ body: { padding: 28 } }}
@@ -355,6 +358,7 @@ export default function HomePage() {
                     </Text>
                   </div>
                 </Card>
+                ) : null}
               </Col>
             </Row>
           </section>
