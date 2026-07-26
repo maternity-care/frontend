@@ -21,10 +21,8 @@ import type {
   UpdateFacilityOperatingHoursInput,
 } from "./facilities.types";
 
-/** Số bản ghi mặc định trên một trang của màn quản lý cơ sở. */
 export const DEFAULT_FACILITY_PAGE_SIZE = 20;
 
-/** Giới hạn tối đa backend cho phép trong một request. */
 export const FACILITY_PAGE_LIMIT = 100;
 const MAX_FACILITY_PAGES = 1000;
 
