@@ -21,6 +21,7 @@ type CreateScheduleFormValues = {
 
 type CreateScheduleModalProps = {
   open: boolean;
+  initialDate?: Dayjs;
   onCancel: () => void;
   onCreate: (schedule: PregnancyScheduleItem) => void;
 };
@@ -57,11 +58,11 @@ const scheduleTypeOptions: Array<{
   },
 ];
 
-function getInitialScheduleFormValues(): CreateScheduleFormValues {
+function getInitialScheduleFormValues(initialDate?: Dayjs): CreateScheduleFormValues {
   return {
     title: "",
     type: "reminder",
-    date: dayjs(),
+    date: initialDate ?? dayjs(),
     time: dayjs().add(1, "hour"),
     location: "",
     note: "",
@@ -70,6 +71,7 @@ function getInitialScheduleFormValues(): CreateScheduleFormValues {
 
 export function CreateScheduleModal({
   open,
+  initialDate,
   onCancel,
   onCreate,
 }: CreateScheduleModalProps) {
@@ -124,11 +126,11 @@ export function CreateScheduleModal({
       }}
     >
       <Form<CreateScheduleFormValues>
-        key={formKey}
+        key={`${formKey}-${initialDate?.format("YYYY-MM-DD") ?? "today"}`}
         id={CREATE_SCHEDULE_FORM_ID}
         layout="vertical"
         requiredMark={false}
-        initialValues={getInitialScheduleFormValues()}
+        initialValues={getInitialScheduleFormValues(initialDate)}
         onFinish={handleFinish}
       >
         <Form.Item
