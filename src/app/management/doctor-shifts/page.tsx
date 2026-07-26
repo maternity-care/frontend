@@ -11,7 +11,6 @@ import {
   Modal,
   Select,
   Space,
-  Statistic,
   Table,
   Tag,
   Tooltip,
@@ -178,6 +177,7 @@ function getPeriodTitle(
     return `Tuần ${new Intl.DateTimeFormat("vi-VN", {
       day: "2-digit",
       month: "2-digit",
+      year: "numeric",
     }).format(weekStart)} - ${new Intl.DateTimeFormat("vi-VN", {
       day: "2-digit",
       month: "2-digit",
@@ -564,25 +564,6 @@ export default function DoctorShiftPage() {
             `${second.shiftDate}-${second.startTime}`,
           ),
       ),
-    [scopedShifts],
-  );
-
-  const stats = useMemo(
-    () => ({
-      total: scopedShifts.length,
-      available: scopedShifts.filter(
-        (shift) =>
-          shift.status === "available",
-      ).length,
-      full: scopedShifts.filter(
-        (shift) => shift.status === "full",
-      ).length,
-      closed: scopedShifts.filter(
-        (shift) =>
-          shift.status === "cancelled" ||
-          shift.status === "off",
-      ).length,
-    }),
     [scopedShifts],
   );
 
@@ -1104,17 +1085,6 @@ export default function DoctorShiftPage() {
       ),
     },
     {
-      title: "Số lịch tối đa",
-      dataIndex: "maxAppointments",
-      width: 135,
-      align: "center",
-      sorter: (first, second) =>
-        first.maxAppointments -
-        second.maxAppointments,
-      render: (value: number) =>
-        `${value} lịch`,
-    },
-    {
       title: "Trạng thái",
       dataIndex: "status",
       width: 135,
@@ -1178,7 +1148,7 @@ export default function DoctorShiftPage() {
       {modalContextHolder}
 
       <PageHeader
-        title="Doctor Shift Management"
+        title="Quản lý ca trực"
         description="Quản lý ca trực theo ngày, tuần, tháng và phân công bác sĩ."
       />
 
@@ -1192,36 +1162,6 @@ export default function DoctorShiftPage() {
             onClose={() => setError(null)}
           />
         ) : null}
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-slate-200 bg-white">
-            <Statistic
-              title="Tổng ca trong kỳ"
-              value={stats.total}
-            />
-          </Card>
-
-          <Card className="border-emerald-100 bg-emerald-50/60">
-            <Statistic
-              title="Ca còn trống"
-              value={stats.available}
-            />
-          </Card>
-
-          <Card className="border-blue-100 bg-blue-50/60">
-            <Statistic
-              title="Ca đã đầy"
-              value={stats.full}
-            />
-          </Card>
-
-          <Card className="border-slate-200 bg-slate-50/70">
-            <Statistic
-              title="Ca hủy / nghỉ"
-              value={stats.closed}
-            />
-          </Card>
-        </div>
 
         <Card className="border-slate-200 bg-white">
           <div className="flex flex-col gap-4">
@@ -1596,7 +1536,7 @@ export default function DoctorShiftPage() {
               columns={tableColumns}
               dataSource={sortedScopedShifts}
               pagination={false}
-              scroll={{ x: 1450 }}
+              scroll={{ x: 1315 }}
               locale={{
                 emptyText: (
                   <Empty
