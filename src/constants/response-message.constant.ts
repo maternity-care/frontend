@@ -86,6 +86,7 @@ export const RESPONSE_MESSAGES = {
     CART: "Giỏ hàng",
     VIEW_PROFILE: "Xem hồ sơ",
     SCHEDULE: "Lịch",
+    record_keeping: "Lưu trữ hồ sơ",
   },
 
   AUTH: {

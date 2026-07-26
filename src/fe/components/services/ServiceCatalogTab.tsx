@@ -325,10 +325,8 @@ export function ServiceCatalogTab() {
       title: "Xóa dịch vụ?",
       content: (
         <>
-          Xóa dịch vụ{" "}
-          <strong>{record.name}</strong>
-          ? Backend có thể từ chối nếu
-          dịch vụ đang được sử dụng.
+          Bạn có xác nhận xóa dịch vụ{" "}
+          <strong>{record.name}?</strong>
         </>
       ),
       okText: "Xóa",

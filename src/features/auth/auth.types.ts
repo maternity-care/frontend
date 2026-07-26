@@ -64,6 +64,7 @@ export interface RegisterInput {
   name: string;
   phone: string;
   email: string;
+  phone: string;
   password: string;
 }
 
@@ -76,4 +77,17 @@ export interface ApiResponse<T> {
   success: boolean;
   message?: string;
   data: T;
+}
+
+export interface RegisterResponse {
+  email?: string;
+}
+
+export interface ResendOtpInput {
+  email: string;
+}
+
+export interface VerifyOtpInput {
+  email: string;
+  otp: string;
 }

@@ -7,6 +7,8 @@ import type {
   ForgotPasswordResponse,
   LoginInput,
   RegisterInput,
+  RegisterResponse,
+  ResendOtpInput,
   ResetPasswordInput,
   VerifyOtpInput,
 } from "./auth.types";
@@ -110,21 +112,26 @@ export function resetPassword(input: ResetPasswordInput) {
   return unwrapApiResponse<null>(apiClient.post("/auth/reset-password", input));
 }
 
-export async function register(input: RegisterInput) {
-  return unwrapApiResponse<null>(
+export function register(input: RegisterInput) {
+  return unwrapApiResponse<RegisterResponse>(
     apiClient.post("/auth/register", input),
   );
 }
 
-export async function resendRegisterOtp(email: string) {
-  return unwrapApiResponse<null>(
-    apiClient.post("/auth/resend-otp", { email }),
+export function resendOtp(input: ResendOtpInput) {
+  return unwrapApiResponse<unknown>(
+    apiClient.post("/auth/resend-otp", input),
   );
 }
 
-export async function verifyRegisterOtp(input: VerifyOtpInput) {
+export async function verifyOtp(input: VerifyOtpInput) {
   const response = await unwrapApiResponse<BackendAuthResponse>(
     apiClient.post("/auth/verify-otp", input),
   );
-  return normalizeAuthResponse(response.data, "user", response.message);
+
+  return normalizeAuthResponse(
+    response.data,
+    "user",
+    response.message,
+  );
 }

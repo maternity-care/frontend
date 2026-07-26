@@ -3,12 +3,20 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, Card, Form, Input, message, Typography } from "antd";
+import {
+  Button,
+  Card,
+  Form,
+  Input,
+  message,
+  Typography,
+} from "antd";
 import { HeartPulse } from "lucide-react";
+
 import {
   register,
-  resendRegisterOtp,
-  verifyRegisterOtp,
+  resendOtp,
+  verifyOtp,
 } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
@@ -24,10 +32,11 @@ type RegisterFormValues = {
 
 function RegisterForm() {
   const router = useRouter();
-  const setSession = useAuthStore((state) => state.setSession);
   const [form] = Form.useForm<RegisterFormValues>();
-
   const [messageApi, contextHolder] = message.useMessage();
+
+  const setSession = useAuthStore((state) => state.setSession);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRequestingOtp, setIsRequestingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -45,32 +54,44 @@ function RegisterForm() {
         "confirmPassword",
       ]);
 
+      const normalizedEmail = values.email.trim().toLowerCase();
+
       const response =
-        otpSent && pendingEmail === values.email
-          ? await resendRegisterOtp(values.email)
+        otpSent && pendingEmail === normalizedEmail
+          ? await resendOtp({
+              email: normalizedEmail,
+            })
           : await register({
-              name: values.name,
-              phone: values.phone,
-              email: values.email,
+              name: values.name.trim(),
+              phone: values.phone.trim(),
+              email: normalizedEmail,
               password: values.password,
             });
 
-      setPendingEmail(values.email);
+      setPendingEmail(normalizedEmail);
       setOtpSent(true);
 
       messageApi.success({
         content:
-          response.message ||
-          "OTP đã được gửi. Vui lòng kiểm tra email để kích hoạt đăng ký.",
+          response.message ??
+          "Mã OTP đã được gửi. Vui lòng kiểm tra email.",
         duration: 3,
       });
     } catch (error) {
-      if (!(error instanceof Error)) {
+      // Lỗi validate của Ant Design không phải Error thông thường.
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "errorFields" in error
+      ) {
         return;
       }
 
       messageApi.error({
-        content: error.message || "Không thể gửi OTP",
+        content:
+          error instanceof Error
+            ? error.message
+            : "Không thể gửi mã OTP.",
         duration: 3,
       });
     } finally {
@@ -79,9 +100,9 @@ function RegisterForm() {
   };
 
   const onFinish = async (values: RegisterFormValues) => {
-    if (!otpSent) {
+    if (!otpSent || !pendingEmail) {
       messageApi.warning({
-        content: "Vui lòng nhận OTP trước khi đăng ký.",
+        content: "Vui lòng nhận mã OTP trước.",
         duration: 3,
       });
       return;
@@ -90,27 +111,28 @@ function RegisterForm() {
     setIsSubmitting(true);
 
     try {
-      const session = await verifyRegisterOtp({
-        email: pendingEmail || values.email,
-        otp: values.otp,
+      const session = await verifyOtp({
+        email: pendingEmail,
+        otp: values.otp.trim(),
       });
 
       setSession(session);
 
       messageApi.success({
-        content: session.message || "Đăng ký tài khoản thành công",
+        content:
+          session.message ??
+          "Xác thực OTP và đăng ký tài khoản thành công.",
         duration: 2,
       });
 
-      setTimeout(() => {
-        router.replace("/schedule");
-      }, 700);
+      router.replace("/schedule");
+      router.refresh();
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Đăng ký thất bại";
-
       messageApi.error({
-        content: errorMessage,
+        content:
+          error instanceof Error
+            ? error.message
+            : "Mã OTP không hợp lệ hoặc đã hết hạn.",
         duration: 3,
       });
     } finally {
@@ -128,6 +150,7 @@ function RegisterForm() {
           className="mb-6 inline-flex items-center gap-2 font-semibold text-teal-900"
         >
           <HeartPulse className="h-5 w-5" />
+
           {RESPONSE_MESSAGES.COMMON.DEFAULT_NAME}
         </Link>
 
@@ -149,8 +172,14 @@ function RegisterForm() {
             label={RESPONSE_MESSAGES.COMMON.NAME}
             name="name"
             rules={[
-              { required: true, message: RESPONSE_MESSAGES.AUTH.NAME_REQUIRED },
-              { min: 2, message: RESPONSE_MESSAGES.AUTH.NAME_MIN_LENGTH },
+              {
+                required: true,
+                message: RESPONSE_MESSAGES.AUTH.NAME_REQUIRED,
+              },
+              {
+                min: 2,
+                message: RESPONSE_MESSAGES.AUTH.NAME_MIN_LENGTH,
+              },
             ]}
           >
             <Input
@@ -164,10 +193,13 @@ function RegisterForm() {
             label={RESPONSE_MESSAGES.COMMON.PHONE}
             name="phone"
             rules={[
-              { required: true, message: "Vui lòng nhập số điện thoại" },
+              {
+                required: true,
+                message: "Vui lòng nhập số điện thoại.",
+              },
               {
                 pattern: /^[0-9+\-\s()]{8,20}$/,
-                message: "Số điện thoại không hợp lệ",
+                message: "Số điện thoại không hợp lệ.",
               },
             ]}
           >
@@ -178,7 +210,10 @@ function RegisterForm() {
             />
           </Form.Item>
 
-          <Form.Item label={RESPONSE_MESSAGES.COMMON.EMAIL} required>
+          <Form.Item
+            label={RESPONSE_MESSAGES.COMMON.EMAIL}
+            required
+          >
             <div className="flex gap-2">
               <Form.Item
                 name="email"
@@ -204,6 +239,7 @@ function RegisterForm() {
               <Button
                 type="default"
                 loading={isRequestingOtp}
+                disabled={isSubmitting}
                 onClick={handleRequestOtp}
               >
                 {otpSent ? "Gửi lại OTP" : "Nhận OTP"}
@@ -219,7 +255,10 @@ function RegisterForm() {
                 required: true,
                 message: RESPONSE_MESSAGES.AUTH.passwordRequired,
               },
-              { min: 6, message: RESPONSE_MESSAGES.AUTH.passwordMinLength },
+              {
+                min: 6,
+                message: RESPONSE_MESSAGES.AUTH.passwordMinLength,
+              },
             ]}
             hasFeedback
           >
@@ -238,16 +277,23 @@ function RegisterForm() {
             rules={[
               {
                 required: true,
-                message: RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD_REQUIRED,
+                message:
+                  RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD_REQUIRED,
               },
               ({ getFieldValue }) => ({
                 validator(_, value) {
-                  if (!value || getFieldValue("password") === value) {
+                  if (
+                    !value ||
+                    getFieldValue("password") === value
+                  ) {
                     return Promise.resolve();
                   }
 
                   return Promise.reject(
-                    new Error(RESPONSE_MESSAGES.AUTH.CONFIRM_PASSWORD_MISMATCH),
+                    new Error(
+                      RESPONSE_MESSAGES.AUTH
+                        .CONFIRM_PASSWORD_MISMATCH,
+                    ),
                   );
                 },
               }),
@@ -261,17 +307,23 @@ function RegisterForm() {
           </Form.Item>
 
           <Form.Item
-            label="OTP"
+            label="Mã OTP"
             name="otp"
             rules={[
-              { required: true, message: "Vui lòng nhập OTP" },
-              { len: 6, message: "OTP gồm 6 chữ số" },
+              {
+                required: true,
+                message: "Vui lòng nhập mã OTP.",
+              },
+              {
+                pattern: /^\d{6}$/,
+                message: "Mã OTP phải gồm đúng 6 chữ số.",
+              },
             ]}
           >
             <Input
               inputMode="numeric"
               maxLength={6}
-              placeholder="Nhập OTP đã gửi đến email"
+              placeholder="Nhập mã OTP được gửi đến email"
               autoComplete="one-time-code"
               disabled={!otpSent}
             />
@@ -282,10 +334,10 @@ function RegisterForm() {
               type="primary"
               htmlType="submit"
               loading={isSubmitting}
-              disabled={!otpSent}
+              disabled={!otpSent || isRequestingOtp}
               block
             >
-              Đăng ký
+              Xác nhận đăng ký
             </Button>
           </Form.Item>
 
@@ -304,9 +356,18 @@ function RegisterForm() {
   );
 }
 
+function RegisterLoading() {
+  return (
+    <Card
+      loading
+      className="w-full max-w-md shadow-sm"
+    />
+  );
+}
+
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<RegisterLoading />}>
       <RegisterForm />
     </Suspense>
   );
