@@ -1048,7 +1048,7 @@ export function DoctorShiftFormModalBase({
         }}
       >
         <Row gutter={[16, 0]}>
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item
               name="shiftDate"
               label="Ngày trực"
@@ -1064,7 +1064,7 @@ export function DoctorShiftFormModalBase({
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={10}>
             <Form.Item
               name="facilityId"
               label="Cơ sở"
@@ -1087,10 +1087,8 @@ export function DoctorShiftFormModalBase({
               />
             </Form.Item>
           </Col>
-        </Row>
 
-        <Row gutter={[16, 0]}>
-          <Col xs={24} md={8}>
+          <Col xs={24} md={6}>
             <Form.Item
               name="status"
               label="Trạng thái"
@@ -1137,8 +1135,10 @@ export function DoctorShiftFormModalBase({
               />
             </Form.Item>
           </Col>
+        </Row>
 
-          <Col xs={24} md={16}>
+        <Row gutter={[16, 0]}>
+          <Col xs={24}>
             <Form.Item
               name="note"
               label="Ghi chú"
