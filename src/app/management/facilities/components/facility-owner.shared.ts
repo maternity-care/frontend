@@ -1,121 +1,129 @@
-import { getUsersPage } from "@/management/features/users/users.api";
+import {
+  FACILITY_PAGE_LIMIT,
+  getFacilityAdminOptions,
+} from "@/management/features/facilities/facilities.api";
 import type {
-  AccountStatus,
-  User,
-} from "@/management/features/users/users.types";
+  FacilityAdminOption,
+  FacilityAdminOptionStatus,
+} from "@/management/features/facilities/facilities.types";
 
-const OWNER_ROLE_ID = "7";
-const OWNER_PAGE_SIZE = 100;
-const MAX_OWNER_PAGES = 100;
+const MAX_OWNER_PAGES = 1000;
 
 export type FacilityOwnerOption = {
   value: string;
   label: string;
   name: string;
   email: string;
+  personalEmail?: string;
   phone: string;
-  status: AccountStatus;
+  employeeCode?: string;
+  homeFacilityName?: string;
+  homeFacilityCode?: string;
+  ownedFacilityCount?: number;
+  status: FacilityAdminOptionStatus;
   disabled: boolean;
 };
 
-function isOwnerAccount(user: User) {
-  const roleNames = (user.roles ?? []).map((role) =>
-    String(role.name ?? "")
-      .trim()
-      .toLowerCase(),
-  );
-
-  if (roleNames.length === 0) {
-    return true;
-  }
-
-  return roleNames.some(
-    (roleName) =>
-      roleName === "owner" ||
-      roleName === "partner",
-  );
-}
-
 function toOwnerOption(
-  user: User,
+  admin: FacilityAdminOption,
 ): FacilityOwnerOption {
   const name =
-    String(user.name ?? "").trim() ||
-    `Chủ cơ sở #${user.id}`;
-  const email = String(user.email ?? "").trim();
-  const phone = String(user.phone ?? "").trim();
+    admin.name ||
+    `Chủ cơ sở #${admin.id}`;
+
+  const secondaryText = [
+    admin.employeeCode,
+    admin.email,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return {
-    value: String(user.id),
-    label: email
-      ? `${name} (${email})`
+    value: admin.id,
+    label: secondaryText
+      ? `${name} (${secondaryText})`
       : name,
     name,
-    email,
-    phone,
-    status: user.status,
-    disabled: user.status !== "active",
+    email: admin.email,
+    personalEmail: admin.personalEmail,
+    phone: admin.phone,
+    employeeCode: admin.employeeCode,
+    homeFacilityName:
+      admin.homeFacilityName,
+    homeFacilityCode:
+      admin.homeFacilityCode,
+    ownedFacilityCount:
+      admin.ownedFacilityCount,
+    status: admin.status,
+    disabled: admin.status !== "active",
   };
 }
 
+/**
+ * Tải toàn bộ admin đang hoạt động từ endpoint chuyên dụng
+ * của module cơ sở. availableOnly=false để modal thêm/sửa
+ * có thể hiển thị đầy đủ danh sách admin.
+ */
 export async function getFacilityOwnerOptions(): Promise<
   FacilityOwnerOption[]
 > {
-  const owners: User[] = [];
+  const owners: FacilityOwnerOption[] = [];
   const loadedOwnerIds = new Set<string>();
 
-  let page = 1;
-  let total = 0;
-
-  while (page <= MAX_OWNER_PAGES) {
-    const result = await getUsersPage({
-      roleId: OWNER_ROLE_ID,
-      page,
-      limit: OWNER_PAGE_SIZE,
-      sort: "name:asc",
+  const firstPage =
+    await getFacilityAdminOptions({
+      status: "active",
+      availableOnly: false,
+      page: 1,
+      limit: FACILITY_PAGE_LIMIT,
     });
 
-    total = result.total;
-
-    const pageOwners = result.users.filter(
-      isOwnerAccount,
-    );
-
-    for (const owner of pageOwners) {
-      if (loadedOwnerIds.has(owner.id)) {
+  const appendItems = (
+    items: FacilityAdminOption[],
+  ) => {
+    for (const admin of items) {
+      if (loadedOwnerIds.has(admin.id)) {
         continue;
       }
 
-      loadedOwnerIds.add(owner.id);
-      owners.push(owner);
+      loadedOwnerIds.add(admin.id);
+      owners.push(
+        toOwnerOption(admin),
+      );
     }
+  };
 
-    if (
-      result.users.length === 0 ||
-      page * OWNER_PAGE_SIZE >= total
-    ) {
-      break;
-    }
+  appendItems(firstPage.items);
 
-    page += 1;
-  }
-
-  if (page > MAX_OWNER_PAGES) {
+  if (
+    firstPage.totalPages >
+    MAX_OWNER_PAGES
+  ) {
     throw new Error(
       "Danh sách chủ cơ sở vượt quá giới hạn tải an toàn.",
     );
   }
 
-  return owners
-    .map(toOwnerOption)
-    .sort((left, right) => {
-      if (left.disabled !== right.disabled) {
-        return left.disabled ? 1 : -1;
-      }
+  for (
+    let page = 2;
+    page <= firstPage.totalPages;
+    page += 1
+  ) {
+    const pageResult =
+      await getFacilityAdminOptions({
+        status: "active",
+        availableOnly: false,
+        page,
+        limit: FACILITY_PAGE_LIMIT,
+      });
 
-      return left.name.localeCompare(
-        right.name,
-        "vi",
-      );
-    });
+    appendItems(pageResult.items);
+  }
+
+  return owners.sort((left, right) =>
+    left.name.localeCompare(
+      right.name,
+      "vi",
+    ),
+  );
 }
