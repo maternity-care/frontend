@@ -23,7 +23,6 @@ import {
   MapPin,
   Phone,
   Save,
-  Search,
   UserRound,
   X,
 } from "lucide-react";
@@ -154,11 +153,6 @@ type ReverseGeocodeResponse = {
   address?: ReverseGeocodeAddress;
 };
 
-type ForwardGeocodeResult =
-  ReverseGeocodeResponse & {
-    lat?: string;
-    lon?: string;
-  };
 
 function firstNonEmpty(
   ...values: Array<string | undefined>
@@ -295,41 +289,6 @@ async function reverseGeocode(
   return (await response.json()) as ReverseGeocodeResponse;
 }
 
-async function forwardGeocode(
-  query: string,
-): Promise<ForwardGeocodeResult | null> {
-  const params = new URLSearchParams({
-    format: "jsonv2",
-    q: query,
-    addressdetails: "1",
-    limit: "1",
-    countrycodes: "vn",
-    "accept-language": "vi",
-  });
-
-  const response = await fetch(
-    `https://nominatim.openstreetmap.org/search?${params.toString()}`,
-    {
-      headers: {
-        Accept: "application/json",
-      },
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      "Không thể tìm kiếm địa chỉ trên bản đồ.",
-    );
-  }
-
-  const results =
-    (await response.json()) as ForwardGeocodeResult[];
-
-  return Array.isArray(results) && results.length > 0
-    ? results[0] ?? null
-    : null;
-}
-
 function getLocationErrorMessage(error: unknown) {
   if (
     error &&
@@ -369,8 +328,6 @@ export function FacilityFormModal({
   const [form] = Form.useForm<FacilityFormValues>();
   const [submitting, setSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [searchingAddress, setSearchingAddress] =
-    useState(false);
   const [ownerOptions, setOwnerOptions] = useState<
     FacilityOwnerOption[]
   >([]);
@@ -554,99 +511,6 @@ export function FacilityFormModal({
     }
   }
 
-
-  async function handleSearchAddress(
-    rawAddress?: string,
-  ) {
-    const manualAddress = String(
-      rawAddress ??
-        form.getFieldValue("address") ??
-        "",
-    ).trim();
-
-    if (!manualAddress) {
-      await form.validateFields(["address"]);
-      return;
-    }
-
-    const currentWard = String(
-      form.getFieldValue("ward") ?? "",
-    ).trim();
-    const currentCity = String(
-      form.getFieldValue("city") ?? "",
-    ).trim();
-
-    const searchQuery = [
-      manualAddress,
-      currentWard,
-      currentCity,
-      "Việt Nam",
-    ]
-      .filter(Boolean)
-      .join(", ");
-
-    setSearchingAddress(true);
-
-    try {
-      const result =
-        await forwardGeocode(searchQuery);
-
-      if (!result) {
-        throw new Error(
-          "Không tìm thấy địa chỉ phù hợp trên bản đồ.",
-        );
-      }
-
-      const nextLatitude = Number(result.lat);
-      const nextLongitude = Number(result.lon);
-
-      if (
-        !Number.isFinite(nextLatitude) ||
-        !Number.isFinite(nextLongitude)
-      ) {
-        throw new Error(
-          "Địa chỉ tìm thấy không có tọa độ hợp lệ.",
-        );
-      }
-
-      const {
-        streetAddress,
-        ward: nextWard,
-        city: nextCity,
-      } = extractGeocodeFields(result);
-
-      form.setFieldsValue({
-        address:
-          streetAddress || manualAddress,
-        ward: nextWard || currentWard,
-        city: nextCity || currentCity,
-        latitude:
-          nextLatitude.toFixed(7),
-        longitude:
-          nextLongitude.toFixed(7),
-      });
-
-      modal.success({
-        title: "Đã tìm thấy địa chỉ",
-        content:
-          "Tỉnh/thành phố, phường/xã và tọa độ đã được tự động điền. Vui lòng kiểm tra lại vị trí trên bản đồ.",
-        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
-        centered: true,
-      });
-    } catch (error) {
-      modal.error({
-        title: "Không thể tìm địa chỉ",
-        content:
-          error instanceof Error
-            ? error.message
-            : "Không thể tìm kiếm địa chỉ trên bản đồ.",
-        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
-        centered: true,
-      });
-    } finally {
-      setSearchingAddress(false);
-    }
-  }
 
   function handleCancel() {
     if (submitting) return;
@@ -870,24 +734,10 @@ export function FacilityFormModal({
                       label={FACILITY_MESSAGES.ADDRESS}
                       rules={[{ required: true, message: "Vui lòng nhập địa chỉ." }]}
                     >
-                      <Input.Search
+                      <Input
                         size="large"
-                        placeholder="Nhập số nhà, tên đường hoặc địa chỉ đầy đủ"
-                        enterButton={
-                          <span className="inline-flex items-center gap-1.5">
-                            <Search className="h-4 w-4" />
-                            Tìm trên bản đồ
-                          </span>
-                        }
-                        loading={searchingAddress}
-                        disabled={
-                          submitting || locating
-                        }
-                        onSearch={(value) => {
-                          void handleSearchAddress(
-                            value,
-                          );
-                        }}
+                        placeholder="Nhập số nhà, tên đường"
+                        disabled={submitting}
                       />
                     </Form.Item>
                   </Col>
