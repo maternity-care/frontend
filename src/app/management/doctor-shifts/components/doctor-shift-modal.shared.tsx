@@ -33,6 +33,7 @@ import { getShiftSlotLookup } from "@/management/features/shift-slots/shift-slot
 import type { ShiftSlotLookupItem } from "@/management/features/shift-slots/shift-slots.types";
 
 const { Text, Title } = Typography;
+const { TextArea } = Input;
 
 export type FacilityOption = {
   id: string;
@@ -67,11 +68,20 @@ type ShiftAssignmentFormValue = {
 type ShiftFormValues = {
   shiftDate: string;
   facilityId: string;
+  status: DoctorShiftStatus;
+  note: string;
   assignments: ShiftAssignmentFormValue[];
 };
 
+export type ShiftFormPayload = Omit<
+  CreateDoctorShiftInput,
+  "status"
+> & {
+  status: DoctorShiftStatus;
+};
+
 export type ValidatedShiftForm = {
-  payloads: CreateDoctorShiftInput[];
+  payloads: ShiftFormPayload[];
   slotById: Map<string, ShiftSlotLookupItem>;
 };
 
@@ -273,7 +283,7 @@ export function mergeShiftDisplayData({
   original?: DoctorShiftItem;
   response: DoctorShiftItem;
   detail?: DoctorShiftItem;
-  payload: CreateDoctorShiftInput;
+  payload: ShiftFormPayload;
   doctors: DoctorOption[];
   facilities: FacilityOption[];
   rooms: RoomOption[];
@@ -304,6 +314,8 @@ export function mergeShiftDisplayData({
     slotId: payload.slotId,
     shiftDate: payload.shiftDate,
     maxAppointments: payload.maxAppointments,
+    status: payload.status,
+    note: payload.note,
     doctorName:
       detail?.doctorName ||
       response.doctorName ||
@@ -364,11 +376,6 @@ export function mergeShiftDisplayData({
       slot?.endTime ||
       original?.endTime ||
       "",
-    note:
-      detail?.note ||
-      response.note ||
-      original?.note ||
-      "",
   };
 }
 
@@ -420,6 +427,8 @@ export function DoctorShiftFormModalBase({
         form.setFieldsValue({
           shiftDate: editingShift.shiftDate,
           facilityId: editingShift.facilityId,
+          status: editingShift.status,
+          note: editingShift.note,
           assignments: [
             {
               doctorId: editingShift.doctorId,
@@ -436,6 +445,8 @@ export function DoctorShiftFormModalBase({
       setShiftSlots([]);
       form.resetFields();
       form.setFieldsValue({
+        status: "available",
+        note: "",
         assignments: [
           {
             doctorId: "",
@@ -626,7 +637,7 @@ export function DoctorShiftFormModalBase({
     setError(null);
 
     try {
-      const payloads: CreateDoctorShiftInput[] = [];
+      const payloads: ShiftFormPayload[] = [];
 
       for (
         let index = 0;
@@ -797,6 +808,11 @@ export function DoctorShiftFormModalBase({
           maxAppointments: Number(
             assignment.maxAppointments,
           ),
+          status:
+            mode === "create"
+              ? "available"
+              : values.status,
+          note: values.note?.trim() ?? "",
         });
       }
 
@@ -814,7 +830,11 @@ export function DoctorShiftFormModalBase({
           firstPayload.shiftDate !==
             editingShift.shiftDate ||
           Number(firstPayload.maxAppointments) !==
-            Number(editingShift.maxAppointments);
+            Number(editingShift.maxAppointments) ||
+          firstPayload.status !==
+            editingShift.status ||
+          firstPayload.note.trim() !==
+            editingShift.note.trim();
 
         if (!hasChanges) {
           modalApi.info({
@@ -1026,7 +1046,7 @@ export function DoctorShiftFormModalBase({
         }}
       >
         <Row gutter={[16, 0]}>
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item
               name="shiftDate"
               label="Ngày trực"
@@ -1042,7 +1062,7 @@ export function DoctorShiftFormModalBase({
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={10}>
             <Form.Item
               name="facilityId"
               label="Cơ sở"
@@ -1062,6 +1082,74 @@ export function DoctorShiftFormModalBase({
                     label: `${facility.name} (${facility.code})`,
                   }),
                 )}
+              />
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={6}>
+            <Form.Item
+              name="status"
+              label="Trạng thái"
+              rules={[
+                {
+                  required: true,
+                  message:
+                    "Vui lòng chọn trạng thái.",
+                },
+              ]}
+            >
+              <Select
+                disabled={mode === "create"}
+                options={
+                  mode === "create"
+                    ? [
+                        {
+                          value: "available",
+                          label: "Còn trống",
+                        },
+                      ]
+                    : [
+                        {
+                          value: "available",
+                          label: "Còn trống",
+                        },
+                        {
+                          value: "full",
+                          label: "Đã đầy",
+                        },
+                        {
+                          value: "cancelled",
+                          label: "Đã hủy",
+                        },
+                        {
+                          value: "off",
+                          label: "Nghỉ",
+                        },
+                      ]
+                }
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 0]}>
+          <Col xs={24}>
+            <Form.Item
+              name="note"
+              label="Ghi chú"
+              rules={[
+                {
+                  max: 500,
+                  message:
+                    "Ghi chú tối đa 500 ký tự.",
+                },
+              ]}
+            >
+              <TextArea
+                rows={2}
+                maxLength={500}
+                showCount
+                placeholder="Nhập ghi chú cho ca trực..."
               />
             </Form.Item>
           </Col>
