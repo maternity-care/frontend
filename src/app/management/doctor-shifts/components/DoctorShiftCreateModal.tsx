@@ -46,10 +46,7 @@ export function DoctorShiftCreateModal({
     const createPayloads =
       payloads.map((payload) => ({
         ...payload,
-        status:
-          payload.status === "off"
-            ? ("off" as const)
-            : ("available" as const),
+        status: "available" as const,
       }));
 
     const responses = await Promise.all(
