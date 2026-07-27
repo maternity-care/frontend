@@ -14,7 +14,18 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { Building2, Clock3, Mail, MapPin, Phone, Save, UserRound, X } from "lucide-react";
+import {
+  Building2,
+  Clock3,
+  ExternalLink,
+  LocateFixed,
+  Mail,
+  MapPin,
+  Phone,
+  Save,
+  UserRound,
+  X,
+} from "lucide-react";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import type {
   FacilityScheduleInput,
@@ -116,6 +127,150 @@ function getScheduleSummary(schedules?: FacilityScheduleInput[]) {
     .join("; ");
 }
 
+type ReverseGeocodeAddress = {
+  house_number?: string;
+  road?: string;
+  pedestrian?: string;
+  residential?: string;
+  neighbourhood?: string;
+  quarter?: string;
+  suburb?: string;
+  ward?: string;
+  village?: string;
+  town?: string;
+  city?: string;
+  municipality?: string;
+  state?: string;
+  province?: string;
+};
+
+type ReverseGeocodeResponse = {
+  display_name?: string;
+  address?: ReverseGeocodeAddress;
+};
+
+function firstNonEmpty(
+  ...values: Array<string | undefined>
+) {
+  return (
+    values.find(
+      (value) =>
+        typeof value === "string" &&
+        value.trim().length > 0,
+    )?.trim() ?? ""
+  );
+}
+
+function getGoogleMapLocation(
+  latitudeValue?: string,
+  longitudeValue?: string,
+) {
+  const latitude = Number(latitudeValue);
+  const longitude = Number(longitudeValue);
+
+  const hasValidCoordinates =
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180;
+
+  if (!hasValidCoordinates) {
+    return null;
+  }
+
+  const coordinates = `${latitude},${longitude}`;
+  const encodedCoordinates =
+    encodeURIComponent(coordinates);
+
+  return {
+    coordinates,
+    embedUrl:
+      `https://www.google.com/maps?q=${encodedCoordinates}` +
+      "&hl=vi&z=16&output=embed",
+    externalUrl:
+      "https://www.google.com/maps/search/" +
+      `?api=1&query=${encodedCoordinates}`,
+  };
+}
+
+function getCurrentPosition() {
+  return new Promise<GeolocationPosition>(
+    (resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        reject,
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        },
+      );
+    },
+  );
+}
+
+async function reverseGeocode(
+  latitude: number,
+  longitude: number,
+): Promise<ReverseGeocodeResponse> {
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    lat: String(latitude),
+    lon: String(longitude),
+    addressdetails: "1",
+    "accept-language": "vi",
+  });
+
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
+    {
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Không thể tra cứu địa chỉ từ tọa độ hiện tại.",
+    );
+  }
+
+  return (await response.json()) as ReverseGeocodeResponse;
+}
+
+function getLocationErrorMessage(error: unknown) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error
+  ) {
+    const code = Number(
+      (error as { code?: unknown }).code,
+    );
+
+    if (code === 1) {
+      return "Bạn chưa cấp quyền truy cập vị trí cho trình duyệt.";
+    }
+
+    if (code === 2) {
+      return "Không thể xác định vị trí hiện tại.";
+    }
+
+    if (code === 3) {
+      return "Yêu cầu lấy vị trí đã hết thời gian chờ.";
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Không thể lấy vị trí hiện tại.";
+}
+
 export function FacilityFormModal({
   open,
   onClose,
@@ -124,6 +279,7 @@ export function FacilityFormModal({
   const [modal, modalContextHolder] = Modal.useModal();
   const [form] = Form.useForm<FacilityFormValues>();
   const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const name = Form.useWatch("name", form);
   const ownerId = Form.useWatch("ownerId", form);
@@ -141,6 +297,140 @@ export function FacilityFormModal({
     () => [address, ward, city].filter(Boolean).join(", "),
     [address, ward, city],
   );
+
+  const googleMapLocation = useMemo(
+    () =>
+      getGoogleMapLocation(
+        latitude,
+        longitude,
+      ),
+    [latitude, longitude],
+  );
+
+  async function handleUseCurrentLocation() {
+    if (!navigator.geolocation) {
+      modal.error({
+        title: "Không hỗ trợ định vị",
+        content:
+          "Trình duyệt hiện tại không hỗ trợ lấy vị trí.",
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+        centered: true,
+      });
+      return;
+    }
+
+    if (!window.isSecureContext) {
+      modal.error({
+        title: "Không thể lấy vị trí",
+        content:
+          "Tính năng định vị chỉ hoạt động trên HTTPS hoặc localhost.",
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+        centered: true,
+      });
+      return;
+    }
+
+    setLocating(true);
+
+    try {
+      const position =
+        await getCurrentPosition();
+
+      const nextLatitude =
+        position.coords.latitude;
+      const nextLongitude =
+        position.coords.longitude;
+
+      form.setFieldsValue({
+        latitude:
+          nextLatitude.toFixed(7),
+        longitude:
+          nextLongitude.toFixed(7),
+      });
+
+      try {
+        const geocodeResult =
+          await reverseGeocode(
+            nextLatitude,
+            nextLongitude,
+          );
+
+        const geocodeAddress =
+          geocodeResult.address ?? {};
+
+        const streetName = firstNonEmpty(
+          geocodeAddress.road,
+          geocodeAddress.pedestrian,
+          geocodeAddress.residential,
+        );
+
+        const streetAddress = [
+          geocodeAddress.house_number,
+          streetName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+
+        const nextWard = firstNonEmpty(
+          geocodeAddress.ward,
+          geocodeAddress.suburb,
+          geocodeAddress.quarter,
+          geocodeAddress.neighbourhood,
+          geocodeAddress.village,
+          geocodeAddress.town,
+        );
+
+        const nextCity = firstNonEmpty(
+          geocodeAddress.city,
+          geocodeAddress.municipality,
+          geocodeAddress.state,
+          geocodeAddress.province,
+        );
+
+        form.setFieldsValue({
+          address:
+            streetAddress ||
+            geocodeResult.display_name ||
+            "",
+          ward: nextWard,
+          city: nextCity,
+          latitude:
+            nextLatitude.toFixed(7),
+          longitude:
+            nextLongitude.toFixed(7),
+        });
+
+        modal.success({
+          title: "Đã lấy vị trí hiện tại",
+          content:
+            "Địa chỉ và tọa độ đã được tự động điền. Vui lòng kiểm tra lại trước khi lưu.",
+          okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+          centered: true,
+        });
+      } catch (reverseError) {
+        modal.warning({
+          title: "Đã lấy được tọa độ",
+          content:
+            reverseError instanceof Error
+              ? `${reverseError.message} Bạn có thể nhập địa chỉ thủ công.`
+              : "Không thể tự động điền địa chỉ. Bạn có thể nhập địa chỉ thủ công.",
+          okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+          centered: true,
+        });
+      }
+    } catch (error) {
+      modal.error({
+        title: "Không thể lấy vị trí",
+        content:
+          getLocationErrorMessage(error),
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+        centered: true,
+      });
+    } finally {
+      setLocating(false);
+    }
+  }
 
   function handleCancel() {
     if (submitting) return;
@@ -313,10 +603,26 @@ export function FacilityFormModal({
                         Địa chỉ
                       </p>
                       <p className="mb-0 text-xs font-normal text-slate-500">
-                        Backend mới sử dụng tỉnh/thành và phường/xã, không còn quận/huyện.
+                        Có thể tự động lấy địa chỉ và tọa độ từ vị trí hiện tại.
                       </p>
                     </span>
                   </Space>
+                }
+                extra={
+                  <Button
+                    type="primary"
+                    ghost
+                    loading={locating}
+                    disabled={submitting}
+                    icon={
+                      <LocateFixed className="h-4 w-4" />
+                    }
+                    onClick={() => {
+                      void handleUseCurrentLocation();
+                    }}
+                  >
+                    Lấy vị trí hiện tại
+                  </Button>
                 }
               >
                 <Row gutter={16}>
@@ -362,6 +668,97 @@ export function FacilityFormModal({
                     </Form.Item>
                   </Col>
                 </Row>
+
+                <div className="mt-1">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <Text strong>
+                      Vị trí trên Google Maps
+                    </Text>
+
+                    {googleMapLocation ? (
+                      <Button
+                        type="link"
+                        size="small"
+                        href={
+                          googleMapLocation.externalUrl
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        icon={
+                          <ExternalLink className="h-4 w-4" />
+                        }
+                      >
+                        Mở Google Maps
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  {googleMapLocation ? (
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <iframe
+                        title="Vị trí cơ sở mới"
+                        src={
+                          googleMapLocation.embedUrl
+                        }
+                        className="h-[300px] w-full border-0"
+                        loading="lazy"
+                        allowFullScreen
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+
+                      <a
+                        href={
+                          googleMapLocation.externalUrl
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-start justify-between gap-4 border-t border-slate-200 px-4 py-3 transition hover:bg-blue-50"
+                      >
+                        <div className="min-w-0">
+                          <p className="mb-1 truncate text-sm font-semibold text-slate-950">
+                            {name ||
+                              FACILITY_MESSAGES.NEW_FACILITY}
+                          </p>
+
+                          <p className="mb-1 break-words text-sm text-slate-600">
+                            {fullAddress ||
+                              FACILITY_MESSAGES.NOT_ENTERED}
+                          </p>
+
+                          <p className="mb-0 text-xs text-slate-400">
+                            Tọa độ:{" "}
+                            {
+                              googleMapLocation.coordinates
+                            }
+                          </p>
+                        </div>
+
+                        <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                          <ExternalLink className="h-4 w-4" />
+                        </span>
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 text-center">
+                      <MapPin className="h-8 w-8 text-slate-300" />
+
+                      <Text
+                        strong
+                        className="mt-3 block text-slate-700"
+                      >
+                        Chưa có vị trí trên bản đồ
+                      </Text>
+
+                      <Text
+                        type="secondary"
+                        className="mt-1 block"
+                      >
+                        Bấm “Lấy vị trí hiện tại” hoặc nhập
+                        đầy đủ vĩ độ và kinh độ.
+                      </Text>
+                    </div>
+                  )}
+                </div>
               </Card>
   
               <Card
