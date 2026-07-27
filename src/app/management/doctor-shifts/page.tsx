@@ -32,6 +32,7 @@ import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { getRooms } from "@/management/features/rooms/rooms.api";
+import type { ClinicRoom } from "@/management/features/rooms/rooms.types";
 import { getDoctors } from "@/management/features/doctors/doctors.api";
 import {
   checkDoctorShiftConflicts,
@@ -285,14 +286,18 @@ export default function DoctorShiftPage() {
     void Promise.all([
       getDoctorShifts({ limit: 30 }),
       getFacilities(),
-      getRooms(),
+      getRooms({
+        status: "active",
+        page: 1,
+        limit: 100,
+      }),
       getDoctors(),
     ])
       .then(
         ([
           shiftData,
           facilityData,
-          roomData,
+          roomResult,
           doctorData,
         ]) => {
           if (cancelled) return;
@@ -348,16 +353,20 @@ export default function DoctorShiftPage() {
           );
 
           setRooms(
-            roomData
+            roomResult.items
               .filter(
-                (room) => room.status === "active",
+                (room: ClinicRoom) =>
+                  room.status === "active",
               )
-              .map((room) => ({
-                id: room.id,
-                facilityId: room.facilityId,
-                name: room.roomName,
-                floor: `Tầng ${room.floor}`,
-              })),
+              .map(
+                (room: ClinicRoom) => ({
+                  id: room.id,
+                  facilityId:
+                    room.facilityId,
+                  name: room.roomName,
+                  floor: room.floor,
+                }),
+              ),
           );
 
           setDoctors(

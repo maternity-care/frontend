@@ -13,6 +13,10 @@ export type DoctorShiftWorkingDay =
   | "SAT"
   | "SUN";
 
+/**
+ * Dữ liệu nguyên bản trả về từ Management - Shifts.
+ * Những field có schema `{}` được giữ là unknown và chuẩn hóa tại API layer.
+ */
 export interface BackendDoctorShift {
   id: string;
   doctorId: string;
@@ -41,6 +45,26 @@ export interface BackendDoctorShift {
   slotName: unknown;
 }
 
+export interface BackendPaginatedDoctorShifts {
+  items: BackendDoctorShift[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface DoctorShiftListResult {
+  items: DoctorShiftItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Dữ liệu ca trực sau khi chuẩn hóa để dùng trong giao diện.
+ * Chỉ gồm các field có trong response Swagger.
+ */
 export interface DoctorShiftItem {
   id: string;
   doctorId: string;
@@ -87,7 +111,6 @@ export interface CreateDoctorShiftInput {
   slotId: string;
   shiftDate: string;
   maxAppointments: number;
-  status?: DoctorShiftStatus;
 }
 
 export interface UpdateDoctorShiftInput {
