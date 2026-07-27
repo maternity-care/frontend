@@ -1,113 +1,97 @@
-import { apiClient } from "@/lib/axios";
+import { apiClient, unwrapApiData } from "@/lib/axios";
 
 import type {
-  ConfirmSoftDeletePregnancyProfilePayload,
-  CreatePregnancyProfilePayload,
+  BackendPregnancyProfile,
+  CreatePregnancyProfileInput,
   PregnancyProfile,
-  SoftDeletePregnancyProfilePayload,
-  UpdatePregnancyProfilePayload,
+  UpdatePregnancyProfileInput,
 } from "./pregnancy-profiles.types";
 
-const PREGNANCY_PROFILES_ENDPOINT = "/pregnancy-profiles";
+import { normalizePregnancyProfile } from "./pregnancy-profiles.types";
 
-/**
- * Lấy toàn bộ hồ sơ thai kỳ của người dùng hiện tại.
- *
- * GET /pregnancy-profiles
- */
+const PREGNANCY_PROFILES_URL = "/pregnancy-profiles";
+
 export async function getMyPregnancyProfiles(): Promise<
   PregnancyProfile[]
 > {
-  const response = await apiClient.get<PregnancyProfile[]>(
-    PREGNANCY_PROFILES_ENDPOINT,
+  const response = await apiClient.get(PREGNANCY_PROFILES_URL);
+
+  const data = await unwrapApiData<BackendPregnancyProfile[]>(
+    response.data,
   );
 
-  return response.data;
+  return data.map(normalizePregnancyProfile);
 }
 
-/**
- * Tạo hồ sơ thai kỳ mới.
- *
- * POST /pregnancy-profiles
- */
-export async function createPregnancyProfile(
-  payload: CreatePregnancyProfilePayload,
-): Promise<PregnancyProfile> {
-  const response = await apiClient.post<PregnancyProfile>(
-    PREGNANCY_PROFILES_ENDPOINT,
-    payload,
-  );
-
-  return response.data;
-}
-
-/**
- * Lấy chi tiết một hồ sơ thai kỳ.
- *
- * GET /pregnancy-profiles/{id}
- */
 export async function getMyPregnancyProfileById(
   id: string,
 ): Promise<PregnancyProfile> {
-  const response = await apiClient.get<PregnancyProfile>(
-    `${PREGNANCY_PROFILES_ENDPOINT}/${encodeURIComponent(id)}`,
+  const response = await apiClient.get(
+    `${PREGNANCY_PROFILES_URL}/${encodeURIComponent(id)}`,
   );
 
-  return response.data;
+  const data = await unwrapApiData<BackendPregnancyProfile>(
+    response.data,
+  );
+
+  return normalizePregnancyProfile(data);
 }
 
-/**
- * Cập nhật hồ sơ thai kỳ.
- *
- * PATCH /pregnancy-profiles/{id}
- */
-export async function updatePregnancyProfile(
-  id: string,
-  payload: UpdatePregnancyProfilePayload,
+export async function createPregnancyProfile(
+  input: CreatePregnancyProfileInput,
 ): Promise<PregnancyProfile> {
-  const response = await apiClient.patch<PregnancyProfile>(
-    `${PREGNANCY_PROFILES_ENDPOINT}/${encodeURIComponent(id)}`,
-    payload,
+  const response = await apiClient.post(
+    PREGNANCY_PROFILES_URL,
+    input,
   );
 
-  return response.data;
+  const data = await unwrapApiData<BackendPregnancyProfile>(
+    response.data,
+  );
+
+  return normalizePregnancyProfile(data);
 }
 
-/**
- * Gửi yêu cầu xóa mềm hồ sơ thai kỳ.
- *
- * POST /pregnancy-profiles/soft-delete/{id}
- *
- * Swagger hiện không khai báo request body. Payload được để optional
- * để có thể gửi lý do xóa nếu backend hỗ trợ.
- */
+export async function updateMyPregnancyProfile(
+  id: string,
+  input: UpdatePregnancyProfileInput,
+): Promise<PregnancyProfile> {
+  const response = await apiClient.patch(
+    `${PREGNANCY_PROFILES_URL}/${encodeURIComponent(id)}`,
+    input,
+  );
+
+  const data = await unwrapApiData<BackendPregnancyProfile>(
+    response.data,
+  );
+
+  return normalizePregnancyProfile(data);
+}
+
 export async function requestSoftDeletePregnancyProfile(
   id: string,
-  payload?: SoftDeletePregnancyProfilePayload,
 ): Promise<PregnancyProfile> {
-  const response = await apiClient.post<PregnancyProfile>(
-    `${PREGNANCY_PROFILES_ENDPOINT}/soft-delete/${encodeURIComponent(id)}`,
-    payload,
+  const response = await apiClient.post(
+    `${PREGNANCY_PROFILES_URL}/soft-delete/${encodeURIComponent(id)}`,
   );
 
-  return response.data;
+  const data = await unwrapApiData<BackendPregnancyProfile>(
+    response.data,
+  );
+
+  return normalizePregnancyProfile(data);
 }
 
-/**
- * Xác nhận hoặc từ chối yêu cầu xóa mềm.
- *
- * PATCH /pregnancy-profiles/soft-delete/{id}
- *
- * Swagger hiện chưa khai báo request body. Vì vậy payload để optional.
- */
 export async function confirmOrRejectSoftDeletePregnancyProfile(
   id: string,
-  payload?: ConfirmSoftDeletePregnancyProfilePayload,
 ): Promise<PregnancyProfile> {
-  const response = await apiClient.patch<PregnancyProfile>(
-    `${PREGNANCY_PROFILES_ENDPOINT}/soft-delete/${encodeURIComponent(id)}`,
-    payload,
+  const response = await apiClient.patch(
+    `${PREGNANCY_PROFILES_URL}/soft-delete/${encodeURIComponent(id)}`,
   );
 
-  return response.data;
+  const data = await unwrapApiData<BackendPregnancyProfile>(
+    response.data,
+  );
+
+  return normalizePregnancyProfile(data);
 }
