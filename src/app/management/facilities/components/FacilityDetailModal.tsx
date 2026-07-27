@@ -131,12 +131,24 @@ export function FacilityDetailModal({
   return (
     <Modal
       open={open}
-      width="min(1280px, calc(100vw - 48px))"
+      width={980}
       centered
       title={null}
       closable={false}
       onCancel={onClose}
       mask={{ closable: true }}
+      style={{
+        maxWidth: "calc(100vw - 32px)",
+      }}
+      styles={{
+        body: {
+          height:
+            "min(620px, calc(100vh - 190px))",
+          overflowY: "auto",
+          overflowX: "hidden",
+          paddingRight: 8,
+        },
+      }}
       footer={
         <div className="flex justify-between gap-3 border-t border-slate-200 pt-3">
           <Button
@@ -167,7 +179,7 @@ export function FacilityDetailModal({
       }
     >
       {facility ? (
-        <div className="space-y-4">
+        <div className="w-full min-w-0 space-y-4 overflow-x-hidden">
           <div className="border-b border-slate-200 pb-4">
             <div className="flex min-w-0 items-start gap-4">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
@@ -317,6 +329,7 @@ export function FacilityDetailModal({
             title={
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
+                  <span className="h-5 w-1 rounded-full bg-blue-600" />
                   <span>Vị trí</span>
                 </div>
 
