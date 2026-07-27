@@ -7,6 +7,7 @@ import {
   CalendarClock,
   CalendarDays,
   DoorOpen,
+  ExternalLink,
   Hash,
   Mail,
   MapPin,
@@ -50,6 +51,41 @@ function formatDate(value?: string) {
   return date.toLocaleDateString("vi-VN");
 }
 
+function getGoogleMapLocation(
+  facility: Facility,
+) {
+  const latitude = Number(facility.latitude);
+  const longitude = Number(facility.longitude);
+
+  const hasValidCoordinates =
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180;
+
+  if (!hasValidCoordinates) {
+    return null;
+  }
+
+  const coordinates = `${latitude},${longitude}`;
+  const encodedCoordinates =
+    encodeURIComponent(coordinates);
+
+  return {
+    latitude,
+    longitude,
+    coordinates,
+    embedUrl:
+      `https://www.google.com/maps?q=${encodedCoordinates}` +
+      "&hl=vi&z=16&output=embed",
+    externalUrl:
+      "https://www.google.com/maps/search/" +
+      `?api=1&query=${encodedCoordinates}`,
+  };
+}
+
 function InfoItem({
   icon,
   label,
@@ -87,6 +123,10 @@ export function FacilityDetailModal({
   const fullAddress = facility
     ? [facility.address, facility.ward, facility.city].filter(Boolean).join(", ")
     : "";
+
+  const googleMapLocation = facility
+    ? getGoogleMapLocation(facility)
+    : null;
 
   return (
     <Modal
@@ -270,6 +310,92 @@ export function FacilityDetailModal({
               </Row>
             </Card>
           </div>
+
+          <Card
+            size="small"
+            className="border-slate-200"
+            title={
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span>Vị trí</span>
+                </div>
+
+                {googleMapLocation ? (
+                  <Button
+                    type="link"
+                    size="small"
+                    href={googleMapLocation.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    icon={
+                      <ExternalLink className="h-4 w-4" />
+                    }
+                  >
+                    Mở trên Google Maps
+                  </Button>
+                ) : null}
+              </div>
+            }
+          >
+            {googleMapLocation ? (
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <iframe
+                  title={`Vị trí ${facility.name}`}
+                  src={googleMapLocation.embedUrl}
+                  className="h-[320px] w-full border-0"
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+
+                <a
+                  href={googleMapLocation.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start justify-between gap-4 border-t border-slate-200 px-5 py-4 transition hover:bg-blue-50"
+                >
+                  <div className="min-w-0">
+                    <p className="mb-1 truncate text-base font-semibold text-slate-950">
+                      {facility.name}
+                    </p>
+
+                    <p className="mb-1 break-words text-sm text-slate-600">
+                      {fullAddress ||
+                        FACILITY_MESSAGES.NOT_UPDATED}
+                    </p>
+
+                    <p className="mb-0 text-xs text-slate-400">
+                      Tọa độ:{" "}
+                      {googleMapLocation.coordinates}
+                    </p>
+                  </div>
+
+                  <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                    <ExternalLink className="h-4 w-4" />
+                  </span>
+                </a>
+              </div>
+            ) : (
+              <div className="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 text-center">
+                <MapPin className="h-8 w-8 text-slate-300" />
+
+                <Text
+                  strong
+                  className="mt-3 block text-slate-700"
+                >
+                  Chưa có vị trí trên bản đồ
+                </Text>
+
+                <Text
+                  type="secondary"
+                  className="mt-1 block"
+                >
+                  Cơ sở chưa được cập nhật đầy đủ vĩ độ và
+                  kinh độ hợp lệ.
+                </Text>
+              </div>
+            )}
+          </Card>
 
           <Card
             size="small"
