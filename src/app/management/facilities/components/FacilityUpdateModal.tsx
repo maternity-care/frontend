@@ -166,7 +166,8 @@ export function FacilityUpdateModal({
     ownerOptions.find(
       (owner) => owner.value === ownerId,
     )?.name ||
-    (ownerId === facility?.ownerId
+    (facility &&
+    ownerId === facility.ownerId
       ? facility.ownerName
       : undefined);
 
