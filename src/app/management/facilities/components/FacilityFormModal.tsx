@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -23,6 +23,7 @@ import {
   MapPin,
   Phone,
   Save,
+  Search,
   UserRound,
   X,
 } from "lucide-react";
@@ -36,6 +37,10 @@ import {
   FacilityScheduleEditor,
   validateFacilitySchedules,
 } from "./FacilityScheduleEditor";
+import {
+  getFacilityOwnerOptions,
+  type FacilityOwnerOption,
+} from "./facility-owner.shared";
 
 const { Text, Title } = Typography;
 const FACILITY_MESSAGES = RESPONSE_MESSAGES.FACILITY_MANAGEMENT;
@@ -149,6 +154,12 @@ type ReverseGeocodeResponse = {
   address?: ReverseGeocodeAddress;
 };
 
+type ForwardGeocodeResult =
+  ReverseGeocodeResponse & {
+    lat?: string;
+    lon?: string;
+  };
+
 function firstNonEmpty(
   ...values: Array<string | undefined>
 ) {
@@ -159,6 +170,49 @@ function firstNonEmpty(
         value.trim().length > 0,
     )?.trim() ?? ""
   );
+}
+
+function extractGeocodeFields(
+  result: ReverseGeocodeResponse,
+) {
+  const geocodeAddress =
+    result.address ?? {};
+
+  const streetName = firstNonEmpty(
+    geocodeAddress.road,
+    geocodeAddress.pedestrian,
+    geocodeAddress.residential,
+  );
+
+  const streetAddress = [
+    geocodeAddress.house_number,
+    streetName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  const ward = firstNonEmpty(
+    geocodeAddress.ward,
+    geocodeAddress.suburb,
+    geocodeAddress.quarter,
+    geocodeAddress.neighbourhood,
+    geocodeAddress.village,
+    geocodeAddress.town,
+  );
+
+  const city = firstNonEmpty(
+    geocodeAddress.city,
+    geocodeAddress.municipality,
+    geocodeAddress.state,
+    geocodeAddress.province,
+  );
+
+  return {
+    streetAddress,
+    ward,
+    city,
+  };
 }
 
 function getGoogleMapLocation(
@@ -241,6 +295,41 @@ async function reverseGeocode(
   return (await response.json()) as ReverseGeocodeResponse;
 }
 
+async function forwardGeocode(
+  query: string,
+): Promise<ForwardGeocodeResult | null> {
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    q: query,
+    addressdetails: "1",
+    limit: "1",
+    countrycodes: "vn",
+    "accept-language": "vi",
+  });
+
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+    {
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Không thể tìm kiếm địa chỉ trên bản đồ.",
+    );
+  }
+
+  const results =
+    (await response.json()) as ForwardGeocodeResult[];
+
+  return Array.isArray(results) && results.length > 0
+    ? results[0] ?? null
+    : null;
+}
+
 function getLocationErrorMessage(error: unknown) {
   if (
     error &&
@@ -280,6 +369,13 @@ export function FacilityFormModal({
   const [form] = Form.useForm<FacilityFormValues>();
   const [submitting, setSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [searchingAddress, setSearchingAddress] =
+    useState(false);
+  const [ownerOptions, setOwnerOptions] = useState<
+    FacilityOwnerOption[]
+  >([]);
+  const [ownersLoading, setOwnersLoading] =
+    useState(false);
 
   const name = Form.useWatch("name", form);
   const ownerId = Form.useWatch("ownerId", form);
@@ -292,6 +388,57 @@ export function FacilityFormModal({
   const latitude = Form.useWatch("latitude", form);
   const longitude = Form.useWatch("longitude", form);
   const schedules = Form.useWatch("schedules", form);
+
+  const selectedOwnerName = useMemo(
+    () =>
+      ownerOptions.find(
+        (owner) => owner.value === ownerId,
+      )?.name,
+    [ownerId, ownerOptions],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    const timer = window.setTimeout(() => {
+      setOwnersLoading(true);
+
+      void getFacilityOwnerOptions()
+        .then((options) => {
+          if (cancelled) return;
+          setOwnerOptions(options);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+
+          setOwnerOptions([]);
+
+          modal.error({
+            title:
+              "Không tải được danh sách chủ cơ sở",
+            content:
+              error instanceof Error
+                ? error.message
+                : "Không thể tải danh sách chủ cơ sở.",
+            okText:
+              RESPONSE_MESSAGES.COMMON.CLOSE,
+            centered: true,
+          });
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setOwnersLoading(false);
+          }
+        });
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [modal, open]);
 
   const fullAddress = useMemo(
     () => [address, ward, city].filter(Boolean).join(", "),
@@ -355,37 +502,12 @@ export function FacilityFormModal({
             nextLongitude,
           );
 
-        const geocodeAddress =
-          geocodeResult.address ?? {};
-
-        const streetName = firstNonEmpty(
-          geocodeAddress.road,
-          geocodeAddress.pedestrian,
-          geocodeAddress.residential,
-        );
-
-        const streetAddress = [
-          geocodeAddress.house_number,
-          streetName,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .trim();
-
-        const nextWard = firstNonEmpty(
-          geocodeAddress.ward,
-          geocodeAddress.suburb,
-          geocodeAddress.quarter,
-          geocodeAddress.neighbourhood,
-          geocodeAddress.village,
-          geocodeAddress.town,
-        );
-
-        const nextCity = firstNonEmpty(
-          geocodeAddress.city,
-          geocodeAddress.municipality,
-          geocodeAddress.state,
-          geocodeAddress.province,
+        const {
+          streetAddress,
+          ward: nextWard,
+          city: nextCity,
+        } = extractGeocodeFields(
+          geocodeResult,
         );
 
         form.setFieldsValue({
@@ -429,6 +551,100 @@ export function FacilityFormModal({
       });
     } finally {
       setLocating(false);
+    }
+  }
+
+
+  async function handleSearchAddress(
+    rawAddress?: string,
+  ) {
+    const manualAddress = String(
+      rawAddress ??
+        form.getFieldValue("address") ??
+        "",
+    ).trim();
+
+    if (!manualAddress) {
+      await form.validateFields(["address"]);
+      return;
+    }
+
+    const currentWard = String(
+      form.getFieldValue("ward") ?? "",
+    ).trim();
+    const currentCity = String(
+      form.getFieldValue("city") ?? "",
+    ).trim();
+
+    const searchQuery = [
+      manualAddress,
+      currentWard,
+      currentCity,
+      "Việt Nam",
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    setSearchingAddress(true);
+
+    try {
+      const result =
+        await forwardGeocode(searchQuery);
+
+      if (!result) {
+        throw new Error(
+          "Không tìm thấy địa chỉ phù hợp trên bản đồ.",
+        );
+      }
+
+      const nextLatitude = Number(result.lat);
+      const nextLongitude = Number(result.lon);
+
+      if (
+        !Number.isFinite(nextLatitude) ||
+        !Number.isFinite(nextLongitude)
+      ) {
+        throw new Error(
+          "Địa chỉ tìm thấy không có tọa độ hợp lệ.",
+        );
+      }
+
+      const {
+        streetAddress,
+        ward: nextWard,
+        city: nextCity,
+      } = extractGeocodeFields(result);
+
+      form.setFieldsValue({
+        address:
+          streetAddress || manualAddress,
+        ward: nextWard || currentWard,
+        city: nextCity || currentCity,
+        latitude:
+          nextLatitude.toFixed(7),
+        longitude:
+          nextLongitude.toFixed(7),
+      });
+
+      modal.success({
+        title: "Đã tìm thấy địa chỉ",
+        content:
+          "Tỉnh/thành phố, phường/xã và tọa độ đã được tự động điền. Vui lòng kiểm tra lại vị trí trên bản đồ.",
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+        centered: true,
+      });
+    } catch (error) {
+      modal.error({
+        title: "Không thể tìm địa chỉ",
+        content:
+          error instanceof Error
+            ? error.message
+            : "Không thể tìm kiếm địa chỉ trên bản đồ.",
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+        centered: true,
+      });
+    } finally {
+      setSearchingAddress(false);
     }
   }
 
@@ -542,13 +758,35 @@ export function FacilityFormModal({
                   <Col xs={24} md={12}>
                     <Form.Item
                       name="ownerId"
-                      label="Mã chủ cơ sở"
-                      rules={[{ required: true, message: "Vui lòng nhập mã chủ cơ sở." }]}
+                      label="Chủ cơ sở"
+                      rules={[
+                        {
+                          required: true,
+                          message:
+                            "Vui lòng chọn chủ cơ sở.",
+                        },
+                      ]}
                     >
-                      <Input
+                      <Select
                         size="large"
-                        prefix={<UserRound className="h-4 w-4 text-slate-400" />}
-                        placeholder="Ví dụ: 900011"
+                        showSearch
+                        allowClear
+                        loading={ownersLoading}
+                        optionFilterProp="label"
+                        placeholder="Chọn chủ cơ sở"
+                        notFoundContent={
+                          ownersLoading
+                            ? "Đang tải danh sách..."
+                            : "Không có chủ cơ sở phù hợp"
+                        }
+                        options={ownerOptions.map(
+                          (owner) => ({
+                            value: owner.value,
+                            label: owner.label,
+                            disabled:
+                              owner.disabled,
+                          }),
+                        )}
                       />
                     </Form.Item>
                   </Col>
@@ -632,7 +870,25 @@ export function FacilityFormModal({
                       label={FACILITY_MESSAGES.ADDRESS}
                       rules={[{ required: true, message: "Vui lòng nhập địa chỉ." }]}
                     >
-                      <Input size="large" placeholder="Nhập số nhà, tên đường" />
+                      <Input.Search
+                        size="large"
+                        placeholder="Nhập số nhà, tên đường hoặc địa chỉ đầy đủ"
+                        enterButton={
+                          <span className="inline-flex items-center gap-1.5">
+                            <Search className="h-4 w-4" />
+                            Tìm trên bản đồ
+                          </span>
+                        }
+                        loading={searchingAddress}
+                        disabled={
+                          submitting || locating
+                        }
+                        onSearch={(value) => {
+                          void handleSearchAddress(
+                            value,
+                          );
+                        }}
+                      />
                     </Form.Item>
                   </Col>
   
@@ -812,8 +1068,8 @@ export function FacilityFormModal({
               <div className="mt-5 space-y-3">
                 <PreviewLine
                   icon={<UserRound className="h-4 w-4" />}
-                  label="Mã chủ cơ sở"
-                  value={ownerId}
+                  label="Chủ cơ sở"
+                  value={selectedOwnerName}
                 />
                 <PreviewLine
                   icon={<Phone className="h-4 w-4" />}
