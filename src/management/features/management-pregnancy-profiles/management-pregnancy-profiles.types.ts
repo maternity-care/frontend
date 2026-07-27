@@ -1,45 +1,272 @@
-import { CreatePregnancyProfilePayload, PregnancyProfile, PregnancyProfileStatus, UpdatePregnancyProfilePayload } from "@/features/pregnancy-profiles/pregnancy-profiles.types";
+export type PregnancyProfileStatus =
+  | "active"
+  | "completed"
+  | "terminated"
+  | "deleted";
+
+export type PregnancyRiskLevel = "low" | "medium" | "high";
+
+export interface ManagementPregnancyProfileUser {
+  id: string;
+
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+
+  cccd: string | null;
+  dateOfBirth: string | null;
+
+  address: string | null;
+  ward: string | null;
+  district: string | null;
+  province: string | null;
+
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface PregnancyConsultationRecord {
+  id: string;
+
+  appointmentId: string | null;
+  pregnancyProfileId: string | null;
+  doctorId: string | null;
+
+  diagnosis: string | null;
+  conclusion: string | null;
+  recommendation: string | null;
+
+  nextAppointmentSuggestedAt: string | null;
+
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PregnancyProfilePdfRecord {
+  id: string;
+
+  name: string;
+  url: string;
+
+  key?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+
+  uploadedBy?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
 
 /**
- * Bộ lọc danh sách hồ sơ thai kỳ phía quản lý.
+ * API hiện tại có thể trả:
  *
- * GET /management/pregnancy-profiles
+ * - string: URL hoặc key của file.
+ * - PregnancyProfilePdfRecord: thông tin file PDF.
+ * - PregnancyConsultationRecord: kết quả khám.
+ *
+ * Khi backend tách riêng consultations và medicalRecords,
+ * có thể bỏ PregnancyConsultationRecord khỏi union này.
  */
-export type ManagementPregnancyProfileQuery = {
+export type ManagementMedicalRecord =
+  | string
+  | PregnancyProfilePdfRecord
+  | PregnancyConsultationRecord;
+
+export interface ManagementPregnancyProfile {
+  id: string;
+
+  code: string | null;
+  patientId: string | null;
+  userId: string | null;
+
+  user: ManagementPregnancyProfileUser | null;
+
+  lastMenstrualPeriod: string | null;
+  expectedDueDate: string | null;
+
+  fetalCount: number | null;
+
+  gravida: number;
+  paraFullTerm: number;
+  paraPremature: number;
+  paraAbortion: number;
+  paraLivingChildren: number;
+
+  riskLevel: PregnancyRiskLevel;
+  status: PregnancyProfileStatus;
+
+  notes: string | null;
+
+  medicalRecords: ManagementMedicalRecord[];
+  consultations: PregnancyConsultationRecord[];
+
+  deletedAt?: string | null;
+  deletedReason?: string | null;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetManagementPregnancyProfilesParams {
+  search?: string;
+
   name?: string;
   code?: string;
   phone?: string;
+  email?: string;
+
+  userId?: string;
+  patientId?: string;
+
+  riskLevel?: PregnancyRiskLevel;
   status?: PregnancyProfileStatus;
+
   page?: number;
   limit?: number;
-};
+}
 
-/**
- * Tạo hồ sơ thai kỳ cho một bệnh nhân.
- *
- * POST /management/pregnancy-profiles/patients/{patientId}
- */
-export type CreateManagementPregnancyProfilePayload =
-  CreatePregnancyProfilePayload;
+export interface ManagementPregnancyProfilesResult {
+  items: ManagementPregnancyProfile[];
 
-/**
- * Cập nhật hồ sơ thai kỳ.
- *
- * PATCH /management/pregnancy-profiles/{id}
- */
-export type UpdateManagementPregnancyProfilePayload =
-  UpdatePregnancyProfilePayload;
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
 
-/**
- * Swagger đang trả trực tiếp PregnancyProfile[].
- *
- * Nếu backend sau này trả thêm total, page và limit thì thay bằng:
- *
- * {
- *   data: PregnancyProfile[];
- *   total: number;
- *   page: number;
- *   limit: number;
- * }
+export interface UpdateManagementPregnancyProfileInput {
+  lastMenstrualPeriod?: string | null;
+  expectedDueDate?: string | null;
+
+  fetalCount?: number;
+
+  gravida?: number;
+  paraFullTerm?: number;
+  paraPremature?: number;
+  paraAbortion?: number;
+  paraLivingChildren?: number;
+
+  riskLevel?: PregnancyRiskLevel;
+  status?: Exclude<PregnancyProfileStatus, "deleted">;
+
+  notes?: string | null;
+}
+
+export interface DeleteManagementPregnancyProfileInput {
+  reason?: string;
+}
+
+/*
+ * Các kiểu dữ liệu thô dùng để nhận response từ backend.
+ * FE sẽ normalize thành ManagementPregnancyProfile.
  */
-export type ManagementPregnancyProfileListResponse = PregnancyProfile[];
+
+export interface BackendManagementPregnancyProfileUser {
+  id?: string | number;
+
+  name?: string | null;
+  fullName?: string | null;
+
+  email?: string | null;
+  phone?: string | null;
+  phoneNumber?: string | null;
+
+  cccd?: string | null;
+  citizenId?: string | null;
+  identificationNumber?: string | null;
+
+  dateOfBirth?: string | null;
+  dob?: string | null;
+
+  address?: string | null;
+  ward?: string | null;
+  district?: string | null;
+  province?: string | null;
+
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface BackendPregnancyConsultationRecord {
+  id?: string | number;
+
+  appointmentId?: string | number | null;
+  pregnancyProfileId?: string | number | null;
+  doctorId?: string | number | null;
+
+  diagnosis?: string | null;
+  conclusion?: string | null;
+  recommendation?: string | null;
+
+  nextAppointmentSuggestedAt?: string | null;
+
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface BackendPregnancyProfilePdfRecord {
+  id?: string | number;
+
+  name?: string | null;
+  fileName?: string | null;
+  originalName?: string | null;
+
+  url?: string | null;
+  publicUrl?: string | null;
+  fileUrl?: string | null;
+
+  key?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+
+  uploadedBy?: string | number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface BackendManagementPregnancyProfile {
+  id?: string | number;
+
+  code?: string | null;
+  profileCode?: string | null;
+
+  patientId?: string | number | null;
+  patientCode?: string | null;
+
+  userId?: string | number | null;
+  user?: BackendManagementPregnancyProfileUser | null;
+  patient?: BackendManagementPregnancyProfileUser | null;
+
+  lastMenstrualPeriod?: string | null;
+  expectedDueDate?: string | null;
+
+  fetalCount?: number | string | null;
+
+  gravida?: number | string | null;
+  paraFullTerm?: number | string | null;
+  paraPremature?: number | string | null;
+  paraAbortion?: number | string | null;
+  paraLivingChildren?: number | string | null;
+
+  riskLevel?: string | null;
+  status?: string | null;
+
+  notes?: string | null;
+
+  medicalRecords?: unknown[] | null;
+  records?: unknown[] | null;
+
+  consultations?: BackendPregnancyConsultationRecord[] | null;
+
+  deletedAt?: string | null;
+  deletedReason?: string | null;
+
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
