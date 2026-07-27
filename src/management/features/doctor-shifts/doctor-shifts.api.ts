@@ -167,6 +167,8 @@ function toCreatePayload(
     slotId: input.slotId.trim(),
     shiftDate: input.shiftDate,
     maxAppointments: input.maxAppointments,
+    status: input.status,
+    note: input.note.trim(),
   };
 }
 
@@ -180,6 +182,8 @@ function toUpdatePayload(
     slotId: input.slotId?.trim(),
     shiftDate: input.shiftDate,
     maxAppointments: input.maxAppointments,
+    status: input.status,
+    note: input.note?.trim(),
   });
 }
 

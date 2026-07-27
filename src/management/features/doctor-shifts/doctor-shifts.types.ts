@@ -111,6 +111,11 @@ export interface CreateDoctorShiftInput {
   slotId: string;
   shiftDate: string;
   maxAppointments: number;
+  status: Extract<
+    DoctorShiftStatus,
+    "available" | "off"
+  >;
+  note: string;
 }
 
 export interface UpdateDoctorShiftInput {
@@ -120,6 +125,8 @@ export interface UpdateDoctorShiftInput {
   slotId?: string;
   shiftDate?: string;
   maxAppointments?: number;
+  status?: DoctorShiftStatus;
+  note?: string;
 }
 
 export interface CheckDoctorShiftConflictsInput {

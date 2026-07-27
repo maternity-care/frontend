@@ -63,13 +63,6 @@ const { Text, Title } = Typography;
 
 type ViewMode = "day" | "week" | "month";
 
-type DoctorFacilitySource = {
-  facilityIds?: Array<string | number>;
-  facilityAssignments?: Array<{
-    facilityId?: string | number;
-  }>;
-};
-
 const STATUS_OPTIONS: Array<{
   value: DoctorShiftStatus;
   label: string;
@@ -375,55 +368,32 @@ export default function DoctorShiftPage() {
                 doctorInfoById.get(
                   doctor.id,
                 );
-              const facilitySource =
-                doctor as typeof doctor &
-                  DoctorFacilitySource;
-
-              const facilityIds = Array.from(
-                new Set(
-                  [
-                    ...(facilitySource.facilityIds ??
-                      []),
-                    ...(facilitySource.facilityAssignments ??
-                      []).map(
-                      (assignment) =>
-                        assignment.facilityId,
-                    ),
-                  ]
-                    .filter(
-                      (
-                        facilityId,
-                      ): facilityId is
-                        | string
-                        | number =>
-                        facilityId !==
-                          undefined &&
-                        facilityId !== null &&
-                        String(
-                          facilityId,
-                        ).trim() !== "",
-                    )
-                    .map((facilityId) =>
-                      String(facilityId),
-                    ),
-                ),
-              );
 
               return {
                 id: doctor.id,
                 name:
+                  doctor.name ||
                   shiftDoctor?.name ||
                   `Bác sĩ #${doctor.id}`,
                 title:
-                  shiftDoctor?.title ||
                   doctor.title ||
+                  shiftDoctor?.title ||
                   "Bác sĩ",
                 specialty:
-                  shiftDoctor?.specialty ||
                   doctor.specialty ||
+                  shiftDoctor?.specialty ||
                   "Chưa cập nhật",
-                status: doctor.status,
-                facilityIds,
+                status:
+                  doctor.status === "active" &&
+                  doctor.staffStatus === "active"
+                    ? "active"
+                    : "inactive",
+                facilityIds:
+                  doctor.facilityIds.length > 0
+                    ? doctor.facilityIds
+                    : doctor.facilityId
+                      ? [doctor.facilityId]
+                      : [],
               };
             }),
           );
