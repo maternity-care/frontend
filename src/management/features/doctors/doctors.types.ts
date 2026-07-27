@@ -1,6 +1,24 @@
 export type DoctorStatus = "active" | "inactive";
 export type DoctorPermissionEffect = "allow" | "deny";
-export type DoctorFacilityRole = "admin" | "doctor" | "nurse" | "staff";
+export type DoctorFacilityRole =
+  | "admin"
+  | "doctor"
+  | "nurse"
+  | "staff";
+
+export interface BackendDoctorStaff {
+  id: string;
+  name: string;
+  personalEmail: string;
+  employeeCode: string;
+  facilityId: string;
+  email: string;
+  phone: string;
+  address: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface BackendDoctor {
   id: string;
@@ -13,17 +31,26 @@ export interface BackendDoctor {
   status: string;
   createdAt: string;
   updatedAt: string;
+  staff?: BackendDoctorStaff | null;
 }
 
 export interface Doctor {
   id: string;
   staffId: string;
+  name: string;
+  facilityId: string;
+  facilityIds: string[];
+  employeeCode: string;
+  email: string;
+  phone: string;
+  address: string;
   licenseNo: string;
   title: string;
   specialty: string;
   yearsOfExperience: number;
   bio: string;
   status: DoctorStatus;
+  staffStatus: DoctorStatus;
   createdAt: string;
   updatedAt: string;
 }
