@@ -43,15 +43,31 @@ export function DoctorShiftCreateModal({
     payloads,
     slotById,
   }: ValidatedShiftForm) {
+    const createPayloads =
+      payloads.map((payload) => ({
+        ...payload,
+        status:
+          payload.status === "off"
+            ? ("off" as const)
+            : ("available" as const),
+      }));
+
     const responses = await Promise.all(
-      payloads.map((payload) =>
+      createPayloads.map((payload) =>
         createDoctorShift(payload),
       ),
     );
 
     const createdShifts = await Promise.all(
       responses.map(async (response, index) => {
-        const payload = payloads[index];
+        const payload =
+          createPayloads[index];
+
+        if (!payload) {
+          throw new Error(
+            "Không tìm thấy dữ liệu ca trực vừa tạo.",
+          );
+        }
 
         try {
           const detail = await getDoctorShift(
