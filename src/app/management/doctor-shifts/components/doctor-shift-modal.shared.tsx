@@ -810,9 +810,7 @@ export function DoctorShiftFormModalBase({
           ),
           status:
             mode === "create"
-              ? values.status === "off"
-                ? "off"
-                : "available"
+              ? "available"
               : values.status,
           note: values.note?.trim() ?? "",
         });
@@ -1101,16 +1099,13 @@ export function DoctorShiftFormModalBase({
               ]}
             >
               <Select
+                disabled={mode === "create"}
                 options={
                   mode === "create"
                     ? [
                         {
                           value: "available",
                           label: "Còn trống",
-                        },
-                        {
-                          value: "off",
-                          label: "Nghỉ",
                         },
                       ]
                     : [
