@@ -14,93 +14,160 @@ import type {
 
 const ENDPOINT = "/management/doctors";
 
-function normalizeStatus(status: string): DoctorStatus {
-  return status.trim().toLowerCase() === "active"
+function normalizeStatus(
+  status?: string,
+): DoctorStatus {
+  return String(status ?? "")
+    .trim()
+    .toLowerCase() === "active"
     ? "active"
     : "inactive";
 }
 
-function normalizeDoctor(doctor: BackendDoctor): Doctor {
-  const yearsOfExperience = Number(doctor.yearsOfExperience);
+function normalizeDoctor(
+  doctor: BackendDoctor,
+): Doctor {
+  const yearsOfExperience = Number(
+    doctor.yearsOfExperience,
+  );
+  const staff = doctor.staff ?? null;
+  const facilityId = String(
+    staff?.facilityId ?? "",
+  ).trim();
 
   return {
-    id: String(doctor.id),
-    staffId: String(doctor.staffId),
-    licenseNo: doctor.licenseNo ?? "",
-    title: doctor.title ?? "",
-    specialty: doctor.specialty ?? "",
+    id: String(doctor.id ?? ""),
+    staffId: String(doctor.staffId ?? ""),
+    name:
+      String(staff?.name ?? "").trim() ||
+      `Bác sĩ #${String(doctor.id ?? "")}`,
+    facilityId,
+    facilityIds: facilityId
+      ? [facilityId]
+      : [],
+    employeeCode: String(
+      staff?.employeeCode ?? "",
+    ),
+    email: String(staff?.email ?? ""),
+    phone: String(staff?.phone ?? ""),
+    address: String(staff?.address ?? ""),
+    licenseNo: String(
+      doctor.licenseNo ?? "",
+    ),
+    title: String(doctor.title ?? ""),
+    specialty: String(
+      doctor.specialty ?? "",
+    ),
     yearsOfExperience:
-      Number.isFinite(yearsOfExperience) && yearsOfExperience >= 0
+      Number.isFinite(yearsOfExperience) &&
+      yearsOfExperience >= 0
         ? yearsOfExperience
         : 0,
-    bio: doctor.bio ?? "",
-    status: normalizeStatus(doctor.status),
-    createdAt: doctor.createdAt,
-    updatedAt: doctor.updatedAt,
+    bio: String(doctor.bio ?? ""),
+    status: normalizeStatus(
+      doctor.status,
+    ),
+    staffStatus: normalizeStatus(
+      staff?.status ?? doctor.status,
+    ),
+    createdAt: String(
+      doctor.createdAt ?? "",
+    ),
+    updatedAt: String(
+      doctor.updatedAt ?? "",
+    ),
   };
 }
 
-function toCreatePayload(input: CreateDoctorInput) {
+function toCreatePayload(
+  input: CreateDoctorInput,
+) {
   return {
     name: input.name.trim(),
-    personalEmail: input.personalEmail.trim(),
+    personalEmail:
+      input.personalEmail.trim(),
     phone: input.phone.trim(),
     roleIds: input.roleIds,
-    facilityAssignments: input.facilityAssignments.map((assignment) => ({
-      facilityId: assignment.facilityId.trim(),
-      roles: assignment.roles,
-    })),
+    facilityAssignments:
+      input.facilityAssignments.map(
+        (assignment) => ({
+          facilityId:
+            assignment.facilityId.trim(),
+          roles: assignment.roles,
+        }),
+      ),
     licenseNo: input.licenseNo.trim(),
     title: input.title.trim(),
     specialty: input.specialty.trim(),
-    yearsOfExperience: input.yearsOfExperience,
-    bio: input.bio?.trim() || undefined,
-    permissionOverrides: input.permissionOverrides ?? [],
+    yearsOfExperience:
+      input.yearsOfExperience,
+    bio:
+      input.bio?.trim() || undefined,
+    permissionOverrides:
+      input.permissionOverrides ?? [],
   };
 }
 
-function toUpdatePayload(input: UpdateDoctorInput) {
+function toUpdatePayload(
+  input: UpdateDoctorInput,
+) {
   const payload = {
     staffId: input.staffId?.trim(),
     licenseNo: input.licenseNo?.trim(),
     title: input.title?.trim(),
     specialty: input.specialty?.trim(),
-    yearsOfExperience: input.yearsOfExperience,
+    yearsOfExperience:
+      input.yearsOfExperience,
     bio: input.bio?.trim(),
     status: input.status,
   };
 
   return Object.fromEntries(
-    Object.entries(payload).filter(([, value]) => value !== undefined),
+    Object.entries(payload).filter(
+      ([, value]) =>
+        value !== undefined,
+    ),
   );
 }
 
-export async function getDoctors(): Promise<Doctor[]> {
-  const data = await unwrapApiData<BackendDoctor[]>(
-    apiClient.get(ENDPOINT),
-  );
+export async function getDoctors(): Promise<
+  Doctor[]
+> {
+  const data = await unwrapApiData<
+    BackendDoctor[]
+  >(apiClient.get(ENDPOINT));
 
-  return Array.isArray(data) ? data.map(normalizeDoctor) : [];
+  return Array.isArray(data)
+    ? data.map(normalizeDoctor)
+    : [];
 }
 
 export async function createDoctor(
   input: CreateDoctorInput,
 ): Promise<DoctorApiResponse<Doctor>> {
-  const response = await unwrapApiResponse<BackendDoctor>(
-    apiClient.post(ENDPOINT, toCreatePayload(input)),
-  );
+  const response =
+    await unwrapApiResponse<BackendDoctor>(
+      apiClient.post(
+        ENDPOINT,
+        toCreatePayload(input),
+      ),
+    );
 
   return {
     success: response.success ?? true,
-    message: response.message ?? "Tạo bác sĩ thành công",
+    message:
+      response.message ??
+      "Tạo bác sĩ thành công",
     data: normalizeDoctor(response.data),
   };
 }
 
-export async function getDoctor(id: string): Promise<Doctor> {
-  const data = await unwrapApiData<BackendDoctor>(
-    apiClient.get(`${ENDPOINT}/${id}`),
-  );
+export async function getDoctor(
+  id: string,
+): Promise<Doctor> {
+  const data = await unwrapApiData<
+    BackendDoctor
+  >(apiClient.get(`${ENDPOINT}/${id}`));
 
   return normalizeDoctor(data);
 }
@@ -109,13 +176,19 @@ export async function updateDoctor(
   id: string,
   input: UpdateDoctorInput,
 ): Promise<DoctorApiResponse<Doctor>> {
-  const response = await unwrapApiResponse<BackendDoctor>(
-    apiClient.patch(`${ENDPOINT}/${id}`, toUpdatePayload(input)),
-  );
+  const response =
+    await unwrapApiResponse<BackendDoctor>(
+      apiClient.patch(
+        `${ENDPOINT}/${id}`,
+        toUpdatePayload(input),
+      ),
+    );
 
   return {
     success: response.success ?? true,
-    message: response.message ?? "Cập nhật bác sĩ thành công",
+    message:
+      response.message ??
+      "Cập nhật bác sĩ thành công",
     data: normalizeDoctor(response.data),
   };
 }
@@ -123,13 +196,18 @@ export async function updateDoctor(
 export async function deleteDoctor(
   id: string,
 ): Promise<DoctorApiResponse<null>> {
-  const response = await unwrapApiResponse<null>(
-    apiClient.delete(`${ENDPOINT}/${id}`),
-  );
+  const response =
+    await unwrapApiResponse<null>(
+      apiClient.delete(
+        `${ENDPOINT}/${id}`,
+      ),
+    );
 
   return {
     success: response.success ?? true,
-    message: response.message ?? "Xóa bác sĩ thành công",
+    message:
+      response.message ??
+      "Xóa bác sĩ thành công",
     data: response.data ?? null,
   };
 }
