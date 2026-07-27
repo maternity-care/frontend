@@ -329,7 +329,6 @@ export function FacilityDetailModal({
             title={
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="h-5 w-1 rounded-full bg-blue-600" />
                   <span>Vị trí</span>
                 </div>
 
