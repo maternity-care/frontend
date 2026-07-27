@@ -3,10 +3,14 @@ import type {
   BackendFacility,
   BackendFacilityListResponse,
   BackendFacilityLookupItem,
+  BackendFacilityAdminOption,
+  BackendFacilityAdminOptionsResponse,
   BackendOperatingHour,
   BackendOperatingHourGroup,
   CreateFacilityInput,
   Facility,
+  FacilityAdminOption,
+  FacilityAdminOptionsResult,
   FacilityListResult,
   FacilityLookupItem,
   FacilityOperatingHoursPreview,
@@ -15,6 +19,7 @@ import type {
   FacilityScheduleInput,
   FacilityStatus,
   GetFacilitiesParams,
+  GetFacilityAdminOptionsParams,
   GetFacilityRoomTypesParams,
   GetFacilityLookupParams,
   UpdateFacilityInput,
@@ -136,6 +141,67 @@ function normalizeLookupItem(
     ward: item.ward,
     status: normalizeStatus(item.status),
     ownerName: item.ownerName,
+  };
+}
+
+function normalizeAdminOptionStatus(
+  status?: string,
+): FacilityAdminOption["status"] {
+  const normalizedStatus = String(
+    status ?? "",
+  )
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalizedStatus === "inactive" ||
+    normalizedStatus === "locked"
+  ) {
+    return normalizedStatus;
+  }
+
+  return "active";
+}
+
+function normalizeAdminOption(
+  item: BackendFacilityAdminOption,
+): FacilityAdminOption {
+  const ownedFacilityCount = Number(
+    item.ownedFacilityCount,
+  );
+
+  return {
+    id: String(item.id ?? ""),
+    name: String(item.name ?? "").trim(),
+    email: String(item.email ?? "").trim(),
+    personalEmail: String(
+      item.personalEmail ?? "",
+    ).trim(),
+    phone: String(item.phone ?? "").trim(),
+    employeeCode: String(
+      item.employeeCode ?? "",
+    ).trim(),
+    status: normalizeAdminOptionStatus(
+      item.status,
+    ),
+    homeFacilityId: String(
+      item.homeFacilityId ?? "",
+    ).trim(),
+    homeFacilityName: String(
+      item.homeFacilityName ?? "",
+    ).trim(),
+    homeFacilityCode: String(
+      item.homeFacilityCode ?? "",
+    ).trim(),
+    roleId: String(item.roleId ?? "").trim(),
+    roleName: String(
+      item.roleName ?? "",
+    ).trim(),
+    ownedFacilityCount:
+      Number.isFinite(ownedFacilityCount) &&
+      ownedFacilityCount >= 0
+        ? Math.trunc(ownedFacilityCount)
+        : 0,
   };
 }
 
@@ -457,6 +523,77 @@ export async function lookupFacilities(params?: GetFacilityLookupParams) {
   );
 
   return data.map(normalizeLookupItem);
+}
+
+export async function getFacilityAdminOptions(
+  params?: GetFacilityAdminOptionsParams,
+): Promise<FacilityAdminOptionsResult> {
+  const requestedPage = normalizePage(
+    params?.page,
+  );
+  const requestedLimit = clampLimit(
+    params?.limit,
+    DEFAULT_FACILITY_PAGE_SIZE,
+  );
+
+  const data =
+    await unwrapApiData<BackendFacilityAdminOptionsResponse>(
+      apiClient.get(
+        "/management/facilities/admin-options",
+        {
+          params: removeUndefined({
+            search:
+              params?.search?.trim() ||
+              undefined,
+            status:
+              params?.status ?? "active",
+            availableOnly:
+              params?.availableOnly ?? false,
+            page: requestedPage,
+            limit: requestedLimit,
+          }),
+        },
+      ),
+    );
+
+  const items = Array.isArray(data?.items)
+    ? data.items
+    : [];
+
+  const total = toNonNegativeInteger(
+    data?.total,
+    items.length,
+  );
+  const page = Math.max(
+    1,
+    toNonNegativeInteger(
+      data?.page,
+      requestedPage,
+    ),
+  );
+  const limit = Math.max(
+    1,
+    toNonNegativeInteger(
+      data?.limit,
+      requestedLimit,
+    ),
+  );
+  const calculatedTotalPages =
+    total === 0
+      ? 0
+      : Math.ceil(total / limit);
+  const totalPages = toNonNegativeInteger(
+    data?.totalPages,
+    calculatedTotalPages,
+  );
+
+  return {
+    items: items.map(normalizeAdminOption),
+    total,
+    page,
+    limit,
+    totalPages,
+  };
 }
 
 export async function getPublicFacilities(params?: GetFacilitiesParams) {
