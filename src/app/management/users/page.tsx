@@ -91,7 +91,7 @@ export default function UsersManagementPage() {
         description="Quản lý tài khoản khách hàng Member và Partner."
       />
       <div className="mt-6 space-y-4">
-        {error ? <Alert type="error" message={error} showIcon closable onClose={() => setError(null)} /> : null}
+        {error ? <Alert type="error" title={error} showIcon closable onClose={() => setError(null)} /> : null}
         <Card className="management-filter">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Space>

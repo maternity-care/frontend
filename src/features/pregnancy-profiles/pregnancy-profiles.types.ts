@@ -1,69 +1,51 @@
-/**
- * Mức độ nguy cơ của thai kỳ.
- * Cho phép string để tránh lỗi nếu backend bổ sung trạng thái mới.
- */
-export type PregnancyRiskLevel =
-  | "low"
-  | "medium"
-  | "high"
-  | (string & {});
+export type PregnancyRiskLevel = "low" | "medium" | "high";
 
-/**
- * Trạng thái hồ sơ thai kỳ.
- *
- * Swagger hiện không thống nhất:
- * - POST sử dụng "ACTIVE"
- * - PATCH sử dụng "active"
- *
- * Vì vậy frontend chấp nhận cả hai dạng.
- */
 export type PregnancyProfileStatus =
-  | "ACTIVE"
-  | "INACTIVE"
-  | "COMPLETED"
-  | "PENDING_DELETE"
-  | "DELETED"
   | "active"
-  | "inactive"
   | "completed"
-  | "pending_delete"
-  | "deleted"
-  | (string & {});
+  | "terminated"
+  | "deleted";
 
-export type PregnancyProfileUser = {
-  id?: string;
-  email?: string;
-  phone?: string;
-  status?: string;
-  [key: string]: unknown;
-};
+export type PregnancyUserStatus = "active" | "inactive" | "locked";
 
-export type PregnancyProfileUserProfile = {
-  id?: string;
-  fullName?: string;
-  dateOfBirth?: string | null;
-  gender?: string;
-  address?: string | null;
-  identityNumber?: string | null;
-  [key: string]: unknown;
-};
+export interface PregnancyProfileUser {
+  id: string;
+  cccd: string | null;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  dateOfBirth: string | null;
+  address: string | null;
+  province: string | null;
+  ward: string | null;
+  status: PregnancyUserStatus;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
 
 /**
- * Hồ sơ thai kỳ được backend trả về.
+ * Swagger hiện chỉ trả medicalRecords là string[].
+ * Có thể là ID hoặc URL của hồ sơ y tế.
  */
-export type PregnancyProfile = {
+export type PregnancyMedicalRecordReference = string;
+
+export interface PregnancyProfile {
   id: string;
   patientId: string;
   code: string;
 
-  lastMenstrualPeriod: string;
-  expectedDueDate: string;
+  lastMenstrualPeriod: string | null;
+  expectedDueDate: string | null;
 
   /**
-   * Swagger có fetalCount trong request nhưng chưa hiển thị
-   * trong response, vì vậy để optional.
+   * Swagger nhận fetalCount khi create/update nhưng hiện
+   * chưa thể hiện trong response. Để optional tránh lỗi.
    */
-  fetalCount?: number;
+  fetalCount?: number | null;
 
   gravida: number;
   paraFullTerm: number;
@@ -73,6 +55,7 @@ export type PregnancyProfile = {
 
   riskLevel: PregnancyRiskLevel;
   status: PregnancyProfileStatus;
+
   notes: string | null;
 
   createdAt: string;
@@ -83,48 +66,228 @@ export type PregnancyProfile = {
   deletedBy: string | null;
   deletedReason: string | null;
 
-  user: PregnancyProfileUser;
-  userProfile: PregnancyProfileUserProfile;
-};
+  user: PregnancyProfileUser | null;
+  medicalRecords: Array<string | PregnancyConsultation>;
+}
 
 /**
- * Dữ liệu gửi lên khi tạo hồ sơ thai kỳ.
+ * Dữ liệu thai phụ được phép nhập khi tạo hồ sơ.
+ *
+ * riskLevel và status không có ở đây vì đây là dữ liệu
+ * chuyên môn, backend nên tự đặt mặc định:
+ * - riskLevel: low
+ * - status: active
  */
-export type CreatePregnancyProfilePayload = {
+export interface CreatePregnancyProfileInput {
   lastMenstrualPeriod: string;
-  expectedDueDate: string;
+  expectedDueDate?: string | null;
+  fetalCount?: number;
 
-  fetalCount: number;
-  gravida: number;
-  paraFullTerm: number;
-  paraPremature: number;
-  paraAbortion: number;
-  paraLivingChildren: number;
+  gravida?: number;
+  paraFullTerm?: number;
+  paraPremature?: number;
+  paraAbortion?: number;
+  paraLivingChildren?: number;
 
-  riskLevel: PregnancyRiskLevel;
-  status: PregnancyProfileStatus;
-  notes?: string;
-};
+  notes?: string | null;
+}
 
 /**
- * PATCH cho phép chỉ gửi những trường cần thay đổi.
+ * Thai phụ không được tự cập nhật:
+ * - riskLevel
+ * - status
+ * - patientId
+ * - code
+ * - medicalRecords
  */
-export type UpdatePregnancyProfilePayload =
-  Partial<CreatePregnancyProfilePayload>;
+export type UpdatePregnancyProfileInput = Partial<
+  Pick<
+    CreatePregnancyProfileInput,
+    | "lastMenstrualPeriod"
+    | "expectedDueDate"
+    | "fetalCount"
+    | "gravida"
+    | "paraFullTerm"
+    | "paraPremature"
+    | "paraAbortion"
+    | "paraLivingChildren"
+    | "notes"
+  >
+>;
 
-/**
- * Nếu backend yêu cầu lý do xóa mềm, có thể sử dụng payload này.
- * Hiện Swagger chưa hiển thị request body.
- */
-export type SoftDeletePregnancyProfilePayload = {
-  deletedReason?: string;
-};
+export interface BackendPregnancyProfileUser {
+  id: string | number;
+  cccd?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  dateOfBirth?: string | null;
+  address?: string | null;
+  province?: string | null;
+  ward?: string | null;
+  status?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+}
 
-/**
- * Dùng khi backend bổ sung body cho API xác nhận/từ chối xóa.
- * Swagger hiện chưa hiển thị request body của endpoint này.
- */
-export type ConfirmSoftDeletePregnancyProfilePayload = {
-  approved: boolean;
-  reason?: string;
-};
+export interface BackendPregnancyProfile {
+  id: string | number;
+  patientId: string | number;
+  code?: string | null;
+
+  lastMenstrualPeriod?: string | null;
+  expectedDueDate?: string | null;
+  fetalCount?: number | null;
+
+  gravida?: number | null;
+  paraFullTerm?: number | null;
+  paraPremature?: number | null;
+  paraAbortion?: number | null;
+  paraLivingChildren?: number | null;
+
+  riskLevel?: string | null;
+  status?: string | null;
+
+  notes?: string | null;
+
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  createdBy?: string | null;
+
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deletedReason?: string | null;
+
+  user?: BackendPregnancyProfileUser | null;
+  medicalRecords?: string[] | null;
+}
+
+export interface PregnancyConsultation {
+  id: string;
+  appointmentId?: string | null;
+  pregnancyProfileId?: string | null;
+  doctorId?: string | null;
+
+  diagnosis?: string | null;
+  conclusion?: string | null;
+  recommendation?: string | null;
+  nextAppointmentSuggestedAt?: string | null;
+
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+function normalizeUserStatus(
+  status?: string | null,
+): PregnancyUserStatus {
+  switch (status?.toLowerCase()) {
+    case "active":
+      return "active";
+
+    case "locked":
+      return "locked";
+
+    default:
+      return "inactive";
+  }
+}
+
+export function normalizePregnancyRiskLevel(
+  riskLevel?: string | null,
+): PregnancyRiskLevel {
+  switch (riskLevel?.toLowerCase()) {
+    case "high":
+      return "high";
+
+    case "medium":
+      return "medium";
+
+    default:
+      return "low";
+  }
+}
+
+export function normalizePregnancyProfileStatus(
+  status?: string | null,
+): PregnancyProfileStatus {
+  switch (status?.toLowerCase()) {
+    case "completed":
+      return "completed";
+
+    case "terminated":
+      return "terminated";
+
+    case "deleted":
+      return "deleted";
+
+    default:
+      return "active";
+  }
+}
+
+function normalizePregnancyProfileUser(
+  user?: BackendPregnancyProfileUser | null,
+): PregnancyProfileUser | null {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    id: String(user.id),
+    cccd: user.cccd ?? null,
+    name: user.name ?? "",
+    phone: user.phone ?? null,
+    email: user.email ?? null,
+    dateOfBirth: user.dateOfBirth ?? null,
+    address: user.address ?? null,
+    province: user.province ?? null,
+    ward: user.ward ?? null,
+    status: normalizeUserStatus(user.status),
+    emergencyContactName: user.emergencyContactName ?? null,
+    emergencyContactPhone: user.emergencyContactPhone ?? null,
+    metadata: user.metadata ?? {},
+    createdAt: user.createdAt ?? "",
+    updatedAt: user.updatedAt ?? "",
+    deletedAt: user.deletedAt ?? null,
+  };
+}
+
+export function normalizePregnancyProfile(
+  profile: BackendPregnancyProfile,
+): PregnancyProfile {
+  return {
+    id: String(profile.id),
+    patientId: String(profile.patientId),
+    code: profile.code ?? "",
+
+    lastMenstrualPeriod: profile.lastMenstrualPeriod ?? null,
+    expectedDueDate: profile.expectedDueDate ?? null,
+    fetalCount: profile.fetalCount ?? null,
+
+    gravida: profile.gravida ?? 0,
+    paraFullTerm: profile.paraFullTerm ?? 0,
+    paraPremature: profile.paraPremature ?? 0,
+    paraAbortion: profile.paraAbortion ?? 0,
+    paraLivingChildren: profile.paraLivingChildren ?? 0,
+
+    riskLevel: normalizePregnancyRiskLevel(profile.riskLevel),
+    status: normalizePregnancyProfileStatus(profile.status),
+
+    notes: profile.notes ?? null,
+
+    createdAt: profile.createdAt ?? "",
+    updatedAt: profile.updatedAt ?? "",
+    createdBy: profile.createdBy ?? null,
+
+    deletedAt: profile.deletedAt ?? null,
+    deletedBy: profile.deletedBy ?? null,
+    deletedReason: profile.deletedReason ?? null,
+
+    user: normalizePregnancyProfileUser(profile.user),
+    medicalRecords: profile.medicalRecords ?? [],
+  };
+}

@@ -186,7 +186,7 @@ export function QuickAppointmentCard() {
 
       <div className="grid gap-4">
         {error ? (
-          <Alert type="warning" showIcon message={error} closable onClose={() => setError(null)} />
+          <Alert type="warning" showIcon title={error} closable onClose={() => setError(null)} />
         ) : null}
 
         <Select
