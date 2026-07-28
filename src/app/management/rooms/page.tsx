@@ -109,6 +109,62 @@ function renderStatus(
   );
 }
 
+function isEmptyRoomResult(
+  error: unknown,
+) {
+  if (
+    !error ||
+    typeof error !== "object" ||
+    !("response" in error)
+  ) {
+    return false;
+  }
+
+  const response = (
+    error as {
+      response?: {
+        status?: number;
+        data?: {
+          message?:
+            | string
+            | string[];
+        };
+      };
+    }
+  ).response;
+
+  const messages = Array.isArray(
+    response?.data?.message,
+  )
+    ? response.data.message
+    : [response?.data?.message];
+
+  const normalizedMessage = messages
+    .filter(
+      (message): message is string =>
+        typeof message === "string",
+    )
+    .join(" ")
+    .trim()
+    .toLowerCase();
+
+  return (
+    response?.status === 404 ||
+    normalizedMessage.includes(
+      "không tìm thấy phòng",
+    ) ||
+    normalizedMessage.includes(
+      "không có phòng",
+    ) ||
+    normalizedMessage.includes(
+      "no rooms found",
+    ) ||
+    normalizedMessage.includes(
+      "room not found",
+    )
+  );
+}
+
 function ClinicRoomManagementContent() {
   const searchParams = useSearchParams();
   const sessionFacilityId = useAuthStore(
@@ -237,7 +293,7 @@ function ClinicRoomManagementContent() {
 
     const timer = window.setTimeout(() => {
       void getRoomTypeLookup({
-        limit: 30,
+        limit: 100,
       })
         .then((data) => {
           if (!cancelled) {
@@ -291,11 +347,22 @@ function ClinicRoomManagementContent() {
           setError(null);
         })
         .catch((loadError) => {
-          if (!cancelled) {
-            setError(
-              getErrorMessage(loadError),
-            );
+          if (cancelled) return;
+
+          setRooms([]);
+          setTotalRooms(0);
+          setSelectedRoomIds([]);
+
+          if (
+            isEmptyRoomResult(loadError)
+          ) {
+            setError(null);
+            return;
           }
+
+          setError(
+            getErrorMessage(loadError),
+          );
         })
         .finally(() => {
           if (!cancelled) {
