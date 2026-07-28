@@ -1,6 +1,11 @@
-export type FacilityStatus = "active" | "suspended";
+export type FacilityStatus =
+  | "active"
+  | "suspended";
 
-export type BackendFacilityStatus = "active" | "inactive" | "deleted";
+export type BackendFacilityStatus =
+  | "active"
+  | "inactive"
+  | "deleted";
 
 export type FacilityOperatingStatus =
   | "open"
@@ -208,9 +213,12 @@ export interface FacilityOperatingHoursResult {
   operatingHourGroups: BackendOperatingHourGroup[];
 }
 
-export type FacilityOperatingHoursPreview = Record<string, unknown>;
+export type FacilityOperatingHoursPreview =
+  Record<string, unknown>;
 
-export type FacilityRoomTypeStatus = "active" | "inactive";
+export type FacilityRoomTypeStatus =
+  | "active"
+  | "inactive";
 
 export interface GetFacilityRoomTypesParams {
   search?: string;
@@ -225,4 +233,68 @@ export interface FacilityRoomType {
   description: string;
   status: FacilityRoomTypeStatus;
   roomCount: number;
+}
+
+/**
+ * GET /management/facilities/admin-options
+ */
+export type FacilityAdminOptionStatus =
+  | "active"
+  | "inactive"
+  | "locked";
+
+export interface GetFacilityAdminOptionsParams {
+  search?: string;
+  status?: FacilityAdminOptionStatus;
+  availableOnly?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface BackendFacilityAdminOption {
+  id: string;
+  name: string;
+  email: string;
+  personalEmail: string | null;
+  phone: string;
+  employeeCode: string;
+  status: FacilityAdminOptionStatus | string;
+  homeFacilityId: string | null;
+  homeFacilityName: string | null;
+  homeFacilityCode: string | null;
+  roleId: string;
+  roleName: string;
+  ownedFacilityCount: number;
+}
+
+export interface BackendFacilityAdminOptionsResponse {
+  items: BackendFacilityAdminOption[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface FacilityAdminOption {
+  id: string;
+  name: string;
+  email: string;
+  personalEmail: string;
+  phone: string;
+  employeeCode: string;
+  status: FacilityAdminOptionStatus;
+  homeFacilityId: string;
+  homeFacilityName: string;
+  homeFacilityCode: string;
+  roleId: string;
+  roleName: string;
+  ownedFacilityCount: number;
+}
+
+export interface FacilityAdminOptionsResult {
+  items: FacilityAdminOption[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }

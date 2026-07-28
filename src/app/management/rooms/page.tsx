@@ -26,7 +26,6 @@ import {
 } from "antd";
 import {
   Boxes,
-  Building2,
   Eye,
   Pencil,
   Plus,
@@ -44,7 +43,6 @@ import {
 } from "@/management/features/facilities/facilities.api";
 import {
   getRooms,
-  getRoomsByFacility,
   getRoomTypeLookup,
 } from "@/management/features/rooms/rooms.api";
 import type {
@@ -62,8 +60,6 @@ import type {
   RoomDeleteTarget,
 } from "./components/RoomDeleteModal";
 import { RoomBulkCreateModal } from "./components/RoomBulkCreateModal";
-import { RoomQuickLookupModal } from "./components/RoomQuickLookupModal";
-import { RoomFacilityOverviewModal } from "./components/RoomFacilityOverviewModal";
 import { RoomTypeManagementModal } from "./components/RoomTypeManagementModal";
 import type {
   FacilityOption,
@@ -181,10 +177,6 @@ function ClinicRoomManagementContent() {
     );
   const [bulkOpen, setBulkOpen] =
     useState(false);
-  const [quickLookupOpen, setQuickLookupOpen] =
-    useState(false);
-  const [overviewOpen, setOverviewOpen] =
-    useState(false);
   const [roomTypesOpen, setRoomTypesOpen] =
     useState(false);
 
@@ -245,7 +237,7 @@ function ClinicRoomManagementContent() {
 
     const timer = window.setTimeout(() => {
       void getRoomTypeLookup({
-        limit: 100,
+        limit: 30,
       })
         .then((data) => {
           if (!cancelled) {
@@ -284,12 +276,10 @@ function ClinicRoomManagementContent() {
         limit: pageSize,
       };
 
-      const request = facilityFilter
-        ? getRoomsByFacility(
-            facilityFilter,
-            params,
-          )
-        : getRooms(params);
+      const request = getRooms({
+        ...params,
+        facilityId: facilityFilter,
+      });
 
       void request
         .then((result) => {
@@ -611,7 +601,7 @@ function ClinicRoomManagementContent() {
               prefix={
                 <Search className="h-4 w-4 text-slate-400" />
               }
-              placeholder="Tên phòng, cơ sở, loại phòng"
+              placeholder="Tên phòng hoặc cơ sở"
               onChange={(event) =>
                 setSearchInput(
                   event.target.value,
@@ -727,28 +717,6 @@ function ClinicRoomManagementContent() {
                 showZero
                 color="#0f766e"
               />
-
-              <Button
-                icon={
-                  <Search className="h-4 w-4" />
-                }
-                onClick={() =>
-                  setQuickLookupOpen(true)
-                }
-              >
-                Tìm nhanh
-              </Button>
-
-              <Button
-                icon={
-                  <Building2 className="h-4 w-4" />
-                }
-                onClick={() =>
-                  setOverviewOpen(true)
-                }
-              >
-                Theo cơ sở
-              </Button>
 
               <Button
                 icon={
@@ -979,32 +947,6 @@ function ClinicRoomManagementContent() {
           setBulkOpen(false);
           setCurrentPage(1);
           refreshRooms();
-        }}
-      />
-
-      <RoomQuickLookupModal
-        open={quickLookupOpen}
-        facilities={facilities}
-        defaultFacilityId={
-          facilityFilter
-        }
-        onClose={() =>
-          setQuickLookupOpen(false)
-        }
-        onSelectRoom={(roomId) => {
-          setQuickLookupOpen(false);
-          openDetail(roomId);
-        }}
-      />
-
-      <RoomFacilityOverviewModal
-        open={overviewOpen}
-        onClose={() =>
-          setOverviewOpen(false)
-        }
-        onSelectRoom={(roomId) => {
-          setOverviewOpen(false);
-          openDetail(roomId);
         }}
       />
 

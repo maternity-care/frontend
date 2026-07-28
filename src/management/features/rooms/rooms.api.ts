@@ -4,22 +4,15 @@ import type {
   BackendPaginatedRooms,
   BackendPaginatedRoomTypes,
   BackendRoom,
-  BackendRoomLookupItem,
-  BackendRoomsByFacility,
   BackendRoomType,
   BulkCreateRoomsInput,
-  BulkCreateRoomsPreviewInput,
   ClinicRoom,
   CreateRoomInput,
   CreateRoomTypeInput,
-  GetRoomLookupParams,
-  GetRoomsByFacilityParams,
   GetRoomsParams,
   GetRoomTypeLookupParams,
   GetRoomTypesParams,
   RoomListResult,
-  RoomLookupItem,
-  RoomsByFacility,
   RoomStatus,
   RoomType,
   RoomTypeListResult,
@@ -170,30 +163,6 @@ function normalizeRoom(
   };
 }
 
-function normalizeRoomLookupItem(
-  room: BackendRoomLookupItem,
-): RoomLookupItem {
-  return {
-    id: String(room.id ?? ""),
-    code: String(room.code ?? ""),
-    name: String(room.name ?? ""),
-    facilityId: String(
-      room.facilityId ?? "",
-    ),
-    facilityName: String(
-      room.facilityName ?? "",
-    ),
-    roomTypeId: String(
-      room.roomTypeId ?? "",
-    ),
-    roomTypeName: String(
-      room.roomTypeName ?? "",
-    ),
-    floor: String(room.floor ?? ""),
-    status: normalizeStatus(room.status),
-  };
-}
-
 function normalizeRoomType(
   roomType: BackendRoomType,
 ): RoomType {
@@ -306,18 +275,6 @@ function toRoomQueryParams(
     roomTypeId:
       params?.roomTypeId?.trim(),
     page: params?.page ?? 1,
-    limit: params?.limit ?? 20,
-  });
-}
-
-function toRoomLookupParams(
-  params?: GetRoomLookupParams,
-) {
-  return compactObject({
-    search: params?.search?.trim(),
-    facilityId:
-      params?.facilityId?.trim(),
-    status: params?.status,
     limit: params?.limit ?? 20,
   });
 }
@@ -485,39 +442,26 @@ export async function deleteRooms(
   );
 }
 
-export async function getRoomLookup(
-  params?: GetRoomLookupParams,
-): Promise<RoomLookupItem[]> {
-  const response = await apiClient.get<
-    ApiEnvelope<BackendRoomLookupItem[]>
-  >(`${ROOM_ENDPOINT}/lookup`, {
-    params: toRoomLookupParams(params),
-  });
-
-  const data = unwrapData<
-    BackendRoomLookupItem[]
-  >(response.data);
-
-  return Array.isArray(data)
-    ? data.map(normalizeRoomLookupItem)
-    : [];
-}
-
 export async function getRoomTypeLookup(
   params?: GetRoomTypeLookupParams,
 ): Promise<RoomType[]> {
   const response = await apiClient.get<
-    ApiEnvelope<BackendRoomType[]>
+    ApiEnvelope<RoomTypesResponseData>
   >(`${ROOM_ENDPOINT}/room-types/lookup`, {
     params: toRoomTypeQueryParams(params),
   });
 
-  const data = unwrapData<
-    BackendRoomType[]
-  >(response.data);
+  const data =
+    unwrapData<RoomTypesResponseData>(
+      response.data,
+    );
 
-  return Array.isArray(data)
-    ? data.map(normalizeRoomType)
+  if (Array.isArray(data)) {
+    return data.map(normalizeRoomType);
+  }
+
+  return Array.isArray(data?.items)
+    ? data.items.map(normalizeRoomType)
     : [];
 }
 
@@ -641,95 +585,6 @@ export async function bulkCreateRooms(
   };
 }
 
-export async function previewBulkCreateRooms(
-  input: BulkCreateRoomsPreviewInput,
-): Promise<ApiResponse<unknown>> {
-  const response = await apiClient.post<
-    ApiEnvelope<unknown>
-  >(
-    `${ROOM_ENDPOINT}/bulk-create/preview`,
-    {
-      rooms: input.rooms.map(
-        toCreateRoomPayload,
-      ),
-      saveOnlyValid: input.saveOnlyValid,
-    },
-  );
-
-  return unwrapResponse<unknown>(
-    response.data,
-    "Kiểm tra danh sách phòng thành công",
-  );
-}
-
-export async function confirmBulkCreateRooms(
-  input: BulkCreateRoomsPreviewInput,
-): Promise<ApiResponse<unknown>> {
-  const response = await apiClient.post<
-    ApiEnvelope<unknown>
-  >(
-    `${ROOM_ENDPOINT}/bulk-create/confirm`,
-    {
-      rooms: input.rooms.map(
-        toCreateRoomPayload,
-      ),
-      saveOnlyValid: input.saveOnlyValid,
-    },
-  );
-
-  return unwrapResponse<unknown>(
-    response.data,
-    "Lưu danh sách phòng thành công",
-  );
-}
-
-export async function getRoomsByFacility(
-  facilityId: string,
-  params?: GetRoomsByFacilityParams,
-): Promise<RoomListResult> {
-  const response = await apiClient.get<
-    ApiEnvelope<RoomsResponseData>
-  >(
-    `/management/facility/rooms/${facilityId}`,
-    {
-      params: toRoomQueryParams({
-        ...params,
-        facilityId: undefined,
-      }),
-    },
-  );
-
-  const data = unwrapData<RoomsResponseData>(
-    response.data,
-  );
-
-  return normalizeRoomList(
-    data,
-    params?.page ?? 1,
-    params?.limit ?? 20,
-  );
-}
-
-export async function getRoomsGroupedByFacilities(): Promise<
-  RoomsByFacility[]
-> {
-  const response = await apiClient.get<
-    ApiEnvelope<BackendRoomsByFacility[]>
-  >(`${ROOM_ENDPOINT}/all/by-facilities`);
-
-  const data = unwrapData<
-    BackendRoomsByFacility[]
-  >(response.data);
-
-  return Array.isArray(data)
-    ? data.map((item) => ({
-        facility: item.facility,
-        rooms: Array.isArray(item.rooms)
-          ? item.rooms.map(normalizeRoom)
-          : [],
-      }))
-    : [];
-}
 
 export const roomsApi = {
   getRooms,
@@ -738,7 +593,6 @@ export const roomsApi = {
   updateRoom,
   deleteRoom,
   deleteRooms,
-  getRoomLookup,
   getRoomTypeLookup,
   getRoomTypes,
   getRoomTypeById,
@@ -746,8 +600,4 @@ export const roomsApi = {
   updateRoomType,
   deleteRoomType,
   bulkCreateRooms,
-  previewBulkCreateRooms,
-  confirmBulkCreateRooms,
-  getRoomsByFacility,
-  getRoomsGroupedByFacilities,
 };

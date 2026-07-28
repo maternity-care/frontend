@@ -31,6 +31,10 @@ import {
   FacilityScheduleEditor,
   validateFacilitySchedules,
 } from "./FacilityScheduleEditor";
+import {
+  getFacilityOwnerOptions,
+  type FacilityOwnerOption,
+} from "./facility-owner.shared";
 
 const { Text, Title } = Typography;
 const FACILITY_MESSAGES = RESPONSE_MESSAGES.FACILITY_MANAGEMENT;
@@ -140,6 +144,11 @@ export function FacilityUpdateModal({
   const [modal, modalContextHolder] = Modal.useModal();
   const [form] = Form.useForm<FacilityUpdateValues>();
   const [submitting, setSubmitting] = useState(false);
+  const [ownerOptions, setOwnerOptions] = useState<
+    FacilityOwnerOption[]
+  >([]);
+  const [ownersLoading, setOwnersLoading] =
+    useState(false);
 
   const name = Form.useWatch("name", form);
   const ownerId = Form.useWatch("ownerId", form);
@@ -152,6 +161,117 @@ export function FacilityUpdateModal({
   const latitude = Form.useWatch("latitude", form);
   const longitude = Form.useWatch("longitude", form);
   const schedules = Form.useWatch("schedules", form);
+
+  const selectedOwnerName =
+    ownerOptions.find(
+      (owner) => owner.value === ownerId,
+    )?.name ||
+    (facility &&
+    ownerId === facility.ownerId
+      ? facility.ownerName
+      : undefined);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    const timer = window.setTimeout(() => {
+      setOwnersLoading(true);
+
+      void getFacilityOwnerOptions()
+        .then((options) => {
+          if (cancelled) return;
+
+          if (
+            facility?.ownerId &&
+            !options.some(
+              (owner) =>
+                owner.value ===
+                facility.ownerId,
+            )
+          ) {
+            setOwnerOptions([
+              {
+                value: facility.ownerId,
+                label:
+                  facility.ownerEmail
+                    ? `${facility.ownerName} (${facility.ownerEmail})`
+                    : facility.ownerName,
+                name:
+                  facility.ownerName ||
+                  `Chủ cơ sở #${facility.ownerId}`,
+                email:
+                  facility.ownerEmail ?? "",
+                phone:
+                  facility.ownerPhone ?? "",
+                status: "active",
+                disabled: false,
+              },
+              ...options,
+            ]);
+            return;
+          }
+
+          setOwnerOptions(options);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+
+          if (facility?.ownerId) {
+            setOwnerOptions([
+              {
+                value: facility.ownerId,
+                label:
+                  facility.ownerEmail
+                    ? `${facility.ownerName} (${facility.ownerEmail})`
+                    : facility.ownerName,
+                name:
+                  facility.ownerName ||
+                  `Chủ cơ sở #${facility.ownerId}`,
+                email:
+                  facility.ownerEmail ?? "",
+                phone:
+                  facility.ownerPhone ?? "",
+                status: "active",
+                disabled: false,
+              },
+            ]);
+          } else {
+            setOwnerOptions([]);
+          }
+
+          modal.error({
+            title:
+              "Không tải được danh sách chủ cơ sở",
+            content:
+              error instanceof Error
+                ? error.message
+                : "Không thể tải danh sách chủ cơ sở.",
+            okText:
+              RESPONSE_MESSAGES.COMMON.CLOSE,
+            centered: true,
+          });
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setOwnersLoading(false);
+          }
+        });
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    facility?.ownerEmail,
+    facility?.ownerId,
+    facility?.ownerName,
+    facility?.ownerPhone,
+    modal,
+    open,
+  ]);
 
   useEffect(() => {
     if (!open || !facility) return;
@@ -297,13 +417,37 @@ export function FacilityUpdateModal({
                   <Col xs={24} md={12}>
                     <Form.Item
                       name="ownerId"
-                      label="Mã chủ cơ sở"
-                      rules={[{ required: true, message: "Vui lòng nhập mã chủ cơ sở." }]}
+                      label="Chủ cơ sở"
+                      rules={[
+                        {
+                          required: true,
+                          message:
+                            "Vui lòng chọn chủ cơ sở.",
+                        },
+                      ]}
                     >
-                      <Input
+                      <Select
                         size="large"
-                        prefix={<UserRound className="h-4 w-4 text-slate-400" />}
-                        placeholder="Nhập mã chủ cơ sở"
+                        showSearch
+                        allowClear
+                        loading={ownersLoading}
+                        optionFilterProp="label"
+                        placeholder="Chọn chủ cơ sở"
+                        notFoundContent={
+                          ownersLoading
+                            ? "Đang tải danh sách..."
+                            : "Không có chủ cơ sở phù hợp"
+                        }
+                        options={ownerOptions.map(
+                          (owner) => ({
+                            value: owner.value,
+                            label: owner.label,
+                            disabled:
+                              owner.disabled &&
+                              owner.value !==
+                                facility?.ownerId,
+                          }),
+                        )}
                       />
                     </Form.Item>
                   </Col>
@@ -462,8 +606,8 @@ export function FacilityUpdateModal({
               <div className="mt-5 space-y-3">
                 <PreviewLine
                   icon={<UserRound className="h-4 w-4" />}
-                  label="Mã chủ cơ sở"
-                  value={ownerId}
+                  label="Chủ cơ sở"
+                  value={selectedOwnerName}
                 />
                 <PreviewLine
                   icon={<Phone className="h-4 w-4" />}
