@@ -1,4 +1,6 @@
-export type RoomStatus = "active" | "inactive";
+export type RoomStatus =
+  | "active"
+  | "inactive";
 
 export interface BackendRoom {
   id: string;
@@ -71,6 +73,10 @@ export interface RoomFormValues {
 }
 
 export interface GetRoomsParams {
+  /**
+   * Backend search chỉ dùng cho tên phòng
+   * hoặc thông tin cơ sở.
+   */
   search?: string;
   floor?: string;
   status?: RoomStatus;
@@ -79,11 +85,6 @@ export interface GetRoomsParams {
   page?: number;
   limit?: number;
 }
-
-export type GetRoomsByFacilityParams = Omit<
-  GetRoomsParams,
-  "facilityId"
->;
 
 export interface CreateRoomInput {
   facilityId: string;
@@ -98,37 +99,6 @@ export interface UpdateRoomInput {
   roomTypeId?: string;
   floor?: string;
   status?: RoomStatus;
-}
-
-export interface BackendRoomLookupItem {
-  id: string;
-  code: string;
-  name: string;
-  facilityId: string;
-  facilityName: string;
-  roomTypeId: string;
-  roomTypeName: string;
-  floor: string;
-  status: string;
-}
-
-export interface RoomLookupItem {
-  id: string;
-  code: string;
-  name: string;
-  facilityId: string;
-  facilityName: string;
-  roomTypeId: string;
-  roomTypeName: string;
-  floor: string;
-  status: RoomStatus;
-}
-
-export interface GetRoomLookupParams {
-  search?: string;
-  facilityId?: string;
-  status?: RoomStatus;
-  limit?: number;
 }
 
 export interface BackendRoomType {
@@ -174,10 +144,8 @@ export interface GetRoomTypesParams {
   limit?: number;
 }
 
-export type GetRoomTypeLookupParams = Omit<
-  GetRoomTypesParams,
-  "page"
->;
+export type GetRoomTypeLookupParams =
+  Omit<GetRoomTypesParams, "page">;
 
 export interface CreateRoomTypeInput {
   name: string;
@@ -188,35 +156,8 @@ export interface CreateRoomTypeInput {
 export type UpdateRoomTypeInput =
   Partial<CreateRoomTypeInput>;
 
-export interface BackendRoomsByFacility {
-  facility: {
-    id: string;
-    name: string;
-    code: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-    province?: string;
-    ward?: string;
-    status?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  };
-  rooms: BackendRoom[];
-}
-
-export interface RoomsByFacility {
-  facility: BackendRoomsByFacility["facility"];
-  rooms: ClinicRoom[];
-}
-
 export interface BulkCreateRoomsInput {
   rooms: CreateRoomInput[];
-}
-
-export interface BulkCreateRoomsPreviewInput
-  extends BulkCreateRoomsInput {
-  saveOnlyValid: boolean;
 }
 
 export interface ApiResponse<T> {
