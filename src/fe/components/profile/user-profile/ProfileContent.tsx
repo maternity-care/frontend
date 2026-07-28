@@ -64,7 +64,7 @@ export function ProfileContent() {
       <Alert
         type="error"
         showIcon
-        message={RESPONSE_MESSAGES.PROFILE.UNABLE_TO_LOAD_PROFILE}
+        title={RESPONSE_MESSAGES.PROFILE.UNABLE_TO_LOAD_PROFILE}
         description={feedback.error ?? RESPONSE_MESSAGES.AUTH.RETURN_LOGIN}
       />
     );
