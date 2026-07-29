@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Alert, Button, Card, DatePicker, Empty, Select, Space, Tag, Typography, message } from "antd";
+import { Alert, Button, Card, DatePicker, Empty, Modal, Select, Tag, Typography, message } from "antd";
 import { CalendarDays, CheckCircle2, Clock, Hospital, Search, Stethoscope } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
 
@@ -63,6 +63,7 @@ function getSlotTimes(slot: AvailabilityShift["availableSlots"][number]) {
 
 export function QuickAppointmentCard() {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const [modal, modalContextHolder] = Modal.useModal();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [facilityServices, setFacilityServices] = useState<FacilityService[]>([]);
   const [doctorShifts, setDoctorShifts] = useState<DoctorShiftItem[]>([]);
@@ -184,7 +185,11 @@ export function QuickAppointmentCard() {
       })),
     ) ?? [];
 
-  const handleBookSlot = async (slot: (typeof availableSlots)[number]) => {
+  const selectedFacility = facilities.find((facility) => facility.id === facilityId);
+  const selectedService = facilityServices.find((service) => service.serviceId === serviceId);
+  const selectedDoctor = doctorOptions.find((doctor) => doctor.value === doctorId);
+
+  const bookSlot = async (slot: (typeof availableSlots)[number]) => {
     if (!accessToken) {
       setError("Bạn cần đăng nhập để đặt lịch.");
       return;
@@ -216,11 +221,53 @@ export function QuickAppointmentCard() {
     }
   };
 
+  const handleBookSlot = (slot: (typeof availableSlots)[number]) => {
+    if (!accessToken) {
+      setError("Bạn cần đăng nhập để đặt lịch.");
+      return;
+    }
+
+    if (!facilityId || !serviceId || !doctorId || !date) return;
+
+    modal.confirm({
+      title: "Xác nhận đặt lịch khám",
+      okText: "Xác nhận đặt lịch",
+      cancelText: "Hủy",
+      centered: true,
+      okButtonProps: {
+        className: "!bg-pink-500 hover:!bg-pink-600",
+      },
+      content: (
+        <div className="mt-3 space-y-2 text-sm text-slate-600">
+          <p>
+            <span className="font-semibold text-slate-900">Cơ sở:</span>{" "}
+            {selectedFacility?.name ?? "Cơ sở đã chọn"}
+          </p>
+          <p>
+            <span className="font-semibold text-slate-900">Dịch vụ:</span>{" "}
+            {selectedService?.serviceName ?? "Dịch vụ đã chọn"}
+          </p>
+          <p>
+            <span className="font-semibold text-slate-900">Bác sĩ:</span>{" "}
+            {selectedDoctor?.label ?? "Bác sĩ đã chọn"}
+          </p>
+          <p>
+            <span className="font-semibold text-slate-900">Thời gian:</span>{" "}
+            {date.format("DD/MM/YYYY")} · {slot.label}
+          </p>
+        </div>
+      ),
+      onOk: () => bookSlot(slot),
+    });
+  };
+
   return (
     <Card
-      className="relative z-10 !rounded-[28px] !border-pink-100 !shadow-xl !shadow-pink-100/70"
-      styles={{ body: { padding: 28 } }}
+      className="relative z-10 w-full min-w-0 overflow-hidden !rounded-[28px] !border-pink-100 !shadow-xl !shadow-pink-100/70"
+      styles={{ body: { padding: 28, minWidth: 0 } }}
     >
+      {modalContextHolder}
+
       <div className="mb-5 flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-100 text-pink-600">
           <CalendarDays className="h-6 w-6" />
@@ -245,6 +292,8 @@ export function QuickAppointmentCard() {
         <Select
           size="large"
           showSearch
+          className="w-full min-w-0"
+          popupMatchSelectWidth={false}
           loading={loadingFacilities}
           placeholder={RESPONSE_MESSAGES.HOME.QUICK_APPOINTMENT.FACILITY_PLACEHOLDER}
           optionFilterProp="label"
@@ -259,6 +308,8 @@ export function QuickAppointmentCard() {
         <Select
           size="large"
           showSearch
+          className="w-full min-w-0"
+          popupMatchSelectWidth={false}
           disabled={!facilityId}
           loading={loadingServices}
           placeholder={RESPONSE_MESSAGES.HOME.QUICK_APPOINTMENT.SERVICE_PLACEHOLDER}
@@ -290,6 +341,8 @@ export function QuickAppointmentCard() {
         <Select
           size="large"
           showSearch
+          className="w-full min-w-0"
+          popupMatchSelectWidth={false}
           disabled={!facilityId || !date}
           loading={loadingDoctors}
           placeholder={RESPONSE_MESSAGES.HOME.QUICK_APPOINTMENT.DOCTOR_PLACEHOLDER}
@@ -309,13 +362,13 @@ export function QuickAppointmentCard() {
               <Stethoscope className="h-4 w-4" />
               Ca trực trong ngày
             </div>
-            <Space wrap>
+            <div className="flex flex-wrap gap-2">
               {selectedDoctorShifts.map((shift) => (
                 <Tag key={shift.id} color={shift.status === "available" ? "green" : "default"}>
                   {shift.startTime} - {shift.endTime}
                 </Tag>
               ))}
-            </Space>
+            </div>
           </div>
         ) : null}
 
@@ -340,7 +393,7 @@ export function QuickAppointmentCard() {
             </div>
 
             {availableSlots.length ? (
-              <Space wrap className="w-full">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {availableSlots.map((slot) => (
                   <Button
                     key={`${slot.shiftId}-${slot.label}`}
@@ -348,13 +401,13 @@ export function QuickAppointmentCard() {
                     icon={<CheckCircle2 className="h-4 w-4" />}
                     loading={bookingSlotKey === `${slot.shiftId}-${slot.label}`}
                     disabled={Boolean(bookingSlotKey)}
-                    className="!rounded-xl !border-pink-200 !bg-pink-50 !font-medium !text-pink-700 hover:!border-pink-400 hover:!bg-pink-100"
+                    className="!h-auto min-w-0 !whitespace-normal !rounded-xl !border-pink-200 !bg-pink-50 !px-3 !py-2 !font-medium !leading-5 !text-pink-700 hover:!border-pink-400 hover:!bg-pink-100"
                     onClick={() => handleBookSlot(slot)}
                   >
                     Đặt {slot.label}
                   </Button>
                 ))}
-              </Space>
+              </div>
             ) : (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Ngày này chưa còn slot trống" />
             )}
