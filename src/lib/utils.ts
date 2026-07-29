@@ -17,3 +17,17 @@ export function formatDate(value?: string) {
 export function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Không thể thực hiện yêu cầu.";
 }
+
+export function formatCurrency(value: string | number | null | undefined) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+export function isFormValidationError(error: unknown) {
+  return typeof error === "object" && error !== null && "errorFields" in error;
+}
