@@ -597,20 +597,22 @@ export async function getFacilityAdminOptions(
 }
 
 export async function getPublicFacilities(params?: GetFacilitiesParams) {
-  const data = await unwrapApiData<BackendFacility[]>(
+  const requestedPage = normalizePage(params?.page);
+  const requestedLimit = clampLimit(params?.limit);
+  const data = await unwrapApiData<unknown>(
     apiClient.get("/public/facilities", {
       params: removeUndefined({
         search:
           params?.rawSearch?.trim() || params?.search?.trim() || undefined,
         city: params?.city?.trim() || undefined,
         status: params?.status ? toBackendStatus(params.status) : undefined,
-        page: params?.page,
-        limit: clampLimit(params?.limit),
+        page: requestedPage,
+        limit: requestedLimit,
       }),
     }),
   );
 
-  return data.map(normalizeFacility);
+  return extractFacilityPage(data, requestedPage, requestedLimit).items.map(normalizeFacility);
 }
 
 export async function createFacility(input: CreateFacilityInput) {

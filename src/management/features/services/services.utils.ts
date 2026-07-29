@@ -55,6 +55,8 @@ type BackendFacilityService = Omit<
   serviceDescription?: unknown;
   serviceDefaultDurationMinutes: unknown;
   serviceRequiresDoctorWarning: BackendBoolean;
+  facility?: unknown;
+  service?: unknown;
 };
 
 type BackendMaternityPackage = Omit<
@@ -205,6 +207,45 @@ function normalizeNullableString(value: unknown): string | null {
   return normalizedValue || null;
 }
 
+function normalizeString(value: unknown, fallback = ""): string {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
+  const normalizedValue = String(value).trim();
+
+  return normalizedValue || fallback;
+}
+
+function pickNestedValue(
+  record: UnknownRecord,
+  key: string,
+  nestedRecord: UnknownRecord | null,
+  nestedKey: string,
+) {
+  return record[key] ?? nestedRecord?.[nestedKey];
+}
+
+function normalizeFacilityServiceType(
+  value: unknown,
+): FacilityService["serviceType"] {
+  const normalized =
+    typeof value === "string" ? value.trim().toLowerCase() : "";
+
+  if (
+    normalized === "consultation" ||
+    normalized === "ultrasound" ||
+    normalized === "lab_test" ||
+    normalized === "screening" ||
+    normalized === "procedure" ||
+    normalized === "other"
+  ) {
+    return normalized;
+  }
+
+  return "other";
+}
+
 function normalizeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -352,19 +393,76 @@ export function toUpdateServicePayload(
 export function normalizeFacilityService(
   facilityService: BackendFacilityService,
 ): FacilityService {
+  const record = facilityService as unknown as UnknownRecord;
+  const facility = isRecord(facilityService.facility)
+    ? facilityService.facility
+    : null;
+  const service = isRecord(facilityService.service)
+    ? facilityService.service
+    : null;
+  const serviceTypeRecord = isRecord(service?.serviceType)
+    ? service.serviceType
+    : null;
+
   return {
     ...facilityService,
     durationMinutes: normalizeNumber(
       facilityService.durationMinutes,
     ),
+    facilityCode: normalizeString(
+      pickNestedValue(record, "facilityCode", facility, "code"),
+    ),
+    facilityName: normalizeString(
+      pickNestedValue(record, "facilityName", facility, "name"),
+    ),
+    facilityAddress: normalizeString(
+      pickNestedValue(record, "facilityAddress", facility, "address"),
+    ),
+    facilityProvince: normalizeString(
+      pickNestedValue(record, "facilityProvince", facility, "province"),
+    ),
+    facilityDistrict: normalizeString(
+      pickNestedValue(record, "facilityDistrict", facility, "district"),
+    ),
+    serviceCode: normalizeString(
+      pickNestedValue(record, "serviceCode", service, "code"),
+    ),
+    serviceName: normalizeString(
+      pickNestedValue(record, "serviceName", service, "name"),
+      "Dịch vụ",
+    ),
     serviceDescription: normalizeNullableString(
-      facilityService.serviceDescription,
+      pickNestedValue(
+        record,
+        "serviceDescription",
+        service,
+        "description",
+      ),
+    ),
+    serviceType: normalizeFacilityServiceType(
+      record.serviceType ??
+        service?.serviceType ??
+        serviceTypeRecord?.code,
+    ),
+    serviceBasePrice: normalizeString(
+      pickNestedValue(record, "serviceBasePrice", service, "basePrice"),
+      facilityService.price,
     ),
     serviceDefaultDurationMinutes: normalizeNumber(
-      facilityService.serviceDefaultDurationMinutes,
+      pickNestedValue(
+        record,
+        "serviceDefaultDurationMinutes",
+        service,
+        "defaultDurationMinutes",
+      ),
     ),
     serviceRequiresDoctorWarning: normalizeBoolean(
-      facilityService.serviceRequiresDoctorWarning,
+      pickNestedValue(
+        record,
+        "serviceRequiresDoctorWarning",
+        service,
+        "requiresDoctorWarning",
+      ),
     ),
   };
 }
