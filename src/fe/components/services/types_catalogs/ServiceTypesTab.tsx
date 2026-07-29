@@ -195,7 +195,7 @@ export function ServiceTypesTab() {
 
           <Popconfirm
             title="Xóa loại dịch vụ?"
-            description="Nếu loại dịch vụ đang được sử dụng, backend có thể chuyển loại dịch vụ sang trạng thái ngừng hoạt động."
+            description="Bạn có chắn chắn xóa loại dịch vụ không?"
             okText="Xóa"
             cancelText="Hủy"
             okButtonProps={{
