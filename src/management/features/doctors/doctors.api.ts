@@ -5,78 +5,380 @@ import {
 } from "@/lib/axios";
 import type {
   BackendDoctor,
+  BackendDoctorDataCountResponse,
+  BackendDoctorListPayload,
+  BackendDoctorPaginatedResponse,
   CreateDoctorInput,
   Doctor,
   DoctorApiResponse,
+  DoctorListResult,
   DoctorStatus,
+  GetDoctorsParams,
   UpdateDoctorInput,
 } from "./doctors.types";
 
-const ENDPOINT = "/management/doctors";
+const ENDPOINT =
+  "/management/doctors";
+
+export const DOCTOR_MAX_PAGE = 100;
+export const DOCTOR_MAX_LIMIT = 50;
+
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
+
+function normalizeText(
+  value: unknown,
+) {
+  return String(value ?? "").trim();
+}
 
 function normalizeStatus(
-  status?: string,
+  status?: string | null,
 ): DoctorStatus {
-  return String(status ?? "")
-    .trim()
+  return normalizeText(status)
     .toLowerCase() === "active"
     ? "active"
     : "inactive";
 }
 
+function normalizePage(
+  value?: number,
+) {
+  const page = Number(value);
+
+  if (!Number.isFinite(page)) {
+    return DEFAULT_PAGE;
+  }
+
+  return Math.min(
+    DOCTOR_MAX_PAGE,
+    Math.max(
+      1,
+      Math.trunc(page),
+    ),
+  );
+}
+
+function normalizeLimit(
+  value?: number,
+) {
+  const limit = Number(value);
+
+  if (!Number.isFinite(limit)) {
+    return DEFAULT_LIMIT;
+  }
+
+  return Math.min(
+    DOCTOR_MAX_LIMIT,
+    Math.max(
+      1,
+      Math.trunc(limit),
+    ),
+  );
+}
+
 function normalizeDoctor(
   doctor: BackendDoctor,
 ): Doctor {
-  const yearsOfExperience = Number(
-    doctor.yearsOfExperience,
+  const staff =
+    doctor.staff ?? null;
+
+  const id = normalizeText(
+    doctor.id,
   );
-  const staff = doctor.staff ?? null;
-  const facilityId = String(
-    staff?.facilityId ?? "",
-  ).trim();
+
+  const facilityId =
+    normalizeText(
+      staff?.facilityId ??
+        doctor.facilityId,
+    );
+
+  const yearsOfExperience =
+    Number(
+      doctor.yearsOfExperience,
+    );
 
   return {
-    id: String(doctor.id ?? ""),
-    staffId: String(doctor.staffId ?? ""),
+    id,
+    staffId: normalizeText(
+      doctor.staffId ??
+        staff?.id,
+    ),
+
     name:
-      String(staff?.name ?? "").trim() ||
-      `Bác sĩ #${String(doctor.id ?? "")}`,
+      normalizeText(
+        staff?.name ??
+          doctor.name,
+      ) ||
+      `Bác sĩ #${id}`,
+
+    employeeCode:
+      normalizeText(
+        staff?.employeeCode ??
+          doctor.employeeCode,
+      ),
+
+    personalEmail:
+      normalizeText(
+        staff?.personalEmail ??
+          doctor.personalEmail,
+      ),
+
+    email:
+      normalizeText(
+        staff?.email ??
+          doctor.email,
+      ),
+
+    phone:
+      normalizeText(
+        staff?.phone ??
+          doctor.phone,
+      ),
+
+    address:
+      normalizeText(
+        staff?.address ??
+          doctor.address,
+      ),
+
     facilityId,
     facilityIds: facilityId
       ? [facilityId]
       : [],
-    employeeCode: String(
-      staff?.employeeCode ?? "",
+
+    licenseNo: normalizeText(
+      doctor.licenseNo,
     ),
-    email: String(staff?.email ?? ""),
-    phone: String(staff?.phone ?? ""),
-    address: String(staff?.address ?? ""),
-    licenseNo: String(
-      doctor.licenseNo ?? "",
+
+    title: normalizeText(
+      doctor.title,
     ),
-    title: String(doctor.title ?? ""),
-    specialty: String(
-      doctor.specialty ?? "",
+
+    specialty: normalizeText(
+      doctor.specialty,
     ),
+
     yearsOfExperience:
-      Number.isFinite(yearsOfExperience) &&
+      Number.isFinite(
+        yearsOfExperience,
+      ) &&
       yearsOfExperience >= 0
         ? yearsOfExperience
         : 0,
-    bio: String(doctor.bio ?? ""),
+
+    bio: normalizeText(
+      doctor.bio,
+    ),
+
     status: normalizeStatus(
       doctor.status,
     ),
-    staffStatus: normalizeStatus(
-      staff?.status ?? doctor.status,
+
+    staffStatus:
+      normalizeStatus(
+        staff?.status ??
+          doctor.status,
+      ),
+
+    createdAt: normalizeText(
+      doctor.createdAt,
     ),
-    createdAt: String(
-      doctor.createdAt ?? "",
-    ),
-    updatedAt: String(
-      doctor.updatedAt ?? "",
+
+    updatedAt: normalizeText(
+      doctor.updatedAt,
     ),
   };
+}
+
+function isPaginatedResponse(
+  data: BackendDoctorListPayload,
+): data is BackendDoctorPaginatedResponse {
+  return (
+    !Array.isArray(data) &&
+    "items" in data &&
+    Array.isArray(data.items)
+  );
+}
+
+function isDataCountResponse(
+  data: BackendDoctorListPayload,
+): data is BackendDoctorDataCountResponse {
+  return (
+    !Array.isArray(data) &&
+    "data" in data &&
+    Array.isArray(data.data)
+  );
+}
+
+function normalizeListResult(
+  data: BackendDoctorListPayload,
+  params?: GetDoctorsParams,
+): DoctorListResult {
+  const requestedPage =
+    normalizePage(params?.page);
+
+  const requestedLimit =
+    normalizeLimit(params?.limit);
+
+  if (
+    isPaginatedResponse(data)
+  ) {
+    const total =
+      Math.max(
+        0,
+        Number(data.total) || 0,
+      );
+
+    const page =
+      normalizePage(data.page);
+
+    const limit =
+      normalizeLimit(data.limit);
+
+    return {
+      items: data.items.map(
+        normalizeDoctor,
+      ),
+      total,
+      page,
+      limit,
+      totalPages:
+        Math.min(
+          DOCTOR_MAX_PAGE,
+          Math.max(
+            total > 0 ? 1 : 0,
+            Number(
+              data.totalPages,
+            ) ||
+              Math.ceil(
+                total / limit,
+              ),
+          ),
+        ),
+      hasPaginationMetadata: true,
+    };
+  }
+
+  if (
+    isDataCountResponse(data)
+  ) {
+    const total =
+      Math.max(
+        0,
+        Number(data.count) || 0,
+      );
+
+    const page =
+      normalizePage(
+        data.page ??
+          requestedPage,
+      );
+
+    const limit =
+      normalizeLimit(
+        data.limit ??
+          requestedLimit,
+      );
+
+    return {
+      items: data.data.map(
+        normalizeDoctor,
+      ),
+      total,
+      page,
+      limit,
+      totalPages:
+        Math.min(
+          DOCTOR_MAX_PAGE,
+          Math.max(
+            total > 0 ? 1 : 0,
+            Number(
+              data.totalPages,
+            ) ||
+              Math.ceil(
+                total / limit,
+              ),
+          ),
+        ),
+      hasPaginationMetadata: true,
+    };
+  }
+
+  const items =
+    Array.isArray(data)
+      ? data.map(
+          normalizeDoctor,
+        )
+      : [];
+
+  const offset =
+    (requestedPage - 1) *
+    requestedLimit;
+
+  const mayHaveNextPage =
+    items.length ===
+    requestedLimit;
+
+  return {
+    items,
+    total:
+      offset +
+      items.length +
+      (mayHaveNextPage ? 1 : 0),
+    page: requestedPage,
+    limit: requestedLimit,
+    totalPages:
+      mayHaveNextPage
+        ? Math.min(
+            DOCTOR_MAX_PAGE,
+            requestedPage + 1,
+          )
+        : requestedPage,
+    hasPaginationMetadata: false,
+  };
+}
+
+function compactParams(
+  params?: GetDoctorsParams,
+) {
+  return Object.fromEntries(
+    Object.entries({
+      name:
+        params?.name?.trim(),
+      email:
+        params?.email?.trim(),
+      employeeCode:
+        params?.employeeCode?.trim(),
+      personalEmail:
+        params?.personalEmail?.trim(),
+      phone:
+        params?.phone?.trim(),
+      licenseNo:
+        params?.licenseNo?.trim(),
+      specialty:
+        params?.specialty?.trim(),
+      facilityId:
+        params?.facilityId?.trim(),
+      status: params?.status,
+      sortYearsOfExperience:
+        params?.sortYearsOfExperience ??
+        "desc",
+      page:
+        normalizePage(
+          params?.page,
+        ),
+      limit:
+        normalizeLimit(
+          params?.limit,
+        ),
+    }).filter(
+      ([, value]) =>
+        value !== undefined &&
+        value !== null &&
+        value !== "",
+    ),
+  );
 }
 
 function toCreatePayload(
@@ -93,18 +395,23 @@ function toCreatePayload(
         (assignment) => ({
           facilityId:
             assignment.facilityId.trim(),
-          roles: assignment.roles,
+          roles:
+            assignment.roles,
         }),
       ),
-    licenseNo: input.licenseNo.trim(),
+    licenseNo:
+      input.licenseNo.trim(),
     title: input.title.trim(),
-    specialty: input.specialty.trim(),
+    specialty:
+      input.specialty.trim(),
     yearsOfExperience:
       input.yearsOfExperience,
     bio:
-      input.bio?.trim() || undefined,
+      input.bio?.trim() ||
+      undefined,
     permissionOverrides:
-      input.permissionOverrides ?? [],
+      input.permissionOverrides ??
+      [],
   };
 }
 
@@ -112,10 +419,14 @@ function toUpdatePayload(
   input: UpdateDoctorInput,
 ) {
   const payload = {
-    staffId: input.staffId?.trim(),
-    licenseNo: input.licenseNo?.trim(),
-    title: input.title?.trim(),
-    specialty: input.specialty?.trim(),
+    staffId:
+      input.staffId?.trim(),
+    licenseNo:
+      input.licenseNo?.trim(),
+    title:
+      input.title?.trim(),
+    specialty:
+      input.specialty?.trim(),
     yearsOfExperience:
       input.yearsOfExperience,
     bio: input.bio?.trim(),
@@ -130,12 +441,54 @@ function toUpdatePayload(
   );
 }
 
-export async function getDoctors(): Promise<
-  Doctor[]
-> {
-  const data = await unwrapApiData<
-    BackendDoctor[]
-  >(apiClient.get(ENDPOINT));
+/**
+ * GET /management/doctors
+ */
+export async function getDoctors(
+  params: GetDoctorsParams = {},
+): Promise<DoctorListResult> {
+  const data =
+    await unwrapApiData<BackendDoctorListPayload>(
+      apiClient.get(
+        ENDPOINT,
+        {
+          params:
+            compactParams(
+              params,
+            ),
+        },
+      ),
+    );
+
+  return normalizeListResult(
+    data,
+    params,
+  );
+}
+
+/**
+ * GET /management/doctors/facility/{id}
+ */
+export async function getDoctorsByFacility(
+  facilityId: string,
+): Promise<Doctor[]> {
+  const normalizedFacilityId =
+    facilityId.trim();
+
+  if (!normalizedFacilityId) {
+    return [];
+  }
+
+  const data =
+    await unwrapApiData<
+      BackendDoctor[]
+    >(
+      apiClient.get(
+        `${ENDPOINT}/facility/${encodeURIComponent(
+          normalizedFacilityId,
+        )}`,
+      ),
+    );
 
   return Array.isArray(data)
     ? data.map(normalizeDoctor)
@@ -144,7 +497,9 @@ export async function getDoctors(): Promise<
 
 export async function createDoctor(
   input: CreateDoctorInput,
-): Promise<DoctorApiResponse<Doctor>> {
+): Promise<
+  DoctorApiResponse<Doctor>
+> {
   const response =
     await unwrapApiResponse<BackendDoctor>(
       apiClient.post(
@@ -154,20 +509,28 @@ export async function createDoctor(
     );
 
   return {
-    success: response.success ?? true,
+    success:
+      response.success ?? true,
     message:
       response.message ??
       "Tạo bác sĩ thành công",
-    data: normalizeDoctor(response.data),
+    data: normalizeDoctor(
+      response.data,
+    ),
   };
 }
 
 export async function getDoctor(
   id: string,
 ): Promise<Doctor> {
-  const data = await unwrapApiData<
-    BackendDoctor
-  >(apiClient.get(`${ENDPOINT}/${id}`));
+  const data =
+    await unwrapApiData<BackendDoctor>(
+      apiClient.get(
+        `${ENDPOINT}/${encodeURIComponent(
+          id,
+        )}`,
+      ),
+    );
 
   return normalizeDoctor(data);
 }
@@ -175,45 +538,59 @@ export async function getDoctor(
 export async function updateDoctor(
   id: string,
   input: UpdateDoctorInput,
-): Promise<DoctorApiResponse<Doctor>> {
+): Promise<
+  DoctorApiResponse<Doctor>
+> {
   const response =
     await unwrapApiResponse<BackendDoctor>(
       apiClient.patch(
-        `${ENDPOINT}/${id}`,
+        `${ENDPOINT}/${encodeURIComponent(
+          id,
+        )}`,
         toUpdatePayload(input),
       ),
     );
 
   return {
-    success: response.success ?? true,
+    success:
+      response.success ?? true,
     message:
       response.message ??
       "Cập nhật bác sĩ thành công",
-    data: normalizeDoctor(response.data),
+    data: normalizeDoctor(
+      response.data,
+    ),
   };
 }
 
 export async function deleteDoctor(
   id: string,
-): Promise<DoctorApiResponse<null>> {
+): Promise<
+  DoctorApiResponse<null>
+> {
   const response =
     await unwrapApiResponse<null>(
       apiClient.delete(
-        `${ENDPOINT}/${id}`,
+        `${ENDPOINT}/${encodeURIComponent(
+          id,
+        )}`,
       ),
     );
 
   return {
-    success: response.success ?? true,
+    success:
+      response.success ?? true,
     message:
       response.message ??
       "Xóa bác sĩ thành công",
-    data: response.data ?? null,
+    data:
+      response.data ?? null,
   };
 }
 
 export const doctorsApi = {
   getDoctors,
+  getDoctorsByFacility,
   createDoctor,
   getDoctor,
   updateDoctor,
