@@ -29,22 +29,27 @@ export async function getManagementServices(
   query: ManagementServiceQuery = {},
 ): Promise<ManagementServiceListResult> {
   const response = await apiClient.get<
-    ApiResponse<ServiceListPayload>
+    ApiResponse<ServiceListPayload | ManagementService[]>
   >(MANAGEMENT_SERVICES_ENDPOINT, {
     params: query,
   });
 
   const payload = response.data?.data;
 
-  if (!payload || !Array.isArray(payload.items)) {
-    console.error(
-      "SERVICES RESPONSE KHÔNG ĐÚNG:",
-      response.data,
-    );
+  // Backend trả data: Service[]  HOẶC  data: { items, total, ... }
+  if (Array.isArray(payload)) {
+    return {
+      items: payload,
+      total: payload.length,
+      page: Number(query.page ?? 1),
+      limit: Number(query.limit ?? 20),
+      totalPages: 1,
+    };
+  }
 
-    throw new Error(
-      "API trả về danh sách dịch vụ không đúng cấu trúc.",
-    );
+  if (!payload || !Array.isArray(payload.items)) {
+    console.error("SERVICES RESPONSE KHÔNG ĐÚNG:", response.data);
+    throw new Error("API trả về danh sách dịch vụ không đúng cấu trúc.");
   }
 
   return {
