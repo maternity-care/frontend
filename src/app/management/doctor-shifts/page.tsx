@@ -363,7 +363,7 @@ export default function DoctorShiftPage() {
           );
 
           setDoctors(
-            doctorData.map((doctor) => {
+            doctorData.items.map((doctor) => {
               const shiftDoctor =
                 doctorInfoById.get(
                   doctor.id,

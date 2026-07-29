@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BriefcaseBusiness, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2, DoorOpen, Stethoscope, HardDrive, MessageSquare } from "lucide-react";
+import { BriefcaseBusiness, CalendarCheck, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2, DoorOpen, Stethoscope, HardDrive, MessageSquare } from "lucide-react";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ const navItems = [
   // { href: "/management/profile", label: "Hồ sơ cá nhân", icon: UserCog },
   { href: "/management/forums", label: "Quản lý diễn đàn", icon: MessageSquare, roles: ["super_admin", "admin"],},
   {  href: "/management/doctor-shifts",label: "Ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"],},
+  { href: "/management/appointments", label: "Lịch đặt khám", icon: CalendarCheck, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
   { href: "/management/shift-slots", label: "Khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"], },
 ];
 
