@@ -119,8 +119,10 @@ export interface GetFacilityServicesParams extends PaginationParams {
 
 export type GetPublicFacilityServicesParams = Omit<
   GetFacilityServicesParams,
-  "facilityId"
->;
+  "facilityId" | "status"
+> & {
+  status?: ServiceStatus;
+};
 
 export interface FacilityServicesListData {
   facilityServices: FacilityService[];

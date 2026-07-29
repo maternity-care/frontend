@@ -430,7 +430,7 @@ export default function HomePage() {
           </section>
 
           {/* Services */}
-          <section>
+          <section id="services" className="scroll-mt-24">
             <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
               <div>
                 <Tag color="pink" className="!mb-3 !rounded-full !px-4 !py-1">
@@ -486,7 +486,7 @@ export default function HomePage() {
           </section>
 
           {/* Packages */}
-          <section className="rounded-[32px] bg-pink-50/70 px-6 py-10 md:px-10">
+          <section id="packages" className="scroll-mt-24 rounded-[32px] bg-pink-50/70 px-6 py-10 md:px-10">
             <div className="mx-auto max-w-3xl text-center">
               <Tag color="pink" className="!mb-3 !rounded-full !px-4 !py-1">
                 {RESPONSE_MESSAGES.HOME.PACKAGES_SECTION.TAG}

@@ -429,6 +429,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { io, type Socket } from "socket.io-client";
 import {
   Alert,
   Badge,
@@ -457,6 +458,7 @@ import {
   CircleDollarSign,
   Clock3,
   HeartPulse,
+  MessageCircle,
   RefreshCw,
   Search,
   Stethoscope,
@@ -467,6 +469,7 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
+import { API_BASE_URL } from "@/lib/constants";
 
 const { Text, Title } = Typography;
 
@@ -483,6 +486,31 @@ type AppointmentStatus =
 type ShiftType = "morning" | "afternoon" | "evening";
 type AlertLevel = "critical" | "warning" | "info";
 type StatTone = "blue" | "emerald" | "violet" | "amber";
+type ChatbotStatus = "bot" | "waiting_for_staff" | "staff_joined" | "closed";
+
+type ChatbotMessage = {
+  id: string;
+  conversationId: string;
+  sender: "user" | "bot" | "staff" | "system";
+  senderName?: string;
+  content: string;
+  createdAt: string;
+};
+
+type ChatbotConversation = {
+  conversationId: string;
+  status: ChatbotStatus;
+  requester?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string | null;
+  };
+  assignedStaffId?: string;
+  assignedStaffName?: string;
+  claimExpiresAt?: string;
+  messages: ChatbotMessage[];
+};
 
 type Facility = {
   id: string;
@@ -1802,6 +1830,143 @@ function ShiftCard({ shift }: { shift: DoctorShift }) {
   );
 }
 
+function getChatSocketUrl() {
+  try {
+    return new URL(API_BASE_URL).origin;
+  } catch {
+    return API_BASE_URL;
+  }
+}
+
+function ManagementChatStatusCard() {
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [queue, setQueue] = useState<ChatbotConversation[]>([]);
+
+  useEffect(() => {
+    const socket: Socket = io(`${getChatSocketUrl()}/chatbot`, {
+      transports: ["websocket", "polling"],
+      auth: { mode: "staff" },
+      reconnectionAttempts: 5,
+    });
+
+    socket.on("connect", () => setSocketConnected(true));
+    socket.on("disconnect", () => setSocketConnected(false));
+    socket.on("connect_error", () => setSocketConnected(false));
+    socket.on("chatbot:staff-queue", (nextQueue: ChatbotConversation[]) => {
+      setQueue(nextQueue);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  const waitingCount = queue.filter(
+    (conversation) =>
+      conversation.status === "waiting_for_staff" && !conversation.assignedStaffId,
+  ).length;
+  const activeCount = queue.filter((conversation) => conversation.assignedStaffName).length;
+  const visibleQueue = queue.slice(0, 4);
+
+  return (
+    <Card
+      className="border-teal-100 bg-white"
+      title={
+        <div>
+          <p className="mb-0 text-base font-semibold text-slate-950">
+            Trạng thái tư vấn realtime
+          </p>
+          <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
+            Theo dõi cuộc chat nào đang chờ và bác sĩ/tư vấn viên nào đang reply.
+          </p>
+        </div>
+      }
+      extra={
+        <div className="flex items-center gap-2">
+          <Badge count={waitingCount} color="#f97316" />
+          <Tag color={socketConnected ? "green" : "red"}>
+            {socketConnected ? "Socket online" : "Socket offline"}
+          </Tag>
+        </div>
+      }
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl bg-orange-50 p-4">
+          <Text type="secondary" className="block text-xs">
+            Đang chờ bác sĩ
+          </Text>
+          <Text strong className="text-2xl text-orange-700">
+            {waitingCount}
+          </Text>
+        </div>
+        <div className="rounded-xl bg-teal-50 p-4">
+          <Text type="secondary" className="block text-xs">
+            Đang có người reply
+          </Text>
+          <Text strong className="text-2xl text-teal-700">
+            {activeCount}
+          </Text>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-4">
+          <Text type="secondary" className="block text-xs">
+            Tổng cuộc chat hỗ trợ
+          </Text>
+          <Text strong className="text-2xl text-slate-950">
+            {queue.length}
+          </Text>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {visibleQueue.length ? (
+          visibleQueue.map((conversation) => {
+            const lastMessage = conversation.messages.at(-1);
+
+            return (
+              <div
+                key={conversation.conversationId}
+                className="rounded-xl border border-slate-200 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                      <MessageCircle className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <Text strong className="block truncate text-slate-950">
+                        {conversation.requester?.name
+                          ? conversation.requester.name
+                          : `Chat #${conversation.conversationId.slice(0, 8)}`}
+                      </Text>
+                      <Text type="secondary" className="mt-1 block truncate text-xs">
+                        {conversation.requester?.phone
+                          ? `${conversation.requester.phone} · ${lastMessage?.content ?? "Chưa có tin nhắn"}`
+                          : lastMessage?.content ?? "Chưa có tin nhắn"}
+                      </Text>
+                    </div>
+                  </div>
+                  <Tag color={conversation.assignedStaffName ? "green" : "orange"}>
+                    {conversation.assignedStaffName
+                      ? `Đang rep: ${conversation.assignedStaffName}`
+                      : "Chờ bác sĩ"}
+                  </Tag>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="lg:col-span-2">
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="Chưa có cuộc chat cần bác sĩ/tư vấn viên hỗ trợ"
+            />
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function ManagementDashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>();
@@ -2265,6 +2430,10 @@ export default function ManagementDashboardPage() {
             helper="trong ngày hôm nay"
             tone="emerald"
           />
+        </div>
+
+        <div className={activeTab === "overview" ? "contents" : "hidden"}>
+          <ManagementChatStatusCard />
         </div>
 
         <div
