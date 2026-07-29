@@ -13,7 +13,6 @@ const navItems = [
   { href: "/management/doctors", label: "Doctors", icon: Stethoscope, roles: ["super_admin", "admin"] },
   { href: "/management/facilities", label: "Cơ sở", icon: Building2, roles: ["super_admin", "admin"] },
   { href: "/management/rooms", label: "Phòng khám", icon: DoorOpen, roles: ["super_admin", "admin"] },
-  { href: "/management/services/super", label: "Dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
   // { href: "/management/roles", label: "Roles", icon: ShieldCheck, roles: ["super_admin"] },
   // { href: "/management/records", label: "Records", icon: HardDrive, roles: ["super_admin", "doctor"] },
   // { href: "/management/permissions", label: "Permissions", icon: KeyRound, roles: ["super_admin"] },
