@@ -1,0 +1,301 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import dayjs from "dayjs";
+import {
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Upload,
+  message,
+  Typography,
+  Space,
+} from "antd";
+import type { UploadFile, UploadProps } from "antd";
+import { Upload as UploadIcon } from "lucide-react";
+
+import { createManagementPresignedUpload } from "@/management/features/uploads/uploads.api";
+import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import {
+  CreateMedicalRecordFileInput,
+  CreateMedicalRecordInput,
+} from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.types";
+import { createManagementMedicalRecord } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
+
+const { TextArea } = Input;
+const { Text } = Typography;
+
+interface Props {
+  open: boolean;
+  profile: ManagementPregnancyProfile | null;
+  loading?: boolean;
+  onCancel: () => void;
+  onSuccess: () => void;
+}
+
+interface FormValues {
+  appointmentId: string;
+  doctorId: string;
+  diagnosis: string;
+  conclusion?: string;
+  recommendation?: string;
+  nextAppointmentSuggestedAt?: dayjs.Dayjs | null;
+}
+
+export function CreateMedicalRecordModal({
+  open,
+  profile,
+  onCancel,
+  onSuccess,
+}: Props) {
+  const [form] = Form.useForm<FormValues>();
+  const [submitting, setSubmitting] = useState(false);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const { doctorId, user } = useCurrentUser();
+
+  // Tự điền doctorId khi mở modal hoặc khi đã có user
+  useEffect(() => {
+    if (!open) return;
+
+    if (doctorId) {
+      form.setFieldsValue({ doctorId });
+    }
+  }, [open, doctorId, form]);
+
+  const handleUpload: UploadProps["customRequest"] = async (options) => {
+    const { file, onSuccess: onUploadSuccess, onError } = options;
+    const rawFile = file as File;
+
+    setUploading(true);
+    try {
+      const presign = await createManagementPresignedUpload({
+        fileName: rawFile.name,
+        mimeType: rawFile.type || "application/octet-stream",
+        size: rawFile.size,
+        path: `medical-records/${profile?.id || "unknown"}`,
+        baseName: "medical-record",
+      });
+
+      const putRes = await fetch(presign.url, {
+        method: presign.method || "PUT",
+        headers: {
+          "Content-Type": rawFile.type || "application/octet-stream",
+          ...presign.headers,
+        },
+        body: rawFile,
+      });
+
+      if (!putRes.ok) {
+        throw new Error("Upload file thất bại");
+      }
+
+      setFileList((prev) =>
+        prev.map((f) =>
+          f.uid === (file as UploadFile).uid
+            ? {
+                ...f,
+                status: "done",
+                url: presign.publicUrl,
+                response: {
+                  publicUrl: presign.publicUrl,
+                  key: presign.key,
+                },
+              }
+            : f,
+        ),
+      );
+
+      onUploadSuccess?.(presign);
+      message.success(`Đã upload: ${rawFile.name}`);
+    } catch (err) {
+      onError?.(err as Error);
+      message.error(
+        err instanceof Error ? err.message : "Upload file thất bại",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemove = (file: UploadFile) => {
+    setFileList((prev) => prev.filter((f) => f.uid !== file.uid));
+  };
+
+  const handleSubmit = async () => {
+    if (!profile) return;
+
+    if (!doctorId) {
+      message.error("Không xác định được bác sĩ đang đăng nhập.");
+      return;
+    }
+
+    try {
+      const values = await form.validateFields();
+      setSubmitting(true);
+
+      const files: CreateMedicalRecordFileInput[] = fileList
+        .filter((f) => f.status === "done" && f.response?.publicUrl)
+        .map((f) => ({
+          fileType: f.type?.startsWith("image/")
+            ? "clinical_image"
+            : "clinical_report",
+          fileName: f.name,
+          fileUrl: f.response.publicUrl as string,
+          mimeType: f.type || "application/octet-stream",
+        }));
+
+      const input: CreateMedicalRecordInput = {
+        appointmentId: values.appointmentId.trim(),
+        pregnancyProfileId: profile.id,
+        doctorId, // luôn lấy từ user đang đăng nhập
+        diagnosis: values.diagnosis.trim(),
+        conclusion: values.conclusion?.trim() || null,
+        recommendation: values.recommendation?.trim() || null,
+        nextAppointmentSuggestedAt: values.nextAppointmentSuggestedAt
+          ? values.nextAppointmentSuggestedAt.toISOString()
+          : null,
+        files: files.length > 0 ? files : undefined,
+      };
+
+      await createManagementMedicalRecord(input);
+
+      message.success("Tạo kết quả khám thành công");
+      form.resetFields();
+      setFileList([]);
+      onSuccess();
+    } catch (err) {
+      if (err && typeof err === "object" && "errorFields" in err) {
+        return;
+      }
+      message.error(
+        err instanceof Error ? err.message : "Không tạo được kết quả khám",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (submitting || uploading) return;
+    form.resetFields();
+    setFileList([]);
+    onCancel();
+  };
+
+  return (
+    <Modal
+      open={open}
+      title="Thêm kết quả khám"
+      width={720}
+      okText="Lưu kết quả khám"
+      cancelText="Hủy"
+      confirmLoading={submitting}
+      mask={{ closable: !submitting && !uploading }}
+      keyboard={!submitting && !uploading}
+      onCancel={handleCancel}
+      onOk={() => void handleSubmit()}
+      afterClose={() => {
+        form.resetFields();
+        setFileList([]);
+      }}
+    >
+      {profile && (
+        <div style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            Hồ sơ: <strong>{profile.code || profile.id}</strong> • Thai phụ:{" "}
+            <strong>{profile.user?.name || "Chưa có tên"}</strong>
+          </Text>
+        </div>
+      )}
+
+      <Form form={form} layout="vertical" disabled={submitting}>
+        <Form.Item
+          name="appointmentId"
+          label="Mã lịch hẹn (appointmentId)"
+          rules={[{ required: true, message: "Vui lòng nhập mã lịch hẹn" }]}
+        >
+          <Input placeholder="Ví dụ: 2" />
+        </Form.Item>
+
+        <Form.Item
+          name="doctorId"
+          label="Bác sĩ phụ trách"
+          rules={[{ required: true, message: "Không xác định được bác sĩ" }]}
+        >
+          <Space.Compact style={{ width: "100%" }}>
+            <Input
+              disabled
+              placeholder={doctorId ? `ID: ${doctorId}` : "Không xác định được bác sĩ"}
+              style={{ flex: 1 }}
+            />
+            {user?.name ? (
+              <Input
+                disabled
+                value={user.name}
+                style={{
+                  width: "auto",
+                  maxWidth: 180,
+                  textAlign: "center",
+                  color: "rgba(0, 0, 0, 0.65)",
+                  background: "#fafafa",
+                }}
+              />
+            ) : null}
+          </Space.Compact>
+        </Form.Item>
+
+        <Form.Item
+          name="diagnosis"
+          label="Chẩn đoán"
+          rules={[{ required: true, message: "Vui lòng nhập chẩn đoán" }]}
+        >
+          <TextArea rows={2} placeholder="Nhập chẩn đoán..." />
+        </Form.Item>
+
+        <Form.Item name="conclusion" label="Kết luận">
+          <TextArea rows={2} placeholder="Nhập kết luận..." />
+        </Form.Item>
+
+        <Form.Item name="recommendation" label="Khuyến nghị">
+          <TextArea rows={2} placeholder="Nhập khuyến nghị..." />
+        </Form.Item>
+
+        <Form.Item
+          name="nextAppointmentSuggestedAt"
+          label="Ngày tái khám đề xuất"
+        >
+          <DatePicker
+            showTime
+            format="DD/MM/YYYY HH:mm"
+            style={{ width: "100%" }}
+            placeholder="Chọn ngày giờ"
+          />
+        </Form.Item>
+
+        <Form.Item label="Tài liệu đính kèm">
+          <Upload
+            multiple
+            fileList={fileList}
+            customRequest={handleUpload}
+            onRemove={handleRemove}
+            onChange={({ fileList: newList }) => setFileList(newList)}
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            disabled={uploading || submitting}
+          >
+            <Button icon={<UploadIcon size={16} />} loading={uploading}>
+              Chọn file & Upload
+            </Button>
+          </Upload>
+          <Text type="secondary" style={{ display: "block", marginTop: 8 }}>
+            File sẽ được upload lên S3 qua presign, sau đó gắn vào lần khám.
+          </Text>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+}

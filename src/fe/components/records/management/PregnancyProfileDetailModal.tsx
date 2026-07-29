@@ -27,6 +27,7 @@ import type {
   ManagementMedicalRecord,
   ManagementPregnancyProfile,
   PregnancyConsultationRecord,
+  PregnancyProfileMedicalRecordFile,
   PregnancyProfilePdfRecord,
 } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 
@@ -36,34 +37,23 @@ interface Props {
   open: boolean;
   profile: ManagementPregnancyProfile | null;
   onClose: () => void;
-
   onEdit: (profile: ManagementPregnancyProfile) => void;
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) {
-    return "—";
-  }
+  if (!value) return "—";
 
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
+  if (Number.isNaN(date.getTime())) return "—";
 
   return new Intl.DateTimeFormat("vi-VN").format(date);
 }
 
 function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return "—";
-  }
+  if (!value) return "—";
 
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
+  if (Number.isNaN(date.getTime())) return "—";
 
   return new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "short",
@@ -72,18 +62,10 @@ function formatDateTime(value?: string | null): string {
 }
 
 function formatFileSize(value?: number | null): string {
-  if (!value || value <= 0) {
-    return "";
-  }
+  if (!value || value <= 0) return "";
 
-  if (value < 1024) {
-    return `${value} B`;
-  }
-
-  if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(1)} KB`;
-  }
-
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
@@ -91,13 +73,10 @@ function getStatusLabel(status: ManagementPregnancyProfile["status"]) {
   switch (status) {
     case "completed":
       return <Tag color="blue">Đã hoàn thành</Tag>;
-
     case "terminated":
       return <Tag color="orange">Đã kết thúc</Tag>;
-
     case "deleted":
       return <Tag>Đã xóa</Tag>;
-
     default:
       return <Tag color="green">Đang theo dõi</Tag>;
   }
@@ -107,10 +86,8 @@ function getRiskLabel(riskLevel: ManagementPregnancyProfile["riskLevel"]) {
   switch (riskLevel) {
     case "high":
       return <Tag color="red">Nguy cơ cao</Tag>;
-
     case "medium":
       return <Tag color="orange">Nguy cơ trung bình</Tag>;
-
     default:
       return <Tag color="green">Nguy cơ thấp</Tag>;
   }
@@ -119,7 +96,6 @@ function getRiskLabel(riskLevel: ManagementPregnancyProfile["riskLevel"]) {
 function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
-
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
@@ -133,9 +109,7 @@ function getFileNameFromString(record: string, index: number): string {
 
   try {
     const url = new URL(record);
-
     const lastSegment = url.pathname.split("/").filter(Boolean).at(-1);
-
     return lastSegment
       ? decodeURIComponent(lastSegment)
       : `Tài liệu ${index + 1}`;
@@ -166,6 +140,8 @@ function isPdfRecord(
   );
 }
 
+/* ===== Document Card (file dạng string hoặc PdfRecord cũ) ===== */
+
 interface DocumentCardProps {
   record: string | PregnancyProfilePdfRecord;
   index: number;
@@ -173,13 +149,10 @@ interface DocumentCardProps {
 
 function DocumentCard({ record, index }: DocumentCardProps) {
   const isStringRecord = typeof record === "string";
-
   const url = isStringRecord ? record : record.url;
-
   const name = isStringRecord
     ? getFileNameFromString(record, index)
     : record.name || `Tài liệu ${index + 1}`;
-
   const canOpen = isHttpUrl(url);
 
   const details = isStringRecord
@@ -208,12 +181,9 @@ function DocumentCard({ record, index }: DocumentCardProps) {
     >
       <Space align="start">
         <FileText size={22} />
-
         <div>
           <Text strong>{name}</Text>
-
           <br />
-
           <Text type="secondary">{details}</Text>
         </div>
       </Space>
@@ -233,6 +203,65 @@ function DocumentCard({ record, index }: DocumentCardProps) {
   );
 }
 
+/* ===== File thuộc lần khám (files[] trong consultation) ===== */
+
+interface MedicalRecordFileCardProps {
+  file: PregnancyProfileMedicalRecordFile;
+}
+
+function MedicalRecordFileCard({ file }: MedicalRecordFileCardProps) {
+  const canOpen = isHttpUrl(file.fileUrl);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "10px 12px",
+        border: "1px solid #f0f0f0",
+        borderRadius: 6,
+        background: "#fafafa",
+      }}
+    >
+      <Space align="start" size={10}>
+        <FileText size={18} />
+        <div>
+          <Text strong style={{ fontSize: 13 }}>
+            {file.fileName}
+          </Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {[
+              file.fileType,
+              file.mimeType,
+              file.createdAt ? `Tải lên: ${formatDateTime(file.createdAt)}` : "",
+            ]
+              .filter(Boolean)
+              .join(" • ")}
+          </Text>
+        </div>
+      </Space>
+
+      {canOpen && (
+        <Button
+          type="link"
+          size="small"
+          icon={<ExternalLink size={14} />}
+          href={file.fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Mở
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/* ===== Consultation Card ===== */
+
 interface ConsultationCardProps {
   consultation: PregnancyConsultationRecord;
 }
@@ -248,7 +277,6 @@ function ConsultationCard({ consultation }: ConsultationCardProps) {
     >
       <Space align="center" style={{ marginBottom: 12 }}>
         <Stethoscope size={20} />
-
         <Text strong>
           Kết quả khám{" "}
           {consultation.createdAt
@@ -288,9 +316,24 @@ function ConsultationCard({ consultation }: ConsultationCardProps) {
           {consultation.doctorId || "—"}
         </Descriptions.Item>
       </Descriptions>
+
+      {consultation.files && consultation.files.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <Text strong style={{ display: "block", marginBottom: 8 }}>
+            Tài liệu đính kèm ({consultation.files.length})
+          </Text>
+          <Flex vertical gap={8}>
+            {consultation.files.map((file) => (
+              <MedicalRecordFileCard key={file.id} file={file} />
+            ))}
+          </Flex>
+        </div>
+      )}
     </div>
   );
 }
+
+/* ===== Main Modal ===== */
 
 export function PregnancyProfileDetailModal({
   open,
@@ -304,11 +347,13 @@ export function PregnancyProfileDetailModal({
 
   const user = profile.user;
 
+  // 1. Top-level string / PdfRecord (legacy)
   const fileRecords = profile.medicalRecords.filter(
     (record): record is string | PregnancyProfilePdfRecord =>
       typeof record === "string" || isPdfRecord(record),
   );
 
+  // 2. All consultations (dedicated + embedded)
   const embeddedConsultations =
     profile.medicalRecords.filter(isConsultationRecord);
 
@@ -319,12 +364,30 @@ export function PregnancyProfileDetailModal({
       const key =
         consultation.id ||
         `${consultation.appointmentId}-${consultation.createdAt}`;
-
       consultationMap.set(key, consultation);
     },
   );
 
   const consultations = Array.from(consultationMap.values());
+
+  // 3. Collect ALL files from every consultation (this is what you need)
+  const allFilesFromConsultations: PregnancyProfileMedicalRecordFile[] = [];
+  const seenFileIds = new Set<string>();
+
+  consultations.forEach((consultation) => {
+    (consultation.files ?? []).forEach((file) => {
+      if (file.id && !seenFileIds.has(file.id)) {
+        seenFileIds.add(file.id);
+        allFilesFromConsultations.push(file);
+      } else if (!file.id) {
+        // fallback if id is missing
+        allFilesFromConsultations.push(file);
+      }
+    });
+  });
+
+  const totalMedicalDocuments =
+    fileRecords.length + allFilesFromConsultations.length;
 
   return (
     <Modal
@@ -336,7 +399,6 @@ export function PregnancyProfileDetailModal({
         <Button key="close" onClick={onClose}>
           Đóng
         </Button>,
-
         <Button
           key="edit"
           type="primary"
@@ -365,12 +427,10 @@ export function PregnancyProfileDetailModal({
         <div>
           <Space align="start">
             <UserRound size={24} />
-
             <div>
               <Title level={4} style={{ margin: 0 }}>
                 {user?.name || "Chưa cập nhật tên thai phụ"}
               </Title>
-
               <Text type="secondary">
                 Mã hồ sơ: {profile.code || profile.id}
               </Text>
@@ -389,32 +449,25 @@ export function PregnancyProfileDetailModal({
               <Descriptions.Item label="Mã bệnh nhân">
                 {profile.patientId || "—"}
               </Descriptions.Item>
-
               <Descriptions.Item label="CCCD">
                 {user?.cccd || "—"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Ngày sinh">
                 {formatDate(user?.dateOfBirth)}
               </Descriptions.Item>
-
               <Descriptions.Item label="Số điện thoại">
                 {user?.phone || "—"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Email">
                 {user?.email || "—"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Địa chỉ">
                 {[user?.address, user?.ward, user?.district, user?.province]
                   .filter(Boolean)
                   .join(", ") || "—"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Liên hệ khẩn cấp">
                 {user?.emergencyContactName || "—"}
-
                 {user?.emergencyContactPhone
                   ? ` – ${user.emergencyContactPhone}`
                   : ""}
@@ -432,27 +485,21 @@ export function PregnancyProfileDetailModal({
               <Descriptions.Item label="Ngày đầu kỳ kinh cuối">
                 {formatDate(profile.lastMenstrualPeriod)}
               </Descriptions.Item>
-
               <Descriptions.Item label="Ngày dự sinh">
                 {formatDate(profile.expectedDueDate)}
               </Descriptions.Item>
-
               <Descriptions.Item label="Số thai">
                 {profile.fetalCount ?? "—"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Mức nguy cơ">
                 {getRiskLabel(profile.riskLevel)}
               </Descriptions.Item>
-
               <Descriptions.Item label="Trạng thái">
                 {getStatusLabel(profile.status)}
               </Descriptions.Item>
-
               <Descriptions.Item label="Ngày tạo">
                 {formatDateTime(profile.createdAt)}
               </Descriptions.Item>
-
               <Descriptions.Item label="Cập nhật lần cuối">
                 {formatDateTime(profile.updatedAt)}
               </Descriptions.Item>
@@ -473,19 +520,15 @@ export function PregnancyProfileDetailModal({
           <Descriptions.Item label="Số lần mang thai">
             {profile.gravida}
           </Descriptions.Item>
-
           <Descriptions.Item label="Sinh đủ tháng">
             {profile.paraFullTerm}
           </Descriptions.Item>
-
           <Descriptions.Item label="Sinh non">
             {profile.paraPremature}
           </Descriptions.Item>
-
           <Descriptions.Item label="Sảy/phá thai">
             {profile.paraAbortion}
           </Descriptions.Item>
-
           <Descriptions.Item label="Con đang sống">
             {profile.paraLivingChildren}
           </Descriptions.Item>
@@ -493,7 +536,6 @@ export function PregnancyProfileDetailModal({
 
         <div>
           <Title level={5}>Ghi chú chuyên môn</Title>
-
           <Paragraph
             style={{
               margin: 0,
@@ -510,16 +552,20 @@ export function PregnancyProfileDetailModal({
 
         <Divider style={{ margin: 0 }} />
 
+        {/* ===== TÀI LIỆU Y TẾ – giờ đã lấy hết files từ consultations ===== */}
         <div>
-          <Title level={5}>Tài liệu y tế ({fileRecords.length})</Title>
+          <Title level={5}>
+            Tài liệu y tế ({totalMedicalDocuments})
+          </Title>
 
-          {fileRecords.length === 0 ? (
+          {totalMedicalDocuments === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="Chưa có tài liệu PDF"
+              description="Chưa có tài liệu"
             />
           ) : (
             <Flex vertical gap={12}>
+              {/* Legacy top-level documents */}
               {fileRecords.map((record, index) => (
                 <DocumentCard
                   key={
@@ -531,6 +577,11 @@ export function PregnancyProfileDetailModal({
                   index={index}
                 />
               ))}
+
+              {/* All files coming from medicalRecords[].files[] */}
+              {allFilesFromConsultations.map((file) => (
+                <MedicalRecordFileCard key={file.id || file.fileUrl} file={file} />
+              ))}
             </Flex>
           )}
         </div>
@@ -539,7 +590,6 @@ export function PregnancyProfileDetailModal({
 
         <div>
           <Title level={5}>Kết quả khám ({consultations.length})</Title>
-
           {consultations.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}

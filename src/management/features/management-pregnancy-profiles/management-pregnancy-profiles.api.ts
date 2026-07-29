@@ -3,6 +3,7 @@ import { apiClient } from "@/lib/axios";
 import type {
   BackendManagementPregnancyProfile,
   BackendManagementPregnancyProfileUser,
+  BackendMedicalRecordFile,
   BackendPregnancyConsultationRecord,
   BackendPregnancyProfilePdfRecord,
   DeleteManagementPregnancyProfileInput,
@@ -12,6 +13,7 @@ import type {
   ManagementPregnancyProfilesResult,
   ManagementPregnancyProfileUser,
   PregnancyConsultationRecord,
+  PregnancyProfileMedicalRecordFile,
   PregnancyProfilePdfRecord,
   PregnancyProfileStatus,
   PregnancyRiskLevel,
@@ -192,29 +194,35 @@ function isPdfRecord(
   );
 }
 
+function normalizeMedicalRecordFile(
+  file: BackendMedicalRecordFile,
+): PregnancyProfileMedicalRecordFile {
+  return {
+    id: toStringValue(file.id),
+    medicalRecordId: toStringValue(file.medicalRecordId),
+    fileType: file.fileType || "other",
+    fileName: file.fileName || "Tài liệu",
+    fileUrl: file.fileUrl || "",
+    mimeType: file.mimeType || "application/octet-stream",
+    uploadedBy: file.uploadedBy ?? null,
+    createdAt: file.createdAt ?? null,
+  };
+}
+
 function normalizeConsultation(
   consultation: BackendPregnancyConsultationRecord,
 ): PregnancyConsultationRecord {
   return {
     id: toStringValue(consultation.id),
-
-    appointmentId: toNullableString(
-      consultation.appointmentId,
-    ),
-
-    pregnancyProfileId: toNullableString(
-      consultation.pregnancyProfileId,
-    ),
-
+    appointmentId: toNullableString(consultation.appointmentId),
+    pregnancyProfileId: toNullableString(consultation.pregnancyProfileId),
     doctorId: toNullableString(consultation.doctorId),
-
     diagnosis: consultation.diagnosis ?? null,
     conclusion: consultation.conclusion ?? null,
     recommendation: consultation.recommendation ?? null,
-
     nextAppointmentSuggestedAt:
       consultation.nextAppointmentSuggestedAt ?? null,
-
+    files: (consultation.files ?? []).map(normalizeMedicalRecordFile),
     createdAt: consultation.createdAt ?? null,
     updatedAt: consultation.updatedAt ?? null,
   };

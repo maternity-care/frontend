@@ -28,6 +28,17 @@ export interface ManagementPregnancyProfileUser {
   updatedAt?: string | null;
 }
 
+export interface PregnancyProfileMedicalRecordFile {
+  id: string;
+  medicalRecordId: string;
+  fileType: string;
+  fileName: string;
+  fileUrl: string;
+  mimeType: string;
+  uploadedBy?: string | null;
+  createdAt?: string | null;
+}
+
 export interface PregnancyConsultationRecord {
   id: string;
 
@@ -40,7 +51,7 @@ export interface PregnancyConsultationRecord {
   recommendation: string | null;
 
   nextAppointmentSuggestedAt: string | null;
-
+  files: PregnancyProfileMedicalRecordFile[];
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -62,13 +73,9 @@ export interface PregnancyProfilePdfRecord {
 
 /**
  * API hiện tại có thể trả:
- *
  * - string: URL hoặc key của file.
  * - PregnancyProfilePdfRecord: thông tin file PDF.
  * - PregnancyConsultationRecord: kết quả khám.
- *
- * Khi backend tách riêng consultations và medicalRecords,
- * có thể bỏ PregnancyConsultationRecord khỏi union này.
  */
 export type ManagementMedicalRecord =
   | string
@@ -159,10 +166,7 @@ export interface DeleteManagementPregnancyProfileInput {
   reason?: string;
 }
 
-/*
- * Các kiểu dữ liệu thô dùng để nhận response từ backend.
- * FE sẽ normalize thành ManagementPregnancyProfile.
- */
+/* ===== Backend raw types ===== */
 
 export interface BackendManagementPregnancyProfileUser {
   id?: string | number;
@@ -193,6 +197,18 @@ export interface BackendManagementPregnancyProfileUser {
   updatedAt?: string | null;
 }
 
+export interface BackendMedicalRecordFile {
+  id?: string | number;
+  medicalRecordId?: string | number | null;
+  fileType?: string | null;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  mimeType?: string | null;
+  uploadedBy?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface BackendPregnancyConsultationRecord {
   id?: string | number;
 
@@ -205,6 +221,7 @@ export interface BackendPregnancyConsultationRecord {
   recommendation?: string | null;
 
   nextAppointmentSuggestedAt?: string | null;
+  files?: BackendMedicalRecordFile[] | null;
 
   createdAt?: string | null;
   updatedAt?: string | null;

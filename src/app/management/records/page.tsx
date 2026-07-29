@@ -27,6 +27,7 @@ import {
   TableFilterColumn,
   TableFilterValues,
 } from "@/management/components/ui/TableFilter";
+import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
 
 const { Title, Text } = Typography;
 
@@ -134,6 +135,9 @@ export default function ManagementPregnancyProfilesPage() {
   const [filters, setFilters] = useState<GetManagementPregnancyProfilesParams>(
     {},
   );
+
+  const [creatingMedicalRecordFor, setCreatingMedicalRecordFor] =
+    useState<ManagementPregnancyProfile | null>(null);
 
   const [detailProfile, setDetailProfile] =
     useState<ManagementPregnancyProfile | null>(null);
@@ -345,6 +349,7 @@ export default function ManagementPregnancyProfilesPage() {
             onView={setDetailProfile}
             onEdit={setEditingProfile}
             onDelete={handleDelete}
+            onAddMedicalRecord={setCreatingMedicalRecordFor}
           />
         </Card>
       </Space>
@@ -369,6 +374,16 @@ export default function ManagementPregnancyProfilesPage() {
           }
         }}
         onSubmit={handleUpdate}
+      />
+
+      <CreateMedicalRecordModal
+        open={creatingMedicalRecordFor !== null}
+        profile={creatingMedicalRecordFor}
+        onCancel={() => setCreatingMedicalRecordFor(null)}
+        onSuccess={() => {
+          setCreatingMedicalRecordFor(null);
+          void loadProfiles(); // reload danh sách để thấy medicalRecords mới
+        }}
       />
     </AdminLayout>
   );
