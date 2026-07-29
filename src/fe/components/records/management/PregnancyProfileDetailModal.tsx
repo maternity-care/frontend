@@ -233,7 +233,11 @@ function MedicalRecordFileCard({ file }: MedicalRecordFileCardProps) {
           </Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {[file.fileType, file.mimeType, file.createdAt ? `Tải lên: ${formatDateTime(file.createdAt)}` : ""]
+            {[
+              file.fileType,
+              file.mimeType,
+              file.createdAt ? `Tải lên: ${formatDateTime(file.createdAt)}` : "",
+            ]
               .filter(Boolean)
               .join(" • ")}
           </Text>
@@ -343,11 +347,13 @@ export function PregnancyProfileDetailModal({
 
   const user = profile.user;
 
+  // 1. Top-level string / PdfRecord (legacy)
   const fileRecords = profile.medicalRecords.filter(
     (record): record is string | PregnancyProfilePdfRecord =>
       typeof record === "string" || isPdfRecord(record),
   );
 
+  // 2. All consultations (dedicated + embedded)
   const embeddedConsultations =
     profile.medicalRecords.filter(isConsultationRecord);
 
@@ -363,6 +369,25 @@ export function PregnancyProfileDetailModal({
   );
 
   const consultations = Array.from(consultationMap.values());
+
+  // 3. Collect ALL files from every consultation (this is what you need)
+  const allFilesFromConsultations: PregnancyProfileMedicalRecordFile[] = [];
+  const seenFileIds = new Set<string>();
+
+  consultations.forEach((consultation) => {
+    (consultation.files ?? []).forEach((file) => {
+      if (file.id && !seenFileIds.has(file.id)) {
+        seenFileIds.add(file.id);
+        allFilesFromConsultations.push(file);
+      } else if (!file.id) {
+        // fallback if id is missing
+        allFilesFromConsultations.push(file);
+      }
+    });
+  });
+
+  const totalMedicalDocuments =
+    fileRecords.length + allFilesFromConsultations.length;
 
   return (
     <Modal
@@ -527,15 +552,20 @@ export function PregnancyProfileDetailModal({
 
         <Divider style={{ margin: 0 }} />
 
+        {/* ===== TÀI LIỆU Y TẾ – giờ đã lấy hết files từ consultations ===== */}
         <div>
-          <Title level={5}>Tài liệu y tế ({fileRecords.length})</Title>
-          {fileRecords.length === 0 ? (
+          <Title level={5}>
+            Tài liệu y tế ({totalMedicalDocuments})
+          </Title>
+
+          {totalMedicalDocuments === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="Chưa có tài liệu PDF"
+              description="Chưa có tài liệu"
             />
           ) : (
             <Flex vertical gap={12}>
+              {/* Legacy top-level documents */}
               {fileRecords.map((record, index) => (
                 <DocumentCard
                   key={
@@ -546,6 +576,11 @@ export function PregnancyProfileDetailModal({
                   record={record}
                   index={index}
                 />
+              ))}
+
+              {/* All files coming from medicalRecords[].files[] */}
+              {allFilesFromConsultations.map((file) => (
+                <MedicalRecordFileCard key={file.id || file.fileUrl} file={file} />
               ))}
             </Flex>
           )}
