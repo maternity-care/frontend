@@ -10,34 +10,53 @@ import {
   useRouter,
 } from "next/navigation";
 import {
+  Alert,
   App,
   Avatar,
   Button,
   Card,
-  Divider,
   Empty,
+  Form,
   Input,
+  Modal,
+  Select,
   Space,
   Tag,
+  Timeline,
   Typography,
 } from "antd";
 import {
   ArrowLeft,
+  BadgeCheck,
   CalendarDays,
-  CornerDownRight,
+  CircleHelp,
+  Clock3,
   Eye,
+  Flag,
+  Lock,
   MessageCircle,
   Reply,
   Send,
   Share2,
   ShieldCheck,
+  Stethoscope,
   UserRound,
 } from "lucide-react";
 
-import { SiteFooter } from "@/fe/components/layout/SiteFooter";
 import {
+  SiteFooter,
+} from "@/fe/components/layout/SiteFooter";
+import {
+  CURRENT_FORUM_USER,
   forumPosts,
+  getForumCommentsByPostId,
   getForumPostById,
+  inspectCommentContent,
+  type ForumAuthor,
+  type ForumComment,
+  type ForumCommentReply,
+  type ForumPostStatus,
+  type ForumReportReason,
 } from "@/features/forum/forum.mock";
 
 const {
@@ -47,84 +66,260 @@ const {
 } = Typography;
 const { TextArea } = Input;
 
-type CommentReply = {
+type ReportTarget = {
+  type: "post" | "comment";
   id: string;
-  author: string;
-  role: string;
-  content: string;
-  createdAt: string;
+  label: string;
+} | null;
+
+type ReportFormValues = {
+  reason: ForumReportReason;
+  detail?: string;
 };
 
-type ForumComment = {
-  id: string;
-  author: string;
-  role: string;
-  content: string;
-  createdAt: string;
-  replies: CommentReply[];
-};
-
-const initialComments: ForumComment[] = [
+const REPORT_REASON_OPTIONS: Array<{
+  value: ForumReportReason;
+  label: string;
+}> = [
   {
-    id: "comment-1",
-    author: "Minh Thư",
-    role: "Mẹ bầu 12 tuần",
-    content:
-      "Cảm ơn bác sĩ. Em từng bị đau bụng nhẹ nhưng không ra máu. Trường hợp này có cần đi khám ngay không ạ?",
-    createdAt: "28/07/2026 · 14:20",
-    replies: [
-      {
-        id: "reply-1",
-        author: "BS. Nguyễn Minh Anh",
-        role: "Bác sĩ Sản phụ khoa",
-        content:
-          "Nếu cơn đau nhẹ, không tăng dần và không kèm ra máu, em có thể nghỉ ngơi và theo dõi. Khi đau kéo dài hoặc xuất hiện thêm triệu chứng bất thường, em nên liên hệ bác sĩ đang theo dõi thai kỳ.",
-        createdAt: "28/07/2026 · 15:02",
-      },
-    ],
+    value: "spam",
+    label: "Spam",
   },
   {
-    id: "comment-2",
-    author: "Hải Yến",
-    role: "Thành viên cộng đồng",
-    content:
-      "Bài viết rất rõ ràng. Mong diễn đàn có thêm bài về những xét nghiệm quan trọng trong ba tháng đầu.",
-    createdAt: "28/07/2026 · 16:10",
-    replies: [],
+    value: "wrong_topic",
+    label: "Sai chủ đề",
+  },
+  {
+    value:
+      "medical_misinformation",
+    label:
+      "Thông tin y tế sai lệch",
+  },
+  {
+    value: "drug_advertising",
+    label:
+      "Quảng cáo thuốc/dịch vụ",
+  },
+  {
+    value: "hate_or_harmful",
+    label:
+      "Nội dung gây hại/kích động",
+  },
+  {
+    value: "other",
+    label: "Lý do khác",
   },
 ];
+
+function getInitials(
+  name: string,
+) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(-2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "TV"
+  );
+}
+
+function getStatusTag(
+  status: ForumPostStatus,
+) {
+  if (status === "published") {
+    return (
+      <Tag color="green">
+        Đã xuất bản
+      </Tag>
+    );
+  }
+
+  if (status === "pending") {
+    return (
+      <Tag color="gold">
+        Chờ duyệt
+      </Tag>
+    );
+  }
+
+  if (status === "hidden") {
+    return (
+      <Tag color="orange">
+        Đã ẩn
+      </Tag>
+    );
+  }
+
+  if (status === "rejected") {
+    return (
+      <Tag color="red">
+        Bị từ chối
+      </Tag>
+    );
+  }
+
+  return <Tag>Đã xóa</Tag>;
+}
+
+function AuthorPanel({
+  author,
+  compact = false,
+}: {
+  author: ForumAuthor;
+  compact?: boolean;
+}) {
+  const isDoctor =
+    author.type === "doctor";
+
+  return (
+    <div className="text-center">
+      <Avatar
+        size={compact ? 44 : 58}
+        className={
+          isDoctor
+            ? "!bg-blue-600"
+            : "!bg-pink-500"
+        }
+      >
+        {isDoctor ? (
+          <Stethoscope className="h-5 w-5" />
+        ) : (
+          getInitials(author.name)
+        )}
+      </Avatar>
+
+      <Text
+        strong
+        className="mt-2 block text-sm"
+      >
+        {author.name}
+      </Text>
+
+      <Text
+        type="secondary"
+        className="mt-0.5 block text-xs"
+      >
+        {author.roleLabel}
+      </Text>
+
+      {author.verified ? (
+        <Tag
+          color="blue"
+          className="!mt-2 !mr-0"
+        >
+          <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
+          Xác thực
+        </Tag>
+      ) : null}
+    </div>
+  );
+}
 
 export default function ForumPostDetailPage() {
   const params = useParams<{
     postId: string;
   }>();
+
   const router = useRouter();
-  const { message } = App.useApp();
+
+  const {
+    message: messageApi,
+  } = App.useApp();
+
+  const [reportForm] =
+    Form.useForm<ReportFormValues>();
 
   const post = getForumPostById(
     params.postId,
   );
 
   const [comments, setComments] =
-    useState(initialComments);
-  const [commentContent, setCommentContent] =
-    useState("");
-  const [replyingTo, setReplyingTo] =
-    useState<string | null>(null);
-  const [replyContent, setReplyContent] =
-    useState("");
+    useState<ForumComment[]>(() =>
+      getForumCommentsByPostId(
+        params.postId,
+      ),
+    );
+
+  const [
+    commentContent,
+    setCommentContent,
+  ] = useState("");
+
+  const [
+    replyingTo,
+    setReplyingTo,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    replyContent,
+    setReplyContent,
+  ] = useState("");
+
+  const [
+    reportTarget,
+    setReportTarget,
+  ] = useState<ReportTarget>(null);
 
   const visibleComments = useMemo(
-    () => [...comments].reverse(),
+    () =>
+      comments
+        .filter(
+          (comment) =>
+            comment.status ===
+              "published" ||
+            (comment.status ===
+              "pending" &&
+              comment.author.id ===
+                CURRENT_FORUM_USER.id),
+        )
+        .slice(),
     [comments],
   );
 
   if (!post) {
     return (
       <>
-        <div className="min-h-screen bg-[#fff8fb] px-4 py-10">
+        <div className="min-h-screen bg-slate-50 px-4 py-10">
           <div className="mx-auto flex min-h-[520px] max-w-5xl items-center justify-center">
-            <Empty description="Không tìm thấy bài viết." />
+            <Empty description="Không tìm thấy chủ đề." />
+          </div>
+        </div>
+
+        <SiteFooter />
+      </>
+    );
+  }
+
+  const currentPost = post;
+
+  const isOwner =
+    currentPost.author.id ===
+    CURRENT_FORUM_USER.id;
+
+  const canView =
+    currentPost.status === "published" ||
+    isOwner;
+
+  if (!canView) {
+    return (
+      <>
+        <div className="min-h-screen bg-slate-50 px-4 py-10">
+          <div className="mx-auto flex min-h-[520px] max-w-5xl items-center justify-center">
+            <Empty description="Chủ đề hiện không được hiển thị công khai.">
+              <Button
+                type="primary"
+                className="!bg-pink-500"
+                onClick={() =>
+                  router.push("/forum")
+                }
+              >
+                Quay lại Forum
+              </Button>
+            </Empty>
           </div>
         </div>
 
@@ -134,31 +329,51 @@ export default function ForumPostDetailPage() {
   }
 
   function submitComment() {
+    if (currentPost.commentsLocked) {
+      messageApi.warning(
+        "Chủ đề đang khóa bình luận.",
+      );
+      return;
+    }
+
     const content =
       commentContent.trim();
 
     if (!content) {
-      message.warning(
+      messageApi.warning(
         "Vui lòng nhập nội dung bình luận.",
       );
       return;
     }
 
+    const moderation =
+      inspectCommentContent(content);
+
+    const nextComment: ForumComment = {
+      id: `comment-${Date.now()}`,
+      postId: currentPost.id,
+      author: CURRENT_FORUM_USER,
+      content,
+      createdAt: "Vừa xong",
+      status: moderation.status,
+      moderationReason:
+        moderation.reason,
+      reportCount: 0,
+      replies: [],
+    };
+
     setComments((current) => [
       ...current,
-      {
-        id: `comment-${Date.now()}`,
-        author: "Người dùng hiện tại",
-        role: "Thành viên cộng đồng",
-        content,
-        createdAt: "Vừa xong",
-        replies: [],
-      },
+      nextComment,
     ]);
 
     setCommentContent("");
-    message.success(
-      "Đã thêm bình luận.",
+
+    messageApi.success(
+      moderation.status ===
+        "published"
+        ? "Đã đăng bình luận."
+        : "Bình luận đang chờ kiểm duyệt.",
     );
   }
 
@@ -169,11 +384,28 @@ export default function ForumPostDetailPage() {
       replyContent.trim();
 
     if (!content) {
-      message.warning(
+      messageApi.warning(
         "Vui lòng nhập nội dung trả lời.",
       );
       return;
     }
+
+    const moderation =
+      inspectCommentContent(content);
+
+    const nextReply: ForumCommentReply = {
+      id: `reply-${Date.now()}`,
+      postId: currentPost.id,
+      parentCommentId:
+        commentId,
+      author: CURRENT_FORUM_USER,
+      content,
+      createdAt: "Vừa xong",
+      status: moderation.status,
+      moderationReason:
+        moderation.reason,
+      reportCount: 0,
+    };
 
     setComments((current) =>
       current.map((comment) =>
@@ -182,15 +414,7 @@ export default function ForumPostDetailPage() {
               ...comment,
               replies: [
                 ...comment.replies,
-                {
-                  id: `reply-${Date.now()}`,
-                  author:
-                    "Người dùng hiện tại",
-                  role:
-                    "Thành viên cộng đồng",
-                  content,
-                  createdAt: "Vừa xong",
-                },
+                nextReply,
               ],
             }
           : comment,
@@ -199,18 +423,44 @@ export default function ForumPostDetailPage() {
 
     setReplyContent("");
     setReplyingTo(null);
-    message.success(
-      "Đã trả lời bình luận.",
+
+    messageApi.success(
+      moderation.status ===
+        "published"
+        ? "Đã gửi trả lời."
+        : "Trả lời đang chờ kiểm duyệt.",
     );
   }
 
-  async function handleSharePost(
-    title: string,
-    excerpt: string,
+  function openReport(
+    target: Exclude<
+      ReportTarget,
+      null
+    >,
   ) {
+    reportForm.resetFields();
+    setReportTarget(target);
+  }
+
+  function submitReport(
+    values: ReportFormValues,
+  ) {
+    if (!reportTarget) return;
+
+    setReportTarget(null);
+    reportForm.resetFields();
+
+    messageApi.success(
+      `Đã gửi báo cáo ${reportTarget.label}. Moderator sẽ kiểm tra nội dung.`,
+    );
+
+    void values;
+  }
+
+  async function handleSharePost() {
     const shareData = {
-      title,
-      text: excerpt,
+      title: currentPost.title,
+      text: currentPost.excerpt,
       url: window.location.href,
     };
 
@@ -229,8 +479,8 @@ export default function ForumPostDetailPage() {
         window.location.href,
       );
 
-      message.success(
-        "Đã sao chép liên kết bài viết.",
+      messageApi.success(
+        "Đã sao chép liên kết chủ đề.",
       );
     } catch (error) {
       if (
@@ -240,8 +490,8 @@ export default function ForumPostDetailPage() {
         return;
       }
 
-      message.error(
-        "Không thể chia sẻ bài viết.",
+      messageApi.error(
+        "Không thể chia sẻ chủ đề.",
       );
     }
   }
@@ -250,322 +500,406 @@ export default function ForumPostDetailPage() {
     forumPosts
       .filter(
         (item) =>
-          item.id !== post.id,
+          item.id !== currentPost.id &&
+          item.status ===
+            "published",
       )
-      .slice(0, 3);
+      .slice(0, 4);
 
   return (
     <>
-      <div className="min-h-screen bg-[#fff8fb]">
-        <main className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
-          <Button
-            type="text"
-            icon={
-              <ArrowLeft className="h-4 w-4" />
-            }
-            onClick={() => router.back()}
-            className="!mb-4 !px-0 !font-semibold !text-slate-600"
-          >
-            Quay lại Forum
-          </Button>
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
-            <div
-              className="min-w-0 flex flex-col"
-              style={{
-                gap: 40,
-              }}
+      <div className="min-h-screen bg-slate-50">
+        <main className="mx-auto max-w-[1380px] px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <Button
+              type="text"
+              icon={
+                <ArrowLeft className="h-4 w-4" />
+              }
+              onClick={() =>
+                router.back()
+              }
+              className="!px-0 !font-semibold !text-slate-600"
             >
+              Quay lại danh sách chủ đề
+            </Button>
+
+            <Space wrap>
+              <Button
+                icon={
+                  <Flag className="h-4 w-4" />
+                }
+                onClick={() =>
+                  openReport({
+                    type: "post",
+                    id: currentPost.id,
+                    label: "chủ đề",
+                  })
+                }
+              >
+                Báo cáo
+              </Button>
+
+              <Button
+                icon={
+                  <Share2 className="h-4 w-4" />
+                }
+                onClick={() =>
+                  void handleSharePost()
+                }
+              >
+                Chia sẻ
+              </Button>
+            </Space>
+          </div>
+
+          {currentPost.status !==
+          "published" ? (
+            <Alert
+              type={
+                currentPost.status ===
+                "rejected"
+                  ? "error"
+                  : "warning"
+              }
+              showIcon
+              className="mb-4 !rounded-xl"
+              title={
+                <Space wrap>
+                  <span>
+                    Trạng thái chủ đề:
+                  </span>
+                  {getStatusTag(
+                    currentPost.status,
+                  )}
+                </Space>
+              }
+              description={
+                currentPost.moderationReason ??
+                "Chủ đề chỉ đang hiển thị cho bạn."
+              }
+            />
+          ) : null}
+
+          <Alert
+            type="warning"
+            showIcon
+            className="mb-4 !rounded-xl !border-amber-200"
+            title="Thông tin tham khảo, không thay thế tư vấn bác sĩ."
+            description="Không tự ý sử dụng thuốc hoặc thay đổi phác đồ điều trị dựa trên nội dung trong Forum."
+          />
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_290px]">
+            <section className="min-w-0 space-y-4">
               <Card
-                className="overflow-hidden !rounded-[30px] !border-pink-100 !shadow-[0_22px_70px_rgba(15,23,42,0.06)]"
+                className="!rounded-2xl !border-slate-200"
                 styles={{
                   body: {
                     padding: 0,
                   },
                 }}
               >
-                <div className="relative overflow-hidden bg-gradient-to-br from-pink-500 via-rose-400 to-orange-300 px-6 py-10 text-white md:px-10 md:py-12">
-                  <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/20 blur-3xl" />
-                  <div className="absolute -bottom-24 left-1/4 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-5 py-3">
+                  <Tag color="pink">
+                    {currentPost.categoryLabel}
+                  </Tag>
 
-                  <div className="relative">
-                    <div className="mb-5 flex flex-wrap items-center gap-2">
-                      <Tag className="!border-white/30 !bg-white/20 !text-white">
-                        {post.categoryLabel}
-                      </Tag>
+                  {currentPost.postType ===
+                  "question" ? (
+                    <Tag color="blue">
+                      <CircleHelp className="mr-1 inline h-3.5 w-3.5" />
+                      Câu hỏi
+                    </Tag>
+                  ) : null}
 
-                      {post.verified ? (
-                        <Tag className="!border-white/30 !bg-white/20 !text-white">
-                          <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
-                          Nội dung xác thực
-                        </Tag>
-                      ) : null}
-                    </div>
+                  {currentPost.pinned ? (
+                    <Tag color="gold">
+                      Ghim
+                    </Tag>
+                  ) : null}
 
-                    <Title
-                      level={1}
-                      className="!mb-4 !max-w-4xl !text-4xl !font-bold !leading-tight !text-white"
-                    >
-                      {post.title}
-                    </Title>
+                  {currentPost.commentsLocked ? (
+                    <Tag>
+                      <Lock className="mr-1 inline h-3.5 w-3.5" />
+                      Khóa bình luận
+                    </Tag>
+                  ) : null}
 
-                    <Paragraph className="!mb-0 !max-w-3xl !text-base !leading-7 !text-pink-50">
-                      {post.excerpt}
-                    </Paragraph>
-                  </div>
-                </div>
-
-                <div className="p-6 md:p-10">
-                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar
-                        size={46}
-                        icon={<UserRound />}
-                        className="!bg-pink-100 !text-pink-600"
-                      />
-
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Text strong>
-                            {post.author}
-                          </Text>
-
-                          {post.verified ? (
-                            <ShieldCheck className="h-4 w-4 text-blue-500" />
-                          ) : null}
-                        </div>
-
-                        <Text
-                          type="secondary"
-                          className="text-xs"
-                        >
-                          {post.authorRole}
-                        </Text>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                      <span className="inline-flex items-center gap-1">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        {post.publishedAt}
-                      </span>
-
-                      <span className="inline-flex items-center gap-1">
-                        <Eye className="h-3.5 w-3.5" />
-                        {post.views}
-                      </span>
-
-                      <span className="inline-flex items-center gap-1">
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        {comments.length}
-                      </span>
-                    </div>
-                  </div>
-
-                  <article className="mx-auto mt-8 max-w-3xl text-[16px] leading-8 text-slate-700">
-                    {post.content.map(
-                      (block, index) => {
-                        if (
-                          block.type ===
-                          "heading"
-                        ) {
-                          return (
-                            <Title
-                              key={index}
-                              level={2}
-                              className="!mb-3 !mt-9 !text-slate-950"
-                            >
-                              {block.text}
-                            </Title>
-                          );
-                        }
-
-                        if (
-                          block.type ===
-                          "quote"
-                        ) {
-                          return (
-                            <blockquote
-                              key={index}
-                              className="my-7 rounded-r-2xl border-l-4 border-pink-400 bg-pink-50 px-5 py-4 font-medium text-slate-700"
-                            >
-                              {block.text}
-                            </blockquote>
-                          );
-                        }
-
-                        if (
-                          block.type ===
-                          "list"
-                        ) {
-                          return (
-                            <ul
-                              key={index}
-                              className="my-5 list-disc space-y-2 pl-6 marker:text-pink-500"
-                            >
-                              {block.items.map(
-                                (item) => (
-                                  <li key={item}>
-                                    {item}
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          );
-                        }
-
-                        return (
-                          <p
-                            key={index}
-                            className="mb-5"
-                          >
-                            {block.text}
-                          </p>
-                        );
-                      },
-                    )}
-                  </article>
-
-                  <Divider />
-
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <Space wrap>
-                      {post.tags.map(
-                        (tag) => (
-                          <Tag
-                            key={tag}
-                            className="!rounded-full !px-3 !py-1"
-                          >
-                            #{tag}
-                          </Tag>
-                        ),
-                      )}
-                    </Space>
-
-                    <Button
-                      icon={
-                        <Share2 className="h-4 w-4" />
-                      }
-                      className="!h-10 !rounded-xl !border-pink-200 !px-4 !font-medium !text-pink-600 hover:!border-pink-400 hover:!text-pink-700"
-                      onClick={() =>
-                        void handleSharePost(
-                          post.title,
-                          post.excerpt,
-                        )
-                      }
-                    >
-                      Chia sẻ bài viết
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="!rounded-[28px] !border-slate-200">
-                <div className="mb-5">
-                  <Title
-                    level={2}
-                    className="!mb-1 !text-slate-950"
+                  <Text
+                    type="secondary"
+                    className="ml-auto text-xs"
                   >
-                    Bình luận
-                  </Title>
-
-                  <Text type="secondary">
-                    {comments.length} bình luận
+                    Chủ đề: {currentPost.topic}
                   </Text>
                 </div>
 
-                <div className="rounded-2xl border border-pink-100 bg-pink-50/50 p-4">
-                  <div className="flex gap-3">
-                    <Avatar
-                      icon={<UserRound />}
-                      className="!bg-pink-100 !text-pink-600"
+                <div className="grid md:grid-cols-[180px_minmax(0,1fr)]">
+                  <aside className="border-b border-slate-200 bg-slate-50/70 p-5 md:border-b-0 md:border-r">
+                    <AuthorPanel
+                      author={currentPost.author}
                     />
 
-                    <div className="min-w-0 flex-1">
-                      <TextArea
-                        value={commentContent}
-                        rows={4}
-                        maxLength={1000}
-                        showCount={false}
-                        placeholder="Chia sẻ suy nghĩ hoặc đặt câu hỏi..."
-                        onChange={(event) =>
-                          setCommentContent(
-                            event.target.value,
-                          )
-                        }
-                      />
+                    <div className="mt-4 space-y-2 text-center text-xs text-slate-500">
+                      <p className="mb-0">
+                        Thành viên Forum
+                      </p>
 
-                      <div className="mt-4 flex items-center justify-between gap-3">
-                        <Text
-                          type="secondary"
-                          className="text-xs"
-                        >
-                          {commentContent.length}/1000
-                        </Text>
+                      <p className="mb-0">
+                        Tham gia 2026
+                      </p>
+                    </div>
+                  </aside>
 
-                        <Button
-                          type="primary"
-                          icon={
-                            <Send className="h-4 w-4" />
-                          }
-                          className="!h-10 !rounded-xl !bg-pink-500 !px-5 !font-medium"
-                          onClick={
-                            submitComment
-                          }
-                        >
-                          Gửi bình luận
-                        </Button>
+                  <article className="min-w-0 p-5 md:p-7">
+                    <div className="mb-5 border-b border-slate-100 pb-4">
+                      <Title
+                        level={2}
+                        className="!mb-2 !text-slate-950"
+                      >
+                        {currentPost.title}
+                      </Title>
+
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          {currentPost.publishedAt ??
+                            "Chưa xuất bản"}
+                        </span>
+
+                        <span className="inline-flex items-center gap-1">
+                          <Eye className="h-3.5 w-3.5" />
+                          {currentPost.views} lượt xem
+                        </span>
+
+                        <span className="inline-flex items-center gap-1">
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          {
+                            visibleComments.length
+                          }{" "}
+                          phản hồi
+                        </span>
                       </div>
                     </div>
-                  </div>
+
+                    <div className="text-[15px] leading-7 text-slate-700">
+                      {currentPost.content.map(
+                        (block, index) => {
+                          if (
+                            block.type ===
+                            "heading"
+                          ) {
+                            return (
+                              <Title
+                                key={`${block.type}-${index}`}
+                                level={3}
+                                className="!mb-3 !mt-7 !text-slate-950"
+                              >
+                                {block.text}
+                              </Title>
+                            );
+                          }
+
+                          if (
+                            block.type ===
+                            "quote"
+                          ) {
+                            return (
+                              <blockquote
+                                key={`${block.type}-${index}`}
+                                className="my-5 border-l-4 border-pink-400 bg-pink-50 px-4 py-3 font-medium text-slate-700"
+                              >
+                                {block.text}
+                              </blockquote>
+                            );
+                          }
+
+                          if (
+                            block.type ===
+                            "list"
+                          ) {
+                            return (
+                              <ul
+                                key={`${block.type}-${index}`}
+                                className="my-4 list-disc space-y-2 pl-6 marker:text-pink-500"
+                              >
+                                {block.items.map(
+                                  (item) => (
+                                    <li
+                                      key={item}
+                                    >
+                                      {item}
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            );
+                          }
+
+                          return (
+                            <p
+                              key={`${block.type}-${index}`}
+                              className="mb-4"
+                            >
+                              {block.text}
+                            </p>
+                          );
+                        },
+                      )}
+                    </div>
+
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                      <Space wrap>
+                        {currentPost.tags.map(
+                          (tag) => (
+                            <Tag key={tag}>
+                              #{tag}
+                            </Tag>
+                          ),
+                        )}
+                      </Space>
+
+                      <Text
+                        type="secondary"
+                        className="text-xs"
+                      >
+                        Bài đăng gốc
+                      </Text>
+                    </div>
+                  </article>
+                </div>
+              </Card>
+
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <div>
+                  <Text strong>
+                    Phản hồi trong chủ đề
+                  </Text>
+
+                  <Text
+                    type="secondary"
+                    className="ml-2 text-xs"
+                  >
+                    {
+                      visibleComments.length
+                    }{" "}
+                    bình luận
+                  </Text>
                 </div>
 
-                <div className="mt-6 divide-y divide-slate-200">
-                  {visibleComments.map(
-                    (comment) => (
-                      <div
-                        key={comment.id}
-                        className="py-6 first:pt-0"
-                      >
-                        <div className="flex gap-3">
-                          <Avatar
-                            icon={
-                              <UserRound />
+                <Button
+                  icon={
+                    <Reply className="h-4 w-4" />
+                  }
+                  disabled={
+                    currentPost.commentsLocked
+                  }
+                  onClick={() => {
+                    document
+                      .getElementById(
+                        "reply-composer",
+                      )
+                      ?.scrollIntoView({
+                        behavior:
+                          "smooth",
+                      });
+                  }}
+                >
+                  Trả lời chủ đề
+                </Button>
+              </div>
+
+              {visibleComments.map(
+                (comment, index) => (
+                  <div
+                    key={comment.id}
+                    className="space-y-3"
+                  >
+                    <Card
+                      className="!rounded-2xl !border-slate-200"
+                      styles={{
+                        body: {
+                          padding: 0,
+                        },
+                      }}
+                    >
+                      <div className="grid md:grid-cols-[180px_minmax(0,1fr)]">
+                        <aside className="border-b border-slate-200 bg-slate-50/70 p-4 md:border-b-0 md:border-r">
+                          <AuthorPanel
+                            author={
+                              comment.author
                             }
-                            className="!bg-slate-100 !text-slate-500"
+                            compact
                           />
+                        </aside>
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Text strong>
-                                {
-                                  comment.author
-                                }
-                              </Text>
-
+                        <div className="min-w-0 p-5">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2">
                               <Text
                                 type="secondary"
                                 className="text-xs"
                               >
-                                {comment.role}
+                                #{index + 1}
                               </Text>
 
-                              <Text
-                                type="secondary"
-                                className="text-xs"
-                              >
-                                ·{" "}
-                                {
-                                  comment.createdAt
-                                }
-                              </Text>
+                              {comment.status ===
+                              "pending" ? (
+                                <Tag color="gold">
+                                  Chờ duyệt
+                                </Tag>
+                              ) : null}
                             </div>
 
-                            <Paragraph className="!mb-2 !mt-2 !leading-6 !text-slate-700">
+                            <Text
+                              type="secondary"
+                              className="text-xs"
+                            >
                               {
-                                comment.content
+                                comment.createdAt
                               }
-                            </Paragraph>
+                            </Text>
+                          </div>
+
+                          <Paragraph className="!mb-4 !whitespace-pre-wrap !leading-7 !text-slate-700">
+                            {
+                              comment.content
+                            }
+                          </Paragraph>
+
+                          {comment.status ===
+                            "pending" &&
+                          comment
+                            .moderationReason ? (
+                            <Alert
+                              type="warning"
+                              showIcon
+                              className="mb-4 !rounded-xl"
+                              title="Bình luận đang chờ kiểm duyệt"
+                              description={
+                                comment.moderationReason
+                              }
+                            />
+                          ) : null}
+
+                          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={
+                                <Flag className="h-3.5 w-3.5" />
+                              }
+                              onClick={() =>
+                                openReport({
+                                  type:
+                                    "comment",
+                                  id: comment.id,
+                                  label:
+                                    "bình luận",
+                                })
+                              }
+                            >
+                              Báo cáo
+                            </Button>
 
                             <Button
                               type="text"
@@ -573,7 +907,6 @@ export default function ForumPostDetailPage() {
                               icon={
                                 <Reply className="h-3.5 w-3.5" />
                               }
-                              className="!px-0 !text-pink-600"
                               onClick={() => {
                                 setReplyingTo(
                                   comment.id,
@@ -585,148 +918,279 @@ export default function ForumPostDetailPage() {
                             >
                               Trả lời
                             </Button>
+                          </div>
 
-                            {comment.replies
-                              .length > 0 ? (
-                              <div className="mt-4 space-y-4 border-l-2 border-pink-100 pl-4">
-                                {comment.replies.map(
-                                  (reply) => (
-                                    <div
-                                      key={
-                                        reply.id
-                                      }
-                                      className="flex gap-3 rounded-2xl bg-slate-50 p-4"
-                                    >
-                                      <CornerDownRight className="mt-2 h-4 w-4 shrink-0 text-pink-400" />
+                          {replyingTo ===
+                          comment.id ? (
+                            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                              <TextArea
+                                value={
+                                  replyContent
+                                }
+                                rows={3}
+                                maxLength={500}
+                                placeholder={`Trả lời ${comment.author.name}...`}
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setReplyContent(
+                                    event.target
+                                      .value,
+                                  )
+                                }
+                              />
 
-                                      <Avatar
-                                        size={32}
-                                        icon={
-                                          <UserRound />
-                                        }
-                                        className="!bg-blue-50 !text-blue-500"
-                                      />
-
-                                      <div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <Text strong>
-                                            {
-                                              reply.author
-                                            }
-                                          </Text>
-
-                                          <Text
-                                            type="secondary"
-                                            className="text-xs"
-                                          >
-                                            {
-                                              reply.role
-                                            }
-                                          </Text>
-
-                                          <Text
-                                            type="secondary"
-                                            className="text-xs"
-                                          >
-                                            ·{" "}
-                                            {
-                                              reply.createdAt
-                                            }
-                                          </Text>
-                                        </div>
-
-                                        <Paragraph className="!mb-0 !mt-2 !leading-6 !text-slate-700">
-                                          {
-                                            reply.content
-                                          }
-                                        </Paragraph>
-                                      </div>
-                                    </div>
-                                  ),
-                                )}
-                              </div>
-                            ) : null}
-
-                            {replyingTo ===
-                            comment.id ? (
-                              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
-                                <TextArea
-                                  value={
-                                    replyContent
-                                  }
-                                  rows={2}
-                                  maxLength={500}
-                                  placeholder={`Trả lời ${comment.author}...`}
-                                  onChange={(
-                                    event,
-                                  ) =>
+                              <div className="mt-2 flex justify-end gap-2">
+                                <Button
+                                  size="small"
+                                  onClick={() => {
+                                    setReplyingTo(
+                                      null,
+                                    );
                                     setReplyContent(
-                                      event.target
-                                        .value,
+                                      "",
+                                    );
+                                  }}
+                                >
+                                  Hủy
+                                </Button>
+
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  className="!bg-pink-500"
+                                  onClick={() =>
+                                    submitReply(
+                                      comment.id,
                                     )
                                   }
-                                />
-
-                                <div className="mt-2 flex justify-end gap-2">
-                                  <Button
-                                    size="small"
-                                    onClick={() => {
-                                      setReplyingTo(
-                                        null,
-                                      );
-                                      setReplyContent(
-                                        "",
-                                      );
-                                    }}
-                                  >
-                                    Hủy
-                                  </Button>
-
-                                  <Button
-                                    type="primary"
-                                    size="small"
-                                    className="!bg-pink-500"
-                                    onClick={() =>
-                                      submitReply(
-                                        comment.id,
-                                      )
-                                    }
-                                  >
-                                    Gửi trả lời
-                                  </Button>
-                                </div>
+                                >
+                                  Gửi trả lời
+                                </Button>
                               </div>
-                            ) : null}
-                          </div>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
-                    ),
-                  )}
+                    </Card>
+
+                    {comment.replies.map(
+                      (reply) => {
+                        const isDoctorReply =
+                          reply.author
+                            .type ===
+                          "doctor";
+
+                        return (
+                          <Card
+                            key={reply.id}
+                            className={[
+                              "!ml-6 !rounded-2xl",
+                              isDoctorReply
+                                ? "!border-blue-200 !bg-blue-50/30"
+                                : "!border-slate-200",
+                            ].join(" ")}
+                            styles={{
+                              body: {
+                                padding: 0,
+                              },
+                            }}
+                          >
+                            <div className="grid md:grid-cols-[180px_minmax(0,1fr)]">
+                              <aside
+                                className={[
+                                  "border-b p-4 md:border-b-0 md:border-r",
+                                  isDoctorReply
+                                    ? "border-blue-200 bg-blue-50"
+                                    : "border-slate-200 bg-slate-50/70",
+                                ].join(" ")}
+                              >
+                                <AuthorPanel
+                                  author={
+                                    reply.author
+                                  }
+                                  compact
+                                />
+                              </aside>
+
+                              <div className="min-w-0 p-5">
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                                  <Space wrap>
+                                    <Text
+                                      type="secondary"
+                                      className="text-xs"
+                                    >
+                                      Trả lời
+                                    </Text>
+
+                                    {reply.officialDoctorAnswer ? (
+                                      <Tag color="blue">
+                                        <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />
+                                        Phản hồi bác sĩ
+                                      </Tag>
+                                    ) : null}
+                                  </Space>
+
+                                  <Text
+                                    type="secondary"
+                                    className="text-xs"
+                                  >
+                                    {
+                                      reply.createdAt
+                                    }
+                                  </Text>
+                                </div>
+
+                                <Paragraph className="!mb-0 !whitespace-pre-wrap !leading-7 !text-slate-700">
+                                  {
+                                    reply.content
+                                  }
+                                </Paragraph>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      },
+                    )}
+                  </div>
+                ),
+              )}
+
+              <Card
+                id="reply-composer"
+                className="!rounded-2xl !border-slate-200"
+                title={
+                  <span className="font-semibold text-slate-900">
+                    Trả lời chủ đề
+                  </span>
+                }
+              >
+                {currentPost.commentsLocked ? (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    title="Chủ đề đang khóa bình luận."
+                    description="Bạn vẫn có thể đọc các phản hồi đã được đăng trước đó."
+                  />
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-[150px_minmax(0,1fr)]">
+                    <AuthorPanel
+                      author={
+                        CURRENT_FORUM_USER
+                      }
+                      compact
+                    />
+
+                    <div>
+                      <TextArea
+                        value={
+                          commentContent
+                        }
+                        rows={6}
+                        maxLength={1000}
+                        placeholder="Nhập nội dung phản hồi hoặc câu hỏi của bạn..."
+                        onChange={(
+                          event,
+                        ) =>
+                          setCommentContent(
+                            event.target
+                              .value,
+                          )
+                        }
+                      />
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <Text
+                          type="secondary"
+                          className="text-xs"
+                        >
+                          Bình luận có thể được tự động đăng hoặc chuyển chờ duyệt khi phát hiện spam/từ khóa nhạy cảm.
+                        </Text>
+
+                        <Button
+                          type="primary"
+                          icon={
+                            <Send className="h-4 w-4" />
+                          }
+                          className="!bg-pink-500"
+                          onClick={
+                            submitComment
+                          }
+                        >
+                          Gửi phản hồi
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </section>
+
+            <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
+              <Card
+                size="small"
+                className="!rounded-2xl !border-slate-200"
+                title="Thông tin chủ đề"
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl bg-slate-50 p-3 text-center">
+                    <Eye className="mx-auto h-4 w-4 text-slate-400" />
+
+                    <p className="mb-0 mt-1 font-semibold text-slate-900">
+                      {currentPost.views}
+                    </p>
+
+                    <p className="mb-0 text-xs text-slate-500">
+                      Lượt xem
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-3 text-center">
+                    <MessageCircle className="mx-auto h-4 w-4 text-slate-400" />
+
+                    <p className="mb-0 mt-1 font-semibold text-slate-900">
+                      {
+                        visibleComments.length
+                      }
+                    </p>
+
+                    <p className="mb-0 text-xs text-slate-500">
+                      Phản hồi
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2 text-sm text-slate-600">
+                  <p className="mb-0 flex items-center justify-between gap-3">
+                    <span>Trạng thái</span>
+                    {getStatusTag(
+                      currentPost.status,
+                    )}
+                  </p>
+
+                  <p className="mb-0 flex items-center justify-between gap-3">
+                    <span>Bình luận</span>
+                    <span>
+                      {currentPost.commentsLocked
+                        ? "Đã khóa"
+                        : "Đang mở"}
+                    </span>
+                  </p>
                 </div>
               </Card>
-            </div>
 
-            <aside
-              className="flex flex-col xl:sticky xl:top-6 xl:self-start"
-              style={{
-                gap: 28,
-              }}
-            >
-              <Card className="!rounded-[24px] !border-slate-200">
-                <Title
-                  level={4}
-                  className="!mb-4 !text-slate-950"
-                >
-                  Bài viết liên quan
-                </Title>
-
-                <div className="space-y-3">
+              <Card
+                size="small"
+                className="!rounded-2xl !border-slate-200"
+                title="Chủ đề liên quan"
+              >
+                <div className="divide-y divide-slate-100">
                   {relatedPosts.map(
                     (item) => (
                       <Link
                         key={item.id}
                         href={`/forum/${item.id}`}
-                        className="group block rounded-2xl border border-slate-100 p-4 transition hover:border-pink-200 hover:bg-pink-50"
+                        className="block py-3 first:pt-0 last:pb-0"
                       >
                         <Tag
                           color="pink"
@@ -737,16 +1201,15 @@ export default function ForumPostDetailPage() {
                           }
                         </Tag>
 
-                        <p className="mb-2 line-clamp-2 text-sm font-semibold leading-5 text-slate-800 transition group-hover:text-pink-600">
+                        <p className="mb-1 line-clamp-2 text-sm font-semibold leading-5 text-slate-800 hover:text-pink-600">
                           {item.title}
                         </p>
 
-                        <p className="mb-0 flex items-center gap-1 text-xs text-slate-400">
-                          <MessageCircle className="h-3.5 w-3.5" />
+                        <p className="mb-0 text-xs text-slate-400">
                           {
-                            item.comments
+                            item.commentCount
                           }{" "}
-                          bình luận
+                          phản hồi
                         </p>
                       </Link>
                     ),
@@ -754,22 +1217,114 @@ export default function ForumPostDetailPage() {
                 </div>
               </Card>
 
-              <Card className="!rounded-[24px] !border-pink-100 !bg-gradient-to-br !from-pink-50 !to-white">
-                <Title
-                  level={5}
-                  className="!mb-2 !text-slate-950"
+              {isOwner ? (
+                <Card
+                  size="small"
+                  className="!rounded-2xl !border-slate-200"
+                  title="Lịch sử kiểm duyệt"
                 >
-                  Lưu ý sức khỏe
-                </Title>
+                  <Timeline
+                    items={currentPost.moderationLogs.map(
+                      (log) => ({
+                        children: (
+                          <div>
+                            <Text
+                              strong
+                              className="block text-sm"
+                            >
+                              {
+                                log.actorName
+                              }
+                            </Text>
 
-                <Paragraph className="!mb-0 !text-sm !leading-6 !text-slate-600">
-                  Nội dung trong Forum chỉ mang tính tham khảo và không thay thế chẩn đoán hoặc tư vấn trực tiếp từ bác sĩ.
-                </Paragraph>
-              </Card>
+                            <Text
+                              type="secondary"
+                              className="block text-xs"
+                            >
+                              {log.actorRole} ·{" "}
+                              {
+                                log.createdAt
+                              }
+                            </Text>
+
+                            {log.reason ? (
+                              <Paragraph className="!mb-0 !mt-1 !text-xs !leading-5 !text-slate-600">
+                                {log.reason}
+                              </Paragraph>
+                            ) : null}
+                          </div>
+                        ),
+                      }),
+                    )}
+                  />
+                </Card>
+              ) : null}
             </aside>
           </div>
         </main>
       </div>
+
+      <Modal
+        open={Boolean(reportTarget)}
+        centered
+        width={520}
+        forceRender
+        destroyOnHidden={false}
+        title={
+          reportTarget
+            ? `Báo cáo ${reportTarget.label}`
+            : "Báo cáo nội dung"
+        }
+        okText="Gửi báo cáo"
+        cancelText="Hủy"
+        onCancel={() => {
+          setReportTarget(null);
+          reportForm.resetFields();
+        }}
+        onOk={() =>
+          reportForm.submit()
+        }
+        mask={{
+          closable: true,
+        }}
+      >
+        <Form<ReportFormValues>
+          form={reportForm}
+          layout="vertical"
+          onFinish={submitReport}
+        >
+          <Form.Item
+            name="reason"
+            label="Lý do báo cáo"
+            rules={[
+              {
+                required: true,
+                message:
+                  "Vui lòng chọn lý do.",
+              },
+            ]}
+          >
+            <Select
+              options={
+                REPORT_REASON_OPTIONS
+              }
+              placeholder="Chọn lý do"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="detail"
+            label="Mô tả thêm"
+          >
+            <TextArea
+              rows={4}
+              maxLength={500}
+              showCount
+              placeholder="Mô tả nội dung cần moderator kiểm tra..."
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <SiteFooter />
     </>
