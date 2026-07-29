@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FloatingChatbot } from "@/fe/components/chatbot/FloatingChatbot";
 import { getPublicSettings } from "@/features/settings/settings.server";
 import { getSettingString } from "@/features/settings/settings.types";
 import { LocalStorageProvider } from "@/providers/LocalStorageProvider";
@@ -23,7 +24,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" suppressHydrationWarning >
       <body>
-        <LocalStorageProvider>{children}</LocalStorageProvider>
+        <LocalStorageProvider>
+          {children}
+          <FloatingChatbot />
+        </LocalStorageProvider>
       </body>
     </html>
   );

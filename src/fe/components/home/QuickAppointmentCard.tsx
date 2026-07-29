@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Alert, Button, Card, DatePicker, Empty, Select, Space, Tag, Typography } from "antd";
-import { CalendarDays, Clock, Hospital, Search, Stethoscope } from "lucide-react";
+import { Alert, Button, Card, DatePicker, Empty, Select, Space, Tag, Typography, message } from "antd";
+import { CalendarDays, CheckCircle2, Clock, Hospital, Search, Stethoscope } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
 
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
+import { createAppointment } from "@/features/appointments/appointments.api";
+import { useAuthStore } from "@/features/auth/auth.store";
 import { getPublicFacilities } from "@/management/features/facilities/facilities.api";
 import type { Facility } from "@/management/features/facilities/facilities.types";
 import { getPublicFacilityServices } from "@/management/features/services/services.api";
@@ -43,7 +45,24 @@ function normalizeSlot(slot: AvailabilityShift["availableSlots"][number]) {
   return `${slot.startTime} - ${slot.endTime}`;
 }
 
+function getSlotTimes(slot: AvailabilityShift["availableSlots"][number]) {
+  if (typeof slot !== "string") {
+    return {
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+    };
+  }
+
+  const [startTime = "", endTime = ""] = slot.split(" - ");
+
+  return {
+    startTime,
+    endTime,
+  };
+}
+
 export function QuickAppointmentCard() {
+  const accessToken = useAuthStore((state) => state.accessToken);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [facilityServices, setFacilityServices] = useState<FacilityService[]>([]);
   const [doctorShifts, setDoctorShifts] = useState<DoctorShiftItem[]>([]);
@@ -58,6 +77,7 @@ export function QuickAppointmentCard() {
   const [loadingServices, setLoadingServices] = useState(false);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [bookingSlotKey, setBookingSlotKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,7 +100,7 @@ export function QuickAppointmentCard() {
     if (!facilityId) return;
 
     setLoadingServices(true);
-    getPublicFacilityServices(facilityId, { status: "available", limit: 100 })
+    getPublicFacilityServices(facilityId, { status: "active", limit: 100 })
       .then(setFacilityServices)
       .catch((loadError) =>
         setError(getErrorMessage(loadError, "Không tải được dịch vụ của cơ sở.")),
@@ -160,8 +180,41 @@ export function QuickAppointmentCard() {
       shift.availableSlots.map((slot) => ({
         shiftId: shift.shiftId,
         label: normalizeSlot(slot),
+        ...getSlotTimes(slot),
       })),
     ) ?? [];
+
+  const handleBookSlot = async (slot: (typeof availableSlots)[number]) => {
+    if (!accessToken) {
+      setError("Bạn cần đăng nhập để đặt lịch.");
+      return;
+    }
+
+    if (!facilityId || !serviceId || !doctorId || !date) return;
+
+    const slotKey = `${slot.shiftId}-${slot.label}`;
+    setBookingSlotKey(slotKey);
+    setError(null);
+
+    try {
+      await createAppointment({
+        facilityId,
+        serviceId,
+        doctorId,
+        shiftId: slot.shiftId,
+        date: date.format("YYYY-MM-DD"),
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+      });
+
+      message.success("Đặt lịch thành công.");
+      await handleCheckAvailability();
+    } catch (bookError) {
+      setError(getErrorMessage(bookError, "Không đặt được lịch. Bạn thử lại nhé."));
+    } finally {
+      setBookingSlotKey(null);
+    }
+  };
 
   return (
     <Card
@@ -287,11 +340,19 @@ export function QuickAppointmentCard() {
             </div>
 
             {availableSlots.length ? (
-              <Space wrap>
+              <Space wrap className="w-full">
                 {availableSlots.map((slot) => (
-                  <Tag key={`${slot.shiftId}-${slot.label}`} color="pink">
-                    {slot.label}
-                  </Tag>
+                  <Button
+                    key={`${slot.shiftId}-${slot.label}`}
+                    size="middle"
+                    icon={<CheckCircle2 className="h-4 w-4" />}
+                    loading={bookingSlotKey === `${slot.shiftId}-${slot.label}`}
+                    disabled={Boolean(bookingSlotKey)}
+                    className="!rounded-xl !border-pink-200 !bg-pink-50 !font-medium !text-pink-700 hover:!border-pink-400 hover:!bg-pink-100"
+                    onClick={() => handleBookSlot(slot)}
+                  >
+                    Đặt {slot.label}
+                  </Button>
                 ))}
               </Space>
             ) : (

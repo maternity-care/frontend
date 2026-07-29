@@ -128,7 +128,13 @@ function normalizeDoctorShift(
 
 type DoctorShiftListData =
   | BackendDoctorShift[]
-  | BackendPaginatedDoctorShifts;
+  | BackendPaginatedDoctorShifts
+  | {
+      days?: Array<{
+        date?: string;
+        shifts?: BackendDoctorShift[];
+      }>;
+    };
 
 function normalizeDoctorShiftList(
   data: DoctorShiftListData,
@@ -137,7 +143,22 @@ function normalizeDoctorShiftList(
     return data.map(normalizeDoctorShift);
   }
 
-  return Array.isArray(data?.items)
+  if ("days" in data && Array.isArray(data.days)) {
+    return data.days.flatMap((day) => {
+      if (!Array.isArray(day.shifts)) {
+        return [];
+      }
+
+      return day.shifts.map((shift) =>
+        normalizeDoctorShift({
+          ...shift,
+          shiftDate: shift.shiftDate || day.date || "",
+        }),
+      );
+    });
+  }
+
+  return "items" in data && Array.isArray(data.items)
     ? data.items.map(normalizeDoctorShift)
     : [];
 }
