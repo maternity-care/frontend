@@ -17,6 +17,7 @@ import {
   CalendarDays,
   Ellipsis,
   Eye,
+  FilePlus2,
   FileText,
   Pencil,
   Trash2,
@@ -41,6 +42,8 @@ interface Props {
   onEdit: (profile: ManagementPregnancyProfile) => void;
 
   onDelete: (profile: ManagementPregnancyProfile) => void;
+
+  onAddMedicalRecord?: (profile: ManagementPregnancyProfile) => void;
 }
 
 function formatDate(value?: string | null): string {
@@ -96,6 +99,7 @@ export function PregnancyProfilesTable({
   onView,
   onEdit,
   onDelete,
+  onAddMedicalRecord,
 }: Props) {
   const getActionItems = (
     profile: ManagementPregnancyProfile,
@@ -112,6 +116,13 @@ export function PregnancyProfilesTable({
       icon: <Pencil size={16} />,
       disabled: profile.status === "deleted",
       onClick: () => onEdit(profile),
+    },
+    {
+      key: "add-medical-record",
+      label: "Thêm kết quả khám",
+      icon: <FilePlus2 size={16} />,
+      disabled: profile.status === "deleted",
+      onClick: () => onAddMedicalRecord?.(profile), // thêm prop này
     },
     {
       type: "divider",
