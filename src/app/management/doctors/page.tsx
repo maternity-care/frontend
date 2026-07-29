@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Alert,
   Button,
@@ -13,21 +17,35 @@ import {
   Statistic,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from "antd";
-import type { ColumnsType } from "antd/es/table";
+import type {
+  ColumnsType,
+  TablePaginationConfig,
+} from "antd/es/table";
 import {
   CalendarClock,
   Eye,
+  FilterX,
+  Mail,
+  MapPin,
   Pencil,
+  Phone,
   Plus,
   Search,
   Stethoscope,
   Trash2,
+  UserRound,
   X,
 } from "lucide-react";
-import { AdminLayout } from "@/management/components/layouts/AdminLayout";
-import { PageHeader } from "@/management/components/ui/PageHeader";
+
+import {
+  AdminLayout,
+} from "@/management/components/layouts/AdminLayout";
+import {
+  PageHeader,
+} from "@/management/components/ui/PageHeader";
 import {
   deleteDoctor,
   getDoctor,
@@ -35,16 +53,55 @@ import {
 } from "@/management/features/doctors/doctors.api";
 import type {
   Doctor,
+  DoctorExperienceSort,
   DoctorStatus,
+  GetDoctorsParams,
 } from "@/management/features/doctors/doctors.types";
 import {
   DoctorFormModal,
   doctorStatusOptions,
 } from "./components/DoctorFormModal";
 
-const { Text, Title } = Typography;
+const {
+  Text,
+  Title,
+} = Typography;
 
-function getErrorMessage(error: unknown) {
+const DEFAULT_PAGE_SIZE = 10;
+
+type CombinedSearchField =
+  | "name"
+  | "phone"
+  | "facilityId"
+  | "employeeCode";
+
+type DoctorFilters = {
+  keyword?: string;
+  specialty?: string;
+  status?: DoctorStatus;
+  sortYearsOfExperience:
+    DoctorExperienceSort;
+};
+
+const EXPERIENCE_SORT_OPTIONS: Array<{
+  value: DoctorExperienceSort;
+  label: string;
+}> = [
+  {
+    value: "desc",
+    label:
+      "Kinh nghiệm: cao đến thấp",
+  },
+  {
+    value: "asc",
+    label:
+      "Kinh nghiệm: thấp đến cao",
+  },
+];
+
+function getErrorMessage(
+  error: unknown,
+) {
   if (
     typeof error === "object" &&
     error &&
@@ -54,7 +111,9 @@ function getErrorMessage(error: unknown) {
       error as {
         response?: {
           data?: {
-            message?: string | string[];
+            message?:
+              | string
+              | string[];
             errors?: {
               fields?: string[];
             };
@@ -64,7 +123,8 @@ function getErrorMessage(error: unknown) {
     ).response;
 
     const fields =
-      response?.data?.errors?.fields;
+      response?.data?.errors
+        ?.fields;
 
     if (
       Array.isArray(fields) &&
@@ -76,73 +136,256 @@ function getErrorMessage(error: unknown) {
     const message =
       response?.data?.message;
 
-    if (Array.isArray(message)) {
+    if (
+      Array.isArray(message)
+    ) {
       return message.join(", ");
     }
 
-    if (message) return message;
+    if (message) {
+      return message;
+    }
   }
 
-  if (error instanceof Error) {
+  if (
+    error instanceof Error
+  ) {
     return error.message;
   }
 
   return "Đã có lỗi xảy ra. Vui lòng thử lại.";
 }
 
-function formatDateTime(value?: string) {
-  if (!value) return "Chưa cập nhật";
+function formatDateTime(
+  value?: string,
+) {
+  if (!value) {
+    return "Chưa cập nhật";
+  }
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
     return value;
   }
 
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return date.toLocaleString(
+    "vi-VN",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    },
+  );
 }
 
 function renderStatus(
   status: DoctorStatus,
 ) {
   return status === "active" ? (
-    <Tag color="green">Hoạt động</Tag>
+    <Tag color="green">
+      Hoạt động
+    </Tag>
   ) : (
-    <Tag color="default">
+    <Tag>
       Ngừng hoạt động
     </Tag>
   );
 }
 
+function mergeDoctorDetail(
+  current: Doctor,
+  detail: Doctor,
+): Doctor {
+  const fallbackName =
+    `Bác sĩ #${detail.id}`;
+
+  return {
+    ...current,
+    ...detail,
+    name:
+      detail.name &&
+      detail.name !== fallbackName
+        ? detail.name
+        : current.name,
+    employeeCode:
+      detail.employeeCode ||
+      current.employeeCode,
+    personalEmail:
+      detail.personalEmail ||
+      current.personalEmail,
+    email:
+      detail.email ||
+      current.email,
+    phone:
+      detail.phone ||
+      current.phone,
+    address:
+      detail.address ||
+      current.address,
+    facilityId:
+      detail.facilityId ||
+      current.facilityId,
+    facilityIds:
+      detail.facilityIds.length > 0
+        ? detail.facilityIds
+        : current.facilityIds,
+  };
+}
+
+/**
+ * Tự nhận diện trường tìm kiếm từ một thanh search:
+ * - Số điện thoại Việt Nam -> phone
+ * - UUID hoặc chuỗi chỉ gồm số -> facilityId
+ * - Mã dạng DR-001, BS001... -> employeeCode
+ * - Còn lại -> name
+ */
+function inferSearchField(
+  keyword: string,
+): CombinedSearchField {
+  const value =
+    keyword.trim();
+
+  if (
+    /^(0|\+84)\d{9,10}$/.test(
+      value,
+    )
+  ) {
+    return "phone";
+  }
+
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    ) ||
+    /^\d+$/.test(value)
+  ) {
+    return "facilityId";
+  }
+
+  if (
+    /^[a-z]{1,12}[-_]?\d+$/i.test(
+      value,
+    )
+  ) {
+    return "employeeCode";
+  }
+
+  return "name";
+}
+
+function toApiParams(
+  filters: DoctorFilters,
+  page: number,
+  limit: number,
+): GetDoctorsParams {
+  const keyword =
+    filters.keyword?.trim();
+
+  const searchField =
+    keyword
+      ? inferSearchField(
+          keyword,
+        )
+      : undefined;
+
+  return {
+    ...(keyword &&
+    searchField
+      ? {
+          [searchField]:
+            keyword,
+        }
+      : {}),
+    specialty:
+      filters.specialty?.trim() ||
+      undefined,
+    status: filters.status,
+    sortYearsOfExperience:
+      filters.sortYearsOfExperience,
+    page,
+    limit,
+  };
+}
+
 export default function DoctorManagementPage() {
-  const [modal, modalContextHolder] =
-    Modal.useModal();
+  const [
+    modal,
+    modalContextHolder,
+  ] = Modal.useModal();
 
-  const [doctors, setDoctors] = useState<
-    Doctor[]
-  >([]);
+  const [doctors, setDoctors] =
+    useState<Doctor[]>([]);
 
-  const [keyword, setKeyword] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState<DoctorStatus | undefined>();
+  const [
+    searchValue,
+    setSearchValue,
+  ] = useState("");
 
-  const [detailDoctor, setDetailDoctor] =
-    useState<Doctor | null>(null);
+  const [
+    specialtyFilter,
+    setSpecialtyFilter,
+  ] = useState("");
 
-  const [editingDoctor, setEditingDoctor] =
-    useState<Doctor | null>(null);
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] =
+    useState<
+      DoctorStatus | undefined
+    >();
 
-  const [formModalOpen, setFormModalOpen] =
-    useState(false);
+  const [
+    experienceSort,
+    setExperienceSort,
+  ] =
+    useState<DoctorExperienceSort>(
+      "desc",
+    );
 
-  const [deletingDoctor, setDeletingDoctor] =
-    useState<Doctor | null>(null);
+  const [
+    appliedFilters,
+    setAppliedFilters,
+  ] =
+    useState<DoctorFilters>({
+      sortYearsOfExperience:
+        "desc",
+    });
+
+  const [
+    detailDoctor,
+    setDetailDoctor,
+  ] =
+    useState<Doctor | null>(
+      null,
+    );
+
+  const [
+    editingDoctor,
+    setEditingDoctor,
+  ] =
+    useState<Doctor | null>(
+      null,
+    );
+
+  const [
+    formModalOpen,
+    setFormModalOpen,
+  ] = useState(false);
+
+  const [
+    deletingDoctor,
+    setDeletingDoctor,
+  ] =
+    useState<Doctor | null>(
+      null,
+    );
 
   const [loading, setLoading] =
     useState(true);
@@ -157,106 +400,178 @@ export default function DoctorManagementPage() {
     setDeleteLoading,
   ] = useState(false);
 
-  const [error, setError] = useState<
-    string | null
-  >(null);
+  const [error, setError] =
+    useState<string | null>(
+      null,
+    );
 
-  const [currentPage, setCurrentPage] =
-    useState(1);
+  const [
+    currentPage,
+    setCurrentPage,
+  ] = useState(1);
 
-  const [pageSize, setPageSize] =
-    useState(10);
+  const [
+    pageSize,
+    setPageSize,
+  ] = useState(
+    DEFAULT_PAGE_SIZE,
+  );
+
+  const [total, setTotal] =
+    useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
-    void getDoctors()
-      .then((doctorData) => {
+    async function loadInitialData() {
+      try {
+        const result =
+          await getDoctors({
+            page: 1,
+            limit:
+              DEFAULT_PAGE_SIZE,
+            sortYearsOfExperience:
+              "desc",
+          });
+
         if (cancelled) return;
 
-        setDoctors(doctorData);
+        setDoctors(
+          result.items,
+        );
+        setTotal(result.total);
         setError(null);
-      })
-      .catch((loadError) => {
+      } catch (loadError) {
         if (!cancelled) {
           setError(
-            getErrorMessage(loadError),
+            getErrorMessage(
+              loadError,
+            ),
           );
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setLoading(false);
         }
-      });
+      }
+    }
+
+    void loadInitialData();
 
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const filteredDoctors = useMemo(() => {
-    const search = keyword
-      .trim()
-      .toLowerCase();
-
-    return doctors.filter((doctor) => {
-      const matchesKeyword =
-        !search ||
-        [
-          doctor.id,
-          doctor.staffId,
-          doctor.licenseNo,
-          doctor.title,
-          doctor.specialty,
-          doctor.bio,
-        ].some((value) =>
-          value
-            .toLowerCase()
-            .includes(search),
-        );
-
-      const matchesStatus =
-        !statusFilter ||
-        doctor.status === statusFilter;
-
-      return (
-        matchesKeyword && matchesStatus
-      );
-    });
-  }, [
-    doctors,
-    keyword,
-    statusFilter,
-  ]);
-
   const stats = useMemo(() => {
     const active = doctors.filter(
       (doctor) =>
-        doctor.status === "active",
+        doctor.status ===
+        "active",
     ).length;
 
-    const averageExperience =
-      doctors.length === 0
-        ? 0
-        : doctors.reduce(
-            (sum, doctor) =>
-              sum +
-              doctor.yearsOfExperience,
-            0,
-          ) / doctors.length;
-
     return {
-      total: doctors.length,
       active,
       inactive:
         doctors.length - active,
-      averageExperience:
-        Math.round(
-          averageExperience * 10,
-        ) / 10,
     };
   }, [doctors]);
+
+  function buildFilters(
+    overrides: Partial<DoctorFilters> = {},
+  ): DoctorFilters {
+    return {
+      keyword:
+        searchValue.trim() ||
+        undefined,
+      specialty:
+        specialtyFilter.trim() ||
+        undefined,
+      status: statusFilter,
+      sortYearsOfExperience:
+        experienceSort,
+      ...overrides,
+    };
+  }
+
+  async function loadDoctors(
+    filters: DoctorFilters,
+    page: number,
+    limit: number,
+  ) {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result =
+        await getDoctors(
+          toApiParams(
+            filters,
+            page,
+            limit,
+          ),
+        );
+
+      setDoctors(result.items);
+      setTotal(result.total);
+      setCurrentPage(
+        result.page,
+      );
+      setPageSize(
+        result.limit,
+      );
+    } catch (loadError) {
+      setError(
+        getErrorMessage(
+          loadError,
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function applyFilters(
+    overrides: Partial<DoctorFilters> = {},
+  ) {
+    const nextFilters =
+      buildFilters(overrides);
+
+    setAppliedFilters(
+      nextFilters,
+    );
+    setCurrentPage(1);
+
+    void loadDoctors(
+      nextFilters,
+      1,
+      pageSize,
+    );
+  }
+
+  function resetFilters() {
+    setSearchValue("");
+    setSpecialtyFilter("");
+    setStatusFilter(undefined);
+    setExperienceSort("desc");
+
+    const nextFilters: DoctorFilters =
+      {
+        sortYearsOfExperience:
+          "desc",
+      };
+
+    setAppliedFilters(
+      nextFilters,
+    );
+    setCurrentPage(1);
+
+    void loadDoctors(
+      nextFilters,
+      1,
+      pageSize,
+    );
+  }
 
   async function openDetail(
     doctor: Doctor,
@@ -265,14 +580,22 @@ export default function DoctorManagementPage() {
     setDetailLoading(true);
 
     try {
-      const data = await getDoctor(
-        doctor.id,
-      );
+      const detail =
+        await getDoctor(
+          doctor.id,
+        );
 
-      setDetailDoctor(data);
+      setDetailDoctor(
+        mergeDoctorDetail(
+          doctor,
+          detail,
+        ),
+      );
     } catch (detailError) {
       setError(
-        getErrorMessage(detailError),
+        getErrorMessage(
+          detailError,
+        ),
       );
     } finally {
       setDetailLoading(false);
@@ -284,7 +607,9 @@ export default function DoctorManagementPage() {
     setFormModalOpen(true);
   }
 
-  function openEdit(doctor: Doctor) {
+  function openEdit(
+    doctor: Doctor,
+  ) {
     setEditingDoctor(doctor);
     setFormModalOpen(true);
   }
@@ -296,59 +621,74 @@ export default function DoctorManagementPage() {
 
   function handleDoctorSaved(
     savedDoctor: Doctor,
-    mode: "create" | "update",
+    mode:
+      | "create"
+      | "update",
   ) {
-    if (mode === "create") {
-      setDoctors((current: Doctor[]) => [
-        savedDoctor,
-        ...current,
-      ]);
-      setCurrentPage(1);
-      return;
-    }
-
-    setDoctors((current: Doctor[]) =>
-      current.map((doctor: Doctor) =>
-        doctor.id === savedDoctor.id
-          ? savedDoctor
-          : doctor,
-      ),
+    setDetailDoctor(
+      (current) =>
+        current?.id ===
+        savedDoctor.id
+          ? mergeDoctorDetail(
+              current,
+              savedDoctor,
+            )
+          : current,
     );
 
-    setDetailDoctor(
-      (current: Doctor | null) =>
-        current?.id === savedDoctor.id
-          ? savedDoctor
-          : current,
+    const targetPage =
+      mode === "create"
+        ? 1
+        : currentPage;
+
+    if (mode === "create") {
+      setCurrentPage(1);
+    }
+
+    void loadDoctors(
+      appliedFilters,
+      targetPage,
+      pageSize,
     );
   }
 
   async function confirmDelete() {
-    if (!deletingDoctor) return;
+    if (!deletingDoctor) {
+      return;
+    }
 
-    const doctor = deletingDoctor;
+    const doctor =
+      deletingDoctor;
 
     setDeleteLoading(true);
     setError(null);
 
     try {
-      await deleteDoctor(doctor.id);
-
-      setDoctors((current: Doctor[]) =>
-        current.filter(
-          (item: Doctor) =>
-            item.id !== doctor.id,
-        ),
+      await deleteDoctor(
+        doctor.id,
       );
 
       setDetailDoctor(
-        (current: Doctor | null) =>
-          current?.id === doctor.id
+        (current) =>
+          current?.id ===
+          doctor.id
             ? null
             : current,
       );
 
       setDeletingDoctor(null);
+
+      const nextPage =
+        doctors.length === 1 &&
+        currentPage > 1
+          ? currentPage - 1
+          : currentPage;
+
+      await loadDoctors(
+        appliedFilters,
+        nextPage,
+        pageSize,
+      );
 
       modal.success({
         centered: true,
@@ -360,7 +700,9 @@ export default function DoctorManagementPage() {
       });
     } catch (deleteError) {
       const message =
-        getErrorMessage(deleteError);
+        getErrorMessage(
+          deleteError,
+        );
 
       setError(message);
 
@@ -376,144 +718,229 @@ export default function DoctorManagementPage() {
     }
   }
 
-  const columns: ColumnsType<Doctor> = [
-    {
-      title: "STT",
-      width: 64,
-      align: "center",
-      render: (
-        _value,
-        _record,
-        index,
-      ) =>
-        (currentPage - 1) *
-          pageSize +
-        index +
-        1,
-    },
-    {
-      title: "Bác sĩ",
-      width: 230,
-      render: (_value, doctor) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
-            <Stethoscope className="h-4 w-4" />
-          </span>
+  function handleTableChange(
+    pagination:
+      TablePaginationConfig,
+  ) {
+    const nextPageSize =
+      pagination.pageSize ??
+      pageSize;
 
-          <div className="min-w-0">
-            <Text
-              strong
-              className="block truncate text-slate-900"
-            >
-              {doctor.title ||
-                "Bác sĩ"}{" "}
-              ·{" "}
-              {doctor.specialty ||
-                "Chưa cập nhật chuyên khoa"}
+    const nextPage =
+      nextPageSize !==
+      pageSize
+        ? 1
+        : pagination.current ??
+          currentPage;
+
+    void loadDoctors(
+      appliedFilters,
+      nextPage,
+      nextPageSize,
+    );
+  }
+
+  const columns: ColumnsType<Doctor> =
+    [
+      {
+        title: "STT",
+        width: 64,
+        align: "center",
+        fixed: "left",
+        render: (
+          _value,
+          _record,
+          index,
+        ) =>
+          (currentPage - 1) *
+            pageSize +
+          index +
+          1,
+      },
+      {
+        title: "Bác sĩ",
+        width: 260,
+        fixed: "left",
+        render: (
+          _value,
+          doctor,
+        ) => (
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
+              <Stethoscope className="h-4 w-4" />
+            </span>
+
+            <div className="min-w-0">
+              <Text
+                strong
+                className="block truncate text-slate-900"
+              >
+                {doctor.name}
+              </Text>
+
+              <Text
+                type="secondary"
+                className="block truncate text-xs"
+              >
+                {doctor.employeeCode
+                  ? `${doctor.employeeCode} · `
+                  : ""}
+                {doctor.title ||
+                  "Bác sĩ"}
+              </Text>
+            </div>
+          </div>
+        ),
+      },
+      {
+        title: "Liên hệ",
+        width: 230,
+        render: (
+          _value,
+          doctor,
+        ) => (
+          <div className="space-y-1">
+            <Text className="block truncate">
+              {doctor.email ||
+                doctor.personalEmail ||
+                "Chưa cập nhật email"}
             </Text>
 
             <Text
               type="secondary"
-              className="block truncate text-xs"
+              className="block text-xs"
             >
-              Staff ID:{" "}
-              {doctor.staffId}
+              {doctor.phone ||
+                "Chưa cập nhật số điện thoại"}
             </Text>
           </div>
-        </div>
-      ),
-    },
-    {
-      title: "Giấy phép",
-      dataIndex: "licenseNo",
-      width: 150,
-      ellipsis: true,
-      render: (value: string) =>
-        value || "Chưa cập nhật",
-    },
-    {
-      title: "Chuyên khoa",
-      dataIndex: "specialty",
-      width: 170,
-      ellipsis: true,
-      render: (value: string) =>
-        value || "Chưa cập nhật",
-    },
-    {
-      title: "Kinh nghiệm",
-      dataIndex:
-        "yearsOfExperience",
-      width: 120,
-      align: "center",
-      sorter: (a, b) =>
-        a.yearsOfExperience -
-        b.yearsOfExperience,
-      render: (value: number) =>
-        `${value} năm`,
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      width: 140,
-      align: "center",
-      render: (
-        status: DoctorStatus,
-      ) => renderStatus(status),
-    },
-    {
-      title: "Cập nhật",
-      dataIndex: "updatedAt",
-      width: 160,
-      align: "center",
-      responsive: ["lg"],
-      render: (value: string) =>
-        formatDateTime(value),
-    },
-    {
-      title: "Thao tác",
-      key: "actions",
-      width: 150,
-      align: "center",
-      fixed: "right",
-      render: (_value, doctor) => (
-        <Space size={6}>
-          <Button
-            title="Xem chi tiết"
-            icon={
-              <Eye className="h-4 w-4" />
-            }
-            onClick={(event) => {
-              event.stopPropagation();
-              void openDetail(doctor);
-            }}
-          />
+        ),
+      },
+      {
+        title: "Mã cơ sở",
+        dataIndex:
+          "facilityId",
+        width: 140,
+        ellipsis: true,
+        render: (
+          value: string,
+        ) =>
+          value ||
+          "Chưa được gán",
+      },
+      {
+        title: "Giấy phép",
+        dataIndex:
+          "licenseNo",
+        width: 150,
+        ellipsis: true,
+        render: (
+          value: string,
+        ) =>
+          value ||
+          "Chưa cập nhật",
+      },
+      {
+        title: "Chuyên khoa",
+        width: 190,
+        render: (
+          _value,
+          doctor,
+        ) => (
+          <div>
+            <Text className="block">
+              {doctor.specialty ||
+                "Chưa cập nhật"}
+            </Text>
 
-          <Button
-            title="Cập nhật"
-            icon={
-              <Pencil className="h-4 w-4" />
-            }
-            onClick={(event) => {
-              event.stopPropagation();
-              openEdit(doctor);
-            }}
-          />
+            <Text
+              type="secondary"
+              className="block text-xs"
+            >
+              {doctor.title ||
+                "Chưa cập nhật chức danh"}
+            </Text>
+          </div>
+        ),
+      },
+      {
+        title: "Kinh nghiệm",
+        dataIndex:
+          "yearsOfExperience",
+        width: 125,
+        align: "center",
+        render: (
+          value: number,
+        ) =>
+          `${value} năm`,
+      },
+      {
+        title: "Trạng thái",
+        dataIndex: "status",
+        width: 140,
+        align: "center",
+        render: (
+          status: DoctorStatus,
+        ) =>
+          renderStatus(status),
+      },
+      {
+        title: "Thao tác",
+        key: "actions",
+        width: 150,
+        align: "center",
+        fixed: "right",
+        render: (
+          _value,
+          doctor,
+        ) => (
+          <Space size={6}>
+            <Tooltip title="Xem chi tiết">
+              <Button
+                icon={
+                  <Eye className="h-4 w-4" />
+                }
+                onClick={(event) => {
+                  event.stopPropagation();
 
-          <Button
-            danger
-            title="Xóa bác sĩ"
-            icon={
-              <Trash2 className="h-4 w-4" />
-            }
-            onClick={(event) => {
-              event.stopPropagation();
-              setDeletingDoctor(doctor);
-            }}
-          />
-        </Space>
-      ),
-    },
-  ];
+                  void openDetail(
+                    doctor,
+                  );
+                }}
+              />
+            </Tooltip>
+
+            <Tooltip title="Cập nhật">
+              <Button
+                icon={
+                  <Pencil className="h-4 w-4" />
+                }
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openEdit(doctor);
+                }}
+              />
+            </Tooltip>
+
+            <Tooltip title="Xóa bác sĩ">
+              <Button
+                danger
+                icon={
+                  <Trash2 className="h-4 w-4" />
+                }
+                onClick={(event) => {
+                  event.stopPropagation();
+
+                  setDeletingDoctor(
+                    doctor,
+                  );
+                }}
+              />
+            </Tooltip>
+          </Space>
+        ),
+      },
+    ];
 
   return (
     <AdminLayout
@@ -521,12 +948,14 @@ export default function DoctorManagementPage() {
         "super_admin",
         "admin",
       ]}
-      permissions={["doctor.view"]}
+      permissions={[
+        "doctor.view",
+      ]}
     >
       {modalContextHolder}
 
       <PageHeader
-        title="Doctor Management"
+        title="Quản lý bác sĩ"
         description="Quản lý hồ sơ chuyên môn, giấy phép hành nghề và trạng thái bác sĩ."
       />
 
@@ -543,75 +972,171 @@ export default function DoctorManagementPage() {
           />
         ) : null}
 
-        <Card className="order-2 border-slate-200 bg-white">
-          <div className="flex flex-col gap-3 md:flex-row">
-            <Input
-              allowClear
-              value={keyword}
-              prefix={
-                <Search className="h-4 w-4 text-slate-400" />
-              }
-              placeholder="Tìm theo mã bác sĩ, Staff ID, giấy phép, chức danh hoặc chuyên khoa"
-              onChange={(event) => {
-                setKeyword(
-                  event.target.value,
-                );
-                setCurrentPage(1);
-              }}
-            />
-
-            <Select
-              allowClear
-              className="w-full md:w-56"
-              value={statusFilter}
-              options={
-                doctorStatusOptions
-              }
-              placeholder="Lọc theo trạng thái"
-              onChange={(
-                value:
-                  | DoctorStatus
-                  | undefined,
-              ) => {
-                setStatusFilter(value);
-                setCurrentPage(1);
-              }}
-            />
-          </div>
-        </Card>
-
-        <div className="order-1 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="order-1 grid gap-4 md:grid-cols-3">
           <Card className="border-slate-200 bg-white">
             <Statistic
               title="Tổng bác sĩ"
-              value={stats.total}
+              value={total}
             />
           </Card>
 
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title="Đang hoạt động"
+              title="Hoạt động trên trang"
               value={stats.active}
             />
           </Card>
 
           <Card className="border-slate-200 bg-slate-50/70">
             <Statistic
-              title="Ngừng hoạt động"
+              title="Ngừng hoạt động trên trang"
               value={stats.inactive}
             />
           </Card>
-
-          <Card className="border-sky-100 bg-sky-50/60">
-            <Statistic
-              title="Kinh nghiệm trung bình"
-              value={
-                stats.averageExperience
-              }
-              suffix="năm"
-            />
-          </Card>
         </div>
+
+        <Card className="order-2 border-slate-200 bg-white">
+          <div
+            className="flex flex-wrap items-center gap-3"
+            style={{
+              maxWidth: "100%",
+              overflow: "hidden",
+            }}
+          >
+            <Input
+              allowClear
+              value={searchValue}
+              prefix={
+                <Search className="h-4 w-4 text-slate-400" />
+              }
+              placeholder="Tìm..."
+              title="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
+              style={{
+                width: 100,
+                minWidth: 100,
+                maxWidth: 100,
+                flex: "0 0 100px",
+              }}
+              onChange={(event) => {
+                const value =
+                  event.target.value;
+
+                setSearchValue(value);
+
+                if (!value.trim()) {
+                  applyFilters({
+                    keyword:
+                      undefined,
+                  });
+                }
+              }}
+              onPressEnter={() =>
+                applyFilters()
+              }
+            />
+
+            <Input
+              allowClear
+              value={specialtyFilter}
+              placeholder="Chuyên khoa"
+              style={{
+                width: 160,
+                minWidth: 160,
+                maxWidth: 160,
+                flex: "0 0 160px",
+              }}
+              onChange={(event) => {
+                const value =
+                  event.target.value;
+
+                setSpecialtyFilter(
+                  value,
+                );
+
+                if (!value.trim()) {
+                  applyFilters({
+                    specialty:
+                      undefined,
+                  });
+                }
+              }}
+              onPressEnter={() =>
+                applyFilters()
+              }
+            />
+
+            <Select
+              allowClear
+              value={statusFilter}
+              options={
+                doctorStatusOptions
+              }
+              placeholder="Trạng thái"
+              style={{
+                width: 150,
+                minWidth: 150,
+                maxWidth: 150,
+                flex: "0 0 150px",
+              }}
+              onChange={(value) => {
+                setStatusFilter(value);
+
+                applyFilters({
+                  status: value,
+                });
+              }}
+            />
+
+            <Select<DoctorExperienceSort>
+              value={experienceSort}
+              options={
+                EXPERIENCE_SORT_OPTIONS
+              }
+              style={{
+                width: 220,
+                minWidth: 220,
+                maxWidth: 220,
+                flex: "0 0 220px",
+              }}
+              onChange={(value) => {
+                setExperienceSort(
+                  value,
+                );
+
+                applyFilters({
+                  sortYearsOfExperience:
+                    value,
+                });
+              }}
+            />
+
+            <Tooltip title="Xóa bộ lọc">
+              <Button
+                aria-label="Xóa bộ lọc"
+                icon={
+                  <FilterX className="h-4 w-4" />
+                }
+                style={{
+                  width: 40,
+                  minWidth: 40,
+                  maxWidth: 40,
+                  flex: "0 0 40px",
+                  paddingInline: 0,
+                }}
+                onClick={
+                  resetFilters
+                }
+              />
+            </Tooltip>
+          </div>
+
+          <Text
+            type="secondary"
+            className="mt-2 block text-xs"
+          >
+            Nhấn Enter sau khi nhập từ khóa hoặc chuyên khoa. Trạng thái và sắp xếp được áp dụng ngay.
+          </Text>
+        </Card>
 
         <Card
           className="order-3 overflow-hidden border-slate-200 bg-white"
@@ -627,7 +1152,7 @@ export default function DoctorManagementPage() {
               </p>
 
               <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Theo dõi hồ sơ chuyên môn và cập nhật thông tin bác sĩ.
+                Bộ lọc và phân trang được gửi trực tiếp đến API quản lý bác sĩ.
               </p>
             </div>
           }
@@ -637,23 +1162,25 @@ export default function DoctorManagementPage() {
               icon={
                 <Plus className="h-4 w-4" />
               }
-              onClick={openCreate}
+              onClick={
+                openCreate
+              }
             >
               Thêm bác sĩ
             </Button>
           }
         >
-          <Table
+          <Table<Doctor>
             rowKey="id"
             size="middle"
             tableLayout="fixed"
             loading={loading}
             columns={columns}
-            dataSource={
-              filteredDoctors
-            }
+            dataSource={doctors}
             className="management-table [&_.ant-table-cell]:px-3"
-            scroll={{ x: 1180 }}
+            scroll={{
+              x: 1480,
+            }}
             onRow={(doctor) => ({
               className:
                 "cursor-pointer",
@@ -678,37 +1205,23 @@ export default function DoctorManagementPage() {
             pagination={{
               current: currentPage,
               pageSize,
-              total:
-                filteredDoctors.length,
+              total,
               showSizeChanger: true,
               pageSizeOptions: [
                 10,
                 20,
                 50,
-                100,
               ],
               showQuickJumper: true,
               showTotal: (
-                total,
+                value,
                 range,
               ) =>
-                `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} bác sĩ`,
-              onChange: (
-                page,
-                nextPageSize,
-              ) => {
-                setCurrentPage(
-                  nextPageSize !==
-                    pageSize
-                    ? 1
-                    : page,
-                );
-
-                setPageSize(
-                  nextPageSize,
-                );
-              },
+                `Hiển thị ${range[0]} - ${range[1]} trong tổng ${value} bác sĩ`,
             }}
+            onChange={
+              handleTableChange
+            }
           />
         </Card>
       </div>
@@ -718,7 +1231,9 @@ export default function DoctorManagementPage() {
         editingDoctor={
           editingDoctor
         }
-        onClose={closeFormModal}
+        onClose={
+          closeFormModal
+        }
         onSaved={
           handleDoctorSaved
         }
@@ -728,12 +1243,9 @@ export default function DoctorManagementPage() {
         open={Boolean(
           detailDoctor,
         )}
-        width={780}
+        width={900}
         centered
         title={null}
-        confirmLoading={
-          detailLoading
-        }
         footer={
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
             {detailDoctor ? (
@@ -762,7 +1274,9 @@ export default function DoctorManagementPage() {
                 <X className="h-4 w-4" />
               }
               onClick={() =>
-                setDetailDoctor(null)
+                setDetailDoctor(
+                  null,
+                )
               }
             >
               Đóng
@@ -789,12 +1303,19 @@ export default function DoctorManagementPage() {
                   level={3}
                   className="!mb-1 !text-slate-950"
                 >
+                  {detailDoctor.name}
+                </Title>
+
+                <Text
+                  type="secondary"
+                  className="mb-2 block"
+                >
                   {detailDoctor.title ||
                     "Bác sĩ"}{" "}
                   ·{" "}
                   {detailDoctor.specialty ||
                     "Chưa cập nhật chuyên khoa"}
-                </Title>
+                </Text>
 
                 <Space size={8} wrap>
                   {renderStatus(
@@ -815,7 +1336,7 @@ export default function DoctorManagementPage() {
               size="middle"
               styles={{
                 label: {
-                  width: 170,
+                  width: 185,
                   fontWeight: 600,
                 },
               }}
@@ -831,7 +1352,64 @@ export default function DoctorManagementPage() {
                 label="Staff ID"
                 span={1}
               >
-                {detailDoctor.staffId}
+                {detailDoctor.staffId ||
+                  "Chưa cập nhật"}
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Họ và tên"
+                span={1}
+              >
+                <Space size={6}>
+                  <UserRound className="h-4 w-4 text-slate-400" />
+                  {detailDoctor.name}
+                </Space>
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Mã nhân viên"
+                span={1}
+              >
+                {detailDoctor.employeeCode ||
+                  "Chưa cập nhật"}
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Email công việc"
+                span={1}
+              >
+                <Space size={6}>
+                  <Mail className="h-4 w-4 text-slate-400" />
+                  {detailDoctor.email ||
+                    "Chưa cập nhật"}
+                </Space>
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Email cá nhân"
+                span={1}
+              >
+                {detailDoctor.personalEmail ||
+                  "Chưa cập nhật"}
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Số điện thoại"
+                span={1}
+              >
+                <Space size={6}>
+                  <Phone className="h-4 w-4 text-slate-400" />
+                  {detailDoctor.phone ||
+                    "Chưa cập nhật"}
+                </Space>
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Mã cơ sở"
+                span={1}
+              >
+                {detailDoctor.facilityId ||
+                  "Chưa được gán"}
               </Descriptions.Item>
 
               <Descriptions.Item
@@ -863,18 +1441,62 @@ export default function DoctorManagementPage() {
                 span={1}
               >
                 {
-                  detailDoctor.yearsOfExperience
+                  detailDoctor
+                    .yearsOfExperience
                 }{" "}
                 năm
               </Descriptions.Item>
 
               <Descriptions.Item
-                label="Trạng thái"
+                label="Trạng thái bác sĩ"
                 span={1}
               >
                 {renderStatus(
                   detailDoctor.status,
                 )}
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Trạng thái nhân sự"
+                span={1}
+              >
+                {renderStatus(
+                  detailDoctor.staffStatus,
+                )}
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Địa chỉ"
+                span={2}
+              >
+                <Space
+                  size={6}
+                  align="start"
+                >
+                  <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
+                  {detailDoctor.address ||
+                    "Chưa cập nhật"}
+                </Space>
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Giới thiệu chuyên môn"
+                span={2}
+              >
+                {detailDoctor.bio ||
+                  "Chưa cập nhật"}
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Ngày tạo"
+                span={1}
+              >
+                <Space size={6}>
+                  <CalendarClock className="h-4 w-4 text-slate-400" />
+                  {formatDateTime(
+                    detailDoctor.createdAt,
+                  )}
+                </Space>
               </Descriptions.Item>
 
               <Descriptions.Item
@@ -887,14 +1509,6 @@ export default function DoctorManagementPage() {
                     detailDoctor.updatedAt,
                   )}
                 </Space>
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Giới thiệu chuyên môn"
-                span={2}
-              >
-                {detailDoctor.bio ||
-                  "Chưa cập nhật"}
               </Descriptions.Item>
             </Descriptions>
           </div>
@@ -958,18 +1572,17 @@ export default function DoctorManagementPage() {
           {deletingDoctor ? (
             <div className="mx-auto mt-4 max-w-[350px] rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
               <p className="mb-0 font-semibold">
+                {
+                  deletingDoctor.name
+                }
+              </p>
+
+              <p className="mb-0 mt-1">
                 {deletingDoctor.title ||
                   "Bác sĩ"}{" "}
                 ·{" "}
                 {deletingDoctor.specialty ||
                   "Chưa cập nhật chuyên khoa"}
-              </p>
-
-              <p className="mb-0 mt-1">
-                Staff ID:{" "}
-                {
-                  deletingDoctor.staffId
-                }
               </p>
             </div>
           ) : null}

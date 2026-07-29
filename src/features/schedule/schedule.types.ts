@@ -21,4 +21,6 @@ export type PregnancyScheduleItem = {
   status: PregnancyScheduleStatus;
   note?: string;
   createdByUser?: boolean;
+  source?: "manual" | "appointment" | string;
+  appointmentId?: string | null;
 };
