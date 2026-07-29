@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Col, Progress, Row, Statistic, Typography } from "antd";
+import { Button, Card, Col, Progress, Row, Spin, Statistic, Typography, message } from "antd";
 import { CalendarPlus, CalendarDays, Clock, Download, Hospital } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
 
 import type { PregnancyScheduleItem } from "@/features/schedule/schedule.types";
 import {
+  createMySchedule,
+  deleteMySchedule,
+  getMySchedules,
+} from "@/features/schedule/schedule.api";
+import {
   buildGoogleCalendarUrl,
   downloadSchedulesIcs,
-  readStoredSchedules,
-  writeStoredSchedules,
 } from "@/features/schedule/schedule.utils";
 import { CreateScheduleModal } from "./CreateScheduleModal";
 import { ScheduleList } from "./ScheduleList";
@@ -22,38 +25,26 @@ const { Title, Text } = Typography;
 type PregnancyScheduleOverviewProps = {
   patientName?: string;
   gestationalWeek?: number;
-  initialSchedules: PregnancyScheduleItem[];
+  initialSchedules?: PregnancyScheduleItem[];
 };
 
 export function PregnancyScheduleOverview({
   patientName,
   gestationalWeek = 24,
-  initialSchedules,
+  initialSchedules = [],
 }: PregnancyScheduleOverviewProps) {
   const [schedules, setSchedules] = useState<PregnancyScheduleItem[]>(initialSchedules);
-  const [storageReady, setStorageReady] = useState(false);
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [createScheduleDate, setCreateScheduleDate] = useState<Dayjs | undefined>();
 
   useEffect(() => {
-    const storedSchedules = readStoredSchedules();
-
-    setSchedules((current) => {
-      const currentIds = new Set(current.map((schedule) => schedule.id));
-      const missingStoredSchedules = storedSchedules.filter(
-        (schedule) => !currentIds.has(schedule.id),
-      );
-
-      return [...current, ...missingStoredSchedules];
-    });
-    setStorageReady(true);
+    setLoadingSchedules(true);
+    getMySchedules()
+      .then(setSchedules)
+      .catch(() => message.warning("Không tải được lịch cá nhân."))
+      .finally(() => setLoadingSchedules(false));
   }, []);
-
-  useEffect(() => {
-    if (!storageReady) return;
-
-    writeStoredSchedules(schedules);
-  }, [schedules, storageReady]);
 
   const sortedSchedules = useMemo(() => {
     return [...schedules].sort((a, b) => {
@@ -76,9 +67,22 @@ export function PregnancyScheduleOverview({
     ? Math.round((completedCount / totalCount) * 100)
     : 0;
 
-  const handleCreateSchedule = (newSchedule: PregnancyScheduleItem) => {
-    setSchedules((prev) => [...prev, newSchedule]);
-    setOpenCreateModal(false);
+  const handleCreateSchedule = async (newSchedule: PregnancyScheduleItem) => {
+    try {
+      const savedSchedule = await createMySchedule({
+        title: newSchedule.title,
+        type: newSchedule.type,
+        date: newSchedule.date,
+        time: newSchedule.time,
+        location: newSchedule.location,
+        note: newSchedule.note,
+      });
+      setSchedules((prev) => [...prev, savedSchedule]);
+      setOpenCreateModal(false);
+      message.success("Đã lưu lịch vào database.");
+    } catch {
+      message.error("Không tạo được lịch. Bạn thử lại nhé.");
+    }
   };
 
   const handleOpenCreateModal = (date?: Dayjs) => {
@@ -86,8 +90,14 @@ export function PregnancyScheduleOverview({
     setOpenCreateModal(true);
   };
 
-  const handleDeleteSchedule = (scheduleId: string) => {
-    setSchedules((prev) => prev.filter((schedule) => schedule.id !== scheduleId));
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    try {
+      await deleteMySchedule(scheduleId);
+      setSchedules((prev) => prev.filter((schedule) => schedule.id !== scheduleId));
+      message.success("Đã xóa lịch.");
+    } catch {
+      message.error("Không xóa được lịch này.");
+    }
   };
 
   const handleOpenGoogleCalendar = (schedule: PregnancyScheduleItem) => {
@@ -100,6 +110,7 @@ export function PregnancyScheduleOverview({
 
   return (
     <div className="space-y-6">
+      <Spin spinning={loadingSchedules}>
       <Card className="overflow-hidden border-0 shadow-sm">
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} lg={15}>
@@ -173,6 +184,7 @@ export function PregnancyScheduleOverview({
           </Col>
         </Row>
       </Card>
+      </Spin>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
