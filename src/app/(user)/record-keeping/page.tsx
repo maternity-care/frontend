@@ -1,127 +1,114 @@
 "use client";
 
-import {
-  Card,
-  Button,
-  Space,
-  Typography,
-  Table,
-  Tag,
-  Upload,
-  message,
-} from "antd";
+import { useEffect, useState } from "react";
+import { Alert, App, Spin, Typography } from "antd";
 
-import {
-  UploadOutlined,
-  EyeOutlined,
-  EditOutlined,
-} from "@ant-design/icons";
+import type { PregnancyProfile } from "@/features/pregnancy-profiles/pregnancy-profiles.types";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { PatientInfoCard } from "@/fe/components/records/pregnancy-profile/PatientInfoCard";
+import { PregnancySummaryCard } from "@/fe/components/records/pregnancy-profile/PregnancySummaryCard";
+import { MedicalRecordsHistory } from "@/fe/components/records/pregnancy-profile/MedicalRecordsHistory";
+import { getMyPregnancyProfileById } from "@/features/pregnancy-profiles/pregnancy-profiles.api";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
+
+type LoadStatus = "pending" | "success" | "error";
 
 export default function RecordKeepingPage() {
-  const columns = [
-    {
-      title: "Tên hồ sơ",
-      dataIndex: "name",
-      key: "name",
-    },
+  const { message } = App.useApp();
+  const { user } = useCurrentUser();
+  const userId = user?.id ? String(user.id) : null;
 
-    {
-      title: "Ngày khám",
-      dataIndex: "date",
-      key: "date",
-    },
+  const [detail, setDetail] = useState<PregnancyProfile | null>(null);
+  const [status, setStatus] = useState<LoadStatus>("pending");
+  const [error, setError] = useState<string | null>(null);
 
-    {
-      title: "Loại file",
-      key: "type",
-      render: () => <Tag color="red">PDF</Tag>,
-    },
+  useEffect(() => {
+    if (!userId) return;
 
-    {
-      title: "Thao tác",
-      key: "action",
-      render: () => (
-        <Space>
-          <Button icon={<EyeOutlined />}>Xem</Button>
+    let cancelled = false;
 
-          <Button icon={<EditOutlined />}>Cập nhật</Button>
-        </Space>
-      ),
-    },
-  ];
+    void getMyPregnancyProfileById(userId)
+      .then((data) => {
+        if (cancelled) return;
+        console.log("Loaded pregnancy profile:", data);
+        setDetail(data);
+        setError(null);
+        setStatus("success");
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        console.error("Failed to load pregnancy profile:", err);
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Không tải được hồ sơ thai kỳ";
+        setDetail(null);
+        setError(msg);
+        setStatus("error");
+        message.error(msg);
+      });
 
-  const data = [
-    {
-      key: "1",
-      name: "Hồ sơ khám thai tuần 12",
-      date: "12/07/2026",
-    },
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, message]);
 
-    {
-      key: "2",
-      name: "Kết quả siêu âm",
-      date: "20/07/2026",
-    },
-  ];
+  if (!userId) {
+    return (
+      <div style={{ padding: 24 }}>
+        <Title level={3}>Hồ sơ thai phụ</Title>
+        <Alert
+          type="warning"
+          showIcon
+          title="Chưa đăng nhập"
+          description="Không tìm thấy thông tin tài khoản. Vui lòng đăng nhập lại."
+        />
+      </div>
+    );
+  }
+
+  if (status === "pending") {
+    return (
+      <div style={{ padding: 48, textAlign: "center" }}>
+        <Spin size="large" description="Đang tải hồ sơ..." />
+      </div>
+    );
+  }
+
+  if (status === "error" || !detail) {
+    return (
+      <div style={{ padding: 24 }}>
+        <Title level={3}>Hồ sơ thai phụ</Title>
+        <Alert
+          type="info"
+          showIcon
+          title="Chưa có hồ sơ thai kỳ"
+          description={
+            error || "Không tìm thấy hồ sơ thai kỳ cho tài khoản này."
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        padding: 24,
-      }}
-    >
-      <Title level={3}>Hồ sơ thai phụ</Title>
+    <div style={{ padding: 24 }}>
+      <div style={{ marginBottom: 16 }}>
+        <Title level={3} style={{ margin: 0 }}>
+          Hồ sơ thai phụ
+        </Title>
+        <Text type="secondary">
+          Xem thông tin thai kỳ và lịch sử khám (chỉ xem)
+        </Text>
+      </div>
 
-      {/* Patient Information */}
-
-      <Card
-        style={{
-          marginBottom: 20,
-        }}
-      >
-        <Space direction="vertical">
-          <b>Mã bệnh nhân:</b>
-          BN0000123
-          <b>Họ tên:</b>
-          Nguyễn Thị A<b>Trạng thái bảo mật:</b>
-          <Tag color="green">Đã đồng ý</Tag>
-        </Space>
-      </Card>
-
-      {/* Upload */}
-
-      <Card title="Danh sách hồ sơ PDF">
-        <Upload
-          accept=".pdf"
-          maxCount={1}
-          beforeUpload={(file) => {
-            if (file.type !== "application/pdf") {
-              message.error("Chỉ được upload file PDF");
-
-              return Upload.LIST_IGNORE;
-            }
-
-            return false;
-          }}
-        >
-          <Button type="primary" icon={<UploadOutlined />}>
-            Upload hồ sơ mới
-          </Button>
-        </Upload>
-
-        <Table
-          style={{
-            marginTop: 20,
-          }}
-          columns={columns}
-          dataSource={data}
-          pagination={{
-            pageSize: 5,
-          }}
-        />
-      </Card>
+      <PatientInfoCard profile={detail} />
+      <PregnancySummaryCard profile={detail} />
+      <MedicalRecordsHistory
+        medicalRecords={detail.medicalRecords ?? []}
+        loading={false}
+      />
     </div>
   );
 }
