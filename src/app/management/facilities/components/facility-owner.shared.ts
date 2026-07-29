@@ -60,20 +60,20 @@ function toOwnerOption(
 }
 
 /**
- * Tải toàn bộ admin đang hoạt động từ endpoint chuyên dụng
- * của module cơ sở. availableOnly=false để modal thêm/sửa
- * có thể hiển thị đầy đủ danh sách admin.
+ * Chỉ tải các admin đang hoạt động và còn khả dụng
+ * để có thể được gán làm chủ cơ sở.
  */
 export async function getFacilityOwnerOptions(): Promise<
   FacilityOwnerOption[]
 > {
   const owners: FacilityOwnerOption[] = [];
-  const loadedOwnerIds = new Set<string>();
+  const loadedOwnerIds =
+    new Set<string>();
 
   const firstPage =
     await getFacilityAdminOptions({
       status: "active",
-      availableOnly: false,
+      availableOnly: true,
       page: 1,
       limit: FACILITY_PAGE_LIMIT,
     });
@@ -82,7 +82,9 @@ export async function getFacilityOwnerOptions(): Promise<
     items: FacilityAdminOption[],
   ) => {
     for (const admin of items) {
-      if (loadedOwnerIds.has(admin.id)) {
+      if (
+        loadedOwnerIds.has(admin.id)
+      ) {
         continue;
       }
 
@@ -112,7 +114,7 @@ export async function getFacilityOwnerOptions(): Promise<
     const pageResult =
       await getFacilityAdminOptions({
         status: "active",
-        availableOnly: false,
+        availableOnly: true,
         page,
         limit: FACILITY_PAGE_LIMIT,
       });
@@ -120,10 +122,11 @@ export async function getFacilityOwnerOptions(): Promise<
     appendItems(pageResult.items);
   }
 
-  return owners.sort((left, right) =>
-    left.name.localeCompare(
-      right.name,
-      "vi",
-    ),
+  return owners.sort(
+    (left, right) =>
+      left.name.localeCompare(
+        right.name,
+        "vi",
+      ),
   );
 }
