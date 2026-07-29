@@ -86,6 +86,7 @@ export const RESPONSE_MESSAGES = {
     CART: "Giỏ hàng",
     VIEW_PROFILE: "Xem hồ sơ",
     SCHEDULE: "Lịch",
+    record_keeping: "Lưu trữ hồ sơ",
   },
 
   AUTH: {
@@ -396,7 +397,7 @@ export const RESPONSE_MESSAGES = {
   },
 
   FACILITY_MANAGEMENT: {
-    PAGE_TITLE: "Facility Management",
+    PAGE_TITLE: "Quản lý cơ sở khám",
     PAGE_DESCRIPTION: "Quản lý danh sách cơ sở khám trong hệ thống.",
 
     DEFAULT_ERROR: "Đã có lỗi xảy ra. Vui lòng thử lại.",
@@ -577,7 +578,7 @@ export const RESPONSE_MESSAGES = {
   },
 
   CLINIC_ROOM_MANAGEMENT: {
-    PAGE_TITLE: "Clinic Room Management",
+    PAGE_TITLE: "Quản lý phòng khám",
     PAGE_DESCRIPTION: "Quản lý danh sách phòng khám tại cơ sở.",
 
     DEFAULT_ERROR: "Đã có lỗi xảy ra. Vui lòng thử lại.",
@@ -590,14 +591,10 @@ export const RESPONSE_MESSAGES = {
     LOADING_ROOMS: "Đang tải danh sách phòng khám...",
 
     STT: "STT",
-    FACILITY: "Cơ sở khám",
     SELECTED_FACILITY_FALLBACK: "cơ sở đã chọn",
     ROOMS_AT_FACILITY_PREFIX: "Phòng khám tại",
-    ALL_ROOMS_TITLE: "Tất cả phòng khám",
     FILTERED_FACILITY_DESCRIPTION:
       "Danh sách phòng được lọc theo cơ sở khám đã chọn.",
-    ALL_ROOMS_DESCRIPTION:
-      "Quản lý phòng, loại phòng, tầng, sức chứa và trạng thái hoạt động.",
 
     SEARCH_PLACEHOLDER: "Tìm theo tên phòng",
     ROOM_TYPE_PLACEHOLDER: "Loại phòng",

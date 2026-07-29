@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BriefcaseBusiness, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2, DoorOpen, Stethoscope } from "lucide-react";
+import { BriefcaseBusiness, Gauge, KeyRound, ShieldCheck, Sparkles, Upload, UserCog, Users, Building2, DoorOpen, Stethoscope, HardDrive, MessageSquare } from "lucide-react";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { cn } from "@/lib/utils";
 
@@ -13,18 +13,22 @@ const navItems = [
   { href: "/management/doctors", label: "Doctors", icon: Stethoscope, roles: ["super_admin", "admin"] },
   { href: "/management/facilities", label: "Cơ sở", icon: Building2, roles: ["super_admin", "admin"] },
   { href: "/management/rooms", label: "Phòng khám", icon: DoorOpen, roles: ["super_admin", "admin"] },
-  { href: "/management/services", label: "Dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
+  // { href: "/management/roles", label: "Roles", icon: ShieldCheck, roles: ["super_admin"] },
+  // { href: "/management/records", label: "Records", icon: HardDrive, roles: ["super_admin", "doctor"] },
+  // { href: "/management/permissions", label: "Permissions", icon: KeyRound, roles: ["super_admin"] },
+  // { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness, roles: ["super_admin"] },
+  // { href: "/management/uploads", label: "Uploads", icon: Upload, roles: ["super_admin"] },
+  { href: "/management/services/super", label: "Dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin"] },
+  { href: "/management/services/facility", label: "Dịch vụ cơ sở", icon: BriefcaseBusiness, roles: ["admin"] },
   { href: "/management/roles", label: "Roles", icon: ShieldCheck, roles: ["super_admin"] },
+  { href: "/management/records", label: "Records", icon: HardDrive, roles: ["super_admin", "doctor"] },
   { href: "/management/permissions", label: "Permissions", icon: KeyRound, roles: ["super_admin"] },
   { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness, roles: ["super_admin"] },
   { href: "/management/uploads", label: "Uploads", icon: Upload, roles: ["super_admin"] },
   // { href: "/management/profile", label: "Hồ sơ cá nhân", icon: UserCog },
-    {
-    href: "/management/doctor-shifts",
-    label: "Ca trực",
-    icon: BriefcaseBusiness,
-    roles: ["super_admin", "admin", "staff", "doctor", "nurse"],
-  },
+  { href: "/management/forums", label: "Quản lý diễn đàn", icon: MessageSquare, roles: ["super_admin", "admin"],},
+  {  href: "/management/doctor-shifts",label: "Ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"],},
+  { href: "/management/shift-slots", label: "Khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"], },
 ];
 
 export function Sidebar() {

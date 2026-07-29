@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
   Alert,
   Button,
   Card,
+  Input,
   Modal,
   Space,
   Statistic,
@@ -15,35 +16,34 @@ import {
 } from "antd";
 import { Building2, Eye, Pencil, Plus, Trash2, X } from "lucide-react";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
+import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
+import { CopyText } from "@/management/components/ui/CopyText";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import { TableFilter } from "@/management/components/ui/TableFilter";
-import { CopyText } from "@/management/components/ui/CopyText";
 import {
   createFacility,
   deleteFacilities,
   deleteFacility,
-  getFacilities,
+  getFacilitiesPage,
 } from "@/management/features/facilities/facilities.api";
 import type {
   Facility,
   FacilityStatus,
 } from "@/management/features/facilities/facilities.types";
+import { FacilityDetailModal } from "./components/FacilityDetailModal";
 import {
   FacilityFormModal,
   type FacilityFormValues,
 } from "./components/FacilityFormModal";
-import { FacilityDetailModal } from "./components/FacilityDetailModal";
 import { FacilityUpdateModal } from "./components/FacilityUpdateModal";
-import { useAuthStore } from "@/features/auth/auth.store";
 
 const { Text } = Typography;
+const { TextArea } = Input;
 const FACILITY_MESSAGES = RESPONSE_MESSAGES.FACILITY_MANAGEMENT;
 
 type DeleteConfirmState =
-  | {
-      open: false;
-    }
+  | { open: false }
   | {
       open: true;
       mode: "single";
@@ -79,18 +79,22 @@ function getFacilityStatusText(status: FacilityStatus) {
 }
 
 export default function FacilityManagementPage() {
+  const [modal, modalContextHolder] = Modal.useModal();
   const isSuperAdmin = useAuthStore((state) =>
     state.roles.includes("super_admin"),
   );
+
   const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalFacilities, setTotalFacilities] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
   const [query, setQuery] = useState("");
-  const [searchQuery, setSearchQuery] = useState<string>();
   const [cityFilter, setCityFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<
     FacilityStatus | undefined
   >();
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -101,48 +105,60 @@ export default function FacilityManagementPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>({
     open: false,
   });
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteReasonTouched, setDeleteReasonTouched] = useState(false);
   const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    const timer = window.setTimeout(async () => {
+  const reloadFacilities = useCallback(
+    async (page = currentPage, limit = pageSize) => {
       setLoading(true);
       setError(null);
 
       try {
-        const data = await getFacilities({
-          rawSearch: searchQuery,
+        const result = await getFacilitiesPage({
           search: query,
           city: cityFilter,
           status: statusFilter,
+          page,
+          limit,
         });
 
-        if (mounted) {
-          setFacilities(data);
-          setCurrentPage(1);
-        }
+        setFacilities(result.items);
+        setTotalFacilities(result.total);
+        setTotalPages(result.totalPages);
+        setCurrentPage(result.page);
+        setPageSize(result.limit);
+        setSelectedFacilityIds((current) =>
+          current.filter((id) =>
+            result.items.some((facility) => facility.id === id),
+          ),
+        );
       } catch (err) {
-        if (mounted) {
-          setError(getErrorMessage(err));
-        }
+        setError(getErrorMessage(err));
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
+    },
+    [
+      cityFilter,
+      currentPage,
+      pageSize,
+      query,
+      statusFilter,
+    ],
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void reloadFacilities();
     }, 300);
 
-    return () => {
-      mounted = false;
-      window.clearTimeout(timer);
-    };
-  }, [query, cityFilter, statusFilter, searchQuery]);
-
-  const filteredFacilities = facilities;
+    return () => window.clearTimeout(timer);
+  }, [reloadFacilities]);
 
   const activeFacilities = facilities.filter(
     (facility) => facility.status === "active",
@@ -152,13 +168,14 @@ export default function FacilityManagementPage() {
     (facility) => facility.status === "suspended",
   ).length;
 
+  const openFacilities = facilities.filter(
+    (facility) => facility.isOpenNow,
+  ).length;
+
   const cityOptions = useMemo(() => {
     return Array.from(
       new Set(facilities.map((facility) => facility.city).filter(Boolean)),
-    ).map((city) => ({
-      value: city,
-      label: city,
-    }));
+    ).map((city) => ({ value: city, label: city }));
   }, [facilities]);
 
   const statusOptions = [
@@ -176,43 +193,24 @@ export default function FacilityManagementPage() {
     setError(null);
 
     try {
-      const workingHours =
-        values.openTime && values.closeTime
-          ? `${values.openTime}-${values.closeTime}`
-          : FACILITY_MESSAGES.NOT_UPDATED;
-
-      const response = await createFacility({
+      await createFacility({
         name: values.name,
-        code: values.code.trim().toUpperCase(),
+        ownerId: values.ownerId,
         hotline: values.hotline,
         email: values.email,
+        schedules: values.schedules,
         address: values.address,
         city: values.city,
-        district: values.district,
         ward: values.ward,
         latitude: values.latitude,
         longitude: values.longitude,
-        workingDays: values.workingDays,
-        openTime: values.openTime,
-        closeTime: values.closeTime,
-        workingHours,
-        featuredServices: values.description || FACILITY_MESSAGES.NOT_UPDATED,
-        description: values.description,
-        internalNote: values.internalNote,
         status: values.status,
       });
 
-      const createdFacility: Facility = {
-        ...response.data,
-        workingHours,
-        featuredServices: values.description || FACILITY_MESSAGES.NOT_UPDATED,
-      };
-
-      setFacilities((current) => [createdFacility, ...current]);
       setCurrentPage(1);
+      await reloadFacilities(1, pageSize);
     } catch (err) {
-      const message = getErrorMessage(err);
-      setError(message);
+      setError(getErrorMessage(err));
       throw err;
     }
   }
@@ -229,102 +227,9 @@ export default function FacilityManagementPage() {
     );
   }
 
-  async function handleDeleteFacility(facilityId: string) {
-    setTableLoading(true);
-    setError(null);
-
-    try {
-      await deleteFacility(facilityId);
-
-      setFacilities((current) =>
-        current.filter((facility) => facility.id !== facilityId),
-      );
-
-      setSelectedFacilityIds((current) =>
-        current.filter((id) => id !== facilityId),
-      );
-
-      setDetailFacility((current) =>
-        current?.id === facilityId ? null : current,
-      );
-
-      setUpdateFacilityTarget((current) =>
-        current?.id === facilityId ? null : current,
-      );
-
-      setCurrentPage(1);
-
-      Modal.success({
-        title: FACILITY_MESSAGES.DELETE_SUCCESS_TITLE,
-        content: FACILITY_MESSAGES.DELETE_SINGLE_SUCCESS_CONTENT,
-        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
-        centered: true,
-      });
-    } catch (err) {
-      const message = getErrorMessage(err);
-      setError(message);
-
-      Modal.error({
-        title: FACILITY_MESSAGES.DELETE_ERROR_TITLE,
-        content: message,
-        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
-        centered: true,
-      });
-
-      throw err;
-    } finally {
-      setTableLoading(false);
-    }
-  }
-
-  async function handleDeleteSelected(ids: string[]) {
-    if (ids.length === 0) return;
-
-    setTableLoading(true);
-    setError(null);
-
-    try {
-      await deleteFacilities(ids);
-
-      setFacilities((current) =>
-        current.filter((facility) => !ids.includes(facility.id)),
-      );
-
-      setDetailFacility((current) =>
-        current && ids.includes(current.id) ? null : current,
-      );
-
-      setUpdateFacilityTarget((current) =>
-        current && ids.includes(current.id) ? null : current,
-      );
-
-      setSelectedFacilityIds([]);
-      setCurrentPage(1);
-
-      Modal.success({
-        title: FACILITY_MESSAGES.DELETE_SUCCESS_TITLE,
-        content: FACILITY_MESSAGES.DELETE_SELECTED_SUCCESS_CONTENT,
-        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
-        centered: true,
-      });
-    } catch (err) {
-      const message = getErrorMessage(err);
-      setError(message);
-
-      Modal.error({
-        title: FACILITY_MESSAGES.DELETE_ERROR_TITLE,
-        content: message,
-        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
-        centered: true,
-      });
-
-      throw err;
-    } finally {
-      setTableLoading(false);
-    }
-  }
-
   function confirmDeleteFacility(record: Facility) {
+    setDeleteReason("");
+    setDeleteReasonTouched(false);
     setDeleteConfirm({
       open: true,
       mode: "single",
@@ -335,6 +240,8 @@ export default function FacilityManagementPage() {
   function confirmDeleteSelected() {
     if (selectedFacilityIds.length === 0) return;
 
+    setDeleteReason("");
+    setDeleteReasonTouched(false);
     setDeleteConfirm({
       open: true,
       mode: "selected",
@@ -346,30 +253,90 @@ export default function FacilityManagementPage() {
   function closeDeleteConfirm() {
     if (deleteConfirmLoading) return;
 
-    setDeleteConfirm({
-      open: false,
-    });
+    setDeleteConfirm({ open: false });
+    setDeleteReason("");
+    setDeleteReasonTouched(false);
   }
 
   async function handleConfirmDelete() {
     const target = deleteConfirm;
+    const reason = deleteReason.trim();
 
     if (!target.open) return;
 
+    if (!reason) {
+      setDeleteReasonTouched(true);
+      return;
+    }
+
     setDeleteConfirmLoading(true);
+    setTableLoading(true);
+    setError(null);
 
     try {
+      const deletedCount =
+        target.mode === "single" ? 1 : target.ids.length;
+
       if (target.mode === "single") {
-        await handleDeleteFacility(target.facility.id);
+        await deleteFacility(target.facility.id, reason);
+
+        setDetailFacility((current) =>
+          current?.id === target.facility.id ? null : current,
+        );
+        setUpdateFacilityTarget((current) =>
+          current?.id === target.facility.id ? null : current,
+        );
       } else {
-        await handleDeleteSelected(target.ids);
+        await deleteFacilities(target.ids, reason);
+
+        setDetailFacility((current) =>
+          current && target.ids.includes(current.id) ? null : current,
+        );
+        setUpdateFacilityTarget((current) =>
+          current && target.ids.includes(current.id) ? null : current,
+        );
       }
 
-      setDeleteConfirm({
-        open: false,
+      const remainingTotal = Math.max(
+        0,
+        totalFacilities - deletedCount,
+      );
+      const lastAvailablePage = Math.max(
+        1,
+        Math.ceil(remainingTotal / pageSize),
+      );
+      const nextPage = Math.min(currentPage, lastAvailablePage);
+
+      setSelectedFacilityIds([]);
+      setCurrentPage(nextPage);
+      setDeleteConfirm({ open: false });
+      setDeleteReason("");
+      setDeleteReasonTouched(false);
+
+      await reloadFacilities(nextPage, pageSize);
+
+      modal.success({
+        title: FACILITY_MESSAGES.DELETE_SUCCESS_TITLE,
+        content:
+          target.mode === "single"
+            ? FACILITY_MESSAGES.DELETE_SINGLE_SUCCESS_CONTENT
+            : FACILITY_MESSAGES.DELETE_SELECTED_SUCCESS_CONTENT,
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+        centered: true,
+      });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      setError(message);
+
+      modal.error({
+        title: FACILITY_MESSAGES.DELETE_ERROR_TITLE,
+        content: message,
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+        centered: true,
       });
     } finally {
       setDeleteConfirmLoading(false);
+      setTableLoading(false);
     }
   }
 
@@ -384,18 +351,16 @@ export default function FacilityManagementPage() {
     {
       title: FACILITY_MESSAGES.FACILITY_NAME,
       dataIndex: "name",
-      width: 210,
+      width: 220,
       render: (name: string, record) => (
         <Space size={10}>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-white">
             <Building2 className="h-4 w-4" aria-hidden="true" />
           </span>
-
           <div className="min-w-0">
             <Text strong className="block whitespace-normal break-words">
               {name}
             </Text>
-
             <Text type="secondary" className="text-xs">
               {record.code}
             </Text>
@@ -404,13 +369,26 @@ export default function FacilityManagementPage() {
       ),
     },
     {
+      title: "Chủ cơ sở",
+      dataIndex: "ownerName",
+      width: 180,
+      render: (ownerName: string, record) => (
+        <div>
+          <div className="font-medium text-slate-900">{ownerName}</div>
+          <div className="text-xs text-slate-500">ID: {record.ownerId}</div>
+          {record.ownerPhone ? (
+            <div className="text-xs text-slate-500">{record.ownerPhone}</div>
+          ) : null}
+        </div>
+      ),
+    },
+    {
       title: FACILITY_MESSAGES.ADDRESS,
       dataIndex: "address",
+      width: 260,
       render: (address: string, record) => (
         <span className="whitespace-normal break-words text-slate-600">
-          {[address, record.ward, record.district, record.city]
-            .filter(Boolean)
-            .join(", ")}
+          {[address, record.ward, record.city].filter(Boolean).join(", ")}
         </span>
       ),
     },
@@ -424,27 +402,41 @@ export default function FacilityManagementPage() {
       ),
     },
     {
-      title: FACILITY_MESSAGES.WORKING_HOURS,
-      dataIndex: "workingHours",
-      width: 130,
-      align: "center",
-      render: (workingHours: string) => (
-        <span className="text-slate-600">{workingHours}</span>
+      title: "Giờ hoạt động",
+      dataIndex: "operatingHourGroups",
+      width: 230,
+      render: (_value, record) => (
+        <div className="space-y-1">
+          {record.operatingHourGroups.length > 0 ? (
+            record.operatingHourGroups.map((group) => (
+              <div key={group.days.join("-")} className="text-xs">
+                <span className="font-medium text-slate-800">
+                  {group.dayLabel}:
+                </span>{" "}
+                <span className="text-slate-600">{group.displayTime}</span>
+              </div>
+            ))
+          ) : (
+            <span className="text-slate-400">Chưa cập nhật</span>
+          )}
+        </div>
       ),
     },
     {
-      title: FACILITY_MESSAGES.FEATURED_SERVICES,
-      dataIndex: "featuredServices",
-      render: (featuredServices: string) => (
-        <span className="whitespace-normal break-words text-slate-600">
-          {featuredServices}
-        </span>
+      title: "Hiện tại",
+      dataIndex: "operatingStatus",
+      width: 150,
+      align: "center",
+      render: (_value, record) => (
+        <Tag color={record.isOpenNow ? "green" : "orange"}>
+          {record.operatingStatusLabel}
+        </Tag>
       ),
     },
     {
       title: FACILITY_MESSAGES.STATUS,
       dataIndex: "status",
-      width: 140,
+      width: 130,
       align: "center",
       render: (status: FacilityStatus) => (
         <Tag color={status === "active" ? "green" : "default"}>
@@ -456,6 +448,7 @@ export default function FacilityManagementPage() {
       title: FACILITY_MESSAGES.ACTIONS,
       key: "actions",
       width: 160,
+      fixed: "right",
       align: "center",
       render: (_value, record) => (
         <Space size={8}>
@@ -467,7 +460,6 @@ export default function FacilityManagementPage() {
               setDetailFacility(record);
             }}
           />
-
           <Button
             title={FACILITY_MESSAGES.EDIT}
             icon={<Pencil className="h-4 w-4" />}
@@ -476,7 +468,6 @@ export default function FacilityManagementPage() {
               setUpdateFacilityTarget(record);
             }}
           />
-
           {isSuperAdmin ? (
             <Button
               danger
@@ -493,8 +484,12 @@ export default function FacilityManagementPage() {
     },
   ];
 
+  const deleteReasonError =
+    deleteReasonTouched && deleteReason.trim().length === 0;
+
   return (
     <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
+      {modalContextHolder}
       <PageHeader
         title={FACILITY_MESSAGES.PAGE_TITLE}
         description={FACILITY_MESSAGES.PAGE_DESCRIPTION}
@@ -512,108 +507,112 @@ export default function FacilityManagementPage() {
         ) : null}
 
         <div className="order-2">
-        <TableFilter
-          columns={[
-            { field: "name", label: FACILITY_MESSAGES.SEARCH_PLACEHOLDER, type: "text", contains: true },
-            { field: "province", label: FACILITY_MESSAGES.CITY_PLACEHOLDER, type: "select", options: cityOptions, width: 190 },
-            { field: "status", label: FACILITY_MESSAGES.STATUS_PLACEHOLDER, type: "select", options: statusOptions, width: 170 },
-          ]}
-          values={{ name: query, province: cityFilter, status: statusFilter }}
-          clearLabel={FACILITY_MESSAGES.CLEAR_FILTERS}
-          onChange={(values, search) => {
-            setSearchQuery(search);
-            setQuery(String(values.name ?? ""));
-            setCityFilter(values.province ? String(values.province) : undefined);
-            setStatusFilter(values.status as FacilityStatus | undefined);
-            setCurrentPage(1);
-          }}
-        />
+          <TableFilter
+            columns={[
+              {
+                field: "name",
+                label: FACILITY_MESSAGES.SEARCH_PLACEHOLDER,
+                type: "text",
+                contains: true,
+                width: 420,
+              },
+              {
+                field: "province",
+                label: FACILITY_MESSAGES.CITY_PLACEHOLDER,
+                type: "select",
+                options: cityOptions,
+                width: 300,
+              },
+              {
+                field: "status",
+                label: FACILITY_MESSAGES.STATUS_PLACEHOLDER,
+                type: "select",
+                options: statusOptions,
+                width: 300,
+              },
+            ]}
+            values={{
+              name: query,
+              province: cityFilter,
+              status: statusFilter,
+            }}
+            clearLabel={FACILITY_MESSAGES.CLEAR_FILTERS}
+            onChange={(values) => {
+              setCurrentPage(1);
+              setSelectedFacilityIds([]);
+              setQuery(String(values.name ?? ""));
+              setCityFilter(
+                values.province ? String(values.province) : undefined,
+              );
+              setStatusFilter(values.status as FacilityStatus | undefined);
+            }}
+          />
         </div>
 
-        <div className="order-1 grid gap-4 md:grid-cols-3">
+        <div className="order-1 grid gap-4 md:grid-cols-4">
           <Card className="border-slate-200 bg-white">
             <Statistic
-              title={
-                <span className="text-slate-500">
-                  {FACILITY_MESSAGES.TOTAL_FACILITIES}
-                </span>
-              }
-              value={facilities.length}
-              formatter={(value) => (
-                <span className="text-slate-950">{value}</span>
-              )}
+              title={FACILITY_MESSAGES.TOTAL_FACILITIES}
+              value={totalFacilities}
             />
           </Card>
-
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title={
-                <span className="text-emerald-700">
-                  {FACILITY_MESSAGES.ACTIVE_FACILITIES}
-                </span>
-              }
+              title={`${FACILITY_MESSAGES.ACTIVE_FACILITIES} (trang hiện tại)`}
               value={activeFacilities}
-              formatter={(value) => (
-                <span className="text-emerald-950">{value}</span>
-              )}
             />
           </Card>
-
           <Card className="border-red-100 bg-red-50/60">
             <Statistic
-              title={
-                <span className="text-red-700">
-                  {FACILITY_MESSAGES.SUSPENDED_FACILITIES}
-                </span>
-              }
+              title={`${FACILITY_MESSAGES.SUSPENDED_FACILITIES} (trang hiện tại)`}
               value={suspendedFacilities}
-              formatter={(value) => (
-                <span className="text-red-950">{value}</span>
-              )}
+            />
+          </Card>
+          <Card className="border-blue-100 bg-blue-50/60">
+            <Statistic
+              title="Đang mở cửa (trang hiện tại)"
+              value={openFacilities}
             />
           </Card>
         </div>
 
         <Card
           className="order-3 overflow-hidden border-slate-200 bg-white"
-          styles={{
-            body: {
-              padding: 0,
-            },
-          }}
+          styles={{ body: { padding: 0 } }}
           title={
             <div>
               <p className="mb-0 text-base font-semibold text-slate-950">
                 {FACILITY_MESSAGES.FACILITY_LIST_TITLE}
               </p>
               <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                {FACILITY_MESSAGES.FACILITY_LIST_DESCRIPTION}
+                Phân trang từ máy chủ · Trang {currentPage}/{Math.max(totalPages, 1)}.
               </p>
             </div>
           }
-          extra={isSuperAdmin ? (
-            <Space wrap>
-              <Button
-                danger
-                disabled={selectedFacilityIds.length === 0}
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={confirmDeleteSelected}
-              >
-                {FACILITY_MESSAGES.DELETE_SELECTED}
-                {selectedFacilityIds.length > 0
-                  ? ` (${selectedFacilityIds.length})`
-                  : ""}
-              </Button>
-
-              <Button
-                type="primary"
-                icon={<Plus className="h-4 w-4" />}
-                onClick={() => setCreateModalOpen(true)}
-              >
-                {FACILITY_MESSAGES.ADD_FACILITY}
-              </Button>
-            </Space>
-          ) : null}
+          extra={
+            isSuperAdmin ? (
+              <Space wrap>
+                <Button
+                  danger
+                  disabled={selectedFacilityIds.length === 0}
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onClick={confirmDeleteSelected}
+                >
+                  {FACILITY_MESSAGES.DELETE_SELECTED}
+                  {selectedFacilityIds.length > 0
+                    ? ` (${selectedFacilityIds.length})`
+                    : ""}
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<Plus className="h-4 w-4" />}
+                  onClick={() => setCreateModalOpen(true)}
+                >
+                  {FACILITY_MESSAGES.ADD_FACILITY}
+                </Button>
+              </Space>
+            ) : null
+          }
         >
           <Table
             className="management-table"
@@ -622,8 +621,29 @@ export default function FacilityManagementPage() {
             tableLayout="fixed"
             loading={loading || tableLoading}
             columns={columns}
-            dataSource={filteredFacilities}
-            scroll={{ x: 920 }}
+            dataSource={facilities}
+            scroll={{ x: 1500 }}
+            pagination={{
+              current: currentPage,
+              pageSize,
+              total: totalFacilities,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              showTotal: (total, range) =>
+                `${range[0]}-${range[1]} / ${total} cơ sở`,
+              onChange: (page, nextPageSize) => {
+                setSelectedFacilityIds([]);
+
+                if (nextPageSize !== pageSize) {
+                  setPageSize(nextPageSize);
+                  setCurrentPage(1);
+                  return;
+                }
+
+                setCurrentPage(page);
+              },
+            }}
             onRow={(record) => ({
               className: "cursor-pointer",
               onClick: (event) => {
@@ -651,20 +671,6 @@ export default function FacilityManagementPage() {
                   }
                 : undefined
             }
-            pagination={{
-              current: currentPage,
-              pageSize,
-              total: filteredFacilities.length,
-              showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50, 100],
-              showQuickJumper: true,
-              showTotal: (total, range) =>
-                `${FACILITY_MESSAGES.PAGINATION_TOTAL_PREFIX} ${range[0]} - ${range[1]} ${FACILITY_MESSAGES.PAGINATION_TOTAL_MIDDLE} ${total} ${FACILITY_MESSAGES.PAGINATION_TOTAL_SUFFIX}`,
-              onChange: (page, nextPageSize) => {
-                setCurrentPage(nextPageSize !== pageSize ? 1 : page);
-                setPageSize(nextPageSize);
-              },
-            }}
           />
         </Card>
       </div>
@@ -691,26 +697,20 @@ export default function FacilityManagementPage() {
       <Modal
         open={deleteConfirm.open}
         centered
-        width={456}
+        width={480}
         title={null}
         footer={null}
         closable={false}
         onCancel={closeDeleteConfirm}
         mask={{ closable: !deleteConfirmLoading }}
-        className="[&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-[14px] [&_.ant-modal-content]:p-0"
-        styles={{
-          body: {
-            padding: 0,
-          },
-        }}
       >
-        <div className="relative px-6 pb-6 pt-7 text-center">
+        <div className="relative px-2 pb-2 pt-3 text-center">
           <button
             type="button"
             aria-label={RESPONSE_MESSAGES.COMMON.CLOSE}
             onClick={closeDeleteConfirm}
             disabled={deleteConfirmLoading}
-            className="absolute right-1 top-1 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="absolute right-0 top-0 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
           >
             <X className="h-5 w-5" />
           </button>
@@ -737,6 +737,28 @@ export default function FacilityManagementPage() {
             </p>
           ) : null}
 
+          <div className="mt-5 text-left">
+            <label className="mb-2 block text-sm font-semibold text-slate-800">
+              Lý do xóa <span className="text-red-500">*</span>
+            </label>
+            <TextArea
+              rows={3}
+              value={deleteReason}
+              status={deleteReasonError ? "error" : undefined}
+              disabled={deleteConfirmLoading}
+              placeholder="Nhập lý do xóa cơ sở"
+              onChange={(event) => {
+                setDeleteReason(event.target.value);
+                if (event.target.value.trim()) setDeleteReasonTouched(false);
+              }}
+            />
+            {deleteReasonError ? (
+              <p className="mt-1 text-xs text-red-500">
+                Vui lòng nhập lý do xóa cơ sở.
+              </p>
+            ) : null}
+          </div>
+
           <div className="mt-6 grid grid-cols-2 gap-3">
             <Button
               size="large"
@@ -746,7 +768,6 @@ export default function FacilityManagementPage() {
             >
               {RESPONSE_MESSAGES.COMMON.CANCEL}
             </Button>
-
             <Button
               danger
               type="primary"

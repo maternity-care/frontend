@@ -77,3 +77,16 @@ export interface ApiResponse<T> {
   message?: string;
   data: T;
 }
+
+export interface RegisterResponse {
+  email?: string;
+}
+
+export interface ResendOtpInput {
+  email: string;
+}
+
+export interface VerifyOtpInput {
+  email: string;
+  otp: string;
+}

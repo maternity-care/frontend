@@ -7,6 +7,7 @@ import {
   ChevronDown,
   HeartPulse,
   LogOut,
+  SquareLibrary,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -84,6 +85,11 @@ export function UserHeader() {
       return;
     }
 
+    if (key === "record_keeping") {
+      router.push("/record-keeping");
+      return;
+    }
+
     if (key === "logout") {
       await handleLogout();
     }
@@ -101,7 +107,9 @@ export function UserHeader() {
       label: RESPONSE_MESSAGES.NAVIGATION.SCHEDULE,
     },
     {
-      type: "divider",
+      key: "record_keeping",
+      icon: <SquareLibrary className="h-4 w-4" />,
+      label: RESPONSE_MESSAGES.NAVIGATION.record_keeping,
     },
     {
       key: "logout",

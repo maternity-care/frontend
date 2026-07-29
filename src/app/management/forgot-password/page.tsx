@@ -29,8 +29,8 @@ export default function ManagementForgotPasswordPage() {
       <Card className="w-full max-w-md">
         <Title level={3}>Quên mật khẩu nhân viên</Title>
         <Text type="secondary">Nhập email công ty để nhận liên kết đặt lại mật khẩu.</Text>
-        {message ? <Alert className="mt-4" type="success" message={message} showIcon /> : null}
-        {error ? <Alert className="mt-4" type="error" message={error} showIcon /> : null}
+        {message ? <Alert className="mt-4" type="success" title={message} showIcon /> : null}
+        {error ? <Alert className="mt-4" type="error" title={error} showIcon /> : null}
         <Form layout="vertical" className="mt-5" onFinish={(values) => void submit(values)}>
           <Form.Item
             name="email"

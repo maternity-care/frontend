@@ -1,18 +1,48 @@
 export type ShiftSlotStatus = "active" | "inactive";
 
+export interface BackendShiftSlotFacility {
+  id: string;
+  name: string;
+  code: string;
+  ownerId?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  province?: string;
+  ward?: string;
+  latitude?: string;
+  longitude?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deleteReason?: string | null;
+}
+
 export interface BackendShiftSlot {
   id: string;
   facilityId: string;
-  facilityName: string;
-  facilityCode: string;
+  facilityName?: string;
+  facilityCode?: string;
   code: string;
   name: string;
   startTime: string;
   endTime: string;
-  isOvernight: boolean;
+  isOvernight: boolean | number | string;
   status: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  facility?: BackendShiftSlotFacility | null;
+}
+
+export interface BackendShiftSlotPagination {
+  items: BackendShiftSlot[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface ShiftSlot {
@@ -28,6 +58,14 @@ export interface ShiftSlot {
   status: ShiftSlotStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ShiftSlotListResult {
+  items: ShiftSlot[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface BackendShiftSlotLookupItem {

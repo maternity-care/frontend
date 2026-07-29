@@ -19,7 +19,7 @@ interface ProtectedRouteProps {
 
 function ProtectedRouteContent({
   children,
-  roles = ["super_admin", "admin"],
+  roles = ["super_admin", "admin", "doctor", "staff", "nurse"],
   permissions = [],
 }: ProtectedRouteProps) {
   const router = useRouter();

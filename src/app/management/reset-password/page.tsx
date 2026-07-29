@@ -30,14 +30,14 @@ function ResetPasswordForm() {
         <Text type="secondary">Mật khẩu mới phải có ít nhất 6 ký tự.</Text>
         {done ? (
           <>
-            <Alert className="mt-4" type="success" message="Đặt lại mật khẩu thành công" showIcon />
+            <Alert className="mt-4" type="success" title="Đặt lại mật khẩu thành công" showIcon />
             <Link className="mt-4 block text-center" href="/management/login">
               Đăng nhập
             </Link>
           </>
         ) : (
           <>
-            {error ? <Alert className="mt-4" type="error" message={error} showIcon /> : null}
+            {error ? <Alert className="mt-4" type="error" title={error} showIcon /> : null}
             <Form layout="vertical" className="mt-5" onFinish={(values) => void submit(values)}>
               <Form.Item
                 name="password"

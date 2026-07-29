@@ -1,84 +1,167 @@
-export type RoomStatus = "active" | "suspended";
+export type RoomStatus =
+  | "active"
+  | "inactive";
 
 export interface BackendRoom {
   id: string;
   facilityId: string;
+  code: string;
   name: string;
-
-  // Backend có thể trả một trong các field này
-  roomType?: string;
-  type?: string;
-  room_type?: string;
-  roomTypeName?: string;
-  room_type_name?: string;
-
+  roomTypeId: string;
   floor: string;
   status: string;
   createdAt: string;
   updatedAt: string;
+
+  facilityName?: string;
+  facilityCode?: string;
+  facilityAddress?: string;
+  facilityProvince?: string;
+  facilityWard?: string;
+  facilityStatus?: string;
+
+  roomTypeName?: string;
+  roomTypeCode?: string;
+  roomTypeDescription?: string;
+  roomTypeStatus?: string;
 }
 
-export interface BackendRoomFacility {
-  id: string;
-  name: string;
-  code: string;
-  phone: string;
-  email: string;
-  address: string;
-  province: string;
-  district: string;
-  ward: string;
-  latitude: string;
-  longitude: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface BackendRoomsByFacility {
-  facility: BackendRoomFacility;
-  rooms: BackendRoom[];
+export interface BackendPaginatedRooms {
+  items: BackendRoom[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface ClinicRoom {
   id: string;
   facilityId: string;
+  code: string;
   roomName: string;
-  roomType: string;
-  floor: number;
-  capacity: number;
+  roomTypeId: string;
+  roomTypeName: string;
+  roomTypeCode: string;
+  roomTypeDescription: string;
+  roomTypeStatus: RoomStatus;
+  floor: string;
   status: RoomStatus;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+
+  facilityName: string;
+  facilityCode: string;
+  facilityAddress: string;
+  facilityProvince: string;
+  facilityWard: string;
+  facilityStatus: RoomStatus;
+}
+
+export interface RoomListResult {
+  items: ClinicRoom[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface RoomFormValues {
   roomName: string;
-  roomType: string;
-  floor: number;
-  capacity: number;
+  roomTypeId: string;
+  floor: string;
   status: RoomStatus;
 }
 
-export interface GetRoomsByFacilityParams {
-  rawSearch?: string;
+export interface GetRoomsParams {
+  /**
+   * Backend search chỉ dùng cho tên phòng
+   * hoặc thông tin cơ sở.
+   */
   search?: string;
   floor?: string;
   status?: RoomStatus;
+  facilityId?: string;
+  roomTypeId?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface CreateRoomInput {
   facilityId: string;
   name: string;
-  roomType: string;
+  roomTypeId: string;
   floor: string;
   status: RoomStatus;
-  capacity?: number;
 }
 
-export type UpdateRoomInput = Partial<CreateRoomInput>;
+export interface UpdateRoomInput {
+  name?: string;
+  roomTypeId?: string;
+  floor?: string;
+  status?: RoomStatus;
+}
 
-export interface RoomsByFacility {
-  facility: BackendRoomFacility;
-  rooms: ClinicRoom[];
+export interface BackendRoomType {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BackendPaginatedRoomTypes {
+  items: BackendRoomType[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface RoomType {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  status: RoomStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoomTypeListResult {
+  items: RoomType[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface GetRoomTypesParams {
+  search?: string;
+  status?: RoomStatus;
+  page?: number;
+  limit?: number;
+}
+
+export type GetRoomTypeLookupParams =
+  Omit<GetRoomTypesParams, "page">;
+
+export interface CreateRoomTypeInput {
+  name: string;
+  description: string;
+  status: RoomStatus;
+}
+
+export type UpdateRoomTypeInput =
+  Partial<CreateRoomTypeInput>;
+
+export interface BulkCreateRoomsInput {
+  rooms: CreateRoomInput[];
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
 }
