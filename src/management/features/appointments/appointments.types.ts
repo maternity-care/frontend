@@ -36,6 +36,7 @@ export interface ManagementAppointment {
 }
 
 export interface GetManagementAppointmentsParams {
+  search?: string;
   facilityId?: string;
   doctorId?: string;
   patientId?: string;

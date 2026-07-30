@@ -20,7 +20,7 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
-import { CalendarClock, CheckCircle2, Eye, FileText, LogIn, RefreshCw, UserX, XCircle } from "lucide-react";
+import { CalendarClock, CheckCircle2, Eye, FileText, LogIn, RefreshCw, Search, UserX, XCircle } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
@@ -88,6 +88,8 @@ function formatPatient(appointment: ManagementAppointment) {
 export default function ManagementAppointmentsPage() {
   const [appointments, setAppointments] = useState<ManagementAppointment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [status, setStatus] = useState<ManagementAppointmentStatus | undefined>();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -110,7 +112,7 @@ export default function ManagementAppointmentsPage() {
   const loadAppointments = async () => {
     setLoading(true);
     try {
-      setAppointments(await getManagementAppointments({ scope, status }));
+      setAppointments(await getManagementAppointments({ scope, status, search }));
     } catch {
       message.error("Không tải được lịch đặt khám.");
     } finally {
@@ -121,7 +123,7 @@ export default function ManagementAppointmentsPage() {
   useEffect(() => {
     loadAppointments();
     getDoctors({ limit: 100 }).then((result) => setDoctors(result.items)).catch(() => undefined);
-  }, [scope, status]);
+  }, [scope, status, search]);
 
   const openCheckIn = async (appointment: ManagementAppointment) => {
     setSelectedAppointment(appointment);
@@ -371,6 +373,20 @@ export default function ManagementAppointmentsPage() {
             value={status}
             onChange={setStatus}
             options={Object.entries(statusMeta).map(([value, meta]) => ({ value, label: meta.label }))}
+          />
+          <Input.Search
+            allowClear
+            className="w-full md:w-80"
+            prefix={<Search className="h-4 w-4 text-slate-400" />}
+            placeholder="Tìm mã lịch, user, SĐT, dịch vụ, bác sĩ..."
+            value={searchInput}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearchInput(value);
+              if (!value) setSearch("");
+            }}
+            onSearch={(value) => setSearch(value.trim())}
+            enterButton="Tìm"
           />
           <Button icon={<CalendarClock className="h-4 w-4" />} onClick={loadAppointments}>Tải lại</Button>
         </Space>
