@@ -37,6 +37,7 @@ import type {
 } from "@/management/features/appointments/appointments.types";
 import { getDoctors } from "@/management/features/doctors/doctors.api";
 import type { Doctor } from "@/management/features/doctors/doctors.types";
+import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { getManagementPregnancyProfiles, getManagementPregnancyProfileById } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.api";
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { PregnancyProfileDetailModal } from "@/fe/components/records/management/PregnancyProfileDetailModal";
@@ -92,7 +93,10 @@ export default function ManagementAppointmentsPage() {
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [status, setStatus] = useState<ManagementAppointmentStatus | undefined>();
+  const [facilityId, setFacilityId] = useState<string | undefined>();
+  const [doctorId, setDoctorId] = useState<string | undefined>();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [facilityOptions, setFacilityOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [profileOptions, setProfileOptions] = useState<ManagementPregnancyProfile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<ManagementAppointment | null>(null);
@@ -112,7 +116,7 @@ export default function ManagementAppointmentsPage() {
   const loadAppointments = async () => {
     setLoading(true);
     try {
-      setAppointments(await getManagementAppointments({ scope, status, search }));
+      setAppointments(await getManagementAppointments({ scope, status, search, facilityId, doctorId }));
     } catch {
       message.error("Không tải được lịch đặt khám.");
     } finally {
@@ -122,8 +126,21 @@ export default function ManagementAppointmentsPage() {
 
   useEffect(() => {
     loadAppointments();
+  }, [scope, status, search, facilityId, doctorId]);
+
+  useEffect(() => {
     getDoctors({ limit: 100 }).then((result) => setDoctors(result.items)).catch(() => undefined);
-  }, [scope, status, search]);
+    getFacilities({ status: "active", limit: 100 })
+      .then((facilities) =>
+        setFacilityOptions(
+          facilities.map((facility) => ({
+            value: facility.id,
+            label: `${facility.name} (${facility.code})`,
+          })),
+        ),
+      )
+      .catch(() => undefined);
+  }, []);
 
   const openCheckIn = async (appointment: ManagementAppointment) => {
     setSelectedAppointment(appointment);
@@ -373,6 +390,26 @@ export default function ManagementAppointmentsPage() {
             value={status}
             onChange={setStatus}
             options={Object.entries(statusMeta).map(([value, meta]) => ({ value, label: meta.label }))}
+          />
+          <Select
+            allowClear
+            showSearch
+            className="w-72"
+            placeholder="Tìm theo cơ sở"
+            value={facilityId}
+            onChange={setFacilityId}
+            optionFilterProp="label"
+            options={facilityOptions}
+          />
+          <Select
+            allowClear
+            showSearch
+            className="w-72"
+            placeholder="Tìm theo bác sĩ"
+            value={doctorId}
+            onChange={setDoctorId}
+            optionFilterProp="label"
+            options={doctorOptions}
           />
           <Input.Search
             allowClear

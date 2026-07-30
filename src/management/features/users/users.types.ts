@@ -84,6 +84,7 @@ export interface GetUsersParams {
   email?: string;
   phone?: string;
   roleId?: string;
+  facilityId?: string;
   status?: AccountStatus;
   page?: number;
   limit?: number;

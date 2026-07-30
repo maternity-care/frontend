@@ -27,6 +27,7 @@ function toQueryParams(params?: GetUsersParams) {
     email: params?.email?.trim() || undefined,
     phone: params?.phone?.trim() || undefined,
     roleId: params?.roleId || undefined,
+    facilityId: params?.facilityId || undefined,
     status: params?.status,
     page: params?.page,
     limit: params?.limit,
