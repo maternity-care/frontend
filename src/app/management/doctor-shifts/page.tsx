@@ -284,7 +284,12 @@ export default function DoctorShiftPage() {
         page: 1,
         limit: 100,
       }),
-      getDoctors(),
+      getDoctors({
+        page: 1,
+        limit: 50,
+        status: "active",
+        sortYearsOfExperience: "desc",
+      }),
     ])
       .then(
         ([
