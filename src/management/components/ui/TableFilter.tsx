@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Button, Card, Input, Select } from "antd";
 import { RotateCcw, Search } from "lucide-react";
+import { buildSearch } from "@/lib/search-filter";
 
 export type TableFilterValue =
   | string
@@ -61,6 +62,16 @@ export function TableFilter({
     hasValue(values[column.field]),
   );
 
+  function emitChange(nextValues: TableFilterValues) {
+    const search = buildSearch(nextValues, {
+      contains: columns
+        .filter((column) => column.contains)
+        .map((column) => column.field),
+    });
+
+    onChange(nextValues, search);
+  }
+
   function handleChange(
     field: string,
     value: TableFilterValue,
@@ -76,7 +87,7 @@ export function TableFilter({
       [field]: normalizedValue,
     };
 
-    onChange(nextValues, undefined);
+    emitChange(nextValues);
   }
 
   function handleClear() {
@@ -88,7 +99,7 @@ export function TableFilter({
       nextValues[column.field] = undefined;
     });
 
-    onChange(nextValues, undefined);
+    emitChange(nextValues);
   }
 
   return (
