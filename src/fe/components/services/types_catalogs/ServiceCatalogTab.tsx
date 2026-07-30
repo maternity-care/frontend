@@ -353,7 +353,7 @@ export function ServiceCatalogTab() {
             allowClear
             value={searchInput}
             prefix={<Search size={16} />}
-            placeholder="Tìm theo mã, tên hoặc mô tả"
+            placeholder="Tìm theo ID, mã hoặc tên"
             style={{ width: 300 }}
             onChange={(event) => setSearchInput(event.target.value)}
             onPressEnter={handleSearch}

@@ -34,6 +34,7 @@ const { TextArea } = Input;
 interface ServiceRow {
   key: string;
   id?: string;
+  serviceId?: string;
   facilityServiceId?: string;
   includedQuantity: number;
   isRequired: boolean;
@@ -104,16 +105,18 @@ export function QuantityPackageFormModal({
     const activeFs = facilityServices.filter((fs) => fs.status === "active");
 
     return services
-      .filter((svc) => svc.status === "active")
+      .filter(
+        (svc) =>
+          svc.status === "active" &&
+          (svc.saleMode === "both" || svc.saleMode === "package_only"),
+      )
       .map((svc) => {
         const fs = activeFs.find((item) => item.serviceId === svc.id);
-        if (!fs) return null;
         return {
-          value: fs.id,
-          label: `${svc.code} - ${svc.name} (${formatCurrency(fs.price)})`,
+          value: svc.id,
+          label: `${svc.code} - ${svc.name} (${formatCurrency(fs?.price ?? svc.basePrice)})`,
         };
-      })
-      .filter((opt): opt is { value: string; label: string } => opt !== null);
+      });
   }, [services, facilityServices]);
 
   // Load /management/services + facility-services (để map facilityServiceId)
@@ -127,7 +130,7 @@ export function QuantityPackageFormModal({
           getManagementServices({
             status: "active",
             page: 1,
-            limit: 20,
+            limit: 100,
           }),
           facilityServicesProp && facilityServicesProp.length > 0
             ? Promise.resolve({ items: facilityServicesProp })
@@ -195,6 +198,7 @@ export function QuantityPackageFormModal({
             ? items.map((item, index) => ({
                 key: String(item.id ?? index),
                 id: item.id,
+                serviceId: item.serviceId ?? item.facilityService?.serviceId,
                 facilityServiceId: item.facilityServiceId,
                 includedQuantity: Number(item.includedQuantity) || 1,
                 isRequired: Boolean(item.isRequired),
@@ -233,7 +237,7 @@ export function QuantityPackageFormModal({
   };
 
   const buildServicesPayload = (): PackageServiceItemInput[] | null => {
-    const selected = serviceRows.filter((row) => row.facilityServiceId);
+    const selected = serviceRows.filter((row) => row.serviceId);
 
     if (selected.length === 0) {
       messageApi.error("Vui lòng chọn ít nhất một dịch vụ.");
@@ -241,7 +245,7 @@ export function QuantityPackageFormModal({
     }
 
     return selected.map((row, index) => ({
-      facilityServiceId: row.facilityServiceId as string,
+      serviceId: row.serviceId as string,
       includedQuantity: row.includedQuantity,
       isRequired: Boolean(row.isRequired),
       isOptional: Boolean(row.isOptional),
@@ -414,10 +418,10 @@ export function QuantityPackageFormModal({
                     placeholder="Chọn dịch vụ"
                     style={{ width: "100%" }}
                     loading={loadingServices}
-                    value={record.facilityServiceId}
+                    value={record.serviceId}
                     options={serviceOptions}
                     onChange={(value) =>
-                      updateRow(record.key, { facilityServiceId: value })
+                      updateRow(record.key, { serviceId: value })
                     }
                   />
                 ),
