@@ -61,6 +61,10 @@ function getSlotTimes(slot: AvailabilityShift["availableSlots"][number]) {
   };
 }
 
+function isPastSlot(date: Dayjs, startTime: string) {
+  return dayjs(`${date.format("YYYY-MM-DD")} ${startTime}`).isBefore(dayjs());
+}
+
 export function QuickAppointmentCard() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const [modal, modalContextHolder] = Modal.useModal();
@@ -156,6 +160,10 @@ export function QuickAppointmentCard() {
 
   const handleCheckAvailability = async () => {
     if (!facilityId || !doctorId || !date) return;
+    if (date.isBefore(dayjs(), "day")) {
+      setError("Không thể đặt lịch trong quá khứ.");
+      return;
+    }
 
     setCheckingAvailability(true);
     setError(null);
@@ -182,7 +190,7 @@ export function QuickAppointmentCard() {
         shiftId: shift.shiftId,
         label: normalizeSlot(slot),
         ...getSlotTimes(slot),
-      })),
+      })).filter((slot) => !date || !isPastSlot(date, slot.startTime)),
     ) ?? [];
 
   const selectedFacility = facilities.find((facility) => facility.id === facilityId);
@@ -196,6 +204,10 @@ export function QuickAppointmentCard() {
     }
 
     if (!facilityId || !serviceId || !doctorId || !date) return;
+    if (isPastSlot(date, slot.startTime)) {
+      setError("Không thể đặt lịch trong quá khứ.");
+      return;
+    }
 
     const slotKey = `${slot.shiftId}-${slot.label}`;
     setBookingSlotKey(slotKey);
@@ -228,6 +240,10 @@ export function QuickAppointmentCard() {
     }
 
     if (!facilityId || !serviceId || !doctorId || !date) return;
+    if (isPastSlot(date, slot.startTime)) {
+      setError("Không thể đặt lịch trong quá khứ.");
+      return;
+    }
 
     modal.confirm({
       title: "Xác nhận đặt lịch khám",
@@ -332,6 +348,7 @@ export function QuickAppointmentCard() {
           value={date}
           format="DD/MM/YYYY"
           placeholder={RESPONSE_MESSAGES.HOME.QUICK_APPOINTMENT.DATE_PLACEHOLDER}
+          disabledDate={(current) => current.isBefore(dayjs(), "day")}
           onChange={(value) => {
             setDate(value);
             setAvailability(null);
