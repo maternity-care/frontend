@@ -1649,7 +1649,7 @@ export default function DoctorShiftPage() {
           </h3>
 
           <p className="mt-2 text-sm text-slate-500">
-            Backend yêu cầu nhập lý do xóa. Thao tác này không thể hoàn tác.
+            Nhập lý do xóa. Thao tác này không thể hoàn tác.
           </p>
 
           {deletingShift ? (

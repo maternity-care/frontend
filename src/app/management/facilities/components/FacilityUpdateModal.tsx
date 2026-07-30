@@ -367,7 +367,7 @@ export function FacilityUpdateModal({
             {FACILITY_MESSAGES.UPDATE_FACILITY_TITLE}
           </Title>
           <Text className="text-slate-500">
-            Thông tin cơ sở và lịch hoạt động sẽ được cập nhật qua hai API riêng.
+            Thông tin cơ sở và lịch hoạt động sẽ được cập nhật.
           </Text>
         </div>
   
@@ -390,9 +390,7 @@ export function FacilityUpdateModal({
                       <p className="mb-0 text-base font-semibold text-slate-950">
                         Thông tin cơ sở
                       </p>
-                      <p className="mb-0 text-xs font-normal text-slate-500">
-                        Mã cơ sở do backend quản lý và không thể chỉnh sửa.
-                      </p>
+                      
                     </span>
                   </Space>
                 }
@@ -502,7 +500,7 @@ export function FacilityUpdateModal({
                         Địa chỉ
                       </p>
                       <p className="mb-0 text-xs font-normal text-slate-500">
-                        Cập nhật tỉnh/thành phố và phường/xã theo contract mới.
+                        Cập nhật tỉnh/thành phố và phường/xã.
                       </p>
                     </span>
                   </Space>
@@ -564,9 +562,7 @@ export function FacilityUpdateModal({
                       <p className="mb-0 text-base font-semibold text-slate-950">
                         Lịch hoạt động
                       </p>
-                      <p className="mb-0 text-xs font-normal text-slate-500">
-                        Lịch được cập nhật qua endpoint operating-hours riêng.
-                      </p>
+                
                     </span>
                   </Space>
                 }

@@ -42,10 +42,6 @@ export interface BackendDoctor {
   createdAt: string;
   updatedAt: string;
 
-  /**
-   * Backend có thể trả thông tin nhân sự dạng object staff
-   * hoặc làm phẳng trực tiếp vào doctor.
-   */
   staff?: BackendDoctorStaff | null;
   name?: string | null;
   personalEmail?: string | null;
@@ -64,10 +60,6 @@ export interface BackendDoctorPaginatedResponse {
   totalPages: number;
 }
 
-/**
- * Dạng repository/service thường trả:
- * { data: Doctor[], count: number }
- */
 export interface BackendDoctorDataCountResponse {
   data: BackendDoctor[];
   count: number;

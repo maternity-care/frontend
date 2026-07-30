@@ -59,10 +59,6 @@ function toOwnerOption(
   };
 }
 
-/**
- * Chỉ tải các admin đang hoạt động và còn khả dụng
- * để có thể được gán làm chủ cơ sở.
- */
 export async function getFacilityOwnerOptions(): Promise<
   FacilityOwnerOption[]
 > {
