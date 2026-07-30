@@ -38,6 +38,7 @@ const { TextArea } = Input;
 interface ServiceRow {
   key: string;
   id?: string;
+  serviceId?: string;
   facilityServiceId?: string;
   includedQuantity: number;
   isRequired: boolean;
@@ -131,16 +132,18 @@ export function SchedulePackageFormModal({
     const activeFs = facilityServices.filter((fs) => fs.status === "active");
 
     return services
-      .filter((svc) => svc.status === "active")
+      .filter(
+        (svc) =>
+          svc.status === "active" &&
+          (svc.saleMode === "both" || svc.saleMode === "package_only"),
+      )
       .map((svc) => {
         const fs = activeFs.find((item) => item.serviceId === svc.id);
-        if (!fs) return null;
         return {
-          value: fs.id,
-          label: `${svc.code} - ${svc.name} (${formatCurrency(fs.price)})`,
+          value: svc.id,
+          label: `${svc.code} - ${svc.name} (${formatCurrency(fs?.price ?? svc.basePrice)})`,
         };
-      })
-      .filter((opt): opt is { value: string; label: string } => opt !== null);
+      });
   }, [services, facilityServices]);
 
   useEffect(() => {
@@ -153,7 +156,7 @@ export function SchedulePackageFormModal({
           getManagementServices({
             status: "active",
             page: 1,
-            limit: 20,
+            limit: 100,
           }),
           facilityServicesProp && facilityServicesProp.length > 0
             ? Promise.resolve({ items: facilityServicesProp })
@@ -225,6 +228,7 @@ export function SchedulePackageFormModal({
                       ? stageItems.map((item) => ({
                           key: String(item.id),
                           id: item.id,
+                          serviceId: item.serviceId ?? item.facilityService?.serviceId,
                           facilityServiceId: item.facilityServiceId,
                           includedQuantity: Number(item.includedQuantity) || 1,
                           isRequired: Boolean(item.isRequired),
@@ -341,7 +345,7 @@ export function SchedulePackageFormModal({
       }
 
       const selectedServices = stage.services.filter(
-        (s) => s.facilityServiceId,
+        (s) => s.serviceId,
       );
 
       if (selectedServices.length === 0) {
@@ -351,7 +355,7 @@ export function SchedulePackageFormModal({
 
       const servicesPayload: PackageServiceItemInput[] = selectedServices.map(
         (service, index) => ({
-          facilityServiceId: service.facilityServiceId as string,
+          serviceId: service.serviceId as string,
           includedQuantity: service.includedQuantity,
           isRequired: Boolean(service.isRequired),
           isOptional: Boolean(service.isOptional),
@@ -631,11 +635,11 @@ export function SchedulePackageFormModal({
                           placeholder="Chọn dịch vụ"
                           style={{ width: "100%" }}
                           loading={loadingServices}
-                          value={record.facilityServiceId}
+                          value={record.serviceId}
                           options={serviceOptions}
                           onChange={(value) =>
                             updateStageService(stage.key, record.key, {
-                              facilityServiceId: value,
+                              serviceId: value,
                             })
                           }
                         />

@@ -13,7 +13,8 @@ export type MaternityPackageStageType =
 export type PackageServiceFacilityScope = "all" | "selected";
 
 export interface PackageServiceItemInput {
-  facilityServiceId: string;
+  serviceId?: string;
+  facilityServiceId?: string;
   includedQuantity: number;
   isRequired?: boolean;
   isOptional?: boolean;
@@ -83,6 +84,7 @@ export interface MaternityPackageItem {
   packageId: string;
   packageStageId?: string | null;
   facilityServiceId: string;
+  serviceId: string;
   includedQuantity: number;
   isRequired: boolean;
   isOptional: boolean;
