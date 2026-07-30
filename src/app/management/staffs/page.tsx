@@ -272,6 +272,7 @@ export default function StaffsManagementPage() {
   const [searchQuery, setSearchQuery] = useState<string>();
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>();
   const [statusFilter, setStatusFilter] = useState<UserStatus | undefined>();
+  const [facilityFilter, setFacilityFilter] = useState<string | undefined>();
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -340,6 +341,26 @@ export default function StaffsManagementPage() {
       window.clearTimeout(timer);
     };
   }, [searchQuery, currentPage, pageSize]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    getFacilities({ status: "active", limit: 100 })
+      .then((facilities) => {
+        if (!mounted) return;
+        setStaffFacilityOptions(
+          facilities.map((facility) => ({
+            value: facility.id,
+            label: `${facility.name} (${facility.code})`,
+          })),
+        );
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredUsers = users;
 
@@ -676,13 +697,15 @@ export default function StaffsManagementPage() {
         <TableFilter
           columns={[
             { field: "keyword", label: "Tìm theo tên/email/SĐT", type: "text", contains: true },
+            { field: "facilityId", label: "Cơ sở", type: "select", options: staffFacilityOptions, width: 240 },
             { field: "role", label: "Vai trò", type: "select", options: roleOptions, width: 165 },
             { field: "status", label: "Trạng thái", type: "select", options: statusOptions, width: 165 },
           ]}
-          values={{ keyword: query, role: roleFilter, status: statusFilter }}
+          values={{ keyword: query, facilityId: facilityFilter, role: roleFilter, status: statusFilter }}
           onChange={(values, search) => {
             setSearchQuery(search);
             setQuery(String(values.keyword ?? ""));
+            setFacilityFilter(values.facilityId ? String(values.facilityId) : undefined);
             setRoleFilter(values.role as UserRole | undefined);
             setStatusFilter(values.status as UserStatus | undefined);
             setCurrentPage(1);
