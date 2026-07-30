@@ -996,7 +996,7 @@ export function DoctorShiftFormModalBase({
             </Title>
 
             <Text type="secondary">
-              Chọn cơ sở, bác sĩ, phòng và khung ca. Thời gian và trạng thái được hiển thị theo dữ liệu API.
+              Chọn cơ sở, bác sĩ, phòng và khung ca.
             </Text>
           </div>
         </div>

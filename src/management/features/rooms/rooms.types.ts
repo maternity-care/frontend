@@ -73,10 +73,7 @@ export interface RoomFormValues {
 }
 
 export interface GetRoomsParams {
-  /**
-   * Backend search chỉ dùng cho tên phòng
-   * hoặc thông tin cơ sở.
-   */
+ 
   search?: string;
   floor?: string;
   status?: RoomStatus;

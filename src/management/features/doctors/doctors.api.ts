@@ -466,9 +466,6 @@ export async function getDoctors(
   );
 }
 
-/**
- * GET /management/doctors/facility/{id}
- */
 export async function getDoctorsByFacility(
   facilityId: string,
 ): Promise<Doctor[]> {

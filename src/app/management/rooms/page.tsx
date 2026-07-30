@@ -771,10 +771,6 @@ function ClinicRoomManagementContent() {
               <p className="mb-0 text-base font-semibold text-slate-950">
                 Danh sách phòng
               </p>
-
-              <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Danh sách được lọc và phân trang từ backend.
-              </p>
             </div>
           }
           extra={

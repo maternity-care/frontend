@@ -622,10 +622,6 @@ export default function ShiftSlotsPage() {
               <p className="mb-0 text-base font-semibold text-slate-950">
                 Danh sách khung ca
               </p>
-
-              <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Hiển thị tối đa 30 khung ca theo bộ lọc hiện tại.
-              </p>
             </div>
           }
           extra={

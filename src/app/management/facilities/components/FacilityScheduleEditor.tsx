@@ -54,11 +54,6 @@ function isDayOfWeek(value: unknown): value is DayOfWeek {
   return typeof value === "string" && VALID_DAYS.has(value as DayOfWeek);
 }
 
-/**
- * Ant Design Form có thể truyền undefined, null hoặc dữ liệu chưa đúng cấu trúc
- * trong một số lần render đầu. Luôn chuẩn hóa về một mảng lịch hợp lệ trước khi
- * map, filter, concat hoặc đọc group.days.
- */
 function normalizeScheduleValue(value: unknown): FacilityScheduleInput[] {
   if (!Array.isArray(value)) return [];
 

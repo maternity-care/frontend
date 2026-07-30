@@ -378,7 +378,7 @@ export function RoomTypeManagementModal({
       title:
         "Xóa hoặc ngừng hoạt động loại phòng?",
       content:
-        "Backend sẽ xóa nếu loại phòng chưa được sử dụng; nếu đang được sử dụng, backend sẽ chuyển về ngừng hoạt động.",
+        "Hệ thống sẽ xóa nếu loại phòng chưa được sử dụng; nếu đang được sử dụng, Hệ thống sẽ chuyển về ngừng hoạt động.",
       okText: "Xác nhận",
       cancelText: "Hủy",
       okButtonProps: {

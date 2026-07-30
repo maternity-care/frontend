@@ -1150,10 +1150,6 @@ export default function DoctorManagementPage() {
               <p className="mb-0 text-base font-semibold text-slate-950">
                 Danh sách bác sĩ
               </p>
-
-              <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Bộ lọc và phân trang được gửi trực tiếp đến API quản lý bác sĩ.
-              </p>
             </div>
           }
           extra={

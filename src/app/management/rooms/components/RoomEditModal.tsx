@@ -65,7 +65,6 @@ function RoomEditModalContent({
         response.data.id || room.id,
       );
     } catch {
-      // Giữ dữ liệu PATCH đã ghép với dữ liệu cũ.
     }
 
     onUpdated(updatedRoom);
