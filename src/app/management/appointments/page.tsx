@@ -42,8 +42,10 @@ import { getManagementPregnancyProfiles, getManagementPregnancyProfileById } fro
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { PregnancyProfileDetailModal } from "@/fe/components/records/management/PregnancyProfileDetailModal";
 import { getDoctorAvailability } from "@/management/features/doctor-shifts/doctor-shifts.api";
+import { useAuthStore } from "@/features/auth/auth.store";
 
 const { Text } = Typography;
+const { RangePicker } = DatePicker;
 
 const statusMeta: Record<ManagementAppointmentStatus, { label: string; color: string }> = {
   pending_payment: { label: "Chờ thanh toán", color: "gold" },
@@ -87,6 +89,12 @@ function formatPatient(appointment: ManagementAppointment) {
 }
 
 export default function ManagementAppointmentsPage() {
+  const authUser = useAuthStore((state) => state.user);
+  const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
+  const isSuperAdmin = authUser?.roles?.some((role) => role.name === "super_admin") ?? false;
+  const activeFacility = authUser?.facilities?.find(
+    (facility) => String(facility.id) === String(activeFacilityId),
+  );
   const [appointments, setAppointments] = useState<ManagementAppointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -95,6 +103,7 @@ export default function ManagementAppointmentsPage() {
   const [status, setStatus] = useState<ManagementAppointmentStatus | undefined>();
   const [facilityId, setFacilityId] = useState<string | undefined>();
   const [doctorId, setDoctorId] = useState<string | undefined>();
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [facilityOptions, setFacilityOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [profileOptions, setProfileOptions] = useState<ManagementPregnancyProfile[]>([]);
@@ -107,6 +116,7 @@ export default function ManagementAppointmentsPage() {
   const [availableSlots, setAvailableSlots] = useState<Array<{ shiftId: string; label: string; startTime: string; endTime: string }>>([]);
   const [checkInForm] = Form.useForm<CheckInFormValues>();
   const [rescheduleForm] = Form.useForm<RescheduleFormValues>();
+  const scopedFacilityId = isSuperAdmin ? facilityId : activeFacilityId ?? undefined;
 
   const doctorOptions = useMemo(
     () => doctors.map((doctor) => ({ value: doctor.id, label: getDoctorLabel(doctor) })),
@@ -116,7 +126,15 @@ export default function ManagementAppointmentsPage() {
   const loadAppointments = async () => {
     setLoading(true);
     try {
-      setAppointments(await getManagementAppointments({ scope, status, search, facilityId, doctorId }));
+      setAppointments(await getManagementAppointments({
+        scope,
+        status,
+        search,
+        facilityId: scopedFacilityId,
+        doctorId,
+        dateFrom: dateRange?.[0]?.format("YYYY-MM-DD"),
+        dateTo: dateRange?.[1]?.format("YYYY-MM-DD"),
+      }));
     } catch {
       message.error("Không tải được lịch đặt khám.");
     } finally {
@@ -126,10 +144,32 @@ export default function ManagementAppointmentsPage() {
 
   useEffect(() => {
     loadAppointments();
-  }, [scope, status, search, facilityId, doctorId]);
+  }, [scope, status, search, scopedFacilityId, doctorId, dateRange]);
 
   useEffect(() => {
-    getDoctors({ limit: 100 }).then((result) => setDoctors(result.items)).catch(() => undefined);
+    setDoctorId(undefined);
+    if (!authUser || (!isSuperAdmin && !activeFacilityId)) {
+      setDoctors([]);
+      return;
+    }
+    getDoctors({ limit: 100, facilityId: isSuperAdmin ? facilityId : activeFacilityId ?? undefined })
+      .then((result) => setDoctors(result.items))
+      .catch(() => setDoctors([]));
+  }, [activeFacilityId, authUser, facilityId, isSuperAdmin]);
+
+  useEffect(() => {
+    if (!authUser) {
+      setFacilityOptions([]);
+      return;
+    }
+    if (!isSuperAdmin) {
+      setFacilityOptions(
+        activeFacility
+          ? [{ value: String(activeFacility.id), label: `${activeFacility.name} (${activeFacility.code})` }]
+          : [],
+      );
+      return;
+    }
     getFacilities({ status: "active", limit: 100 })
       .then((facilities) =>
         setFacilityOptions(
@@ -139,8 +179,8 @@ export default function ManagementAppointmentsPage() {
           })),
         ),
       )
-      .catch(() => undefined);
-  }, []);
+      .catch(() => setFacilityOptions([]));
+  }, [activeFacility?.code, activeFacility?.id, activeFacility?.name, authUser, isSuperAdmin]);
 
   const openCheckIn = async (appointment: ManagementAppointment) => {
     setSelectedAppointment(appointment);
@@ -392,12 +432,13 @@ export default function ManagementAppointmentsPage() {
             options={Object.entries(statusMeta).map(([value, meta]) => ({ value, label: meta.label }))}
           />
           <Select
-            allowClear
+            allowClear={isSuperAdmin}
             showSearch
             className="w-72"
             placeholder="Tìm theo cơ sở"
-            value={facilityId}
-            onChange={setFacilityId}
+            value={isSuperAdmin ? facilityId : activeFacilityId ?? undefined}
+            onChange={isSuperAdmin ? setFacilityId : undefined}
+            disabled={!isSuperAdmin}
             optionFilterProp="label"
             options={facilityOptions}
           />
@@ -410,6 +451,13 @@ export default function ManagementAppointmentsPage() {
             onChange={setDoctorId}
             optionFilterProp="label"
             options={doctorOptions}
+          />
+          <RangePicker
+            className="w-full md:w-72"
+            format="DD/MM/YYYY"
+            placeholder={["Từ ngày", "Đến ngày"]}
+            value={dateRange}
+            onChange={(value) => setDateRange(value)}
           />
           <Input.Search
             allowClear
