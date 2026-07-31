@@ -1239,11 +1239,11 @@ export default function DoctorManagementPage() {
         open={Boolean(
           detailDoctor,
         )}
-        width={900}
+        width={950}
         centered
         title={null}
         footer={
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-2">
             {detailDoctor ? (
               <Button
                 icon={
@@ -1286,18 +1286,27 @@ export default function DoctorManagementPage() {
           closable:
             !detailLoading,
         }}
+        styles={{
+          body: {
+            maxHeight: "80vh",
+            overflowY: "auto",
+            paddingTop: 16,
+            paddingBottom: 12,
+            paddingInline: 18,
+          },
+        }}
       >
         {detailDoctor ? (
           <div>
-            <div className="mb-5 flex items-start gap-4 border-b border-slate-200 pb-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
-                <Stethoscope className="h-6 w-6" />
+            <div className="mb-4 flex items-start gap-3 border-b border-slate-200 pb-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                <Stethoscope className="h-5 w-5" />
               </div>
 
               <div className="min-w-0">
                 <Title
-                  level={3}
-                  className="!mb-1 !text-slate-950"
+                  level={4}
+                  className="!mb-0.5 !text-slate-950"
                 >
                   {detailDoctor.name}
                 </Title>
@@ -1329,11 +1338,14 @@ export default function DoctorManagementPage() {
             <Descriptions
               bordered
               column={2}
-              size="middle"
+              size="small"
               styles={{
                 label: {
-                  width: 185,
+                  width: 145,
                   fontWeight: 600,
+                },
+                content: {
+                  minWidth: 0,
                 },
               }}
             >
