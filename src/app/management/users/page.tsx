@@ -17,7 +17,6 @@ import {
   Empty,
   Form,
   Input,
-  InputNumber,
   Modal,
   Row,
   Select,
@@ -33,17 +32,13 @@ import type {
   TablePaginationConfig,
 } from "antd/es/table";
 import {
-  Baby,
   BadgeCheck,
   Building2,
-  CalendarClock,
   CalendarDays,
-  CheckCircle2,
   ContactRound,
   Crown,
   Eye,
   FileBadge2,
-  HeartPulse,
   IdCard,
   Lock,
   Mail,
@@ -53,7 +48,6 @@ import {
   Phone,
   Plus,
   Search,
-  ShieldAlert,
   ShieldCheck,
   UsersRound,
   X,
@@ -77,16 +71,6 @@ type AccountStatus =
   | "inactive"
   | "locked";
 
-type PregnancyStatus =
-  | "pregnant"
-  | "postpartum"
-  | "completed";
-
-type RiskLevel =
-  | "normal"
-  | "monitor"
-  | "high";
-
 type ExaminationPriority =
   | "package"
   | "regular";
@@ -97,6 +81,7 @@ type PregnantUser = {
   patientCode: string;
   fullName: string;
   citizenId: string;
+  healthInsuranceCode?: string;
   dateOfBirth: string;
   phone: string;
   email: string;
@@ -107,11 +92,6 @@ type PregnantUser = {
   emergencyContactRelationship?: string;
   emergencyContactPhone?: string;
 
-  pregnancyStatus: PregnancyStatus;
-  gestationalWeek?: number;
-  expectedDueDate?: string;
-  riskLevel: RiskLevel;
-
   examinationPriority: ExaminationPriority;
   packageName?: string;
   packageCode?: string;
@@ -119,7 +99,6 @@ type PregnantUser = {
 
   facilityId?: string;
   facilityName?: string;
-  lastVisitAt?: string;
 
   accountStatus: AccountStatus;
   createdAt: string;
@@ -129,6 +108,7 @@ type PregnantUser = {
 type PregnantUserFormValues = {
   fullName: string;
   citizenId: string;
+  healthInsuranceCode?: string;
   dateOfBirth: string;
   phone: string;
   email: string;
@@ -139,18 +119,12 @@ type PregnantUserFormValues = {
   emergencyContactRelationship?: string;
   emergencyContactPhone?: string;
 
-  pregnancyStatus: PregnancyStatus;
-  gestationalWeek?: number;
-  expectedDueDate?: string;
-  riskLevel: RiskLevel;
-
   examinationPriority: ExaminationPriority;
   packageName?: string;
   packageCode?: string;
   packageExpiryDate?: string;
 
   facilityId?: string;
-  lastVisitAt?: string;
 
   accountStatus: AccountStatus;
 };
@@ -182,41 +156,6 @@ const FACILITIES: FacilityOption[] = [
   },
 ];
 
-const PREGNANCY_STATUS_OPTIONS: Array<{
-  value: PregnancyStatus;
-  label: string;
-}> = [
-  {
-    value: "pregnant",
-    label: "Đang mang thai",
-  },
-  {
-    value: "postpartum",
-    label: "Sau sinh",
-  },
-  {
-    value: "completed",
-    label: "Đã kết thúc theo dõi",
-  },
-];
-
-const RISK_LEVEL_OPTIONS: Array<{
-  value: RiskLevel;
-  label: string;
-}> = [
-  {
-    value: "normal",
-    label: "Bình thường",
-  },
-  {
-    value: "monitor",
-    label: "Cần theo dõi",
-  },
-  {
-    value: "high",
-    label: "Nguy cơ cao",
-  },
-];
 
 const EXAMINATION_PRIORITY_OPTIONS: Array<{
   value: ExaminationPriority;
@@ -257,6 +196,7 @@ const INITIAL_USERS: PregnantUser[] = [
     patientCode: "MOM-0001",
     fullName: "Nguyễn Thị Mai",
     citizenId: "001197008451",
+    healthInsuranceCode: "DN4010123456789",
     dateOfBirth: "1997-05-12",
     phone: "0901234501",
     email: "mai.nguyen@gmail.com",
@@ -269,10 +209,6 @@ const INITIAL_USERS: PregnantUser[] = [
       "Chồng",
     emergencyContactPhone:
       "0912345601",
-    pregnancyStatus: "pregnant",
-    gestationalWeek: 12,
-    expectedDueDate: "2027-02-08",
-    riskLevel: "normal",
     examinationPriority: "package",
     packageName:
       "Gói thai sản An Tâm",
@@ -281,8 +217,6 @@ const INITIAL_USERS: PregnantUser[] = [
     facilityId: "FAC-001",
     facilityName:
       "Phòng khám Maternity Care Hà Nội",
-    lastVisitAt:
-      "2026-07-26T03:30:00.000Z",
     accountStatus: "active",
     createdAt:
       "2026-05-02T12:30:00.000Z",
@@ -294,6 +228,7 @@ const INITIAL_USERS: PregnantUser[] = [
     patientCode: "MOM-0002",
     fullName: "Trần Ngọc Anh",
     citizenId: "001193002864",
+    healthInsuranceCode: "GD4012345678901",
     dateOfBirth: "1993-09-21",
     phone: "0901234502",
     email:
@@ -306,16 +241,10 @@ const INITIAL_USERS: PregnantUser[] = [
       "Chồng",
     emergencyContactPhone:
       "0912345602",
-    pregnancyStatus: "pregnant",
-    gestationalWeek: 28,
-    expectedDueDate: "2026-10-18",
-    riskLevel: "monitor",
     examinationPriority: "regular",
     facilityId: "FAC-002",
     facilityName:
       "Phòng khám Maternity Care Cầu Giấy",
-    lastVisitAt:
-      "2026-07-27T08:00:00.000Z",
     accountStatus: "active",
     createdAt:
       "2026-03-14T02:20:00.000Z",
@@ -327,6 +256,7 @@ const INITIAL_USERS: PregnantUser[] = [
     patientCode: "MOM-0003",
     fullName: "Phạm Thu Hương",
     citizenId: "001189006327",
+    healthInsuranceCode: "DN4019876543210",
     dateOfBirth: "1989-11-03",
     phone: "0901234503",
     email:
@@ -339,10 +269,6 @@ const INITIAL_USERS: PregnantUser[] = [
       "Chồng",
     emergencyContactPhone:
       "0912345603",
-    pregnancyStatus: "pregnant",
-    gestationalWeek: 34,
-    expectedDueDate: "2026-09-09",
-    riskLevel: "high",
     examinationPriority: "package",
     packageName:
       "Gói thai sản Toàn Diện",
@@ -351,8 +277,6 @@ const INITIAL_USERS: PregnantUser[] = [
     facilityId: "FAC-001",
     facilityName:
       "Phòng khám Maternity Care Hà Nội",
-    lastVisitAt:
-      "2026-07-28T02:45:00.000Z",
     accountStatus: "active",
     createdAt:
       "2026-01-21T04:10:00.000Z",
@@ -376,14 +300,10 @@ const INITIAL_USERS: PregnantUser[] = [
       "Chồng",
     emergencyContactPhone:
       "0912345604",
-    pregnancyStatus: "postpartum",
-    riskLevel: "normal",
     examinationPriority: "regular",
     facilityId: "FAC-002",
     facilityName:
       "Phòng khám Maternity Care Cầu Giấy",
-    lastVisitAt:
-      "2026-07-22T07:15:00.000Z",
     accountStatus: "active",
     createdAt:
       "2025-11-18T09:30:00.000Z",
@@ -395,6 +315,7 @@ const INITIAL_USERS: PregnantUser[] = [
     patientCode: "MOM-0005",
     fullName: "Võ Thị Thanh",
     citizenId: "079195004281",
+    healthInsuranceCode: "GD4791234567890",
     dateOfBirth: "1995-07-26",
     phone: "0901234505",
     email:
@@ -408,10 +329,6 @@ const INITIAL_USERS: PregnantUser[] = [
       "Chồng",
     emergencyContactPhone:
       "0912345605",
-    pregnancyStatus: "pregnant",
-    gestationalWeek: 20,
-    expectedDueDate: "2026-12-16",
-    riskLevel: "normal",
     examinationPriority: "package",
     packageName:
       "Gói theo dõi thai kỳ Nâng Cao",
@@ -420,8 +337,6 @@ const INITIAL_USERS: PregnantUser[] = [
     facilityId: "FAC-003",
     facilityName:
       "Phòng khám Maternity Care Hồ Chí Minh",
-    lastVisitAt:
-      "2026-07-18T04:20:00.000Z",
     accountStatus: "locked",
     createdAt:
       "2026-04-01T06:45:00.000Z",
@@ -446,14 +361,10 @@ const INITIAL_USERS: PregnantUser[] = [
       "Chồng",
     emergencyContactPhone:
       "0912345606",
-    pregnancyStatus: "completed",
-    riskLevel: "normal",
     examinationPriority: "regular",
     facilityId: "FAC-003",
     facilityName:
       "Phòng khám Maternity Care Hồ Chí Minh",
-    lastVisitAt:
-      "2026-06-20T03:10:00.000Z",
     accountStatus: "inactive",
     createdAt:
       "2025-08-12T03:10:00.000Z",
@@ -478,16 +389,10 @@ const INITIAL_USERS: PregnantUser[] = [
       "Anh trai",
     emergencyContactPhone:
       "0912345607",
-    pregnancyStatus: "pregnant",
-    gestationalWeek: 8,
-    expectedDueDate: "2027-03-05",
-    riskLevel: "monitor",
     examinationPriority: "regular",
     facilityId: "FAC-001",
     facilityName:
       "Phòng khám Maternity Care Hà Nội",
-    lastVisitAt:
-      "2026-07-24T05:00:00.000Z",
     accountStatus: "active",
     createdAt:
       "2026-06-22T05:00:00.000Z",
@@ -565,58 +470,6 @@ function getInitials(
   );
 }
 
-
-function renderPregnancyStatus(
-  value: PregnancyStatus,
-) {
-  if (value === "pregnant") {
-    return (
-      <Tag color="pink">
-        Đang mang thai
-      </Tag>
-    );
-  }
-
-  if (value === "postpartum") {
-    return (
-      <Tag color="purple">
-        Sau sinh
-      </Tag>
-    );
-  }
-
-  return (
-    <Tag>
-      Đã kết thúc theo dõi
-    </Tag>
-  );
-}
-
-function renderRiskLevel(
-  value: RiskLevel,
-) {
-  if (value === "high") {
-    return (
-      <Tag color="red">
-        Nguy cơ cao
-      </Tag>
-    );
-  }
-
-  if (value === "monitor") {
-    return (
-      <Tag color="gold">
-        Cần theo dõi
-      </Tag>
-    );
-  }
-
-  return (
-    <Tag color="green">
-      Bình thường
-    </Tag>
-  );
-}
 
 function renderExaminationPriority(
   value: ExaminationPriority,
@@ -730,11 +583,6 @@ function PregnantUserFormModal({
   const [form] =
     Form.useForm<PregnantUserFormValues>();
 
-  const pregnancyStatus =
-    Form.useWatch(
-      "pregnancyStatus",
-      form,
-    );
 
   const examinationPriority =
     Form.useWatch(
@@ -751,6 +599,8 @@ function PregnantUserFormModal({
           form.setFieldsValue({
             fullName: user.fullName,
             citizenId: user.citizenId,
+            healthInsuranceCode:
+              user.healthInsuranceCode,
             dateOfBirth:
               user.dateOfBirth,
             phone: user.phone,
@@ -764,14 +614,6 @@ function PregnantUserFormModal({
               user.emergencyContactRelationship,
             emergencyContactPhone:
               user.emergencyContactPhone,
-            pregnancyStatus:
-              user.pregnancyStatus,
-            gestationalWeek:
-              user.gestationalWeek,
-            expectedDueDate:
-              user.expectedDueDate,
-            riskLevel:
-              user.riskLevel,
             examinationPriority:
               user.examinationPriority,
             packageName:
@@ -782,11 +624,6 @@ function PregnantUserFormModal({
               user.packageExpiryDate,
             facilityId:
               user.facilityId,
-            lastVisitAt:
-              user.lastVisitAt?.slice(
-                0,
-                10,
-              ),
             accountStatus:
               user.accountStatus,
           });
@@ -797,6 +634,7 @@ function PregnantUserFormModal({
         form.setFieldsValue({
           fullName: "",
           citizenId: "",
+          healthInsuranceCode: "",
           dateOfBirth: "",
           phone: "",
           email: "",
@@ -806,18 +644,12 @@ function PregnantUserFormModal({
           emergencyContactRelationship:
             "",
           emergencyContactPhone: "",
-          pregnancyStatus: "pregnant",
-          gestationalWeek:
-            undefined,
-          expectedDueDate: "",
-          riskLevel: "normal",
           examinationPriority:
             "regular",
           packageName: "",
           packageCode: "",
           packageExpiryDate: "",
           facilityId: undefined,
-          lastVisitAt: "",
           accountStatus: "active",
         });
       }, 0);
@@ -950,6 +782,46 @@ function PregnantUserFormModal({
 
             <Col xs={24} md={12}>
               <Form.Item
+                name="healthInsuranceCode"
+                label="Mã thẻ bảo hiểm y tế"
+                rules={[
+                  {
+                    max: 20,
+                    message:
+                      "Mã thẻ bảo hiểm y tế không được vượt quá 20 ký tự.",
+                  },
+                  {
+                    pattern:
+                      /^[A-Za-z0-9]+$/,
+                    message:
+                      "Mã thẻ bảo hiểm y tế chỉ gồm chữ và số.",
+                  },
+                ]}
+              >
+                <Input
+                  size="large"
+                  maxLength={20}
+                  placeholder="Nhập mã thẻ BHYT"
+                  onChange={(event) => {
+                    const value =
+                      event.target.value
+                        .replace(
+                          /[^A-Za-z0-9]/g,
+                          "",
+                        )
+                        .toUpperCase();
+
+                    form.setFieldValue(
+                      "healthInsuranceCode",
+                      value,
+                    );
+                  }}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} md={12}>
+              <Form.Item
                 name="dateOfBirth"
                 label="Ngày sinh"
                 rules={[
@@ -987,7 +859,6 @@ function PregnantUserFormModal({
                 />
               </Form.Item>
             </Col>
-
 
 
             <Col xs={24}>
@@ -1245,97 +1116,9 @@ function PregnantUserFormModal({
         <Card
           size="small"
           className="mb-5 border-slate-200"
-          title="Thông tin theo dõi thai kỳ"
+          title="Thông tin quản lý"
         >
           <Row gutter={[16, 0]}>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="pregnancyStatus"
-                label="Trạng thái theo dõi"
-                rules={[
-                  {
-                    required: true,
-                    message:
-                      "Vui lòng chọn trạng thái theo dõi.",
-                  },
-                ]}
-              >
-                <Select
-                  size="large"
-                  options={
-                    PREGNANCY_STATUS_OPTIONS
-                  }
-                />
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="riskLevel"
-                label="Mức độ theo dõi"
-                rules={[
-                  {
-                    required: true,
-                    message:
-                      "Vui lòng chọn mức độ theo dõi.",
-                  },
-                ]}
-              >
-                <Select
-                  size="large"
-                  options={
-                    RISK_LEVEL_OPTIONS
-                  }
-                />
-              </Form.Item>
-            </Col>
-
-            {pregnancyStatus ===
-            "pregnant" ? (
-              <>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="gestationalWeek"
-                    label="Tuần thai hiện tại"
-                    rules={[
-                      {
-                        required: true,
-                        message:
-                          "Vui lòng nhập tuần thai.",
-                      },
-                    ]}
-                  >
-                    <InputNumber
-                      min={1}
-                      max={42}
-                      className="w-full"
-                      size="large"
-                      placeholder="1 - 42"
-                    />
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="expectedDueDate"
-                    label="Ngày dự sinh"
-                    rules={[
-                      {
-                        required: true,
-                        message:
-                          "Vui lòng chọn ngày dự sinh.",
-                      },
-                    ]}
-                  >
-                    <Input
-                      size="large"
-                      type="date"
-                    />
-                  </Form.Item>
-                </Col>
-              </>
-            ) : null}
-
             <Col xs={24} md={12}>
               <Form.Item
                 name="facilityId"
@@ -1358,40 +1141,28 @@ function PregnantUserFormModal({
               </Form.Item>
             </Col>
 
-
-            <Col xs={24}>
+            <Col xs={24} md={12}>
               <Form.Item
-                name="lastVisitAt"
-                label="Lần khám gần nhất"
+                name="accountStatus"
+                label="Trạng thái tài khoản"
+                rules={[
+                  {
+                    required: true,
+                    message:
+                      "Vui lòng chọn trạng thái tài khoản.",
+                  },
+                ]}
               >
-                <Input
+                <Select
                   size="large"
-                  type="date"
+                  options={
+                    ACCOUNT_STATUS_OPTIONS
+                  }
                 />
               </Form.Item>
             </Col>
-
           </Row>
         </Card>
-
-        <Form.Item
-          name="accountStatus"
-          label="Trạng thái tài khoản"
-          rules={[
-            {
-              required: true,
-              message:
-                "Vui lòng chọn trạng thái tài khoản.",
-            },
-          ]}
-        >
-          <Select
-            size="large"
-            options={
-              ACCOUNT_STATUS_OPTIONS
-            }
-          />
-        </Form.Item>
       </Form>
     </Modal>
   );
@@ -1461,13 +1232,6 @@ function PregnantUserDetailModal({
                 </Text>
 
                 <Space size={8} wrap>
-                  {renderPregnancyStatus(
-                    user.pregnancyStatus,
-                  )}
-
-                  {renderRiskLevel(
-                    user.riskLevel,
-                  )}
 
                   {renderAccountStatus(
                     user.accountStatus,
@@ -1500,6 +1264,16 @@ function PregnantUserDetailModal({
               }
               label="Căn cước công dân"
               value={user.citizenId}
+            />
+
+            <InfoCard
+              icon={
+                <FileBadge2 className="h-4 w-4" />
+              }
+              label="Mã thẻ bảo hiểm y tế"
+              value={
+                user.healthInsuranceCode
+              }
             />
 
             <InfoCard
@@ -1640,61 +1414,13 @@ function PregnantUserDetailModal({
             />
           </DetailSection>
 
+
           <DetailSection
-            title="Thông tin theo dõi thai kỳ"
+            title="Thông tin quản lý"
             icon={
-              <Baby className="h-5 w-5" />
+              <ShieldCheck className="h-5 w-5" />
             }
           >
-            <InfoCard
-              icon={
-                <Baby className="h-4 w-4" />
-              }
-              label="Trạng thái theo dõi"
-              value={renderPregnancyStatus(
-                user.pregnancyStatus,
-              )}
-            />
-
-            <InfoCard
-              icon={
-                <HeartPulse className="h-4 w-4" />
-              }
-              label="Mức độ theo dõi"
-              value={renderRiskLevel(
-                user.riskLevel,
-              )}
-            />
-
-            <InfoCard
-              icon={
-                <CalendarDays className="h-4 w-4" />
-              }
-              label="Tuần thai hiện tại"
-              value={
-                user.pregnancyStatus ===
-                  "pregnant" &&
-                user.gestationalWeek
-                  ? `Tuần ${user.gestationalWeek}`
-                  : "Không áp dụng"
-              }
-            />
-
-            <InfoCard
-              icon={
-                <CalendarDays className="h-4 w-4" />
-              }
-              label="Ngày dự sinh"
-              value={
-                user.pregnancyStatus ===
-                "pregnant"
-                  ? formatDate(
-                      user.expectedDueDate,
-                    )
-                  : "Không áp dụng"
-              }
-            />
-
             <InfoCard
               icon={
                 <Building2 className="h-4 w-4" />
@@ -1703,23 +1429,6 @@ function PregnantUserDetailModal({
               value={user.facilityName}
             />
 
-            <InfoCard
-              icon={
-                <CalendarClock className="h-4 w-4" />
-              }
-              label="Lần khám gần nhất"
-              value={formatDateTime(
-                user.lastVisitAt,
-              )}
-            />
-          </DetailSection>
-
-          <DetailSection
-            title="Thông tin tài khoản"
-            icon={
-              <ShieldCheck className="h-5 w-5" />
-            }
-          >
             <InfoCard
               icon={
                 <ShieldCheck className="h-4 w-4" />
@@ -1817,16 +1526,6 @@ export default function PregnantUserManagementPage() {
   const [keyword, setKeyword] =
     useState("");
 
-  const [
-    pregnancyStatusFilter,
-    setPregnancyStatusFilter,
-  ] =
-    useState<PregnancyStatus>();
-
-  const [
-    riskFilter,
-    setRiskFilter,
-  ] = useState<RiskLevel>();
 
   const [
     priorityFilter,
@@ -1885,6 +1584,7 @@ export default function PregnantUserManagementPage() {
           user.patientCode,
           user.fullName,
           user.citizenId,
+          user.healthInsuranceCode ?? "",
           user.phone,
           user.email,
           user.facilityName ?? "",
@@ -1900,12 +1600,6 @@ export default function PregnantUserManagementPage() {
 
       return (
         matchesKeyword &&
-        (!pregnancyStatusFilter ||
-          user.pregnancyStatus ===
-            pregnancyStatusFilter) &&
-        (!riskFilter ||
-          user.riskLevel ===
-            riskFilter) &&
         (!priorityFilter ||
           user.examinationPriority ===
             priorityFilter) &&
@@ -1921,23 +1615,19 @@ export default function PregnantUserManagementPage() {
     accountStatusFilter,
     facilityFilter,
     keyword,
-    pregnancyStatusFilter,
     priorityFilter,
-    riskFilter,
     users,
   ]);
 
-  const activePregnancyCount =
+  const activeAccountCount =
     users.filter(
       (user) =>
-        user.pregnancyStatus ===
-        "pregnant",
+        user.accountStatus === "active",
     ).length;
 
-  const highRiskCount =
+  const assignedFacilityCount =
     users.filter(
-      (user) =>
-        user.riskLevel === "high",
+      (user) => Boolean(user.facilityId),
     ).length;
 
   const packagePriorityCount =
@@ -1949,10 +1639,6 @@ export default function PregnantUserManagementPage() {
 
   function resetFilters() {
     setKeyword("");
-    setPregnancyStatusFilter(
-      undefined,
-    );
-    setRiskFilter(undefined);
     setPriorityFilter(undefined);
     setAccountStatusFilter(
       undefined,
@@ -1992,6 +1678,11 @@ export default function PregnantUserManagementPage() {
         values.fullName.trim(),
       citizenId:
         values.citizenId.trim(),
+      healthInsuranceCode:
+        values.healthInsuranceCode
+          ?.trim()
+          .toUpperCase() ||
+        undefined,
       phone: values.phone.trim(),
       email:
         values.email
@@ -2031,22 +1722,6 @@ export default function PregnantUserManagementPage() {
           : undefined,
       facilityName:
         facility?.name,
-      lastVisitAt:
-        values.lastVisitAt
-          ? new Date(
-              `${values.lastVisitAt}T00:00:00`,
-            ).toISOString()
-          : undefined,
-      gestationalWeek:
-        values.pregnancyStatus ===
-        "pregnant"
-          ? values.gestationalWeek
-          : undefined,
-      expectedDueDate:
-        values.pregnancyStatus ===
-        "pregnant"
-          ? values.expectedDueDate
-          : undefined,
     };
 
     if (editingUser) {
@@ -2233,46 +1908,18 @@ export default function PregnantUserManagementPage() {
         ),
       },
       {
-        title: "Thai kỳ",
-        width: 190,
+        title: "Mã BHYT",
+        dataIndex:
+          "healthInsuranceCode",
+        width: 170,
         render: (
-          _value,
-          user,
+          value?: string,
         ) => (
-          <div className="space-y-1">
-            {renderPregnancyStatus(
-              user.pregnancyStatus,
-            )}
-
-            {user.pregnancyStatus ===
-              "pregnant" &&
-            user.gestationalWeek ? (
-              <Text
-                type="secondary"
-                className="block text-xs"
-              >
-                Tuần{" "}
-                {
-                  user.gestationalWeek
-                }{" "}
-                · Dự sinh{" "}
-                {formatDate(
-                  user.expectedDueDate,
-                )}
-              </Text>
-            ) : null}
-          </div>
+          <Text className="font-mono">
+            {value ||
+              "Chưa cập nhật"}
+          </Text>
         ),
-      },
-      {
-        title: "Mức độ theo dõi",
-        dataIndex: "riskLevel",
-        width: 150,
-        align: "center",
-        render: (
-          value: RiskLevel,
-        ) =>
-          renderRiskLevel(value),
       },
       {
         title: "Ưu tiên khám",
@@ -2425,7 +2072,7 @@ export default function PregnantUserManagementPage() {
 
       <PageHeader
         title="Quản lý thai phụ"
-        description="Quản lý tài khoản, hồ sơ hành chính và thông tin theo dõi tổng quan của thai phụ."
+        description="Quản lý tài khoản, hồ sơ hành chính, gói khám và cơ sở theo dõi của thai phụ."
       />
 
       <div className="mt-6 flex flex-col gap-5">
@@ -2451,14 +2098,12 @@ export default function PregnantUserManagementPage() {
             sm={12}
             xl={6}
           >
-            <Card className="h-full border-pink-100 bg-pink-50/60">
+            <Card className="h-full border-green-100 bg-green-50/60">
               <Statistic
-                title="Đang mang thai"
-                value={
-                  activePregnancyCount
-                }
+                title="Tài khoản hoạt động"
+                value={activeAccountCount}
                 prefix={
-                  <Baby className="mr-2 h-5 w-5 text-pink-600" />
+                  <ShieldCheck className="mr-2 h-5 w-5 text-green-600" />
                 }
               />
             </Card>
@@ -2469,12 +2114,12 @@ export default function PregnantUserManagementPage() {
             sm={12}
             xl={6}
           >
-            <Card className="h-full border-red-100 bg-red-50/60">
+            <Card className="h-full border-blue-100 bg-blue-50/60">
               <Statistic
-                title="Nguy cơ cao"
-                value={highRiskCount}
+                title="Đã gán cơ sở"
+                value={assignedFacilityCount}
                 prefix={
-                  <ShieldAlert className="mr-2 h-5 w-5 text-red-600" />
+                  <Building2 className="mr-2 h-5 w-5 text-blue-600" />
                 }
               />
             </Card>
@@ -2507,7 +2152,7 @@ export default function PregnantUserManagementPage() {
               prefix={
                 <Search className="h-4 w-4 text-slate-400" />
               }
-              placeholder="Tìm tên, mã thai phụ, CCCD, gói khám, điện thoại, email hoặc cơ sở..."
+              placeholder="Tìm tên, mã thai phụ, CCCD, mã BHYT, gói khám, điện thoại, email hoặc cơ sở..."
               className="min-w-0 xl:flex-1"
               onChange={(event) => {
                 setKeyword(
@@ -2517,37 +2162,6 @@ export default function PregnantUserManagementPage() {
               }}
             />
 
-            <Select
-              allowClear
-              value={
-                pregnancyStatusFilter
-              }
-              placeholder="Trạng thái theo dõi"
-              className="w-full xl:w-[200px] xl:shrink-0"
-              options={
-                PREGNANCY_STATUS_OPTIONS
-              }
-              onChange={(value) => {
-                setPregnancyStatusFilter(
-                  value,
-                );
-                setCurrentPage(1);
-              }}
-            />
-
-            <Select
-              allowClear
-              value={riskFilter}
-              placeholder="Mức độ theo dõi"
-              className="w-full xl:w-[190px] xl:shrink-0"
-              options={
-                RISK_LEVEL_OPTIONS
-              }
-              onChange={(value) => {
-                setRiskFilter(value);
-                setCurrentPage(1);
-              }}
-            />
 
             <Select
               allowClear
@@ -2651,7 +2265,7 @@ export default function PregnantUserManagementPage() {
               filteredUsers
             }
             scroll={{
-              x: 1510,
+              x: 1340,
             }}
             pagination={{
               current: currentPage,
