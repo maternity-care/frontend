@@ -744,9 +744,9 @@ export default function DoctorManagementPage() {
     [
       {
         title: "STT",
-        width: 64,
+        width: 56,
         align: "center",
-        fixed: "left",
+        responsive: ["md"],
         render: (
           _value,
           _record,
@@ -759,8 +759,7 @@ export default function DoctorManagementPage() {
       },
       {
         title: "Bác sĩ",
-        width: 260,
-        fixed: "left",
+        width: "26%",
         render: (
           _value,
           doctor,
@@ -794,7 +793,8 @@ export default function DoctorManagementPage() {
       },
       {
         title: "Liên hệ",
-        width: 230,
+        width: "24%",
+        responsive: ["md"],
         render: (
           _value,
           doctor,
@@ -808,7 +808,7 @@ export default function DoctorManagementPage() {
 
             <Text
               type="secondary"
-              className="block text-xs"
+              className="block truncate text-xs"
             >
               {doctor.phone ||
                 "Chưa cập nhật số điện thoại"}
@@ -817,45 +817,21 @@ export default function DoctorManagementPage() {
         ),
       },
       {
-        title: "Mã cơ sở",
-        dataIndex:
-          "facilityId",
-        width: 140,
-        ellipsis: true,
-        render: (
-          value: string,
-        ) =>
-          value ||
-          "Chưa được gán",
-      },
-      {
-        title: "Giấy phép",
-        dataIndex:
-          "licenseNo",
-        width: 150,
-        ellipsis: true,
-        render: (
-          value: string,
-        ) =>
-          value ||
-          "Chưa cập nhật",
-      },
-      {
         title: "Chuyên khoa",
-        width: 190,
+        width: "20%",
         render: (
           _value,
           doctor,
         ) => (
           <div>
-            <Text className="block">
+            <Text className="block truncate">
               {doctor.specialty ||
                 "Chưa cập nhật"}
             </Text>
 
             <Text
               type="secondary"
-              className="block text-xs"
+              className="block truncate text-xs"
             >
               {doctor.title ||
                 "Chưa cập nhật chức danh"}
@@ -867,8 +843,9 @@ export default function DoctorManagementPage() {
         title: "Kinh nghiệm",
         dataIndex:
           "yearsOfExperience",
-        width: 125,
+        width: 105,
         align: "center",
+        responsive: ["lg"],
         render: (
           value: number,
         ) =>
@@ -877,7 +854,7 @@ export default function DoctorManagementPage() {
       {
         title: "Trạng thái",
         dataIndex: "status",
-        width: 140,
+        width: 125,
         align: "center",
         render: (
           status: DoctorStatus,
@@ -887,14 +864,13 @@ export default function DoctorManagementPage() {
       {
         title: "Thao tác",
         key: "actions",
-        width: 150,
+        width: 132,
         align: "center",
-        fixed: "right",
         render: (
           _value,
           doctor,
         ) => (
-          <Space size={6}>
+          <Space size={4}>
             <Tooltip title="Xem chi tiết">
               <Button
                 icon={
@@ -1129,13 +1105,6 @@ export default function DoctorManagementPage() {
               />
             </Tooltip>
           </div>
-
-          <Text
-            type="secondary"
-            className="mt-2 block text-xs"
-          >
-            Nhấn Enter sau khi nhập từ khóa hoặc chuyên khoa. Trạng thái và sắp xếp được áp dụng ngay.
-          </Text>
         </Card>
 
         <Card
@@ -1174,9 +1143,6 @@ export default function DoctorManagementPage() {
             columns={columns}
             dataSource={doctors}
             className="management-table [&_.ant-table-cell]:px-3"
-            scroll={{
-              x: 1480,
-            }}
             onRow={(doctor) => ({
               className:
                 "cursor-pointer",
@@ -1355,7 +1321,7 @@ export default function DoctorManagementPage() {
               size="small"
               styles={{
                 label: {
-                  width: 150,
+                  width: 145,
                   fontWeight: 600,
                 },
                 content: {
