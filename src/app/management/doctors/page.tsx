@@ -744,9 +744,9 @@ export default function DoctorManagementPage() {
     [
       {
         title: "STT",
-        width: 64,
+        width: 56,
         align: "center",
-        fixed: "left",
+        responsive: ["md"],
         render: (
           _value,
           _record,
@@ -759,8 +759,7 @@ export default function DoctorManagementPage() {
       },
       {
         title: "Bác sĩ",
-        width: 260,
-        fixed: "left",
+        width: "26%",
         render: (
           _value,
           doctor,
@@ -794,7 +793,8 @@ export default function DoctorManagementPage() {
       },
       {
         title: "Liên hệ",
-        width: 230,
+        width: "24%",
+        responsive: ["md"],
         render: (
           _value,
           doctor,
@@ -808,7 +808,7 @@ export default function DoctorManagementPage() {
 
             <Text
               type="secondary"
-              className="block text-xs"
+              className="block truncate text-xs"
             >
               {doctor.phone ||
                 "Chưa cập nhật số điện thoại"}
@@ -817,45 +817,21 @@ export default function DoctorManagementPage() {
         ),
       },
       {
-        title: "Mã cơ sở",
-        dataIndex:
-          "facilityId",
-        width: 140,
-        ellipsis: true,
-        render: (
-          value: string,
-        ) =>
-          value ||
-          "Chưa được gán",
-      },
-      {
-        title: "Giấy phép",
-        dataIndex:
-          "licenseNo",
-        width: 150,
-        ellipsis: true,
-        render: (
-          value: string,
-        ) =>
-          value ||
-          "Chưa cập nhật",
-      },
-      {
         title: "Chuyên khoa",
-        width: 190,
+        width: "20%",
         render: (
           _value,
           doctor,
         ) => (
           <div>
-            <Text className="block">
+            <Text className="block truncate">
               {doctor.specialty ||
                 "Chưa cập nhật"}
             </Text>
 
             <Text
               type="secondary"
-              className="block text-xs"
+              className="block truncate text-xs"
             >
               {doctor.title ||
                 "Chưa cập nhật chức danh"}
@@ -867,8 +843,9 @@ export default function DoctorManagementPage() {
         title: "Kinh nghiệm",
         dataIndex:
           "yearsOfExperience",
-        width: 125,
+        width: 105,
         align: "center",
+        responsive: ["lg"],
         render: (
           value: number,
         ) =>
@@ -877,7 +854,7 @@ export default function DoctorManagementPage() {
       {
         title: "Trạng thái",
         dataIndex: "status",
-        width: 140,
+        width: 125,
         align: "center",
         render: (
           status: DoctorStatus,
@@ -887,14 +864,13 @@ export default function DoctorManagementPage() {
       {
         title: "Thao tác",
         key: "actions",
-        width: 150,
+        width: 132,
         align: "center",
-        fixed: "right",
         render: (
           _value,
           doctor,
         ) => (
-          <Space size={6}>
+          <Space size={4}>
             <Tooltip title="Xem chi tiết">
               <Button
                 icon={
@@ -1129,13 +1105,6 @@ export default function DoctorManagementPage() {
               />
             </Tooltip>
           </div>
-
-          <Text
-            type="secondary"
-            className="mt-2 block text-xs"
-          >
-            Nhấn Enter sau khi nhập từ khóa hoặc chuyên khoa. Trạng thái và sắp xếp được áp dụng ngay.
-          </Text>
         </Card>
 
         <Card
@@ -1174,9 +1143,6 @@ export default function DoctorManagementPage() {
             columns={columns}
             dataSource={doctors}
             className="management-table [&_.ant-table-cell]:px-3"
-            scroll={{
-              x: 1480,
-            }}
             onRow={(doctor) => ({
               className:
                 "cursor-pointer",
@@ -1242,8 +1208,9 @@ export default function DoctorManagementPage() {
         width={900}
         centered
         title={null}
+        closable={false}
         footer={
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-2">
             {detailDoctor ? (
               <Button
                 icon={
@@ -1286,54 +1253,79 @@ export default function DoctorManagementPage() {
           closable:
             !detailLoading,
         }}
+        styles={{
+          body: {
+            padding: 0,
+          },
+        }}
       >
         {detailDoctor ? (
-          <div>
-            <div className="mb-5 flex items-start gap-4 border-b border-slate-200 pb-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
-                <Stethoscope className="h-6 w-6" />
+          <div className="flex max-h-[78vh] flex-col">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-[18px] py-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                  <Stethoscope className="h-5 w-5" />
+                </div>
+
+                <div className="min-w-0">
+                  <Title
+                    level={4}
+                    className="!mb-0.5 !text-slate-950"
+                  >
+                    {detailDoctor.name}
+                  </Title>
+
+                  <Text
+                    type="secondary"
+                    className="mb-2 block"
+                  >
+                    {detailDoctor.title ||
+                      "Bác sĩ"}{" "}
+                    ·{" "}
+                    {detailDoctor.specialty ||
+                      "Chưa cập nhật chuyên khoa"}
+                  </Text>
+
+                  <Space size={8} wrap>
+                    {renderStatus(
+                      detailDoctor.status,
+                    )}
+
+                    <Tag color="blue">
+                      {detailDoctor.licenseNo ||
+                        "Chưa có giấy phép"}
+                    </Tag>
+                  </Space>
+                </div>
               </div>
 
-              <div className="min-w-0">
-                <Title
-                  level={3}
-                  className="!mb-1 !text-slate-950"
-                >
-                  {detailDoctor.name}
-                </Title>
-
-                <Text
-                  type="secondary"
-                  className="mb-2 block"
-                >
-                  {detailDoctor.title ||
-                    "Bác sĩ"}{" "}
-                  ·{" "}
-                  {detailDoctor.specialty ||
-                    "Chưa cập nhật chuyên khoa"}
-                </Text>
-
-                <Space size={8} wrap>
-                  {renderStatus(
-                    detailDoctor.status,
-                  )}
-
-                  <Tag color="blue">
-                    {detailDoctor.licenseNo ||
-                      "Chưa có giấy phép"}
-                  </Tag>
-                </Space>
-              </div>
+              <Button
+                type="text"
+                shape="circle"
+                aria-label="Đóng"
+                title="Đóng"
+                icon={
+                  <X className="h-5 w-5" />
+                }
+                className="shrink-0"
+                onClick={() =>
+                  setDetailDoctor(null)
+                }
+              />
             </div>
 
+            <div className="min-h-0 overflow-y-auto px-[18px] py-4 pr-3">
             <Descriptions
               bordered
               column={2}
-              size="middle"
+              size="small"
               styles={{
                 label: {
-                  width: 185,
+                  width: 145,
                   fontWeight: 600,
+                },
+                content: {
+                  minWidth: 0,
                 },
               }}
             >
@@ -1507,6 +1499,7 @@ export default function DoctorManagementPage() {
                 </Space>
               </Descriptions.Item>
             </Descriptions>
+            </div>
           </div>
         ) : null}
       </Modal>
