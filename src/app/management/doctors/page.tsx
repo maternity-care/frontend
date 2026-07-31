@@ -1239,9 +1239,10 @@ export default function DoctorManagementPage() {
         open={Boolean(
           detailDoctor,
         )}
-        width={950}
+        width={900}
         centered
         title={null}
+        closable={false}
         footer={
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-2">
             {detailDoctor ? (
@@ -1288,60 +1289,73 @@ export default function DoctorManagementPage() {
         }}
         styles={{
           body: {
-            maxHeight: "80vh",
-            overflowY: "auto",
-            paddingTop: 16,
-            paddingBottom: 12,
-            paddingInline: 18,
+            padding: 0,
           },
         }}
       >
         {detailDoctor ? (
-          <div>
-            <div className="mb-4 flex items-start gap-3 border-b border-slate-200 pb-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
-                <Stethoscope className="h-5 w-5" />
+          <div className="flex max-h-[78vh] flex-col">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-[18px] py-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                  <Stethoscope className="h-5 w-5" />
+                </div>
+
+                <div className="min-w-0">
+                  <Title
+                    level={4}
+                    className="!mb-0.5 !text-slate-950"
+                  >
+                    {detailDoctor.name}
+                  </Title>
+
+                  <Text
+                    type="secondary"
+                    className="mb-2 block"
+                  >
+                    {detailDoctor.title ||
+                      "Bác sĩ"}{" "}
+                    ·{" "}
+                    {detailDoctor.specialty ||
+                      "Chưa cập nhật chuyên khoa"}
+                  </Text>
+
+                  <Space size={8} wrap>
+                    {renderStatus(
+                      detailDoctor.status,
+                    )}
+
+                    <Tag color="blue">
+                      {detailDoctor.licenseNo ||
+                        "Chưa có giấy phép"}
+                    </Tag>
+                  </Space>
+                </div>
               </div>
 
-              <div className="min-w-0">
-                <Title
-                  level={4}
-                  className="!mb-0.5 !text-slate-950"
-                >
-                  {detailDoctor.name}
-                </Title>
-
-                <Text
-                  type="secondary"
-                  className="mb-2 block"
-                >
-                  {detailDoctor.title ||
-                    "Bác sĩ"}{" "}
-                  ·{" "}
-                  {detailDoctor.specialty ||
-                    "Chưa cập nhật chuyên khoa"}
-                </Text>
-
-                <Space size={8} wrap>
-                  {renderStatus(
-                    detailDoctor.status,
-                  )}
-
-                  <Tag color="blue">
-                    {detailDoctor.licenseNo ||
-                      "Chưa có giấy phép"}
-                  </Tag>
-                </Space>
-              </div>
+              <Button
+                type="text"
+                shape="circle"
+                aria-label="Đóng"
+                title="Đóng"
+                icon={
+                  <X className="h-5 w-5" />
+                }
+                className="shrink-0"
+                onClick={() =>
+                  setDetailDoctor(null)
+                }
+              />
             </div>
 
+            <div className="min-h-0 overflow-y-auto px-[18px] py-4 pr-3">
             <Descriptions
               bordered
               column={2}
               size="small"
               styles={{
                 label: {
-                  width: 145,
+                  width: 150,
                   fontWeight: 600,
                 },
                 content: {
@@ -1519,6 +1533,7 @@ export default function DoctorManagementPage() {
                 </Space>
               </Descriptions.Item>
             </Descriptions>
+            </div>
           </div>
         ) : null}
       </Modal>
