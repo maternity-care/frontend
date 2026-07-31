@@ -13,7 +13,7 @@ import {
   Gauge,
   MessageSquare,
   ShieldCheck,
-  Sparkles,
+  HeartPulse,
   Stethoscope,
   UserCog,
   Users,
@@ -134,7 +134,10 @@ export function Sidebar() {
       >
         <div className="flex min-w-0 items-center">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-slate-950">
-            <Sparkles className="h-5 w-5" aria-hidden="true" />
+            <HeartPulse
+              className="h-5 w-5 !text-pink-700"
+              aria-hidden="true"
+            />
           </div>
 
           {!collapsed ? (
@@ -174,6 +177,12 @@ export function Sidebar() {
       <nav
         className={cn(
           "min-h-0 flex-1 space-y-1 overflow-y-auto pb-4 transition-all duration-300",
+          "[scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.35)_transparent]",
+          "[&::-webkit-scrollbar]:w-1.5",
+          "[&::-webkit-scrollbar-track]:bg-transparent",
+          "[&::-webkit-scrollbar-thumb]:rounded-full",
+          "[&::-webkit-scrollbar-thumb]:bg-slate-700/80",
+          "hover:[&::-webkit-scrollbar-thumb]:bg-cyan-400/50",
           collapsed ? "px-2 pt-4" : "px-3",
         )}
       >
