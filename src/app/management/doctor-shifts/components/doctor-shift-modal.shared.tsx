@@ -140,6 +140,19 @@ export function getErrorMessage(error: unknown) {
   return "Đã có lỗi xảy ra. Vui lòng thử lại.";
 }
 
+function getCurrentDateKey() {
+  const currentDate = new Date();
+  const year = currentDate.getFullYear();
+  const month = String(
+    currentDate.getMonth() + 1,
+  ).padStart(2, "0");
+  const day = String(
+    currentDate.getDate(),
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 function timeToMinutes(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
 
@@ -445,6 +458,7 @@ export function DoctorShiftFormModalBase({
       setShiftSlots([]);
       form.resetFields();
       form.setFieldsValue({
+        shiftDate: getCurrentDateKey(),
         status: "available",
         note: "",
         assignments: [
