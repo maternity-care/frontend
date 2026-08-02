@@ -106,7 +106,7 @@ function isOvernightTime(
   return (
     Boolean(startTime) &&
     Boolean(endTime) &&
-    timeToMinutes(endTime) <=
+    timeToMinutes(endTime) <
       timeToMinutes(startTime)
   );
 }
@@ -426,11 +426,30 @@ export function ShiftSlotFormModalBase({
             <Form.Item
               name="endTime"
               label="Giờ kết thúc"
+              dependencies={["startTime"]}
               rules={[
                 {
                   required: true,
                   message:
                     "Vui lòng chọn giờ kết thúc.",
+                },
+                {
+                  validator: async (_, value) => {
+                    const startTime =
+                      form.getFieldValue(
+                        "startTime",
+                      );
+
+                    if (
+                      startTime &&
+                      value &&
+                      startTime === value
+                    ) {
+                      throw new Error(
+                        "Giờ kết thúc phải khác giờ bắt đầu.",
+                      );
+                    }
+                  },
                 },
               ]}
             >

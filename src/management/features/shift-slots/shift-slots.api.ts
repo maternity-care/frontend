@@ -15,6 +15,8 @@ import type {
 } from "./shift-slots.types";
 
 const ENDPOINT = "/management/shift-slots";
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 20;
 
 function compactObject(
   value: Record<string, unknown>,
@@ -29,7 +31,33 @@ function compactObject(
   );
 }
 
-function normalizeTime(value: string): string {
+function normalizePositiveInteger(
+  value: unknown,
+  fallback: number,
+) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return Math.trunc(parsed);
+}
+
+function normalizeNonNegativeInteger(
+  value: unknown,
+  fallback: number,
+) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+
+  return Math.trunc(parsed);
+}
+
+function normalizeTime(value: unknown): string {
   const [hour = "00", minute = "00"] = String(
     value ?? "",
   )
@@ -43,7 +71,7 @@ function normalizeTime(value: string): string {
 }
 
 function normalizeStatus(
-  status: string,
+  status: unknown,
 ): ShiftSlotStatus {
   return String(status ?? "")
     .trim()
@@ -76,28 +104,32 @@ function normalizeShiftSlot(
   slot: BackendShiftSlot,
 ): ShiftSlot {
   return {
-    id: String(slot.id ?? ""),
-    facilityId: String(slot.facilityId ?? ""),
+    id: String(slot?.id ?? ""),
+    facilityId: String(
+      slot?.facilityId ?? "",
+    ),
     facilityName: String(
-      slot.facilityName ??
-        slot.facility?.name ??
-        "",
+      slot?.facilityName ?? "",
     ),
     facilityCode: String(
-      slot.facilityCode ??
-        slot.facility?.code ??
-        "",
+      slot?.facilityCode ?? "",
     ),
-    code: String(slot.code ?? ""),
-    name: String(slot.name ?? ""),
-    startTime: normalizeTime(slot.startTime),
-    endTime: normalizeTime(slot.endTime),
+    code: String(slot?.code ?? ""),
+    name: String(slot?.name ?? ""),
+    startTime: normalizeTime(
+      slot?.startTime,
+    ),
+    endTime: normalizeTime(slot?.endTime),
     isOvernight: normalizeBoolean(
-      slot.isOvernight,
+      slot?.isOvernight,
     ),
-    status: normalizeStatus(slot.status),
-    createdAt: String(slot.createdAt ?? ""),
-    updatedAt: String(slot.updatedAt ?? ""),
+    status: normalizeStatus(slot?.status),
+    createdAt: String(
+      slot?.createdAt ?? "",
+    ),
+    updatedAt: String(
+      slot?.updatedAt ?? "",
+    ),
   };
 }
 
@@ -105,13 +137,17 @@ function normalizeLookupItem(
   slot: BackendShiftSlotLookupItem,
 ): ShiftSlotLookupItem {
   return {
-    id: String(slot.id ?? ""),
-    facilityId: String(slot.facilityId ?? ""),
-    code: String(slot.code ?? ""),
-    name: String(slot.name ?? ""),
-    startTime: normalizeTime(slot.startTime),
-    endTime: normalizeTime(slot.endTime),
-    status: normalizeStatus(slot.status),
+    id: String(slot?.id ?? ""),
+    facilityId: String(
+      slot?.facilityId ?? "",
+    ),
+    code: String(slot?.code ?? ""),
+    name: String(slot?.name ?? ""),
+    startTime: normalizeTime(
+      slot?.startTime,
+    ),
+    endTime: normalizeTime(slot?.endTime),
+    status: normalizeStatus(slot?.status),
   };
 }
 
@@ -123,21 +159,38 @@ function readResponseData<T>(
   data: T;
 } {
   if (
-    raw &&
+    raw === undefined ||
+    raw === null ||
+    raw === ""
+  ) {
+    return {
+      success: true,
+      message: "",
+      data: null as T,
+    };
+  }
+
+  if (
     typeof raw === "object" &&
     !Array.isArray(raw) &&
-    "data" in raw
+    (
+      "data" in raw ||
+      "success" in raw ||
+      "message" in raw
+    )
   ) {
     const envelope = raw as {
       success?: boolean;
       message?: string;
-      data: T;
+      data?: T;
     };
 
     return {
       success: envelope.success ?? true,
       message: envelope.message ?? "",
-      data: envelope.data,
+      data:
+        envelope.data ??
+        (null as T),
     };
   }
 
@@ -155,8 +208,8 @@ function toListParams(
     search: params?.search?.trim(),
     facilityId: params?.facilityId?.trim(),
     status: params?.status,
-    page: params?.page,
-    limit: params?.limit ?? 20,
+    page: params?.page ?? DEFAULT_PAGE,
+    limit: params?.limit ?? DEFAULT_LIMIT,
   });
 }
 
@@ -167,7 +220,7 @@ function toLookupParams(
     search: params?.search?.trim(),
     facilityId: params?.facilityId?.trim(),
     status: params?.status ?? "active",
-    limit: params?.limit ?? 20,
+    limit: params?.limit ?? DEFAULT_LIMIT,
   });
 }
 
@@ -204,14 +257,22 @@ function toUpdatePayload(
 export async function getShiftSlots(
   params?: GetShiftSlotsParams,
 ): Promise<ShiftSlotListResult> {
-  const response = await apiClient.get(ENDPOINT, {
-    params: toListParams(params),
-  });
+  const requestedPage =
+    params?.page ?? DEFAULT_PAGE;
+  const requestedLimit =
+    params?.limit ?? DEFAULT_LIMIT;
 
-  const result =
-    readResponseData<
-      BackendShiftSlotPagination | BackendShiftSlot[]
-    >(response.data);
+  const response = await apiClient.get(
+    ENDPOINT,
+    {
+      params: toListParams(params),
+    },
+  );
+
+  const result = readResponseData<
+    | BackendShiftSlotPagination
+    | BackendShiftSlot[]
+  >(response.data);
 
   if (Array.isArray(result.data)) {
     const items = result.data.map(
@@ -221,32 +282,48 @@ export async function getShiftSlots(
     return {
       items,
       total: items.length,
-      page: params?.page ?? 1,
-      limit: params?.limit ?? 20,
-      totalPages: 1,
+      page: requestedPage,
+      limit: requestedLimit,
+      totalPages:
+        items.length > 0 ? 1 : 0,
     };
   }
 
   const pagination = result.data;
+  const items = Array.isArray(
+    pagination?.items,
+  )
+    ? pagination.items.map(
+        normalizeShiftSlot,
+      )
+    : [];
+  const total = normalizeNonNegativeInteger(
+    pagination?.total,
+    items.length,
+  );
+  const page = normalizePositiveInteger(
+    pagination?.page,
+    requestedPage,
+  );
+  const limit = normalizePositiveInteger(
+    pagination?.limit,
+    requestedLimit,
+  );
+  const calculatedTotalPages =
+    total === 0
+      ? 0
+      : Math.ceil(total / limit);
 
   return {
-    items: Array.isArray(pagination?.items)
-      ? pagination.items.map(
-          normalizeShiftSlot,
-        )
-      : [],
-    total: Number(pagination?.total ?? 0),
-    page: Number(
-      pagination?.page ?? params?.page ?? 1,
-    ),
-    limit: Number(
-      pagination?.limit ??
-        params?.limit ??
-        20,
-    ),
-    totalPages: Number(
-      pagination?.totalPages ?? 0,
-    ),
+    items,
+    total,
+    page,
+    limit,
+    totalPages:
+      normalizeNonNegativeInteger(
+        pagination?.totalPages,
+        calculatedTotalPages,
+      ),
   };
 }
 
@@ -259,10 +336,11 @@ export async function getShiftSlotLookup(
       params: toLookupParams(params),
     },
   );
+
   const result =
-    readResponseData<BackendShiftSlotLookupItem[]>(
-      response.data,
-    );
+    readResponseData<
+      BackendShiftSlotLookupItem[]
+    >(response.data);
 
   return Array.isArray(result.data)
     ? result.data.map(normalizeLookupItem)
@@ -273,30 +351,35 @@ export async function getShiftSlot(
   id: string,
 ): Promise<ShiftSlot> {
   const response = await apiClient.get(
-    `${ENDPOINT}/${id}`,
+    `${ENDPOINT}/${encodeURIComponent(id)}`,
   );
-  const result = readResponseData<BackendShiftSlot>(
-    response.data,
-  );
+  const result =
+    readResponseData<BackendShiftSlot>(
+      response.data,
+    );
 
   return normalizeShiftSlot(result.data);
 }
 
 export async function createShiftSlot(
   input: CreateShiftSlotInput,
-): Promise<ShiftSlotApiResponse<ShiftSlot>> {
+): Promise<
+  ShiftSlotApiResponse<ShiftSlot>
+> {
   const response = await apiClient.post(
     ENDPOINT,
     toCreatePayload(input),
   );
-  const result = readResponseData<BackendShiftSlot>(
-    response.data,
-  );
+  const result =
+    readResponseData<BackendShiftSlot>(
+      response.data,
+    );
 
   return {
     success: result.success,
     message:
-      result.message || "Tạo khung ca thành công",
+      result.message ||
+      "Tạo khung ca thành công",
     data: normalizeShiftSlot(result.data),
   };
 }
@@ -304,14 +387,17 @@ export async function createShiftSlot(
 export async function updateShiftSlot(
   id: string,
   input: UpdateShiftSlotInput,
-): Promise<ShiftSlotApiResponse<ShiftSlot>> {
+): Promise<
+  ShiftSlotApiResponse<ShiftSlot>
+> {
   const response = await apiClient.patch(
-    `${ENDPOINT}/${id}`,
+    `${ENDPOINT}/${encodeURIComponent(id)}`,
     toUpdatePayload(input),
   );
-  const result = readResponseData<BackendShiftSlot>(
-    response.data,
-  );
+  const result =
+    readResponseData<BackendShiftSlot>(
+      response.data,
+    );
 
   return {
     success: result.success,
@@ -326,16 +412,17 @@ export async function deleteShiftSlot(
   id: string,
 ): Promise<ShiftSlotApiResponse<null>> {
   const response = await apiClient.delete(
-    `${ENDPOINT}/${id}`,
+    `${ENDPOINT}/${encodeURIComponent(id)}`,
   );
   const result = readResponseData<null>(
-    response.data ?? null,
+    response.data,
   );
 
   return {
     success: result.success,
     message:
-      result.message || "Xóa khung ca thành công",
+      result.message ||
+      "Xóa khung ca thành công",
     data: null,
   };
 }
