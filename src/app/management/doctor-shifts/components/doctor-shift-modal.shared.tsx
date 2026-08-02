@@ -61,8 +61,13 @@ export type DoctorOption = {
 type ShiftAssignmentFormValue = {
   doctorId: string;
   roomId: string;
-  slotId: string;
+  slotId?: string;
   maxAppointments: number;
+};
+
+type ShiftSlotGroupFormValue = {
+  slotId: string;
+  assignments: ShiftAssignmentFormValue[];
 };
 
 type ShiftFormValues = {
@@ -71,7 +76,28 @@ type ShiftFormValues = {
   status: DoctorShiftStatus;
   note: string;
   assignments: ShiftAssignmentFormValue[];
+  slotGroups: ShiftSlotGroupFormValue[];
 };
+
+type DoctorFieldPath =
+  | ["assignments", number, "doctorId"]
+  | [
+      "slotGroups",
+      number,
+      "assignments",
+      number,
+      "doctorId",
+    ];
+
+type RoomFieldPath =
+  | ["assignments", number, "roomId"]
+  | [
+      "slotGroups",
+      number,
+      "assignments",
+      number,
+      "roomId",
+    ];
 
 export type ShiftFormPayload = Omit<
   CreateDoctorShiftInput,
@@ -421,6 +447,8 @@ export function DoctorShiftFormModalBase({
     Form.useWatch("facilityId", form) ?? "";
   const watchedAssignments =
     Form.useWatch("assignments", form) ?? [];
+  const watchedSlotGroups =
+    Form.useWatch("slotGroups", form) ?? [];
 
   const slotById = useMemo(
     () =>
@@ -451,6 +479,7 @@ export function DoctorShiftFormModalBase({
                 editingShift.maxAppointments,
             },
           ],
+          slotGroups: [],
         });
         return;
       }
@@ -461,14 +490,8 @@ export function DoctorShiftFormModalBase({
         shiftDate: getCurrentDateKey(),
         status: "available",
         note: "",
-        assignments: [
-          {
-            doctorId: "",
-            roomId: "",
-            slotId: "",
-            maxAppointments: 8,
-          },
-        ],
+        assignments: [],
+        slotGroups: [],
       });
     }, 0);
 
@@ -478,7 +501,9 @@ export function DoctorShiftFormModalBase({
   }, [editingShift, form, mode, open]);
 
   useEffect(() => {
-    if (!open || !watchedFacilityId) return;
+    if (!open || !watchedFacilityId) {
+      return;
+    }
 
     let cancelled = false;
 
@@ -522,11 +547,25 @@ export function DoctorShiftFormModalBase({
         }
 
         setShiftSlots(nextSlots);
+
+        if (mode === "create") {
+          form.setFieldsValue({
+            slotGroups: nextSlots.map((slot) => ({
+              slotId: slot.id,
+              assignments: [],
+            })),
+          });
+        }
       })
       .catch((slotError) => {
         if (!cancelled) {
           setError(getErrorMessage(slotError));
           setShiftSlots([]);
+          if (mode === "create") {
+            form.setFieldsValue({
+              slotGroups: [],
+            });
+          }
         }
       })
       .finally(() => {
@@ -540,6 +579,7 @@ export function DoctorShiftFormModalBase({
     };
   }, [
     editingShift,
+    form,
     mode,
     open,
     watchedFacilityId,
@@ -568,20 +608,106 @@ export function DoctorShiftFormModalBase({
     [shiftSlots],
   );
 
-  function getDoctorOptions(rowIndex: number) {
-    const row = watchedAssignments[rowIndex];
-    const selectedSlot = row?.slotId
-      ? slotById.get(row.slotId)
-      : undefined;
-
+  function getActiveDoctorsForFacility() {
     return doctors
       .filter((doctor) => doctor.status === "active")
       .filter((doctor) =>
         doctor.facilityIds.includes(
           watchedFacilityId,
         ),
-      )
-      .map((doctor) => {
+      );
+  }
+
+  function getCreateDoctorOptions(
+    groupIndex: number,
+    assignmentIndex: number,
+    slotId: string,
+  ) {
+    const selectedSlot = slotById.get(slotId);
+    const currentDoctorId =
+      watchedSlotGroups[groupIndex]?.assignments?.[
+        assignmentIndex
+      ]?.doctorId;
+
+    return getActiveDoctorsForFacility().map(
+      (doctor) => {
+        const busyInSavedSchedule = selectedSlot
+          ? shifts.some(
+              (shift) =>
+                shift.doctorId === doctor.id &&
+                shift.shiftDate === watchedDate &&
+                shiftsOverlap(
+                  shift.startTime,
+                  shift.endTime,
+                  selectedSlot.startTime,
+                  selectedSlot.endTime,
+                ),
+            )
+          : false;
+
+        const duplicatedInCurrentForm = selectedSlot
+          ? watchedSlotGroups.some(
+              (group, otherGroupIndex) => {
+                const otherSlot = slotById.get(
+                  group?.slotId,
+                );
+
+                if (!otherSlot) return false;
+
+                return (
+                  group?.assignments ?? []
+                ).some(
+                  (assignment, otherAssignmentIndex) => {
+                    if (
+                      otherGroupIndex === groupIndex &&
+                      otherAssignmentIndex ===
+                        assignmentIndex
+                    ) {
+                      return false;
+                    }
+
+                    return (
+                      assignment?.doctorId === doctor.id &&
+                      shiftsOverlap(
+                        otherSlot.startTime,
+                        otherSlot.endTime,
+                        selectedSlot.startTime,
+                        selectedSlot.endTime,
+                      )
+                    );
+                  },
+                );
+              },
+            )
+          : false;
+
+        const unavailable =
+          busyInSavedSchedule ||
+          duplicatedInCurrentForm;
+
+        return {
+          value: doctor.id,
+          disabled:
+            unavailable &&
+            currentDoctorId !== doctor.id,
+          label: `${doctor.title} ${doctor.name} · ${doctor.specialty}${
+            unavailable && currentDoctorId !== doctor.id
+              ? " · Trùng ca"
+              : ""
+          }`,
+        };
+      },
+    );
+  }
+
+  function getEditDoctorOptions(rowIndex: number) {
+    const row = watchedAssignments[rowIndex];
+    const selectedSlot = row?.slotId
+      ? slotById.get(row.slotId)
+      : undefined;
+
+    return getActiveDoctorsForFacility().map(
+      (doctor) => {
         const busyInSavedSchedule = selectedSlot
           ? shifts.some(
               (shift) =>
@@ -597,54 +723,20 @@ export function DoctorShiftFormModalBase({
             )
           : false;
 
-        const duplicatedInCurrentForm =
-          selectedSlot
-            ? watchedAssignments.some(
-                (
-                  assignment,
-                  assignmentIndex,
-                ) => {
-                  if (
-                    assignmentIndex === rowIndex ||
-                    assignment?.doctorId !== doctor.id ||
-                    !assignment?.slotId
-                  ) {
-                    return false;
-                  }
-
-                  const otherSlot = slotById.get(
-                    assignment.slotId,
-                  );
-
-                  return otherSlot
-                    ? shiftsOverlap(
-                        otherSlot.startTime,
-                        otherSlot.endTime,
-                        selectedSlot.startTime,
-                        selectedSlot.endTime,
-                      )
-                    : false;
-                },
-              )
-            : false;
-
-        const unavailable =
-          busyInSavedSchedule ||
-          duplicatedInCurrentForm;
-
         return {
           value: doctor.id,
           disabled:
-            unavailable &&
+            busyInSavedSchedule &&
             row?.doctorId !== doctor.id,
           label: `${doctor.title} ${doctor.name} · ${doctor.specialty}${
-            unavailable &&
+            busyInSavedSchedule &&
             row?.doctorId !== doctor.id
               ? " · Trùng ca"
               : ""
           }`,
         };
-      });
+      },
+    );
   }
 
   async function handleFinish(values: ShiftFormValues) {
@@ -652,13 +744,254 @@ export function DoctorShiftFormModalBase({
 
     try {
       const payloads: ShiftFormPayload[] = [];
+      const payloadFieldPaths: Array<{
+        doctor: DoctorFieldPath;
+        room: RoomFieldPath;
+      }> = [];
 
-      for (
-        let index = 0;
-        index < values.assignments.length;
-        index += 1
-      ) {
-        const assignment = values.assignments[index];
+      if (mode === "create") {
+        const groups = values.slotGroups ?? [];
+        const selectedAssignmentCount = groups.reduce(
+          (total, group) =>
+            total + (group.assignments?.length ?? 0),
+          0,
+        );
+
+        if (selectedAssignmentCount === 0) {
+          setError(
+            "Vui lòng thêm ít nhất một bác sĩ vào một khung ca.",
+          );
+          return;
+        }
+
+        for (
+          let groupIndex = 0;
+          groupIndex < groups.length;
+          groupIndex += 1
+        ) {
+          const group = groups[groupIndex];
+          const selectedSlot = slotById.get(
+            group.slotId,
+          );
+
+          if (!selectedSlot) {
+            continue;
+          }
+
+          const assignments = group.assignments ?? [];
+
+          for (
+            let assignmentIndex = 0;
+            assignmentIndex < assignments.length;
+            assignmentIndex += 1
+          ) {
+            const assignment =
+              assignments[assignmentIndex];
+
+            const duplicateDoctor = groups.some(
+              (otherGroup, otherGroupIndex) => {
+                const otherSlot = slotById.get(
+                  otherGroup.slotId,
+                );
+
+                if (!otherSlot) return false;
+
+                return (
+                  otherGroup.assignments ?? []
+                ).some(
+                  (other, otherAssignmentIndex) => {
+                    if (
+                      otherGroupIndex === groupIndex &&
+                      otherAssignmentIndex ===
+                        assignmentIndex
+                    ) {
+                      return false;
+                    }
+
+                    return (
+                      other.doctorId ===
+                        assignment.doctorId &&
+                      shiftsOverlap(
+                        otherSlot.startTime,
+                        otherSlot.endTime,
+                        selectedSlot.startTime,
+                        selectedSlot.endTime,
+                      )
+                    );
+                  },
+                );
+              },
+            );
+
+            if (duplicateDoctor) {
+              form.setFields([
+                {
+                  name: [
+                    "slotGroups",
+                    groupIndex,
+                    "assignments",
+                    assignmentIndex,
+                    "doctorId",
+                  ],
+                  errors: [
+                    "Bác sĩ bị trùng thời gian trong các khung ca đang chọn.",
+                  ],
+                },
+              ]);
+              return;
+            }
+
+            const duplicateRoom = groups.some(
+              (otherGroup, otherGroupIndex) => {
+                const otherSlot = slotById.get(
+                  otherGroup.slotId,
+                );
+
+                if (!otherSlot) return false;
+
+                return (
+                  otherGroup.assignments ?? []
+                ).some(
+                  (other, otherAssignmentIndex) => {
+                    if (
+                      otherGroupIndex === groupIndex &&
+                      otherAssignmentIndex ===
+                        assignmentIndex
+                    ) {
+                      return false;
+                    }
+
+                    return (
+                      other.roomId === assignment.roomId &&
+                      shiftsOverlap(
+                        otherSlot.startTime,
+                        otherSlot.endTime,
+                        selectedSlot.startTime,
+                        selectedSlot.endTime,
+                      )
+                    );
+                  },
+                );
+              },
+            );
+
+            if (duplicateRoom) {
+              form.setFields([
+                {
+                  name: [
+                    "slotGroups",
+                    groupIndex,
+                    "assignments",
+                    assignmentIndex,
+                    "roomId",
+                  ],
+                  errors: [
+                    "Phòng bị trùng thời gian trong các khung ca đang chọn.",
+                  ],
+                },
+              ]);
+              return;
+            }
+
+            const existingDoctorConflict = shifts.some(
+              (shift) =>
+                shift.doctorId === assignment.doctorId &&
+                shift.shiftDate === values.shiftDate &&
+                shiftsOverlap(
+                  shift.startTime,
+                  shift.endTime,
+                  selectedSlot.startTime,
+                  selectedSlot.endTime,
+                ),
+            );
+
+            if (existingDoctorConflict) {
+              form.setFields([
+                {
+                  name: [
+                    "slotGroups",
+                    groupIndex,
+                    "assignments",
+                    assignmentIndex,
+                    "doctorId",
+                  ],
+                  errors: [
+                    "Bác sĩ đã có lịch trong thời gian này.",
+                  ],
+                },
+              ]);
+              return;
+            }
+
+            const existingRoomConflict = shifts.some(
+              (shift) =>
+                shift.roomId === assignment.roomId &&
+                shift.shiftDate === values.shiftDate &&
+                shiftsOverlap(
+                  shift.startTime,
+                  shift.endTime,
+                  selectedSlot.startTime,
+                  selectedSlot.endTime,
+                ),
+            );
+
+            if (existingRoomConflict) {
+              form.setFields([
+                {
+                  name: [
+                    "slotGroups",
+                    groupIndex,
+                    "assignments",
+                    assignmentIndex,
+                    "roomId",
+                  ],
+                  errors: [
+                    "Phòng đã được sử dụng trong thời gian này.",
+                  ],
+                },
+              ]);
+              return;
+            }
+
+            payloads.push({
+              doctorId: assignment.doctorId.trim(),
+              facilityId: values.facilityId.trim(),
+              roomId: assignment.roomId.trim(),
+              slotId: group.slotId.trim(),
+              shiftDate: values.shiftDate,
+              maxAppointments: Number(
+                assignment.maxAppointments,
+              ),
+              status: "available",
+              note: values.note?.trim() ?? "",
+            });
+            payloadFieldPaths.push({
+              doctor: [
+                "slotGroups",
+                groupIndex,
+                "assignments",
+                assignmentIndex,
+                "doctorId",
+              ],
+              room: [
+                "slotGroups",
+                groupIndex,
+                "assignments",
+                assignmentIndex,
+                "roomId",
+              ],
+            });
+          }
+        }
+      } else {
+        const assignment = values.assignments?.[0];
+
+        if (!assignment?.slotId) {
+          throw new Error(
+            "Không tìm thấy khung ca cần cập nhật.",
+          );
+        }
+
         const selectedSlot = slotById.get(
           assignment.slotId,
         );
@@ -666,89 +999,9 @@ export function DoctorShiftFormModalBase({
         if (!selectedSlot) {
           form.setFields([
             {
-              name: [
-                "assignments",
-                index,
-                "slotId",
-              ],
+              name: ["assignments", 0, "slotId"],
               errors: [
                 "Khung ca không hợp lệ hoặc đã ngừng hoạt động.",
-              ],
-            },
-          ]);
-          return;
-        }
-
-        const duplicateDoctor = values.assignments.some(
-          (other, otherIndex) => {
-            if (
-              otherIndex === index ||
-              other.doctorId !== assignment.doctorId
-            ) {
-              return false;
-            }
-
-            const otherSlot = slotById.get(other.slotId);
-
-            return otherSlot
-              ? shiftsOverlap(
-                  otherSlot.startTime,
-                  otherSlot.endTime,
-                  selectedSlot.startTime,
-                  selectedSlot.endTime,
-                )
-              : false;
-          },
-        );
-
-        if (duplicateDoctor) {
-          form.setFields([
-            {
-              name: [
-                "assignments",
-                index,
-                "doctorId",
-              ],
-              errors: [
-                "Bác sĩ bị trùng thời gian trong các dòng đang nhập.",
-              ],
-            },
-          ]);
-          return;
-        }
-
-        const duplicateRoom = values.assignments.some(
-          (other, otherIndex) => {
-            if (
-              otherIndex === index ||
-              other.roomId !== assignment.roomId
-            ) {
-              return false;
-            }
-
-            const otherSlot = slotById.get(other.slotId);
-
-            return otherSlot
-              ? shiftsOverlap(
-                  otherSlot.startTime,
-                  otherSlot.endTime,
-                  selectedSlot.startTime,
-                  selectedSlot.endTime,
-                )
-              : false;
-          },
-        );
-
-        if (duplicateRoom) {
-          form.setFields([
-            {
-              name: [
-                "assignments",
-                index,
-                "roomId",
-              ],
-              errors: [
-                "Phòng bị trùng thời gian trong các dòng đang nhập.",
               ],
             },
           ]);
@@ -771,13 +1024,9 @@ export function DoctorShiftFormModalBase({
         if (existingDoctorConflict) {
           form.setFields([
             {
-              name: [
-                "assignments",
-                index,
-                "doctorId",
-              ],
+              name: ["assignments", 0, "doctorId"],
               errors: [
-                "Bác sĩ đã có lịch trong khung ca này.",
+                "Bác sĩ đã có lịch trong thời gian này.",
               ],
             },
           ]);
@@ -800,13 +1049,9 @@ export function DoctorShiftFormModalBase({
         if (existingRoomConflict) {
           form.setFields([
             {
-              name: [
-                "assignments",
-                index,
-                "roomId",
-              ],
+              name: ["assignments", 0, "roomId"],
               errors: [
-                "Phòng đã được sử dụng trong khung ca này.",
+                "Phòng đã được sử dụng trong thời gian này.",
               ],
             },
           ]);
@@ -822,16 +1067,24 @@ export function DoctorShiftFormModalBase({
           maxAppointments: Number(
             assignment.maxAppointments,
           ),
-          status:
-            mode === "create"
-              ? "available"
-              : values.status,
+          status: values.status,
           note: values.note?.trim() ?? "",
+        });
+        payloadFieldPaths.push({
+          doctor: ["assignments", 0, "doctorId"],
+          room: ["assignments", 0, "roomId"],
         });
       }
 
       if (mode === "edit" && editingShift) {
         const firstPayload = payloads[0];
+
+        if (!firstPayload) {
+          throw new Error(
+            "Không tìm thấy dữ liệu ca trực cần cập nhật.",
+          );
+        }
+
         const hasChanges =
           firstPayload.doctorId !==
             editingShift.doctorId ||
@@ -862,33 +1115,31 @@ export function DoctorShiftFormModalBase({
         }
 
         const confirmed =
-          await new Promise<boolean>(
-            (resolve) => {
-              let resolved = false;
+          await new Promise<boolean>((resolve) => {
+            let resolved = false;
 
-              const finish = (value: boolean) => {
-                if (resolved) return;
-                resolved = true;
-                resolve(value);
-              };
+            const finish = (value: boolean) => {
+              if (resolved) return;
+              resolved = true;
+              resolve(value);
+            };
 
-              modalApi.confirm({
-                centered: true,
+            modalApi.confirm({
+              centered: true,
+              closable: false,
+              mask: {
                 closable: false,
-                mask: {
-                  closable: false,
-                },
-                title:
-                  "Xác nhận cập nhật ca trực",
-                content:
-                  "Bạn có chắc chắn muốn lưu các thay đổi của ca trực này không?",
-                okText: "Xác nhận cập nhật",
-                cancelText: "Kiểm tra lại",
-                onOk: () => finish(true),
-                onCancel: () => finish(false),
-              });
-            },
-          );
+              },
+              title:
+                "Xác nhận cập nhật ca trực",
+              content:
+                "Bạn có chắc chắn muốn lưu các thay đổi của ca trực này không?",
+              okText: "Xác nhận cập nhật",
+              cancelText: "Kiểm tra lại",
+              onOk: () => finish(true),
+              onCancel: () => finish(false),
+            });
+          });
 
         if (!confirmed) return;
       }
@@ -917,22 +1168,22 @@ export function DoctorShiftFormModalBase({
 
       if (conflictIndex >= 0) {
         const conflict = conflicts[conflictIndex];
+        const paths = payloadFieldPaths[conflictIndex];
 
-        form.setFields([
-          {
-            name: [
-              "assignments",
-              conflictIndex,
-              conflict.target === "room"
-                ? "roomId"
-                : "doctorId",
-            ],
-            errors: [
-              conflict.message ||
-                "Ca trực bị trùng với lịch đã có.",
-            ],
-          },
-        ]);
+        if (paths) {
+          form.setFields([
+            {
+              name:
+                conflict.target === "room"
+                  ? paths.room
+                  : paths.doctor,
+              errors: [
+                conflict.message ||
+                  "Ca trực bị trùng với lịch đã có.",
+              ],
+            },
+          ]);
+        }
         return;
       }
 
@@ -969,7 +1220,7 @@ export function DoctorShiftFormModalBase({
     <Modal
       open={open}
       centered
-      width={1040}
+      width={1080}
       title={null}
       okText={
         mode === "edit"
@@ -986,7 +1237,7 @@ export function DoctorShiftFormModalBase({
       destroyOnHidden
       styles={{
         body: {
-          maxHeight: "74vh",
+          maxHeight: "76vh",
           overflowY: "auto",
           marginRight: 28,
           paddingRight: 12,
@@ -1010,7 +1261,9 @@ export function DoctorShiftFormModalBase({
             </Title>
 
             <Text type="secondary">
-              Chọn cơ sở, bác sĩ, phòng và khung ca.
+              {mode === "create"
+                ? "Chọn cơ sở, sau đó phân công bác sĩ theo từng khung ca hoạt động."
+                : "Cập nhật bác sĩ, phòng và khung ca của lịch trực."}
             </Text>
           </div>
         </div>
@@ -1038,24 +1291,31 @@ export function DoctorShiftFormModalBase({
           if ("facilityId" in changedValues) {
             const facilityId =
               changedValues.facilityId as string;
-            const assignments =
-              form.getFieldValue("assignments") ?? [];
 
             setShiftSlots([]);
             setSlotsLoading(Boolean(facilityId));
 
-            form.setFieldsValue({
-              assignments: assignments.map(
-                (
-                  assignment: ShiftAssignmentFormValue,
-                ) => ({
-                  ...assignment,
-                  doctorId: "",
-                  roomId: "",
-                  slotId: "",
-                }),
-              ),
-            });
+            if (mode === "create") {
+              form.setFieldsValue({
+                slotGroups: [],
+              });
+            } else {
+              const assignments =
+                form.getFieldValue("assignments") ?? [];
+
+              form.setFieldsValue({
+                assignments: assignments.map(
+                  (
+                    assignment: ShiftAssignmentFormValue,
+                  ) => ({
+                    ...assignment,
+                    doctorId: "",
+                    roomId: "",
+                    slotId: "",
+                  }),
+                ),
+              });
+            }
           }
         }}
       >
@@ -1076,7 +1336,10 @@ export function DoctorShiftFormModalBase({
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={10}>
+          <Col
+            xs={24}
+            md={mode === "create" ? 16 : 10}
+          >
             <Form.Item
               name="facilityId"
               label="Cơ sở"
@@ -1090,6 +1353,7 @@ export function DoctorShiftFormModalBase({
               <Select
                 showSearch
                 optionFilterProp="label"
+                placeholder="Chọn cơ sở khám"
                 options={facilities.map(
                   (facility) => ({
                     value: facility.id,
@@ -1100,50 +1364,42 @@ export function DoctorShiftFormModalBase({
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={6}>
-            <Form.Item
-              name="status"
-              label="Trạng thái"
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Vui lòng chọn trạng thái.",
-                },
-              ]}
-            >
-              <Select
-                disabled={mode === "create"}
-                options={
-                  mode === "create"
-                    ? [
-                        {
-                          value: "available",
-                          label: "Còn trống",
-                        },
-                      ]
-                    : [
-                        {
-                          value: "available",
-                          label: "Còn trống",
-                        },
-                        {
-                          value: "full",
-                          label: "Đã đầy",
-                        },
-                        {
-                          value: "cancelled",
-                          label: "Đã hủy",
-                        },
-                        {
-                          value: "off",
-                          label: "Nghỉ",
-                        },
-                      ]
-                }
-              />
-            </Form.Item>
-          </Col>
+          {mode === "edit" ? (
+            <Col xs={24} md={6}>
+              <Form.Item
+                name="status"
+                label="Trạng thái"
+                rules={[
+                  {
+                    required: true,
+                    message:
+                      "Vui lòng chọn trạng thái.",
+                  },
+                ]}
+              >
+                <Select
+                  options={[
+                    {
+                      value: "available",
+                      label: "Còn trống",
+                    },
+                    {
+                      value: "full",
+                      label: "Đã đầy",
+                    },
+                    {
+                      value: "cancelled",
+                      label: "Đã hủy",
+                    },
+                    {
+                      value: "off",
+                      label: "Nghỉ",
+                    },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+          ) : null}
         </Row>
 
         <Row gutter={[16, 0]}>
@@ -1163,230 +1419,402 @@ export function DoctorShiftFormModalBase({
                 rows={2}
                 maxLength={500}
                 showCount
-                placeholder="Nhập ghi chú cho ca trực..."
+                placeholder="Nhập ghi chú chung cho các ca trực..."
               />
             </Form.Item>
           </Col>
         </Row>
 
-        <Form.List
-          name="assignments"
-          rules={[
-            {
-              validator: async (
-                _,
-                assignments: ShiftAssignmentFormValue[],
-              ) => {
-                if (
-                  !assignments ||
-                  assignments.length === 0
-                ) {
-                  throw new Error(
-                    "Cần ít nhất một ca trực.",
-                  );
-                }
-              },
-            },
-          ]}
-        >
-          {(
-            fields,
-            { add, remove },
-            { errors },
-          ) => (
-            <div className="flex flex-col gap-3">
-              {fields.map((field, index) => {
-                const selectedSlotId =
-                  watchedAssignments[index]?.slotId;
-                const selectedSlot = selectedSlotId
-                  ? slotById.get(selectedSlotId)
-                  : undefined;
+        {mode === "create" ? (
+          <div className="mt-1">
+            <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+              <div>
+                <Text strong className="block text-slate-950">
+                  Các khung ca của cơ sở
+                </Text>
+                <Text type="secondary" className="text-sm">
+                  Thêm một hoặc nhiều bác sĩ vào từng khung ca; mỗi bác sĩ chọn phòng và số lịch tối đa riêng.
+                </Text>
+              </div>
 
-                return (
-                  <div
-                    key={field.key}
-                    className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-                          {index + 1}
-                        </span>
-
-                        <Text strong>
-                          Thông tin ca trực
-                        </Text>
-                      </div>
-
-                      {mode === "create" &&
-                      fields.length > 1 ? (
-                        <Button
-                          danger
-                          type="text"
-                          icon={
-                            <Trash2 className="h-4 w-4" />
-                          }
-                          onClick={() =>
-                            remove(field.name)
-                          }
-                        >
-                          Xóa dòng
-                        </Button>
-                      ) : null}
-                    </div>
-
-                    <Row gutter={[16, 0]}>
-                      <Col xs={24} md={12} xl={7}>
-                        <Form.Item
-                          name={[
-                            field.name,
-                            "doctorId",
-                          ]}
-                          label="Bác sĩ"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Chọn bác sĩ.",
-                            },
-                          ]}
-                        >
-                          <Select
-                            showSearch
-                            optionFilterProp="label"
-                            placeholder="Chọn bác sĩ"
-                            options={getDoctorOptions(
-                              index,
-                            )}
-                            notFoundContent={
-                              watchedFacilityId
-                                ? "Cơ sở chưa có bác sĩ đang hoạt động"
-                                : "Vui lòng chọn cơ sở"
-                            }
-                          />
-                        </Form.Item>
-                      </Col>
-
-                      <Col xs={24} md={12} xl={5}>
-                        <Form.Item
-                          name={[
-                            field.name,
-                            "roomId",
-                          ]}
-                          label="Phòng"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Chọn phòng.",
-                            },
-                          ]}
-                        >
-                          <Select
-                            showSearch
-                            optionFilterProp="label"
-                            placeholder="Chọn phòng"
-                            options={roomOptions}
-                            notFoundContent={
-                              watchedFacilityId
-                                ? "Cơ sở chưa có phòng hoạt động"
-                                : "Vui lòng chọn cơ sở"
-                            }
-                          />
-                        </Form.Item>
-                      </Col>
-
-                      <Col xs={24} md={12} xl={6}>
-                        <Form.Item
-                          name={[
-                            field.name,
-                            "slotId",
-                          ]}
-                          label="Khung ca"
-                          rules={[
-                            {
-                              required: true,
-                              message:
-                                "Chọn khung ca.",
-                            },
-                          ]}
-                        >
-                          <Select
-                            showSearch
-                            optionFilterProp="label"
-                            placeholder="Chọn khung ca"
-                            loading={slotsLoading}
-                            options={slotOptions}
-                            notFoundContent={
-                              slotsLoading
-                                ? "Đang tải khung ca..."
-                                : watchedFacilityId
-                                  ? "Cơ sở chưa có khung ca hoạt động"
-                                  : "Vui lòng chọn cơ sở"
-                            }
-                          />
-                        </Form.Item>
-
-                        {selectedSlot ? (
-                          <div className="-mt-3 mb-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                            <Clock className="h-4 w-4 shrink-0" />
-                            <span>
-                              {selectedSlot.startTime} -{" "}
-                              {selectedSlot.endTime}
-                            </span>
-                          </div>
-                        ) : null}
-                      </Col>
-
-                      <Col xs={24} md={12} xl={3}>
-                        <Form.Item
-                          name={[
-                            field.name,
-                            "maxAppointments",
-                          ]}
-                          label="Số lịch tối đa"
-                          rules={[
-                            {
-                              required: true,
-                              message:
-                                "Nhập số lịch tối đa.",
-                            },
-                          ]}
-                        >
-                          <InputNumber
-                            min={0}
-                            className="w-full"
-                          />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-                  </div>
-                );
-              })}
-
-              {mode === "create" ? (
-                <Button
-                  type="dashed"
-                  block
-                  size="large"
-                  icon={
-                    <Plus className="h-4 w-4" />
-                  }
-                  onClick={() =>
-                    add({
-                      doctorId: "",
-                      roomId: "",
-                      slotId: "",
-                      maxAppointments: 8,
-                    })
-                  }
-                >
-                  Thêm ca trực
-                </Button>
+              {watchedFacilityId && !slotsLoading ? (
+                <Tag color="blue">
+                  {shiftSlots.length} khung ca hoạt động
+                </Tag>
               ) : null}
-
-              <Form.ErrorList errors={errors} />
             </div>
-          )}
-        </Form.List>
+
+            {!watchedFacilityId ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
+                <Clock className="mx-auto h-7 w-7 text-slate-400" />
+                <Text className="mt-3 block font-medium text-slate-700">
+                  Vui lòng chọn cơ sở khám
+                </Text>
+                <Text type="secondary" className="mt-1 block text-sm">
+                  Hệ thống sẽ hiển thị các khung ca đang hoạt động của cơ sở.
+                </Text>
+              </div>
+            ) : slotsLoading ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-10 text-center">
+                <Text type="secondary">
+                  Đang tải danh sách khung ca...
+                </Text>
+              </div>
+            ) : shiftSlots.length === 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                title="Cơ sở chưa có khung ca hoạt động"
+                description="Hãy tạo hoặc kích hoạt khung ca trước khi thêm lịch trực."
+              />
+            ) : (
+              <Form.List name="slotGroups">
+                {(groupFields) => (
+                  <div className="grid gap-4">
+                    {groupFields.map(
+                      (groupField, groupIndex) => {
+                        const group =
+                          watchedSlotGroups[groupIndex];
+                        const slot = slotById.get(
+                          group?.slotId ??
+                            shiftSlots[groupIndex]?.id ??
+                            "",
+                        );
+
+                        if (!slot) return null;
+
+                        const assignmentCount =
+                          group?.assignments?.length ?? 0;
+
+                        return (
+                          <div
+                            key={groupField.key}
+                            className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+                          >
+                            <Form.Item
+                              name={[
+                                groupField.name,
+                                "slotId",
+                              ]}
+                              hidden
+                            >
+                              <Input />
+                            </Form.Item>
+
+                            <div className="flex flex-col justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center">
+                              <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                                  <Clock className="h-5 w-5" />
+                                </span>
+
+                                <div>
+                                  <Text strong className="block text-slate-950">
+                                    {slot.name}
+                                  </Text>
+                                  <Text type="secondary" className="text-sm">
+                                    {slot.code} · {slot.startTime} - {slot.endTime}
+                                  </Text>
+                                </div>
+                              </div>
+
+                              <Tag
+                                color={
+                                  assignmentCount > 0
+                                    ? "green"
+                                    : "default"
+                                }
+                              >
+                                {assignmentCount > 0
+                                  ? `${assignmentCount} bác sĩ`
+                                  : "Chưa phân công"}
+                              </Tag>
+                            </div>
+
+                            <div className="p-4">
+                              <Form.List
+                                name={[
+                                  groupField.name,
+                                  "assignments",
+                                ]}
+                              >
+                                {(
+                                  assignmentFields,
+                                  { add, remove },
+                                ) => (
+                                  <div className="flex flex-col gap-3">
+                                    {assignmentFields.length === 0 ? (
+                                      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center">
+                                        <Text type="secondary" className="text-sm">
+                                          Chưa có bác sĩ trong khung ca này.
+                                        </Text>
+                                      </div>
+                                    ) : null}
+
+                                    {assignmentFields.map(
+                                      (
+                                        assignmentField,
+                                        assignmentIndex,
+                                      ) => (
+                                        <div
+                                          key={assignmentField.key}
+                                          className="rounded-lg border border-slate-200 bg-slate-50/70 p-3"
+                                        >
+                                          <div className="mb-2 flex items-center justify-between">
+                                            <Text strong className="text-sm text-slate-700">
+                                              Bác sĩ {assignmentIndex + 1}
+                                            </Text>
+
+                                            <Button
+                                              danger
+                                              type="text"
+                                              size="small"
+                                              icon={<Trash2 className="h-4 w-4" />}
+                                              onClick={() =>
+                                                remove(
+                                                  assignmentField.name,
+                                                )
+                                              }
+                                            >
+                                              Xóa
+                                            </Button>
+                                          </div>
+
+                                          <Row gutter={[12, 0]}>
+                                            <Col xs={24} lg={10}>
+                                              <Form.Item
+                                                name={[
+                                                  assignmentField.name,
+                                                  "doctorId",
+                                                ]}
+                                                label="Bác sĩ"
+                                                rules={[
+                                                  {
+                                                    required: true,
+                                                    message:
+                                                      "Chọn bác sĩ.",
+                                                  },
+                                                ]}
+                                              >
+                                                <Select
+                                                  showSearch
+                                                  optionFilterProp="label"
+                                                  placeholder="Chọn bác sĩ"
+                                                  options={getCreateDoctorOptions(
+                                                    groupIndex,
+                                                    assignmentIndex,
+                                                    slot.id,
+                                                  )}
+                                                  notFoundContent="Cơ sở chưa có bác sĩ phù hợp"
+                                                />
+                                              </Form.Item>
+                                            </Col>
+
+                                            <Col xs={24} md={14} lg={9}>
+                                              <Form.Item
+                                                name={[
+                                                  assignmentField.name,
+                                                  "roomId",
+                                                ]}
+                                                label="Phòng"
+                                                rules={[
+                                                  {
+                                                    required: true,
+                                                    message:
+                                                      "Chọn phòng.",
+                                                  },
+                                                ]}
+                                              >
+                                                <Select
+                                                  showSearch
+                                                  optionFilterProp="label"
+                                                  placeholder="Chọn phòng"
+                                                  options={roomOptions}
+                                                  notFoundContent="Cơ sở chưa có phòng hoạt động"
+                                                />
+                                              </Form.Item>
+                                            </Col>
+
+                                            <Col xs={24} md={10} lg={5}>
+                                              <Form.Item
+                                                name={[
+                                                  assignmentField.name,
+                                                  "maxAppointments",
+                                                ]}
+                                                label="Số lịch tối đa"
+                                                rules={[
+                                                  {
+                                                    required: true,
+                                                    message:
+                                                      "Nhập số lịch tối đa.",
+                                                  },
+                                                ]}
+                                              >
+                                                <InputNumber
+                                                  min={0}
+                                                  className="w-full"
+                                                />
+                                              </Form.Item>
+                                            </Col>
+                                          </Row>
+                                        </div>
+                                      ),
+                                    )}
+
+                                    <Button
+                                      type="dashed"
+                                      block
+                                      icon={<Plus className="h-4 w-4" />}
+                                      onClick={() =>
+                                        add({
+                                          doctorId: "",
+                                          roomId: "",
+                                          maxAppointments: 8,
+                                        })
+                                      }
+                                    >
+                                      Thêm bác sĩ vào {slot.name}
+                                    </Button>
+                                  </div>
+                                )}
+                              </Form.List>
+                            </div>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                )}
+              </Form.List>
+            )}
+          </div>
+        ) : (
+          <Form.List name="assignments">
+            {(fields) => (
+              <div className="flex flex-col gap-3">
+                {fields.map((field, index) => {
+                  const selectedSlotId =
+                    watchedAssignments[index]?.slotId;
+                  const selectedSlot = selectedSlotId
+                    ? slotById.get(selectedSlotId)
+                    : undefined;
+
+                  return (
+                    <div
+                      key={field.key}
+                      className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+                    >
+                      <Row gutter={[16, 0]}>
+                        <Col xs={24} md={12} xl={7}>
+                          <Form.Item
+                            name={[
+                              field.name,
+                              "doctorId",
+                            ]}
+                            label="Bác sĩ"
+                            rules={[
+                              {
+                                required: true,
+                                message: "Chọn bác sĩ.",
+                              },
+                            ]}
+                          >
+                            <Select
+                              showSearch
+                              optionFilterProp="label"
+                              placeholder="Chọn bác sĩ"
+                              options={getEditDoctorOptions(
+                                index,
+                              )}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col xs={24} md={12} xl={5}>
+                          <Form.Item
+                            name={[
+                              field.name,
+                              "roomId",
+                            ]}
+                            label="Phòng"
+                            rules={[
+                              {
+                                required: true,
+                                message: "Chọn phòng.",
+                              },
+                            ]}
+                          >
+                            <Select
+                              showSearch
+                              optionFilterProp="label"
+                              placeholder="Chọn phòng"
+                              options={roomOptions}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col xs={24} md={12} xl={7}>
+                          <Form.Item
+                            name={[
+                              field.name,
+                              "slotId",
+                            ]}
+                            label="Khung ca"
+                            rules={[
+                              {
+                                required: true,
+                                message:
+                                  "Chọn khung ca.",
+                              },
+                            ]}
+                          >
+                            <Select
+                              showSearch
+                              optionFilterProp="label"
+                              placeholder="Chọn khung ca"
+                              loading={slotsLoading}
+                              options={slotOptions}
+                            />
+                          </Form.Item>
+
+                          {selectedSlot ? (
+                            <div className="-mt-3 mb-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                              <Clock className="h-4 w-4 shrink-0" />
+                              <span>
+                                {selectedSlot.startTime} - {selectedSlot.endTime}
+                              </span>
+                            </div>
+                          ) : null}
+                        </Col>
+
+                        <Col xs={24} md={12} xl={5}>
+                          <Form.Item
+                            name={[
+                              field.name,
+                              "maxAppointments",
+                            ]}
+                            label="Số lịch tối đa"
+                            rules={[
+                              {
+                                required: true,
+                                message:
+                                  "Nhập số lịch tối đa.",
+                              },
+                            ]}
+                          >
+                            <InputNumber
+                              min={0}
+                              className="w-full"
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Form.List>
+        )}
       </Form>
     </Modal>
   );
