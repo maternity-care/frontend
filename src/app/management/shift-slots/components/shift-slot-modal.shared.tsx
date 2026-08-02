@@ -19,7 +19,6 @@ import {
 import type {
   CreateShiftSlotInput,
   ShiftSlot,
-  ShiftSlotStatus,
 } from "@/management/features/shift-slots/shift-slots.types";
 
 const { Text, Title } = Typography;
@@ -36,7 +35,6 @@ export type ShiftSlotFormValues = {
   name: string;
   startTime: string;
   endTime: string;
-  status: ShiftSlotStatus;
 };
 
 type ShiftSlotFormModalBaseProps = {
@@ -106,7 +104,7 @@ function isOvernightTime(
   return (
     Boolean(startTime) &&
     Boolean(endTime) &&
-    timeToMinutes(endTime) <
+    timeToMinutes(endTime) <=
       timeToMinutes(startTime)
   );
 }
@@ -126,7 +124,7 @@ function hasSlotChanges(
     values.startTime !== editingSlot.startTime ||
     values.endTime !== editingSlot.endTime ||
     isOvernight !== editingSlot.isOvernight ||
-    values.status !== editingSlot.status
+    editingSlot.status !== "active"
   );
 }
 
@@ -171,15 +169,11 @@ export function ShiftSlotFormModalBase({
           name: editingSlot.name,
           startTime: editingSlot.startTime,
           endTime: editingSlot.endTime,
-          status: editingSlot.status,
         });
         return;
       }
 
       form.resetFields();
-      form.setFieldsValue({
-        status: "active",
-      });
     }, 0);
 
     return () => {
@@ -257,7 +251,7 @@ export function ShiftSlotFormModalBase({
             values.startTime,
             values.endTime,
           ),
-          status: values.status,
+          status: "active",
         });
 
       messageApi.success(successMessage);
@@ -426,61 +420,15 @@ export function ShiftSlotFormModalBase({
             <Form.Item
               name="endTime"
               label="Giờ kết thúc"
-              dependencies={["startTime"]}
               rules={[
                 {
                   required: true,
                   message:
                     "Vui lòng chọn giờ kết thúc.",
                 },
-                {
-                  validator: async (_, value) => {
-                    const startTime =
-                      form.getFieldValue(
-                        "startTime",
-                      );
-
-                    if (
-                      startTime &&
-                      value &&
-                      startTime === value
-                    ) {
-                      throw new Error(
-                        "Giờ kết thúc phải khác giờ bắt đầu.",
-                      );
-                    }
-                  },
-                },
               ]}
             >
               <Input type="time" />
-            </Form.Item>
-          </Col>
-
-         <Col xs={24} md={12}>
-            <Form.Item
-              name="status"
-              label="Trạng thái"
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Vui lòng chọn trạng thái.",
-                },
-              ]}
-            >
-              <Select
-                options={[
-                  {
-                    value: "active",
-                    label: "Hoạt động",
-                  },
-                  {
-                    value: "inactive",
-                    label: "Ngừng hoạt động",
-                  },
-                ]}
-              />
             </Form.Item>
           </Col>
 
@@ -513,7 +461,6 @@ export function ShiftSlotFormModalBase({
               />
             </div>
           </Col>
-
         </Row>
       </Form>
     </Modal>
