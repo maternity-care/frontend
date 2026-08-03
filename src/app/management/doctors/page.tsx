@@ -51,6 +51,12 @@ import {
   getDoctor,
   getDoctors,
 } from "@/management/features/doctors/doctors.api";
+import {
+  getFacilities,
+} from "@/management/features/facilities/facilities.api";
+import {
+  getRoomTypeLookup,
+} from "@/management/features/rooms/rooms.api";
 import type {
   Doctor,
   DoctorExperienceLevel,
@@ -458,6 +464,16 @@ export default function DoctorManagementPage() {
   const [total, setTotal] =
     useState(0);
 
+  const [
+    facilityNameById,
+    setFacilityNameById,
+  ] = useState<Record<string, string>>({});
+
+  const [
+    roomTypeNameById,
+    setRoomTypeNameById,
+  ] = useState<Record<string, string>>({});
+
   useEffect(() => {
     let cancelled = false;
 
@@ -500,6 +516,134 @@ export default function DoctorManagementPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDisplayLookups() {
+      const [
+        facilityResult,
+        roomTypeResult,
+      ] = await Promise.allSettled([
+        getFacilities({
+          page: 1,
+          limit: 100,
+        }),
+        getRoomTypeLookup({
+          status: "active",
+          limit: 50,
+        }),
+      ]);
+
+      if (cancelled) return;
+
+      if (
+        facilityResult.status ===
+        "fulfilled"
+      ) {
+        setFacilityNameById(
+          Object.fromEntries(
+            facilityResult.value.map(
+              (facility) => [
+                facility.id,
+                facility.name,
+              ],
+            ),
+          ),
+        );
+      }
+
+      if (
+        roomTypeResult.status ===
+        "fulfilled"
+      ) {
+        setRoomTypeNameById(
+          Object.fromEntries(
+            roomTypeResult.value.map(
+              (roomType) => [
+                roomType.id,
+                roomType.name,
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    void loadDisplayLookups();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const detailFacilityName =
+    useMemo(() => {
+      if (!detailDoctor) {
+        return "";
+      }
+
+      const facilityIds =
+        detailDoctor.facilityIds.length >
+        0
+          ? detailDoctor.facilityIds
+          : detailDoctor.facilityId
+            ? [
+                detailDoctor.facilityId,
+              ]
+            : [];
+
+      if (facilityIds.length === 0) {
+        return "Chưa được gán";
+      }
+
+      const names = Array.from(
+        new Set(facilityIds),
+      )
+        .map(
+          (facilityId) =>
+            facilityNameById[
+              facilityId
+            ],
+        )
+        .filter(
+          (
+            name,
+          ): name is string =>
+            Boolean(name),
+        );
+
+      return names.length > 0
+        ? names.join(", ")
+        : "Không tìm thấy tên cơ sở";
+    }, [
+      detailDoctor,
+      facilityNameById,
+    ]);
+
+  const detailRoomTypeName =
+    useMemo(() => {
+      if (!detailDoctor) {
+        return "";
+      }
+
+      if (
+        !detailDoctor.workingRoomTypeId
+      ) {
+        return "Chưa cập nhật";
+      }
+
+      return (
+        roomTypeNameById[
+          detailDoctor
+            .workingRoomTypeId
+        ] ||
+        "Không tìm thấy tên loại phòng"
+      );
+    }, [
+      detailDoctor,
+      roomTypeNameById,
+    ]);
 
   const stats = useMemo(() => {
     const active = doctors.filter(
@@ -1456,11 +1600,10 @@ export default function DoctorManagementPage() {
               </Descriptions.Item>
 
               <Descriptions.Item
-                label="Mã cơ sở"
+                label="Cơ sở làm việc"
                 span={1}
               >
-                {detailDoctor.facilityId ||
-                  "Chưa được gán"}
+                {detailFacilityName}
               </Descriptions.Item>
 
               <Descriptions.Item
@@ -1502,8 +1645,7 @@ export default function DoctorManagementPage() {
                 label="Loại phòng làm việc"
                 span={1}
               >
-                {detailDoctor.workingRoomTypeId ||
-                  "Chưa cập nhật"}
+                {detailRoomTypeName}
               </Descriptions.Item>
 
               <Descriptions.Item
