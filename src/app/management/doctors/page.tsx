@@ -1517,7 +1517,7 @@ export default function DoctorManagementPage() {
 
               <Descriptions.Item
                 label="Trạng thái nhân sự"
-                span={1}
+                span={2}
               >
                 {renderStatus(
                   detailDoctor.staffStatus,
