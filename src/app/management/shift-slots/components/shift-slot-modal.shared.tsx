@@ -19,7 +19,6 @@ import {
 import type {
   CreateShiftSlotInput,
   ShiftSlot,
-  ShiftSlotStatus,
 } from "@/management/features/shift-slots/shift-slots.types";
 
 const { Text, Title } = Typography;
@@ -36,7 +35,6 @@ export type ShiftSlotFormValues = {
   name: string;
   startTime: string;
   endTime: string;
-  status: ShiftSlotStatus;
 };
 
 type ShiftSlotFormModalBaseProps = {
@@ -126,7 +124,7 @@ function hasSlotChanges(
     values.startTime !== editingSlot.startTime ||
     values.endTime !== editingSlot.endTime ||
     isOvernight !== editingSlot.isOvernight ||
-    values.status !== editingSlot.status
+    editingSlot.status !== "active"
   );
 }
 
@@ -171,15 +169,11 @@ export function ShiftSlotFormModalBase({
           name: editingSlot.name,
           startTime: editingSlot.startTime,
           endTime: editingSlot.endTime,
-          status: editingSlot.status,
         });
         return;
       }
 
       form.resetFields();
-      form.setFieldsValue({
-        status: "active",
-      });
     }, 0);
 
     return () => {
@@ -257,7 +251,7 @@ export function ShiftSlotFormModalBase({
             values.startTime,
             values.endTime,
           ),
-          status: values.status,
+          status: "active",
         });
 
       messageApi.success(successMessage);
@@ -438,33 +432,6 @@ export function ShiftSlotFormModalBase({
             </Form.Item>
           </Col>
 
-         <Col xs={24} md={12}>
-            <Form.Item
-              name="status"
-              label="Trạng thái"
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Vui lòng chọn trạng thái.",
-                },
-              ]}
-            >
-              <Select
-                options={[
-                  {
-                    value: "active",
-                    label: "Hoạt động",
-                  },
-                  {
-                    value: "inactive",
-                    label: "Ngừng hoạt động",
-                  },
-                ]}
-              />
-            </Form.Item>
-          </Col>
-
           <Col xs={24}>
             <div className="mb-6">
               <Text className="mb-2 block text-sm font-medium text-slate-700">
@@ -494,7 +461,6 @@ export function ShiftSlotFormModalBase({
               />
             </div>
           </Col>
-
         </Row>
       </Form>
     </Modal>
