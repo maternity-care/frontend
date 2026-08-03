@@ -63,13 +63,14 @@ function DoctorShiftEditModalContent({
 
     const updatePayload: UpdateDoctorShiftInput = {
       doctorId: firstPayload.doctorId,
+      staffId: firstPayload.staffId,
+      roleId: firstPayload.roleId,
       facilityId: firstPayload.facilityId,
       roomId: firstPayload.roomId,
       slotId: firstPayload.slotId,
       shiftDate: firstPayload.shiftDate,
       maxAppointments:
         firstPayload.maxAppointments,
-      status: firstPayload.status,
       note: firstPayload.note,
     };
 
