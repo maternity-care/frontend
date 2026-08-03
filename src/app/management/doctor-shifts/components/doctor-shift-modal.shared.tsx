@@ -51,6 +51,8 @@ export type RoomOption = {
 
 export type DoctorOption = {
   id: string;
+  staffId: string;
+  roleId: number;
   name: string;
   title: string;
   specialty: string;
@@ -73,7 +75,7 @@ type ShiftSlotGroupFormValue = {
 type ShiftFormValues = {
   shiftDate: string;
   facilityId: string;
-  status: DoctorShiftStatus;
+  status?: DoctorShiftStatus;
   note: string;
   assignments: ShiftAssignmentFormValue[];
   slotGroups: ShiftSlotGroupFormValue[];
@@ -348,6 +350,8 @@ export function mergeShiftDisplayData({
     ...merged,
     id: merged.id || original?.id || "",
     doctorId: payload.doctorId,
+    staffId: payload.staffId,
+    roleId: payload.roleId,
     facilityId: payload.facilityId,
     roomId: payload.roomId,
     slotId: payload.slotId,
@@ -355,6 +359,17 @@ export function mergeShiftDisplayData({
     maxAppointments: payload.maxAppointments,
     status: payload.status,
     note: payload.note,
+    staffName:
+      detail?.staffName ||
+      response.staffName ||
+      doctor?.name ||
+      original?.staffName ||
+      "",
+    roleName:
+      detail?.roleName ||
+      response.roleName ||
+      original?.roleName ||
+      "Bác sĩ",
     doctorName:
       detail?.doctorName ||
       response.doctorName ||
@@ -516,7 +531,7 @@ export function DoctorShiftFormModalBase({
         return getShiftSlotLookup({
           facilityId: watchedFacilityId,
           status: "active",
-          limit: 30,
+          limit: 40,
         });
       })
       .then((data) => {
@@ -953,8 +968,33 @@ export function DoctorShiftFormModalBase({
               return;
             }
 
+            const selectedDoctor = doctors.find(
+              (doctor) =>
+                doctor.id === assignment.doctorId,
+            );
+
+            if (!selectedDoctor?.staffId) {
+              form.setFields([
+                {
+                  name: [
+                    "slotGroups",
+                    groupIndex,
+                    "assignments",
+                    assignmentIndex,
+                    "doctorId",
+                  ],
+                  errors: [
+                    "Bác sĩ chưa có staffId hợp lệ.",
+                  ],
+                },
+              ]);
+              return;
+            }
+
             payloads.push({
               doctorId: assignment.doctorId.trim(),
+              staffId: selectedDoctor.staffId.trim(),
+              roleId: selectedDoctor.roleId,
               facilityId: values.facilityId.trim(),
               roomId: assignment.roomId.trim(),
               slotId: group.slotId.trim(),
@@ -1058,8 +1098,27 @@ export function DoctorShiftFormModalBase({
           return;
         }
 
+        const selectedDoctor = doctors.find(
+          (doctor) =>
+            doctor.id === assignment.doctorId,
+        );
+
+        if (!selectedDoctor?.staffId) {
+          form.setFields([
+            {
+              name: ["assignments", 0, "doctorId"],
+              errors: [
+                "Bác sĩ chưa có staffId hợp lệ.",
+              ],
+            },
+          ]);
+          return;
+        }
+
         payloads.push({
           doctorId: assignment.doctorId.trim(),
+          staffId: selectedDoctor.staffId.trim(),
+          roleId: selectedDoctor.roleId,
           facilityId: values.facilityId.trim(),
           roomId: assignment.roomId.trim(),
           slotId: assignment.slotId.trim(),
@@ -1067,7 +1126,8 @@ export function DoctorShiftFormModalBase({
           maxAppointments: Number(
             assignment.maxAppointments,
           ),
-          status: values.status,
+          status:
+            editingShift?.status ?? "available",
           note: values.note?.trim() ?? "",
         });
         payloadFieldPaths.push({
@@ -1088,6 +1148,10 @@ export function DoctorShiftFormModalBase({
         const hasChanges =
           firstPayload.doctorId !==
             editingShift.doctorId ||
+          firstPayload.staffId !==
+            editingShift.staffId ||
+          firstPayload.roleId !==
+            editingShift.roleId ||
           firstPayload.facilityId !==
             editingShift.facilityId ||
           firstPayload.roomId !==
@@ -1098,8 +1162,6 @@ export function DoctorShiftFormModalBase({
             editingShift.shiftDate ||
           Number(firstPayload.maxAppointments) !==
             Number(editingShift.maxAppointments) ||
-          firstPayload.status !==
-            editingShift.status ||
           firstPayload.note.trim() !==
             editingShift.note.trim();
 
@@ -1150,10 +1212,13 @@ export function DoctorShiftFormModalBase({
         payloads.map((payload) =>
           checkDoctorShiftConflicts({
             doctorId: payload.doctorId,
+            staffId: payload.staffId,
+            roleId: payload.roleId,
             facilityId: payload.facilityId,
             roomId: payload.roomId,
             slotId: payload.slotId,
             shiftDate: payload.shiftDate,
+            note: payload.note,
             excludeShiftId: editingShift?.id,
           }),
         ),
@@ -1336,10 +1401,7 @@ export function DoctorShiftFormModalBase({
             </Form.Item>
           </Col>
 
-          <Col
-            xs={24}
-            md={mode === "create" ? 16 : 10}
-          >
+          <Col xs={24} md={16}>
             <Form.Item
               name="facilityId"
               label="Cơ sở"
@@ -1363,43 +1425,6 @@ export function DoctorShiftFormModalBase({
               />
             </Form.Item>
           </Col>
-
-          {mode === "edit" ? (
-            <Col xs={24} md={6}>
-              <Form.Item
-                name="status"
-                label="Trạng thái"
-                rules={[
-                  {
-                    required: true,
-                    message:
-                      "Vui lòng chọn trạng thái.",
-                  },
-                ]}
-              >
-                <Select
-                  options={[
-                    {
-                      value: "available",
-                      label: "Còn trống",
-                    },
-                    {
-                      value: "full",
-                      label: "Đã đầy",
-                    },
-                    {
-                      value: "cancelled",
-                      label: "Đã hủy",
-                    },
-                    {
-                      value: "off",
-                      label: "Nghỉ",
-                    },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
-          ) : null}
         </Row>
 
         <Row gutter={[16, 0]}>

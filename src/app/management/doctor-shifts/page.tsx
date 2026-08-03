@@ -18,6 +18,7 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -37,8 +38,8 @@ import { getDoctors } from "@/management/features/doctors/doctors.api";
 import {
   checkDoctorShiftConflicts,
   deleteDoctorShift,
+  getAllDoctorShifts,
   getDoctorShift,
-  getDoctorShifts,
   updateDoctorShift,
 } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type {
@@ -46,6 +47,7 @@ import type {
   DoctorShiftStatus,
 } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import { DoctorShiftCreateModal } from "./components/DoctorShiftCreateModal";
+import { DoctorShiftBulkGenerateModal } from "./components/DoctorShiftBulkGenerateModal";
 import { DoctorShiftEditModal } from "./components/DoctorShiftEditModal";
 import { DoctorShiftDetailModal } from "./components/DoctorShiftDetailModal";
 import {
@@ -60,6 +62,8 @@ import type {
 } from "./components/doctor-shift-modal.shared";
 
 const { Text, Title } = Typography;
+
+const DOCTOR_ROLE_ID = 3;
 
 type ViewMode = "day" | "week" | "month";
 
@@ -304,6 +308,10 @@ export default function DoctorShiftPage() {
     useState<DoctorShiftItem | null>(null);
   const [createModalOpen, setCreateModalOpen] =
     useState(false);
+  const [
+    bulkGenerateModalOpen,
+    setBulkGenerateModalOpen,
+  ] = useState(false);
   const [editingShift, setEditingShift] =
     useState<DoctorShiftItem | null>(null);
   const [deletingShift, setDeletingShift] =
@@ -324,16 +332,16 @@ export default function DoctorShiftPage() {
     let cancelled = false;
 
     void Promise.all([
-      getDoctorShifts({ limit: 30 }),
+      getAllDoctorShifts(),
       getFacilities(),
       getRooms({
         status: "active",
         page: 1,
-        limit: 100,
+        limit: 40,
       }),
       getDoctors({
         page: 1,
-        limit: 50,
+        limit: 40,
         status: "active",
         sortYearsOfExperience: "desc",
       }),
@@ -423,6 +431,8 @@ export default function DoctorShiftPage() {
 
               return {
                 id: doctor.id,
+                staffId: doctor.staffId,
+                roleId: DOCTOR_ROLE_ID,
                 name:
                   doctor.name ||
                   shiftDoctor?.name ||
@@ -807,6 +817,33 @@ export default function DoctorShiftPage() {
     );
   }
 
+  async function handleBulkGenerated({
+    fromDate,
+  }: {
+    fromDate: string;
+    toDate: string;
+  }) {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const nextShifts =
+        await getAllDoctorShifts();
+
+      setShifts(nextShifts);
+      setSelectedDate(fromDate);
+      setViewMode("week");
+    } catch (loadError) {
+      const message =
+        getErrorMessage(loadError);
+
+      setError(message);
+      throw loadError;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function handleUpdated(
     updatedShift: DoctorShiftItem,
   ) {
@@ -854,15 +891,28 @@ export default function DoctorShiftPage() {
     setError(null);
 
     try {
+      const selectedDoctor = doctors.find(
+        (item) => item.id === doctorId,
+      );
+
+      if (!selectedDoctor?.staffId) {
+        throw new Error(
+          "Bác sĩ chưa có staffId hợp lệ.",
+        );
+      }
+
       const conflictRaw =
         await checkDoctorShiftConflicts({
           doctorId,
+          staffId: selectedDoctor.staffId,
+          roleId: selectedDoctor.roleId,
           facilityId:
             detailShift.facilityId,
           roomId: detailShift.roomId,
           slotId: detailShift.slotId,
           shiftDate:
             detailShift.shiftDate,
+          note: detailShift.note,
           excludeShiftId:
             detailShift.id,
         });
@@ -882,6 +932,8 @@ export default function DoctorShiftPage() {
           detailShift.id,
           {
             doctorId,
+            staffId: selectedDoctor.staffId,
+            roleId: selectedDoctor.roleId,
             facilityId:
               detailShift.facilityId,
             roomId: detailShift.roomId,
@@ -890,12 +942,9 @@ export default function DoctorShiftPage() {
               detailShift.shiftDate,
             maxAppointments:
               detailShift.maxAppointments,
+            note: detailShift.note,
           },
         );
-
-      const selectedDoctor = doctors.find(
-        (item) => item.id === doctorId,
-      );
 
       let updatedShift: DoctorShiftItem;
 
@@ -910,6 +959,16 @@ export default function DoctorShiftPage() {
           ...response.data,
           ...detail,
           doctorId,
+          staffId: selectedDoctor.staffId,
+          roleId: selectedDoctor.roleId,
+          staffName:
+            detail.staffName ||
+            response.data.staffName ||
+            selectedDoctor.name,
+          roleName:
+            detail.roleName ||
+            response.data.roleName ||
+            "Bác sĩ",
           doctorName:
             detail.doctorName ||
             response.data.doctorName ||
@@ -938,6 +997,14 @@ export default function DoctorShiftPage() {
             response.data.id ||
             detailShift.id,
           doctorId,
+          staffId: selectedDoctor.staffId,
+          roleId: selectedDoctor.roleId,
+          staffName:
+            response.data.staffName ||
+            selectedDoctor.name,
+          roleName:
+            response.data.roleName ||
+            "Bác sĩ",
           doctorName:
             response.data.doctorName ||
             selectedDoctor?.name ||
@@ -1481,6 +1548,24 @@ export default function DoctorShiftPage() {
                   }
                 >
                   Tháng
+                </Button>
+
+                <Button
+                  icon={
+                    <CalendarRange className="h-4 w-4" />
+                  }
+                  disabled={
+                    facilities.length === 0 ||
+                    rooms.length === 0 ||
+                    doctors.length === 0
+                  }
+                  onClick={() =>
+                    setBulkGenerateModalOpen(
+                      true,
+                    )
+                  }
+                >
+                  Tạo nhiều ngày
                 </Button>
 
                 <Button
@@ -2076,6 +2161,21 @@ export default function DoctorShiftPage() {
           setCreateModalOpen(false)
         }
         onCreated={handleCreated}
+      />
+
+      <DoctorShiftBulkGenerateModal
+        open={bulkGenerateModalOpen}
+        facilities={facilities}
+        rooms={rooms}
+        doctors={doctors}
+        onClose={() =>
+          setBulkGenerateModalOpen(
+            false,
+          )
+        }
+        onGenerated={
+          handleBulkGenerated
+        }
       />
 
       <DoctorShiftEditModal
