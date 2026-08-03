@@ -6,9 +6,6 @@ import { useSyncExternalStore } from "react";
 import {
   HeartPulse,
   LogOut,
-  ShoppingCart,
-  Upload,
-  UserRound,
 } from "lucide-react";
 
 import { logout as logoutApi } from "@/features/auth/auth.api";
@@ -33,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const siteName = getOrDefault(
     "site_name",
-    getOrDefault("app_name", RESPONSE_MESSAGES.COMMON.DEFAULT_NAME)
+    getOrDefault("app_name", RESPONSE_MESSAGES.COMMON.DEFAULT_NAME),
   );
 
   // Zustand reads tokens from browser storage. Keep the first client render
@@ -110,15 +107,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </>
             ) : (
               <>
-                <button
-                  type="button"
-                  aria-label={RESPONSE_MESSAGES.NAVIGATION.CART}
-                  onClick={() => router.push("/login")}
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-pink-700 transition hover:bg-pink-50"
+                <Link
+                  className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-medium !text-slate-700 hover:bg-pink-50 sm:flex"
+                  href="/"
                 >
-                  <ShoppingCart className="h-5 w-5" />
-                </button>
+                  Giới thiệu
+                </Link>
 
+                <Link
+                  className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-medium !text-slate-700 hover:bg-pink-50 sm:flex"
+                  href="/"
+                >
+                  Dịch vụ
+                </Link>
+
+                <Link
+                  className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-medium !text-slate-700 hover:bg-pink-50 sm:flex"
+                  href="/"
+                >
+                  Liên hệ
+                </Link>
                 <Button variant="light" onClick={() => router.push("/login")}>
                   {RESPONSE_MESSAGES.AUTH.LOGIN}
                 </Button>
