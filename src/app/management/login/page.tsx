@@ -37,7 +37,7 @@ function LoginForm() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "admin@example.com",
-      password: "password",
+      password: "Password@123",
       rememberMe: true,
     },
   });
