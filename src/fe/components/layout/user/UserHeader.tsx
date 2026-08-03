@@ -85,8 +85,8 @@ export function UserHeader() {
       return;
     }
 
-    if (key === "record_keeping") {
-      router.push("/record-keeping");
+    if (key === "pregnancy-profiles") {
+      router.push("/pregnancy-profiles");
       return;
     }
 

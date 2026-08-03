@@ -66,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="flex items-center gap-2">
             {isLoggedIn ? (
               <>
-                <Link
+                {/* <Link
                   className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-medium !text-slate-700 hover:bg-pink-50 sm:flex"
                   href="/profile"
                 >
@@ -80,6 +80,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <Upload className="h-4 w-4" />
                   {RESPONSE_MESSAGES.NAVIGATION.UPLOAD}
+                </Link> */}
+
+                <Link
+                  className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-medium !text-slate-700 hover:bg-pink-50 sm:flex"
+                  href="/"
+                >
+                  Giới thiệu
+                </Link>
+
+                <Link
+                  className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-medium !text-slate-700 hover:bg-pink-50 sm:flex"
+                  href="/"
+                >
+                  Dịch vụ
+                </Link>
+
+                <Link
+                  className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-medium !text-slate-700 hover:bg-pink-50 sm:flex"
+                  href="/"
+                >
+                  Liên hệ
                 </Link>
 
                 <Button variant="light" onClick={handleLogout}>
