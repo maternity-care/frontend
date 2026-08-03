@@ -516,7 +516,7 @@ export function DoctorFormModal({
   return (
     <Modal
       open={open}
-      width={980}
+      width={1180}
       centered
       title={null}
       footer={null}
@@ -525,12 +525,14 @@ export function DoctorFormModal({
       destroyOnHidden
       styles={{
         body: {
-          paddingTop: 20,
-          paddingBottom: 16,
+          maxHeight: "84vh",
+          overflow: "hidden",
+          paddingTop: 16,
+          paddingBottom: 12,
         },
       }}
     >
-      <div className="border-b border-slate-200 px-1 pb-3">
+      <div className="shrink-0 border-b border-slate-200 px-1 pb-2">
         <Title
           level={4}
           className="!mb-1 !text-slate-950"
@@ -552,12 +554,13 @@ export function DoctorFormModal({
         layout="vertical"
         initialValues={createInitialValues}
         onFinish={handleFinish}
-        className="mt-4"
+        className="mt-3 flex max-h-[calc(84vh-94px)] flex-col"
         autoComplete="off"
         clearOnDestroy
       >
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="space-y-3">
             {!isEditing ? (
               <Card
                 size="small"
@@ -568,7 +571,7 @@ export function DoctorFormModal({
                     minHeight: 46,
                   },
                   body: {
-                    padding: "12px 12px 0",
+                    padding: "10px 12px 0",
                   },
                 }}
                 title={
@@ -676,7 +679,7 @@ export function DoctorFormModal({
                     minHeight: 46,
                   },
                   body: {
-                    padding: "12px 12px 0",
+                    padding: "10px 12px 0",
                   },
                 }}
                 title={
@@ -786,7 +789,7 @@ export function DoctorFormModal({
                     minHeight: 46,
                   },
                   body: {
-                    padding: "12px 12px 0",
+                    padding: "10px 12px 0",
                   },
                 }}
                 title={
@@ -1020,7 +1023,7 @@ export function DoctorFormModal({
                     label="Giới thiệu chuyên môn"
                   >
                     <Input.TextArea
-                      rows={4}
+                      rows={3}
                       placeholder="Mô tả kinh nghiệm và thế mạnh chuyên môn của bác sĩ"
                       showCount
                       maxLength={1000}
@@ -1031,7 +1034,7 @@ export function DoctorFormModal({
             </Card>
           </div>
 
-          <aside className="rounded-xl border border-slate-200 bg-slate-50 p-4 xl:self-start">
+          <aside className="rounded-xl border border-slate-200 bg-slate-50 p-3 xl:self-start">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-white">
                 <Stethoscope className="h-5 w-5" />
@@ -1079,7 +1082,7 @@ export function DoctorFormModal({
               )}
             </div>
 
-            <div className="mt-4 space-y-2.5">
+            <div className="mt-3 space-y-2">
               {!isEditing ? (
                 <>
                   <PreviewLine
@@ -1201,9 +1204,10 @@ export function DoctorFormModal({
               />
             </div>
           </aside>
+          </div>
         </div>
 
-        <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-4">
+        <div className="mt-3 flex shrink-0 justify-end gap-2 border-t border-slate-200 pt-3">
           <Button
             onClick={handleCancel}
             disabled={submitting}
