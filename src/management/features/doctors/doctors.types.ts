@@ -16,6 +16,12 @@ export type DoctorExperienceSort =
   | "asc"
   | "desc";
 
+export type DoctorExperienceLevel =
+  | 1
+  | 2
+  | 3
+  | 4;
+
 export interface BackendDoctorStaff {
   id?: string | null;
   name?: string | null;
@@ -37,6 +43,7 @@ export interface BackendDoctor {
   title: string;
   specialty: string;
   yearsOfExperience: number;
+  workingRoomTypeId?: string | null;
   bio: string;
   status: string;
   createdAt: string;
@@ -91,6 +98,7 @@ export interface Doctor {
   title: string;
   specialty: string;
   yearsOfExperience: number;
+  workingRoomTypeId: string;
   bio: string;
 
   status: DoctorStatus;
@@ -110,6 +118,8 @@ export interface GetDoctorsParams {
   specialty?: string;
   facilityId?: string;
   status?: DoctorStatus;
+  filterYearsOfExperienceLevel?:
+    DoctorExperienceLevel;
   sortYearsOfExperience?: DoctorExperienceSort;
   page?: number;
   limit?: number;
@@ -145,6 +155,7 @@ export interface CreateDoctorInput {
   title: string;
   specialty: string;
   yearsOfExperience: number;
+  workingRoomTypeId: string;
   bio?: string;
   permissionOverrides?:
     DoctorPermissionOverrideInput[];
@@ -152,10 +163,15 @@ export interface CreateDoctorInput {
 
 export interface UpdateDoctorInput {
   staffId?: string;
+  name?: string;
+  personalEmail?: string;
+  phone?: string;
+  address?: string;
   licenseNo?: string;
   title?: string;
   specialty?: string;
   yearsOfExperience?: number;
+  workingRoomTypeId?: string;
   bio?: string;
   status?: DoctorStatus;
 }

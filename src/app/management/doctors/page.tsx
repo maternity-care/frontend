@@ -51,8 +51,15 @@ import {
   getDoctor,
   getDoctors,
 } from "@/management/features/doctors/doctors.api";
+import {
+  getFacilities,
+} from "@/management/features/facilities/facilities.api";
+import {
+  getRoomTypeLookup,
+} from "@/management/features/rooms/rooms.api";
 import type {
   Doctor,
+  DoctorExperienceLevel,
   DoctorExperienceSort,
   DoctorStatus,
   GetDoctorsParams,
@@ -79,9 +86,33 @@ type DoctorFilters = {
   keyword?: string;
   specialty?: string;
   status?: DoctorStatus;
+  experienceLevel?:
+    DoctorExperienceLevel;
   sortYearsOfExperience:
     DoctorExperienceSort;
 };
+
+const EXPERIENCE_LEVEL_OPTIONS: Array<{
+  value: DoctorExperienceLevel;
+  label: string;
+}> = [
+  {
+    value: 1,
+    label: "Kinh nghiệm 1 - 5 năm",
+  },
+  {
+    value: 2,
+    label: "Kinh nghiệm 6 - 10 năm",
+  },
+  {
+    value: 3,
+    label: "Kinh nghiệm 11 - 20 năm",
+  },
+  {
+    value: 4,
+    label: "Kinh nghiệm trên 20 năm",
+  },
+];
 
 const EXPERIENCE_SORT_OPTIONS: Array<{
   value: DoctorExperienceSort;
@@ -236,6 +267,9 @@ function mergeDoctorDetail(
       detail.facilityIds.length > 0
         ? detail.facilityIds
         : current.facilityIds,
+    workingRoomTypeId:
+      detail.workingRoomTypeId ||
+      current.workingRoomTypeId,
   };
 }
 
@@ -307,6 +341,8 @@ function toApiParams(
       filters.specialty?.trim() ||
       undefined,
     status: filters.status,
+    filterYearsOfExperienceLevel:
+      filters.experienceLevel,
     sortYearsOfExperience:
       filters.sortYearsOfExperience,
     page,
@@ -339,6 +375,14 @@ export default function DoctorManagementPage() {
   ] =
     useState<
       DoctorStatus | undefined
+    >();
+
+  const [
+    experienceLevel,
+    setExperienceLevel,
+  ] =
+    useState<
+      DoctorExperienceLevel | undefined
     >();
 
   const [
@@ -420,6 +464,16 @@ export default function DoctorManagementPage() {
   const [total, setTotal] =
     useState(0);
 
+  const [
+    facilityNameById,
+    setFacilityNameById,
+  ] = useState<Record<string, string>>({});
+
+  const [
+    roomTypeNameById,
+    setRoomTypeNameById,
+  ] = useState<Record<string, string>>({});
+
   useEffect(() => {
     let cancelled = false;
 
@@ -463,6 +517,134 @@ export default function DoctorManagementPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDisplayLookups() {
+      const [
+        facilityResult,
+        roomTypeResult,
+      ] = await Promise.allSettled([
+        getFacilities({
+          page: 1,
+          limit: 100,
+        }),
+        getRoomTypeLookup({
+          status: "active",
+          limit: 50,
+        }),
+      ]);
+
+      if (cancelled) return;
+
+      if (
+        facilityResult.status ===
+        "fulfilled"
+      ) {
+        setFacilityNameById(
+          Object.fromEntries(
+            facilityResult.value.map(
+              (facility) => [
+                facility.id,
+                facility.name,
+              ],
+            ),
+          ),
+        );
+      }
+
+      if (
+        roomTypeResult.status ===
+        "fulfilled"
+      ) {
+        setRoomTypeNameById(
+          Object.fromEntries(
+            roomTypeResult.value.map(
+              (roomType) => [
+                roomType.id,
+                roomType.name,
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    void loadDisplayLookups();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const detailFacilityName =
+    useMemo(() => {
+      if (!detailDoctor) {
+        return "";
+      }
+
+      const facilityIds =
+        detailDoctor.facilityIds.length >
+        0
+          ? detailDoctor.facilityIds
+          : detailDoctor.facilityId
+            ? [
+                detailDoctor.facilityId,
+              ]
+            : [];
+
+      if (facilityIds.length === 0) {
+        return "Chưa được gán";
+      }
+
+      const names = Array.from(
+        new Set(facilityIds),
+      )
+        .map(
+          (facilityId) =>
+            facilityNameById[
+              facilityId
+            ],
+        )
+        .filter(
+          (
+            name,
+          ): name is string =>
+            Boolean(name),
+        );
+
+      return names.length > 0
+        ? names.join(", ")
+        : "Không tìm thấy tên cơ sở";
+    }, [
+      detailDoctor,
+      facilityNameById,
+    ]);
+
+  const detailRoomTypeName =
+    useMemo(() => {
+      if (!detailDoctor) {
+        return "";
+      }
+
+      if (
+        !detailDoctor.workingRoomTypeId
+      ) {
+        return "Chưa cập nhật";
+      }
+
+      return (
+        roomTypeNameById[
+          detailDoctor
+            .workingRoomTypeId
+        ] ||
+        "Không tìm thấy tên loại phòng"
+      );
+    }, [
+      detailDoctor,
+      roomTypeNameById,
+    ]);
+
   const stats = useMemo(() => {
     const active = doctors.filter(
       (doctor) =>
@@ -488,6 +670,7 @@ export default function DoctorManagementPage() {
         specialtyFilter.trim() ||
         undefined,
       status: statusFilter,
+      experienceLevel,
       sortYearsOfExperience:
         experienceSort,
       ...overrides,
@@ -553,6 +736,7 @@ export default function DoctorManagementPage() {
     setSearchValue("");
     setSpecialtyFilter("");
     setStatusFilter(undefined);
+    setExperienceLevel(undefined);
     setExperienceSort("desc");
 
     const nextFilters: DoctorFilters =
@@ -1063,6 +1247,29 @@ export default function DoctorManagementPage() {
               }}
             />
 
+            <Select<DoctorExperienceLevel>
+              allowClear
+              value={experienceLevel}
+              options={
+                EXPERIENCE_LEVEL_OPTIONS
+              }
+              placeholder="Mức kinh nghiệm"
+              style={{
+                width: 190,
+                minWidth: 190,
+                maxWidth: 190,
+                flex: "0 0 190px",
+              }}
+              onChange={(value) => {
+                setExperienceLevel(value);
+
+                applyFilters({
+                  experienceLevel:
+                    value,
+                });
+              }}
+            />
+
             <Select<DoctorExperienceSort>
               value={experienceSort}
               options={
@@ -1393,11 +1600,10 @@ export default function DoctorManagementPage() {
               </Descriptions.Item>
 
               <Descriptions.Item
-                label="Mã cơ sở"
+                label="Cơ sở làm việc"
                 span={1}
               >
-                {detailDoctor.facilityId ||
-                  "Chưa được gán"}
+                {detailFacilityName}
               </Descriptions.Item>
 
               <Descriptions.Item
@@ -1436,6 +1642,13 @@ export default function DoctorManagementPage() {
               </Descriptions.Item>
 
               <Descriptions.Item
+                label="Loại phòng làm việc"
+                span={1}
+              >
+                {detailRoomTypeName}
+              </Descriptions.Item>
+
+              <Descriptions.Item
                 label="Trạng thái bác sĩ"
                 span={1}
               >
@@ -1446,7 +1659,7 @@ export default function DoctorManagementPage() {
 
               <Descriptions.Item
                 label="Trạng thái nhân sự"
-                span={1}
+                span={2}
               >
                 {renderStatus(
                   detailDoctor.staffStatus,

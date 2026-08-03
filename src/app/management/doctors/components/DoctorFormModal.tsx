@@ -20,6 +20,7 @@ import {
 import {
   Award,
   Building2,
+  DoorOpen,
   Mail,
   Pencil,
   Phone,
@@ -30,6 +31,12 @@ import {
 } from "lucide-react";
 import { ApiClientError } from "@/lib/axios";
 import { getFacilities } from "@/management/features/facilities/facilities.api";
+import {
+  getRoomTypeLookup,
+} from "@/management/features/rooms/rooms.api";
+import type {
+  RoomType,
+} from "@/management/features/rooms/rooms.types";
 import {
   createDoctor,
   updateDoctor,
@@ -54,12 +61,14 @@ type DoctorFormValues = {
   name?: string;
   personalEmail?: string;
   phone?: string;
+  address?: string;
   facilityIds?: string[];
   staffId?: string;
   licenseNo: string;
   title: string;
   specialty: string;
   yearsOfExperience: number;
+  workingRoomTypeId: string;
   bio?: string;
   status?: DoctorStatus;
 };
@@ -78,11 +87,13 @@ const createInitialValues: Partial<DoctorFormValues> = {
   name: "",
   personalEmail: "",
   phone: "",
+  address: "",
   facilityIds: [],
   licenseNo: "",
   title: "",
   specialty: "",
   yearsOfExperience: 0,
+  workingRoomTypeId: "",
   bio: "",
   status: "active",
 };
@@ -165,6 +176,44 @@ export function DoctorFormModal({
   >([]);
   const [facilitiesLoading, setFacilitiesLoading] =
     useState(true);
+  const [roomTypes, setRoomTypes] =
+    useState<RoomType[]>([]);
+  const [roomTypesLoading, setRoomTypesLoading] =
+    useState(true);
+
+  const roomTypeOptions = useMemo(
+    () => {
+      const options = roomTypes.map(
+        (roomType) => ({
+          value: roomType.id,
+          label: `${roomType.name}${
+            roomType.code
+              ? ` (${roomType.code})`
+              : ""
+          }`,
+        }),
+      );
+
+      const currentId =
+        editingDoctor?.workingRoomTypeId;
+
+      if (
+        currentId &&
+        !options.some(
+          (option) =>
+            option.value === currentId,
+        )
+      ) {
+        options.push({
+          value: currentId,
+          label: `Loại phòng #${currentId}`,
+        });
+      }
+
+      return options;
+    },
+    [editingDoctor, roomTypes],
+  );
 
   const name = Form.useWatch("name", form);
   const personalEmail = Form.useWatch(
@@ -172,6 +221,7 @@ export function DoctorFormModal({
     form,
   );
   const phone = Form.useWatch("phone", form);
+  const address = Form.useWatch("address", form);
   const facilityIds = Form.useWatch(
     "facilityIds",
     form,
@@ -185,6 +235,10 @@ export function DoctorFormModal({
   );
   const yearsOfExperience = Form.useWatch(
     "yearsOfExperience",
+    form,
+  );
+  const workingRoomTypeId = Form.useWatch(
+    "workingRoomTypeId",
     form,
   );
   const status = Form.useWatch("status", form);
@@ -229,17 +283,57 @@ export function DoctorFormModal({
   }, [messageApi]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    void getRoomTypeLookup({
+      status: "active",
+      limit: 50,
+    })
+      .then((data) => {
+        if (!cancelled) {
+          setRoomTypes(data);
+        }
+      })
+      .catch((roomTypeError) => {
+        if (cancelled) return;
+
+        setRoomTypes([]);
+        void messageApi.error(
+          roomTypeError instanceof Error
+            ? roomTypeError.message
+            : "Không tải được danh sách loại phòng.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRoomTypesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messageApi]);
+
+  useEffect(() => {
     if (!open) return;
 
     const timer = window.setTimeout(() => {
       if (editingDoctor) {
         form.setFieldsValue({
           staffId: editingDoctor.staffId,
+          name: editingDoctor.name,
+          personalEmail:
+            editingDoctor.personalEmail,
+          phone: editingDoctor.phone,
+          address: editingDoctor.address,
           licenseNo: editingDoctor.licenseNo,
           title: editingDoctor.title,
           specialty: editingDoctor.specialty,
           yearsOfExperience:
             editingDoctor.yearsOfExperience,
+          workingRoomTypeId:
+            editingDoctor.workingRoomTypeId,
           bio: editingDoctor.bio,
           status: editingDoctor.status,
         });
@@ -306,11 +400,18 @@ export function DoctorFormModal({
       if (editingDoctor) {
         const payload: UpdateDoctorInput = {
           staffId: values.staffId?.trim(),
+          name: values.name?.trim(),
+          personalEmail:
+            values.personalEmail?.trim(),
+          phone: values.phone?.trim(),
+          address: values.address?.trim(),
           licenseNo: values.licenseNo.trim(),
           title: values.title.trim(),
           specialty: values.specialty.trim(),
           yearsOfExperience:
             values.yearsOfExperience,
+          workingRoomTypeId:
+            values.workingRoomTypeId.trim(),
           bio: values.bio?.trim() ?? "",
           status: values.status,
         };
@@ -353,6 +454,8 @@ export function DoctorFormModal({
         specialty: values.specialty.trim(),
         yearsOfExperience:
           values.yearsOfExperience,
+        workingRoomTypeId:
+          values.workingRoomTypeId.trim(),
         bio: values.bio?.trim() || undefined,
         permissionOverrides: [],
       };
@@ -413,7 +516,7 @@ export function DoctorFormModal({
   return (
     <Modal
       open={open}
-      width={980}
+      width={1180}
       centered
       title={null}
       footer={null}
@@ -422,12 +525,14 @@ export function DoctorFormModal({
       destroyOnHidden
       styles={{
         body: {
-          paddingTop: 20,
-          paddingBottom: 16,
+          maxHeight: "84vh",
+          overflow: "hidden",
+          paddingTop: 16,
+          paddingBottom: 12,
         },
       }}
     >
-      <div className="border-b border-slate-200 px-1 pb-3">
+      <div className="shrink-0 border-b border-slate-200 px-1 pb-2">
         <Title
           level={4}
           className="!mb-1 !text-slate-950"
@@ -449,12 +554,13 @@ export function DoctorFormModal({
         layout="vertical"
         initialValues={createInitialValues}
         onFinish={handleFinish}
-        className="mt-4"
+        className="mt-3 flex max-h-[calc(84vh-94px)] flex-col"
         autoComplete="off"
         clearOnDestroy
       >
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="space-y-3">
             {!isEditing ? (
               <Card
                 size="small"
@@ -465,7 +571,7 @@ export function DoctorFormModal({
                     minHeight: 46,
                   },
                   body: {
-                    padding: "12px 12px 0",
+                    padding: "10px 12px 0",
                   },
                 }}
                 title={
@@ -563,6 +669,116 @@ export function DoctorFormModal({
               </Card>
             ) : null}
 
+            {isEditing ? (
+              <Card
+                size="small"
+                className="border-slate-200"
+                styles={{
+                  header: {
+                    padding: "8px 12px",
+                    minHeight: 46,
+                  },
+                  body: {
+                    padding: "10px 12px 0",
+                  },
+                }}
+                title={
+                  <Space size={10}>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+                      <UserRound className="h-4 w-4" />
+                    </span>
+
+                    <span>
+                      <p className="mb-0 text-base font-semibold text-slate-950">
+                        Thông tin cá nhân
+                      </p>
+                      <p className="mb-0 text-xs font-normal text-slate-500">
+                        Cập nhật họ tên, email, số điện thoại và địa chỉ.
+                      </p>
+                    </span>
+                  </Space>
+                }
+              >
+                <Row gutter={[12, 0]}>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="name"
+                      label="Họ tên"
+                      rules={[
+                        {
+                          required: true,
+                          message:
+                            "Vui lòng nhập họ tên.",
+                        },
+                        {
+                          whitespace: true,
+                          message:
+                            "Họ tên không hợp lệ.",
+                        },
+                      ]}
+                    >
+                      <Input placeholder="Nhập họ tên" />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="personalEmail"
+                      label="Email cá nhân"
+                      rules={[
+                        {
+                          required: true,
+                          message:
+                            "Vui lòng nhập email.",
+                        },
+                        {
+                          type: "email",
+                          message:
+                            "Email không hợp lệ.",
+                        },
+                      ]}
+                    >
+                      <Input placeholder="doctor@example.com" />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="phone"
+                      label="Số điện thoại"
+                      rules={[
+                        {
+                          required: true,
+                          message:
+                            "Vui lòng nhập số điện thoại.",
+                        },
+                        {
+                          pattern:
+                            /^(?:\+84|0)[35789]\d{8}$/,
+                          message:
+                            "Số điện thoại Việt Nam không hợp lệ.",
+                        },
+                      ]}
+                    >
+                      <Input
+                        placeholder="0901234567"
+                        inputMode="tel"
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24}>
+                    <Form.Item
+                      name="address"
+                      label="Địa chỉ"
+                    >
+                      <Input placeholder="Nhập địa chỉ" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+            ) : null}
+
             {!isEditing ? (
               <Card
                 size="small"
@@ -573,7 +789,7 @@ export function DoctorFormModal({
                     minHeight: 46,
                   },
                   body: {
-                    padding: "12px 12px 0",
+                    padding: "10px 12px 0",
                   },
                 }}
                 title={
@@ -756,6 +972,29 @@ export function DoctorFormModal({
                   </Form.Item>
                 </Col>
 
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="workingRoomTypeId"
+                    label="Loại phòng làm việc"
+                    rules={[
+                      {
+                        required: true,
+                        message:
+                          "Vui lòng chọn loại phòng làm việc.",
+                      },
+                    ]}
+                  >
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      options={roomTypeOptions}
+                      loading={roomTypesLoading}
+                      placeholder="Chọn loại phòng làm việc"
+                      notFoundContent="Chưa có loại phòng hoạt động"
+                    />
+                  </Form.Item>
+                </Col>
+
                 {isEditing ? (
                   <Col xs={24} md={12}>
                     <Form.Item
@@ -784,7 +1023,7 @@ export function DoctorFormModal({
                     label="Giới thiệu chuyên môn"
                   >
                     <Input.TextArea
-                      rows={4}
+                      rows={3}
                       placeholder="Mô tả kinh nghiệm và thế mạnh chuyên môn của bác sĩ"
                       showCount
                       maxLength={1000}
@@ -795,7 +1034,7 @@ export function DoctorFormModal({
             </Card>
           </div>
 
-          <aside className="rounded-xl border border-slate-200 bg-slate-50 p-4 xl:self-start">
+          <aside className="rounded-xl border border-slate-200 bg-slate-50 p-3 xl:self-start">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-white">
                 <Stethoscope className="h-5 w-5" />
@@ -843,7 +1082,7 @@ export function DoctorFormModal({
               )}
             </div>
 
-            <div className="mt-4 space-y-2.5">
+            <div className="mt-3 space-y-2">
               {!isEditing ? (
                 <>
                   <PreviewLine
@@ -883,16 +1122,42 @@ export function DoctorFormModal({
                   />
                 </>
               ) : (
-                <PreviewLine
-                  icon={
-                    <UserRound className="h-4 w-4" />
-                  }
-                  label="Staff ID"
-                  value={
-                    staffId ||
-                    editingDoctor?.staffId
-                  }
-                />
+                <>
+                  <PreviewLine
+                    icon={
+                      <UserRound className="h-4 w-4" />
+                    }
+                    label="Staff ID"
+                    value={
+                      staffId ||
+                      editingDoctor?.staffId
+                    }
+                  />
+
+                  <PreviewLine
+                    icon={
+                      <Mail className="h-4 w-4" />
+                    }
+                    label="Email cá nhân"
+                    value={personalEmail}
+                  />
+
+                  <PreviewLine
+                    icon={
+                      <Phone className="h-4 w-4" />
+                    }
+                    label="Số điện thoại"
+                    value={phone}
+                  />
+
+                  <PreviewLine
+                    icon={
+                      <Building2 className="h-4 w-4" />
+                    }
+                    label="Địa chỉ"
+                    value={address}
+                  />
+                </>
               )}
 
               <PreviewLine
@@ -923,11 +1188,26 @@ export function DoctorFormModal({
                     : undefined
                 }
               />
+
+              <PreviewLine
+                icon={
+                  <DoorOpen className="h-4 w-4" />
+                }
+                label="Loại phòng làm việc"
+                value={
+                  roomTypeOptions.find(
+                    (option) =>
+                      option.value ===
+                      workingRoomTypeId,
+                  )?.label
+                }
+              />
             </div>
           </aside>
+          </div>
         </div>
 
-        <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-4">
+        <div className="mt-3 flex shrink-0 justify-end gap-2 border-t border-slate-200 pt-3">
           <Button
             onClick={handleCancel}
             disabled={submitting}
