@@ -1,128 +1,78 @@
-export type PregnancyProfileStatus =
+export type PregnancyStatus =
   | "active"
   | "completed"
   | "terminated"
   | "deleted"
-  | string;
+  | "ACTIVE";
 
-export type PregnancyRiskLevel = "low" | "medium" | "high" | string;
+export type RiskLevel = "low" | "medium" | "high";
 
-export interface PregnancyProfileUser {
+export interface UserInfo {
   id: string;
-  cccd: string | null;
-  name: string | null;
-  phone: string | null;
-  email: string | null;
-  dateOfBirth: string | null;
-  address: string | null;
-  priorityLevel?: number | null;
-  province: string | null;
-  ward: string | null;
-  status?: string | null;
-  emergencyContactName: string | null;
-  emergencyContactPhone: string | null;
-  metadata?: Record<string, unknown> | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
+  cccd?: string | null;
+  name?: string;
+  phone?: string;
+  email?: string;
+  dateOfBirth?: string;
+  address?: string;
+  priorityLevel?: number;
+  province?: string;
+  ward?: string;
+  status?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
   deletedAt?: string | null;
+}
+
+export interface MedicalRecordFile {
+  id: string;
+  medicalRecordId: string;
+  fileType: string;
+  fileName: string;
+  fileUrl: string;
+  mimeType?: string;
+  uploadedBy?: string;
+  createdAt?: string;
+}
+
+export interface MedicalRecord {
+  id: string;
+  appointmentId?: string;
+  pregnancyProfileId: string;
+  doctorId?: string;
+  diagnosis?: string;
+  conclusion?: string;
+  recommendation?: string;
+  nextAppointmentSuggestedAt?: string;
+  files?: MedicalRecordFile[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PregnancyProfile {
   id: string;
-  patientId: string | null;
-  code: string | null;
-  lastMenstrualPeriod: string | null;
-  expectedDueDate: string | null;
-  fetalCount: number | null;
-  gravida: number;
-  paraFullTerm: number;
-  paraPremature: number;
-  paraAbortion: number;
-  paraLivingChildren: number;
-  riskLevel: PregnancyRiskLevel;
-  status: PregnancyProfileStatus;
-  notes: string | null;
-  user: PregnancyProfileUser | null;
-  medicalRecords: unknown[];
-  createdAt: string;
-  updatedAt: string;
-  createdBy?: string | null;
-  deletedAt?: string | null;
-  deletedBy?: string | null;
-  deletedReason?: string | null;
-}
-
-export interface CreatePregnancyProfileInput {
-  lastMenstrualPeriod: string;
-  expectedDueDate: string;
+  patientId: string;
+  code?: string;
+  lastMenstrualPeriod?: string;
+  expectedDueDate?: string;
   fetalCount?: number;
   gravida?: number;
   paraFullTerm?: number;
   paraPremature?: number;
   paraAbortion?: number;
   paraLivingChildren?: number;
-  riskLevel?: PregnancyRiskLevel;
-  status?: PregnancyProfileStatus;
-  notes?: string | null;
-}
-
-export interface UpdatePregnancyProfileInput {
-  lastMenstrualPeriod?: string | null;
-  expectedDueDate?: string | null;
-  fetalCount?: number;
-  gravida?: number;
-  paraFullTerm?: number;
-  paraPremature?: number;
-  paraAbortion?: number;
-  paraLivingChildren?: number;
-  riskLevel?: PregnancyRiskLevel;
-  status?: PregnancyProfileStatus;
-  notes?: string | null;
-}
-
-/* ===== Backend raw ===== */
-
-export interface BackendPregnancyProfileUser {
-  id?: string | number;
-  cccd?: string | null;
-  name?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  dateOfBirth?: string | null;
-  address?: string | null;
-  priorityLevel?: number | null;
-  province?: string | null;
-  ward?: string | null;
-  status?: string | null;
-  emergencyContactName?: string | null;
-  emergencyContactPhone?: string | null;
-  metadata?: Record<string, unknown> | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  deletedAt?: string | null;
-}
-
-export interface BackendPregnancyProfile {
-  id?: string | number;
-  patientId?: string | number | null;
-  code?: string | null;
-  lastMenstrualPeriod?: string | null;
-  expectedDueDate?: string | null;
-  fetalCount?: number | string | null;
-  gravida?: number | string | null;
-  paraFullTerm?: number | string | null;
-  paraPremature?: number | string | null;
-  paraAbortion?: number | string | null;
-  paraLivingChildren?: number | string | null;
-  riskLevel?: string | null;
-  status?: string | null;
-  notes?: string | null;
-  user?: BackendPregnancyProfileUser | null;
-  medicalRecords?: unknown[] | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  createdBy?: string | null;
+  riskLevel?: RiskLevel | string;
+  status?: PregnancyStatus | string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
   deletedAt?: string | null;
   deletedBy?: string | null;
   deletedReason?: string | null;
+  user?: UserInfo;
+  medicalRecords?: MedicalRecord[];
 }
