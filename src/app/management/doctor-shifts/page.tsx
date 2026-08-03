@@ -63,6 +63,25 @@ const { Text, Title } = Typography;
 
 type ViewMode = "day" | "week" | "month";
 
+type WeeklyScheduleRow = {
+  key: string;
+  slotId: string;
+  slotName: string;
+  slotCode: string;
+  facilityId: string;
+  facilityName: string;
+  startTime: string;
+  endTime: string;
+  shiftsByDate: Record<string, DoctorShiftItem[]>;
+};
+
+type DayShiftGroupMeta = {
+  key: string;
+  groupIndex: number;
+  rowSpan: number;
+  isFirstRow: boolean;
+};
+
 const STATUS_OPTIONS: Array<{
   value: DoctorShiftStatus;
   label: string;
@@ -206,6 +225,34 @@ function getShiftAccent(startTime: string) {
   }
 
   return "border-violet-200 bg-violet-50 text-violet-900";
+}
+
+function getDayShiftGroupKey(
+  shift: DoctorShiftItem,
+) {
+  const slotIdentity =
+    shift.slotId ||
+    shift.slotCode ||
+    shift.slotName ||
+    `${shift.startTime}-${shift.endTime}`;
+
+  return `${shift.facilityId}:${slotIdentity}`;
+}
+
+function getDayShiftMergedCellClass(
+  startTime: string,
+) {
+  const hour = Number(startTime.split(":")[0]);
+
+  if (hour < 12) {
+    return "!bg-blue-50/70 !border-l-4 !border-l-blue-400 align-top";
+  }
+
+  if (hour < 18) {
+    return "!bg-amber-50/70 !border-l-4 !border-l-amber-400 align-top";
+  }
+
+  return "!bg-violet-50/70 !border-l-4 !border-l-violet-400 align-top";
 }
 
 function renderStatus(status: DoctorShiftStatus) {
@@ -551,10 +598,171 @@ export default function DoctorShiftPage() {
     [scopedShifts],
   );
 
+  const dayTableShifts = useMemo(() => {
+    if (viewMode !== "day") {
+      return sortedScopedShifts;
+    }
+
+    return [...sortedScopedShifts].sort(
+      (first, second) => {
+        const firstFacility =
+          first.facilityName ||
+          facilityById.get(first.facilityId)?.name ||
+          "";
+        const secondFacility =
+          second.facilityName ||
+          facilityById.get(second.facilityId)?.name ||
+          "";
+
+        return [
+          first.startTime,
+          first.endTime,
+          firstFacility,
+          getDayShiftGroupKey(first),
+          first.doctorName,
+          first.roomName,
+        ]
+          .join("|")
+          .localeCompare(
+            [
+              second.startTime,
+              second.endTime,
+              secondFacility,
+              getDayShiftGroupKey(second),
+              second.doctorName,
+              second.roomName,
+            ].join("|"),
+          );
+      },
+    );
+  }, [
+    facilityById,
+    sortedScopedShifts,
+    viewMode,
+  ]);
+
+  const dayShiftGroupMeta = useMemo(() => {
+    const metadata: DayShiftGroupMeta[] = [];
+    let groupIndex = -1;
+    let index = 0;
+
+    while (index < dayTableShifts.length) {
+      const groupKey = getDayShiftGroupKey(
+        dayTableShifts[index],
+      );
+      let groupEnd = index + 1;
+
+      while (
+        groupEnd < dayTableShifts.length &&
+        getDayShiftGroupKey(
+          dayTableShifts[groupEnd],
+        ) === groupKey
+      ) {
+        groupEnd += 1;
+      }
+
+      groupIndex += 1;
+      const groupSize = groupEnd - index;
+
+      for (
+        let rowIndex = index;
+        rowIndex < groupEnd;
+        rowIndex += 1
+      ) {
+        metadata[rowIndex] = {
+          key: groupKey,
+          groupIndex,
+          rowSpan:
+            rowIndex === index
+              ? groupSize
+              : 0,
+          isFirstRow: rowIndex === index,
+        };
+      }
+
+      index = groupEnd;
+    }
+
+    return metadata;
+  }, [dayTableShifts]);
+
   const monthGrid = useMemo(
     () => getMonthGrid(selectedDate),
     [selectedDate],
   );
+
+  const weekDays = useMemo(() => {
+    const weekStart = startOfWeek(selectedDate);
+
+    return Array.from(
+      { length: 7 },
+      (_, index) => addDays(weekStart, index),
+    );
+  }, [selectedDate]);
+
+  const weeklyScheduleRows = useMemo(() => {
+    const rows = new Map<string, WeeklyScheduleRow>();
+
+    sortedScopedShifts.forEach((shift) => {
+      const slotIdentity =
+        shift.slotId ||
+        shift.slotCode ||
+        `${shift.startTime}-${shift.endTime}`;
+      const rowKey = `${shift.facilityId}:${slotIdentity}`;
+      const existingRow = rows.get(rowKey);
+
+      const row: WeeklyScheduleRow =
+        existingRow ?? {
+          key: rowKey,
+          slotId: shift.slotId,
+          slotName:
+            shift.slotName ||
+            shift.slotCode ||
+            getShiftShortLabel(shift.startTime),
+          slotCode: shift.slotCode,
+          facilityId: shift.facilityId,
+          facilityName:
+            shift.facilityName ||
+            facilityById.get(shift.facilityId)?.name ||
+            "",
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          shiftsByDate: {},
+        };
+
+      const dayShifts =
+        row.shiftsByDate[shift.shiftDate] ?? [];
+
+      dayShifts.push(shift);
+      row.shiftsByDate[shift.shiftDate] = dayShifts;
+      rows.set(rowKey, row);
+    });
+
+    return Array.from(rows.values())
+      .map((row) => ({
+        ...row,
+        shiftsByDate: Object.fromEntries(
+          Object.entries(row.shiftsByDate).map(
+            ([dateKey, dayShifts]) => [
+              dateKey,
+              [...dayShifts].sort((first, second) =>
+                `${first.doctorName}-${first.roomName}`.localeCompare(
+                  `${second.doctorName}-${second.roomName}`,
+                ),
+              ),
+            ],
+          ),
+        ),
+      }))
+      .sort((first, second) =>
+        `${first.startTime}-${first.endTime}-${first.facilityName}`.localeCompare(
+          `${second.startTime}-${second.endTime}-${second.facilityName}`,
+        ),
+      );
+  }, [
+    facilityById,
+    sortedScopedShifts,
+  ]);
 
   const periodStartDate = useMemo(() => {
     if (viewMode === "week") {
@@ -926,48 +1134,93 @@ export default function DoctorShiftPage() {
   const tableColumns: ColumnsType<DoctorShiftItem> = [
     {
       title: "STT",
-      width: 64,
+      width: "5%",
       align: "center",
       render: (_value, _record, index) =>
         index + 1,
     },
     {
       title: "Ca trực",
-      width: 230,
-      render: (_value, shift) => (
-        <div>
-          <Text
-            strong
-            className="block text-slate-950"
-          >
-            {getShiftShortLabel(
-              shift.startTime,
-            )}
-          </Text>
+      width: "18%",
+      onCell: (
+        shift,
+        index,
+      ) => {
+        const group =
+          dayShiftGroupMeta[index ?? 0];
 
-          <Text
-            type="secondary"
-            className="block text-xs"
-          >
-            {shift.startTime} -{" "}
-            {shift.endTime}
-          </Text>
+        return {
+          rowSpan: group?.rowSpan ?? 1,
+          className:
+            group?.rowSpan === 0
+              ? undefined
+              : getDayShiftMergedCellClass(
+                  shift.startTime,
+                ),
+        };
+      },
+      render: (_value, shift, index) => {
+        const group =
+          dayShiftGroupMeta[index];
 
-          <Text
-            type="secondary"
-            className="block truncate text-xs"
-          >
-            {shift.slotName ||
-              shift.slotCode ||
-              `Slot ${shift.slotId}`}
-          </Text>
-        </div>
-      ),
+        return (
+          <div className="min-w-0 py-1">
+            <Text
+              strong
+              className="block truncate text-sm text-slate-950"
+            >
+              {shift.slotName ||
+                shift.slotCode ||
+                getShiftShortLabel(
+                  shift.startTime,
+                )}
+            </Text>
+
+            <Text
+              className="mt-1 block truncate text-xs font-semibold text-slate-700"
+            >
+              {shift.startTime} -{" "}
+              {shift.endTime}
+            </Text>
+
+            {shift.slotCode &&
+            shift.slotName ? (
+              <Text
+                type="secondary"
+                className="mt-1 block truncate text-xs"
+              >
+                {shift.slotCode}
+              </Text>
+            ) : null}
+
+            <Text
+              type="secondary"
+              className="mt-2 block truncate text-xs"
+            >
+              {shift.facilityName ||
+                facilityById.get(
+                  shift.facilityId,
+                )?.name ||
+                "Chưa cập nhật cơ sở"}
+            </Text>
+
+            {group?.rowSpan &&
+            group.rowSpan > 1 ? (
+              <Tag
+                color="blue"
+                className="mt-2 max-w-full truncate"
+              >
+                {group.rowSpan} bác sĩ
+              </Tag>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       title: "Ngày trực",
       dataIndex: "shiftDate",
-      width: 150,
+      width: "12%",
       sorter: (first, second) =>
         first.shiftDate.localeCompare(
           second.shiftDate,
@@ -994,9 +1247,9 @@ export default function DoctorShiftPage() {
     },
     {
       title: "Bác sĩ",
-      width: 230,
+      width: "20%",
       render: (_value, shift) => (
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
             <Stethoscope className="h-4 w-4" />
           </span>
@@ -1034,9 +1287,9 @@ export default function DoctorShiftPage() {
     },
     {
       title: "Cơ sở / Phòng",
-      width: 235,
+      width: "20%",
       render: (_value, shift) => (
-        <div>
+        <div className="min-w-0">
           <Text
             strong
             className="block truncate"
@@ -1071,7 +1324,7 @@ export default function DoctorShiftPage() {
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: 135,
+      width: "11%",
       align: "center",
       render: (
         status: DoctorShiftStatus,
@@ -1080,13 +1333,13 @@ export default function DoctorShiftPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 150,
+      width: "14%",
       align: "center",
-      fixed: "right",
       render: (_value, shift) => (
-        <Space size={6}>
+        <Space size={4}>
           <Tooltip title="Xem chi tiết">
             <Button
+              size="small"
               icon={
                 <Eye className="h-4 w-4" />
               }
@@ -1099,6 +1352,7 @@ export default function DoctorShiftPage() {
 
           <Tooltip title="Cập nhật">
             <Button
+              size="small"
               icon={
                 <Pencil className="h-4 w-4" />
               }
@@ -1112,6 +1366,7 @@ export default function DoctorShiftPage() {
           <Tooltip title="Xóa ca trực">
             <Button
               danger
+              size="small"
               icon={
                 <Trash2 className="h-4 w-4" />
               }
@@ -1371,16 +1626,14 @@ export default function DoctorShiftPage() {
             }
           >
             <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
-              {WEEKDAY_LABELS.map(
-                (label) => (
-                  <div
-                    key={label}
-                    className="border-r border-slate-200 px-2 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 last:border-r-0"
-                  >
-                    {label}
-                  </div>
-                ),
-              )}
+              {WEEKDAY_LABELS.map((label) => (
+                <div
+                  key={label}
+                  className="border-r border-slate-200 px-2 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 last:border-r-0"
+                >
+                  {label}
+                </div>
+              ))}
             </div>
 
             <div className="grid grid-cols-7">
@@ -1487,6 +1740,239 @@ export default function DoctorShiftPage() {
               })}
             </div>
           </Card>
+        ) : viewMode === "week" ? (
+          <Card
+            className="overflow-hidden border-slate-200 bg-white"
+            styles={{ body: { padding: 0 } }}
+            title={
+              <div>
+                <p className="mb-0 text-base font-semibold text-slate-950">
+                  Lịch ca trực theo tuần
+                </p>
+
+                <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
+                  Cột bên trái là khung ca; mỗi ô hiển thị lịch của bác sĩ trong ngày tương ứng.
+                </p>
+              </div>
+            }
+            extra={
+              <Text type="secondary">
+                {sortedScopedShifts.length} lịch trực
+              </Text>
+            }
+          >
+            <div className="w-full overflow-hidden">
+              <div className="w-full">
+                <div
+                  className="grid border-b border-slate-200 bg-slate-50"
+                  style={{
+                    gridTemplateColumns:
+                      "minmax(150px, 1.15fr) repeat(7, minmax(0, 1fr))",
+                  }}
+                >
+                  <div className="flex min-w-0 items-center border-r border-slate-200 bg-slate-100 px-2 py-3 lg:px-3">
+                    <Text className="text-xs font-bold uppercase tracking-wide text-slate-600">
+                      Khung ca
+                    </Text>
+                  </div>
+
+                  {weekDays.map((date, index) => {
+                    const dateKey = toDateKey(date);
+                    const today = dateKey === TODAY;
+
+                    return (
+                      <button
+                        key={dateKey}
+                        type="button"
+                        className={`min-w-0 border-r border-slate-200 px-1 py-3 text-center last:border-r-0 sm:px-2 ${
+                          today
+                            ? "bg-blue-50"
+                            : "bg-slate-50"
+                        }`}
+                        onClick={() => {
+                          setSelectedDate(dateKey);
+                          setViewMode("day");
+                        }}
+                      >
+                        <Text
+                          strong
+                          className={`block text-xs uppercase ${
+                            today
+                              ? "text-blue-700"
+                              : "text-slate-600"
+                          }`}
+                        >
+                          {WEEKDAY_LABELS[index]}
+                        </Text>
+
+                        <span
+                          className={`mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                            today
+                              ? "bg-blue-600 text-white"
+                              : "text-slate-800"
+                          }`}
+                        >
+                          {String(date.getDate()).padStart(
+                            2,
+                            "0",
+                          )}
+                        </span>
+
+                        <Text
+                          type="secondary"
+                          className="mt-1 block truncate text-[9px] lg:text-[11px]"
+                        >
+                          {String(
+                            date.getMonth() + 1,
+                          ).padStart(2, "0")}
+                          /{date.getFullYear()}
+                        </Text>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {weeklyScheduleRows.length === 0 ? (
+                  <div className="px-6 py-12">
+                    <Empty
+                      image={
+                        Empty.PRESENTED_IMAGE_SIMPLE
+                      }
+                      description="Không có ca trực phù hợp trong tuần này."
+                    >
+                      <Button
+                        type="primary"
+                        onClick={() => openCreate()}
+                      >
+                        Thêm ca trực
+                      </Button>
+                    </Empty>
+                  </div>
+                ) : (
+                  weeklyScheduleRows.map((row) => (
+                    <div
+                      key={row.key}
+                      className="grid border-b border-slate-200 last:border-b-0"
+                      style={{
+                        gridTemplateColumns:
+                          "minmax(150px, 1.15fr) repeat(7, minmax(0, 1fr))",
+                      }}
+                    >
+                      <div className="min-w-0 border-r border-slate-200 bg-slate-50 px-2 py-3 lg:px-3">
+                        <Text
+                          strong
+                          className="block text-slate-950"
+                        >
+                          {row.slotName}
+                        </Text>
+
+                        <Text
+                          type="secondary"
+                          className="mt-1 block text-xs"
+                        >
+                          {row.startTime} -{" "}
+                          {row.endTime}
+                        </Text>
+
+                        {row.slotCode ? (
+                          <Text
+                            type="secondary"
+                            className="mt-1 block truncate text-xs"
+                          >
+                            {row.slotCode}
+                          </Text>
+                        ) : null}
+
+                        {!facilityFilter &&
+                        row.facilityName ? (
+                          <Text className="mt-2 block truncate text-xs font-medium text-blue-700">
+                            {row.facilityName}
+                          </Text>
+                        ) : null}
+                      </div>
+
+                      {weekDays.map((date) => {
+                        const dateKey = toDateKey(date);
+                        const dayShifts =
+                          row.shiftsByDate[dateKey] ?? [];
+                        const today =
+                          dateKey === TODAY;
+
+                        return (
+                          <div
+                            key={`${row.key}-${dateKey}`}
+                            className={`min-w-0 border-r border-slate-200 p-1.5 last:border-r-0 lg:p-2 ${
+                              today
+                                ? "bg-blue-50/30"
+                                : "bg-white"
+                            }`}
+                          >
+                            {dayShifts.length > 0 ? (
+                              <div className="flex flex-col gap-2">
+                                {dayShifts.map(
+                                  (shift) => (
+                                    <button
+                                      key={shift.id}
+                                      type="button"
+                                      className={`w-full min-w-0 rounded-md border px-1.5 py-2 text-left transition hover:shadow-sm lg:px-2 ${getShiftAccent(
+                                        shift.startTime,
+                                      )}`}
+                                      title={`${shift.doctorTitle || "Bác sĩ"} ${shift.doctorName} · ${shift.roomName || "Chưa có phòng"}`}
+                                      onClick={() =>
+                                        void openDetail(
+                                          shift,
+                                        )
+                                      }
+                                    >
+                                      <span className="block truncate text-[10px] font-semibold sm:text-[11px] lg:text-xs">
+                                        {shift.doctorTitle ||
+                                          doctorById.get(
+                                            shift.doctorId,
+                                          )?.title ||
+                                          "Bác sĩ"}{" "}
+                                        {shift.doctorName ||
+                                          doctorById.get(
+                                            shift.doctorId,
+                                          )?.name ||
+                                          `#${shift.doctorId}`}
+                                      </span>
+
+                                      <span className="mt-1 block truncate text-[9px] opacity-80 sm:text-[10px] lg:text-[11px]">
+                                        {shift.roomName ||
+                                          roomById.get(
+                                            shift.roomId,
+                                          )?.name ||
+                                          "Chưa cập nhật phòng"}
+                                      </span>
+
+                                      <span className="mt-1 block truncate text-[9px] font-medium opacity-75 lg:text-[10px]">
+                                        Tối đa{" "}
+                                        {shift.maxAppointments}{" "}
+                                        lịch
+                                      </span>
+                                    </button>
+                                  ),
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex min-h-[92px] items-center justify-center lg:min-h-[110px]">
+                                <Text
+                                  type="secondary"
+                                  className="text-xs"
+                                >
+                                  Chưa có lịch
+                                </Text>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </Card>
         ) : (
           <Card
             className="overflow-hidden border-slate-200 bg-white"
@@ -1494,11 +1980,8 @@ export default function DoctorShiftPage() {
             title={
               <div>
                 <p className="mb-0 text-base font-semibold text-slate-950">
-                  {viewMode === "day"
-                    ? `Danh sách ca trực ngày ${formatShortDate(
-                        selectedDate,
-                      )}`
-                    : "Danh sách ca trực theo tuần"}
+                  Danh sách ca trực ngày{" "}
+                  {formatShortDate(selectedDate)}
                 </p>
 
                 <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
@@ -1518,16 +2001,15 @@ export default function DoctorShiftPage() {
               tableLayout="fixed"
               loading={loading}
               columns={tableColumns}
-              dataSource={sortedScopedShifts}
+              dataSource={dayTableShifts}
               pagination={false}
-              scroll={{ x: 1315 }}
               locale={{
                 emptyText: (
                   <Empty
                     image={
                       Empty.PRESENTED_IMAGE_SIMPLE
                     }
-                    description="Không có ca trực phù hợp trong khoảng thời gian này."
+                    description="Không có ca trực phù hợp trong ngày này."
                   >
                     <Button
                       type="primary"
@@ -1540,9 +2022,27 @@ export default function DoctorShiftPage() {
                   </Empty>
                 ),
               }}
-              onRow={(shift) => ({
-                className:
+              rowClassName={(
+                _shift,
+                index,
+              ) => {
+                const group =
+                  dayShiftGroupMeta[index];
+
+                return [
                   "cursor-pointer",
+                  group?.isFirstRow &&
+                  index > 0
+                    ? "[&>td]:border-t-2 [&>td]:border-t-slate-300"
+                    : "",
+                  group?.groupIndex % 2 === 1
+                    ? "[&>td]:bg-slate-50/35"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+              }}
+              onRow={(shift) => ({
                 onClick: (event) => {
                   const target =
                     event.target as HTMLElement;
@@ -1563,6 +2063,7 @@ export default function DoctorShiftPage() {
             />
           </Card>
         )}
+
       </div>
 
       <DoctorShiftCreateModal
