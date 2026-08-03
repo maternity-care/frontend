@@ -17,6 +17,7 @@ import {
   Stethoscope,
   UserCog,
   Users,
+  HardDrive,
 } from "lucide-react";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ const navItems = [
   // { href: "/management/permissions", label: "Permissions", icon: KeyRound, roles: ["super_admin"] },
   // { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness, roles: ["super_admin"] },
   // { href: "/management/uploads", label: "Uploads", icon: Upload, roles: ["super_admin"] },
+  { href: "/management/records", label: "Hồ sơ thai phụ", icon: HardDrive, roles: ["doctor"] },
   { href: "/management/services/super", label: "Dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin"] },
   { href: "/management/services/facility", label: "Dịch vụ cơ sở", icon: BriefcaseBusiness, roles: ["admin"] },
   // { href: "/management/roles", label: "Roles", icon: ShieldCheck, roles: ["super_admin"] },
