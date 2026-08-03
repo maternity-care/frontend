@@ -53,6 +53,7 @@ import {
 } from "@/management/features/doctors/doctors.api";
 import type {
   Doctor,
+  DoctorExperienceLevel,
   DoctorExperienceSort,
   DoctorStatus,
   GetDoctorsParams,
@@ -79,9 +80,33 @@ type DoctorFilters = {
   keyword?: string;
   specialty?: string;
   status?: DoctorStatus;
+  experienceLevel?:
+    DoctorExperienceLevel;
   sortYearsOfExperience:
     DoctorExperienceSort;
 };
+
+const EXPERIENCE_LEVEL_OPTIONS: Array<{
+  value: DoctorExperienceLevel;
+  label: string;
+}> = [
+  {
+    value: 1,
+    label: "Kinh nghiệm 1 - 5 năm",
+  },
+  {
+    value: 2,
+    label: "Kinh nghiệm 6 - 10 năm",
+  },
+  {
+    value: 3,
+    label: "Kinh nghiệm 11 - 20 năm",
+  },
+  {
+    value: 4,
+    label: "Kinh nghiệm trên 20 năm",
+  },
+];
 
 const EXPERIENCE_SORT_OPTIONS: Array<{
   value: DoctorExperienceSort;
@@ -236,6 +261,9 @@ function mergeDoctorDetail(
       detail.facilityIds.length > 0
         ? detail.facilityIds
         : current.facilityIds,
+    workingRoomTypeId:
+      detail.workingRoomTypeId ||
+      current.workingRoomTypeId,
   };
 }
 
@@ -307,6 +335,8 @@ function toApiParams(
       filters.specialty?.trim() ||
       undefined,
     status: filters.status,
+    filterYearsOfExperienceLevel:
+      filters.experienceLevel,
     sortYearsOfExperience:
       filters.sortYearsOfExperience,
     page,
@@ -339,6 +369,14 @@ export default function DoctorManagementPage() {
   ] =
     useState<
       DoctorStatus | undefined
+    >();
+
+  const [
+    experienceLevel,
+    setExperienceLevel,
+  ] =
+    useState<
+      DoctorExperienceLevel | undefined
     >();
 
   const [
@@ -488,6 +526,7 @@ export default function DoctorManagementPage() {
         specialtyFilter.trim() ||
         undefined,
       status: statusFilter,
+      experienceLevel,
       sortYearsOfExperience:
         experienceSort,
       ...overrides,
@@ -553,6 +592,7 @@ export default function DoctorManagementPage() {
     setSearchValue("");
     setSpecialtyFilter("");
     setStatusFilter(undefined);
+    setExperienceLevel(undefined);
     setExperienceSort("desc");
 
     const nextFilters: DoctorFilters =
@@ -1063,6 +1103,29 @@ export default function DoctorManagementPage() {
               }}
             />
 
+            <Select<DoctorExperienceLevel>
+              allowClear
+              value={experienceLevel}
+              options={
+                EXPERIENCE_LEVEL_OPTIONS
+              }
+              placeholder="Mức kinh nghiệm"
+              style={{
+                width: 190,
+                minWidth: 190,
+                maxWidth: 190,
+                flex: "0 0 190px",
+              }}
+              onChange={(value) => {
+                setExperienceLevel(value);
+
+                applyFilters({
+                  experienceLevel:
+                    value,
+                });
+              }}
+            />
+
             <Select<DoctorExperienceSort>
               value={experienceSort}
               options={
@@ -1433,6 +1496,14 @@ export default function DoctorManagementPage() {
                     .yearsOfExperience
                 }{" "}
                 năm
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label="Loại phòng làm việc"
+                span={1}
+              >
+                {detailDoctor.workingRoomTypeId ||
+                  "Chưa cập nhật"}
               </Descriptions.Item>
 
               <Descriptions.Item
