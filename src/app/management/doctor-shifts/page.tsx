@@ -75,6 +75,13 @@ type WeeklyScheduleRow = {
   shiftsByDate: Record<string, DoctorShiftItem[]>;
 };
 
+type DayShiftGroupMeta = {
+  key: string;
+  groupIndex: number;
+  rowSpan: number;
+  isFirstRow: boolean;
+};
+
 const STATUS_OPTIONS: Array<{
   value: DoctorShiftStatus;
   label: string;
@@ -218,6 +225,34 @@ function getShiftAccent(startTime: string) {
   }
 
   return "border-violet-200 bg-violet-50 text-violet-900";
+}
+
+function getDayShiftGroupKey(
+  shift: DoctorShiftItem,
+) {
+  const slotIdentity =
+    shift.slotId ||
+    shift.slotCode ||
+    shift.slotName ||
+    `${shift.startTime}-${shift.endTime}`;
+
+  return `${shift.facilityId}:${slotIdentity}`;
+}
+
+function getDayShiftMergedCellClass(
+  startTime: string,
+) {
+  const hour = Number(startTime.split(":")[0]);
+
+  if (hour < 12) {
+    return "!bg-blue-50/70 !border-l-4 !border-l-blue-400 align-top";
+  }
+
+  if (hour < 18) {
+    return "!bg-amber-50/70 !border-l-4 !border-l-amber-400 align-top";
+  }
+
+  return "!bg-violet-50/70 !border-l-4 !border-l-violet-400 align-top";
 }
 
 function renderStatus(status: DoctorShiftStatus) {
@@ -562,6 +597,94 @@ export default function DoctorShiftPage() {
       ),
     [scopedShifts],
   );
+
+  const dayTableShifts = useMemo(() => {
+    if (viewMode !== "day") {
+      return sortedScopedShifts;
+    }
+
+    return [...sortedScopedShifts].sort(
+      (first, second) => {
+        const firstFacility =
+          first.facilityName ||
+          facilityById.get(first.facilityId)?.name ||
+          "";
+        const secondFacility =
+          second.facilityName ||
+          facilityById.get(second.facilityId)?.name ||
+          "";
+
+        return [
+          first.startTime,
+          first.endTime,
+          firstFacility,
+          getDayShiftGroupKey(first),
+          first.doctorName,
+          first.roomName,
+        ]
+          .join("|")
+          .localeCompare(
+            [
+              second.startTime,
+              second.endTime,
+              secondFacility,
+              getDayShiftGroupKey(second),
+              second.doctorName,
+              second.roomName,
+            ].join("|"),
+          );
+      },
+    );
+  }, [
+    facilityById,
+    sortedScopedShifts,
+    viewMode,
+  ]);
+
+  const dayShiftGroupMeta = useMemo(() => {
+    const metadata: DayShiftGroupMeta[] = [];
+    let groupIndex = -1;
+    let index = 0;
+
+    while (index < dayTableShifts.length) {
+      const groupKey = getDayShiftGroupKey(
+        dayTableShifts[index],
+      );
+      let groupEnd = index + 1;
+
+      while (
+        groupEnd < dayTableShifts.length &&
+        getDayShiftGroupKey(
+          dayTableShifts[groupEnd],
+        ) === groupKey
+      ) {
+        groupEnd += 1;
+      }
+
+      groupIndex += 1;
+      const groupSize = groupEnd - index;
+
+      for (
+        let rowIndex = index;
+        rowIndex < groupEnd;
+        rowIndex += 1
+      ) {
+        metadata[rowIndex] = {
+          key: groupKey,
+          groupIndex,
+          rowSpan:
+            rowIndex === index
+              ? groupSize
+              : 0,
+          isFirstRow: rowIndex === index,
+        };
+      }
+
+      index = groupEnd;
+    }
+
+    return metadata;
+  }, [dayTableShifts]);
 
   const monthGrid = useMemo(
     () => getMonthGrid(selectedDate),
@@ -1011,48 +1134,93 @@ export default function DoctorShiftPage() {
   const tableColumns: ColumnsType<DoctorShiftItem> = [
     {
       title: "STT",
-      width: 64,
+      width: "5%",
       align: "center",
       render: (_value, _record, index) =>
         index + 1,
     },
     {
       title: "Ca trực",
-      width: 230,
-      render: (_value, shift) => (
-        <div>
-          <Text
-            strong
-            className="block truncate text-xs text-slate-950 lg:text-sm"
-          >
-            {getShiftShortLabel(
-              shift.startTime,
-            )}
-          </Text>
+      width: "18%",
+      onCell: (
+        shift,
+        index,
+      ) => {
+        const group =
+          dayShiftGroupMeta[index ?? 0];
 
-          <Text
-            type="secondary"
-            className="block text-xs"
-          >
-            {shift.startTime} -{" "}
-            {shift.endTime}
-          </Text>
+        return {
+          rowSpan: group?.rowSpan ?? 1,
+          className:
+            group?.rowSpan === 0
+              ? undefined
+              : getDayShiftMergedCellClass(
+                  shift.startTime,
+                ),
+        };
+      },
+      render: (_value, shift, index) => {
+        const group =
+          dayShiftGroupMeta[index];
 
-          <Text
-            type="secondary"
-            className="block truncate text-xs"
-          >
-            {shift.slotName ||
-              shift.slotCode ||
-              `Slot ${shift.slotId}`}
-          </Text>
-        </div>
-      ),
+        return (
+          <div className="min-w-0 py-1">
+            <Text
+              strong
+              className="block truncate text-sm text-slate-950"
+            >
+              {shift.slotName ||
+                shift.slotCode ||
+                getShiftShortLabel(
+                  shift.startTime,
+                )}
+            </Text>
+
+            <Text
+              className="mt-1 block truncate text-xs font-semibold text-slate-700"
+            >
+              {shift.startTime} -{" "}
+              {shift.endTime}
+            </Text>
+
+            {shift.slotCode &&
+            shift.slotName ? (
+              <Text
+                type="secondary"
+                className="mt-1 block truncate text-xs"
+              >
+                {shift.slotCode}
+              </Text>
+            ) : null}
+
+            <Text
+              type="secondary"
+              className="mt-2 block truncate text-xs"
+            >
+              {shift.facilityName ||
+                facilityById.get(
+                  shift.facilityId,
+                )?.name ||
+                "Chưa cập nhật cơ sở"}
+            </Text>
+
+            {group?.rowSpan &&
+            group.rowSpan > 1 ? (
+              <Tag
+                color="blue"
+                className="mt-2 max-w-full truncate"
+              >
+                {group.rowSpan} bác sĩ
+              </Tag>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       title: "Ngày trực",
       dataIndex: "shiftDate",
-      width: 150,
+      width: "12%",
       sorter: (first, second) =>
         first.shiftDate.localeCompare(
           second.shiftDate,
@@ -1079,9 +1247,9 @@ export default function DoctorShiftPage() {
     },
     {
       title: "Bác sĩ",
-      width: 230,
+      width: "20%",
       render: (_value, shift) => (
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
             <Stethoscope className="h-4 w-4" />
           </span>
@@ -1119,9 +1287,9 @@ export default function DoctorShiftPage() {
     },
     {
       title: "Cơ sở / Phòng",
-      width: 235,
+      width: "20%",
       render: (_value, shift) => (
-        <div>
+        <div className="min-w-0">
           <Text
             strong
             className="block truncate"
@@ -1156,7 +1324,7 @@ export default function DoctorShiftPage() {
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: 135,
+      width: "11%",
       align: "center",
       render: (
         status: DoctorShiftStatus,
@@ -1165,13 +1333,13 @@ export default function DoctorShiftPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 150,
+      width: "14%",
       align: "center",
-      fixed: "right",
       render: (_value, shift) => (
-        <Space size={6}>
+        <Space size={4}>
           <Tooltip title="Xem chi tiết">
             <Button
+              size="small"
               icon={
                 <Eye className="h-4 w-4" />
               }
@@ -1184,6 +1352,7 @@ export default function DoctorShiftPage() {
 
           <Tooltip title="Cập nhật">
             <Button
+              size="small"
               icon={
                 <Pencil className="h-4 w-4" />
               }
@@ -1197,6 +1366,7 @@ export default function DoctorShiftPage() {
           <Tooltip title="Xóa ca trực">
             <Button
               danger
+              size="small"
               icon={
                 <Trash2 className="h-4 w-4" />
               }
@@ -1831,9 +2001,8 @@ export default function DoctorShiftPage() {
               tableLayout="fixed"
               loading={loading}
               columns={tableColumns}
-              dataSource={sortedScopedShifts}
+              dataSource={dayTableShifts}
               pagination={false}
-              scroll={{ x: 1315 }}
               locale={{
                 emptyText: (
                   <Empty
@@ -1853,9 +2022,27 @@ export default function DoctorShiftPage() {
                   </Empty>
                 ),
               }}
-              onRow={(shift) => ({
-                className:
+              rowClassName={(
+                _shift,
+                index,
+              ) => {
+                const group =
+                  dayShiftGroupMeta[index];
+
+                return [
                   "cursor-pointer",
+                  group?.isFirstRow &&
+                  index > 0
+                    ? "[&>td]:border-t-2 [&>td]:border-t-slate-300"
+                    : "",
+                  group?.groupIndex % 2 === 1
+                    ? "[&>td]:bg-slate-50/35"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+              }}
+              onRow={(shift) => ({
                 onClick: (event) => {
                   const target =
                     event.target as HTMLElement;
