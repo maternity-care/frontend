@@ -120,12 +120,35 @@ function PreviewLine({
   );
 }
 
+const DAY_LABELS: Record<
+  FacilityScheduleInput["days"][number],
+  string
+> = {
+  MON: "Thứ 2",
+  TUE: "Thứ 3",
+  WED: "Thứ 4",
+  THU: "Thứ 5",
+  FRI: "Thứ 6",
+  SAT: "Thứ 7",
+  SUN: "Chủ nhật",
+};
+
+function formatScheduleDays(
+  days: FacilityScheduleInput["days"],
+) {
+  return days
+    .map((day) => DAY_LABELS[day])
+    .join(", ");
+}
+
 function getScheduleSummary(schedules?: FacilityScheduleInput[]) {
   if (!schedules?.length) return "Chưa thiết lập";
 
   return schedules
     .map((schedule) => {
-      const days = schedule.days.join(", ") || "Chưa chọn ngày";
+      const days =
+        formatScheduleDays(schedule.days) ||
+        "Chưa chọn ngày";
       const time = schedule.isClosed
         ? "Đóng cửa"
         : `${schedule.openTime || "--:--"} - ${schedule.closeTime || "--:--"}`;
