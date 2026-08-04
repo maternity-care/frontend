@@ -120,7 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Button>
             ) : (
               <Button variant="light" onClick={() => router.push("/login")}>
-                {RESPONSE_MESSAGES.AUTH.LOGIN}
+                {RESPONSE_MESSAGES.AUTH.LOGIN} / Đăng ký
               </Button>
             )}
           </nav>
