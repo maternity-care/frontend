@@ -13,7 +13,6 @@ import {
   Modal,
   Row,
   Select,
-  Switch,
   Tag,
   Typography,
 } from "antd";
@@ -78,7 +77,6 @@ type BulkGenerateFormValues = {
   facilityId: string;
   fromDate: string;
   toDate: string;
-  saveOnlyValid: boolean;
   slotGroups: BulkSlotGroupFormValue[];
 };
 
@@ -240,7 +238,6 @@ export function DoctorShiftBulkGenerateModal({
       form.setFieldsValue({
         fromDate: today,
         toDate: addDaysToDateKey(today, 30),
-        saveOnlyValid: true,
         slotGroups: [],
       });
       setShiftSlots([]);
@@ -372,8 +369,7 @@ export function DoctorShiftBulkGenerateModal({
       fromDate: values.fromDate,
       toDate: values.toDate,
       slotAssignments,
-      saveOnlyValid:
-        values.saveOnlyValid ?? true,
+      saveOnlyValid: false,
     };
   }
 
@@ -533,7 +529,7 @@ export function DoctorShiftBulkGenerateModal({
         }}
       >
         <Row gutter={[16, 0]}>
-          <Col xs={24} lg={10}>
+          <Col xs={24} lg={12}>
             <Form.Item
               name="facilityId"
               label="Cơ sở"
@@ -559,7 +555,7 @@ export function DoctorShiftBulkGenerateModal({
             </Form.Item>
           </Col>
 
-          <Col xs={24} sm={12} lg={5}>
+          <Col xs={24} sm={12} lg={6}>
             <Form.Item
               name="fromDate"
               label="Từ ngày"
@@ -575,7 +571,7 @@ export function DoctorShiftBulkGenerateModal({
             </Form.Item>
           </Col>
 
-          <Col xs={24} sm={12} lg={5}>
+          <Col xs={24} sm={12} lg={6}>
             <Form.Item
               name="toDate"
               label="Đến ngày"
@@ -616,15 +612,6 @@ export function DoctorShiftBulkGenerateModal({
             </Form.Item>
           </Col>
 
-          <Col xs={24} lg={4}>
-            <Form.Item
-              name="saveOnlyValid"
-              label="Chỉ lưu lịch hợp lệ"
-              valuePropName="checked"
-            >
-              <Switch />
-            </Form.Item>
-          </Col>
         </Row>
 
         <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">

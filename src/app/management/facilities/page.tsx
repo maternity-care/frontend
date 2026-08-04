@@ -514,7 +514,7 @@ export default function FacilityManagementPage() {
                 label: FACILITY_MESSAGES.SEARCH_PLACEHOLDER,
                 type: "text",
                 contains: true,
-                width: 420,
+                width: 370,
               },
               {
                 field: "province",
@@ -583,9 +583,6 @@ export default function FacilityManagementPage() {
             <div>
               <p className="mb-0 text-base font-semibold text-slate-950">
                 {FACILITY_MESSAGES.FACILITY_LIST_TITLE}
-              </p>
-              <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Phân trang từ máy chủ · Trang {currentPage}/{Math.max(totalPages, 1)}.
               </p>
             </div>
           }
