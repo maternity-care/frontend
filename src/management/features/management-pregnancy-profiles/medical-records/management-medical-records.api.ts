@@ -5,9 +5,13 @@ import type {
   MedicalRecord,
   MedicalRecordFile,
   BackendMedicalRecordFile,
+  BackendAppointment,
+  Appointment,
 } from "./management-medical-records.types";
 
 const MEDICAL_RECORDS_URL = "/management/medical-records";
+const APPOINTMENTS_BY_PREGNANCY_PROFILE_URL =
+  "/management/appointments/pregnancy-profile";
 
 function toStringValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -37,6 +41,21 @@ function normalizeFile(
   };
 }
 
+function normalizeAppointment(
+  item: BackendAppointment,
+): Appointment {
+  return {
+    id: toStringValue(item.id),
+    pregnancyProfileId: toNullableString(item.pregnancyProfileId),
+    doctorId: toNullableString(item.doctorId),
+    appointmentAt: item.appointmentAt ?? null,
+    status: item.status ?? null,
+    note: item.note ?? null,
+    createdAt: item.createdAt ?? null,
+    updatedAt: item.updatedAt ?? null,
+  };
+}
+
 export function normalizeMedicalRecord(
   record: BackendMedicalRecord,
 ): MedicalRecord {
@@ -63,4 +82,18 @@ export async function createManagementMedicalRecord(
   );
 
   return normalizeMedicalRecord(data);
+}
+
+export async function getAppointmentsByPregnancyProfileId(
+  pregnancyProfileId: string,
+): Promise<Appointment[]> {
+  const data = await unwrapApiData<BackendAppointment[] | BackendAppointment>(
+    apiClient.get(
+      `${APPOINTMENTS_BY_PREGNANCY_PROFILE_URL}/${pregnancyProfileId}`,
+    ),
+  );
+
+  // Hỗ trợ cả trường hợp backend trả về array hoặc single object
+  const list = Array.isArray(data) ? data : data ? [data] : [];
+  return list.map(normalizeAppointment);
 }
