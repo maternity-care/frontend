@@ -284,7 +284,9 @@ export function CreateMedicalRecordModal({
             showSearch
             optionFilterProp="label"
             // Quan trọng: fix dropdown bị ẩn trong Modal
-            getPopupContainer={(trigger) => trigger.parentElement || document.body}
+            getPopupContainer={(trigger) =>
+              trigger.parentElement || document.body
+            }
             notFoundContent={
               loadingAppointments ? (
                 <div style={{ textAlign: "center", padding: 12 }}>
