@@ -1704,12 +1704,27 @@ function RevenueMixDonut({
   items: RevenueMixItem[];
   totalRevenue: number;
 }) {
-  let cursor = 0;
-  const gradientStops = items.map((item) => {
-    const start = cursor;
-    cursor += item.percent;
-    return `${item.color} ${start}% ${cursor}%`;
-  });
+  const gradientStops = items.reduce<{
+    stops: string[];
+    totalPercent: number;
+  }>(
+    (result, item) => {
+      const start = result.totalPercent;
+      const end = start + item.percent;
+
+      return {
+        stops: [
+          ...result.stops,
+          `${item.color} ${start}% ${end}%`,
+        ],
+        totalPercent: end,
+      };
+    },
+    {
+      stops: [],
+      totalPercent: 0,
+    },
+  ).stops;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[210px_minmax(0,1fr)] lg:items-center">
@@ -2036,15 +2051,6 @@ function ManagementDashboardPage() {
   const [lastRefresh, setLastRefresh] = useState("18:20");
 
   const appointmentPageSize = 5;
-
-  useEffect(() => {
-    setAppointmentPage(1);
-  }, [
-    keyword,
-    selectedFacilityId,
-    fromDate,
-    toDate,
-  ]);
 
   const visibleAppointments = useMemo(() => {
     const search = keyword.trim().toLowerCase();
@@ -2418,6 +2424,7 @@ function ManagementDashboardPage() {
   function applyPeriod(
     nextPeriod: DateRangeMode,
   ) {
+    setAppointmentPage(1);
     setPeriod(nextPeriod);
 
     if (nextPeriod === "custom") {
@@ -2611,13 +2618,14 @@ function ManagementDashboardPage() {
                     }),
                   ),
                 ]}
-                onChange={(value) =>
+                onChange={(value) => {
+                  setAppointmentPage(1);
                   setSelectedFacilityId(
                     value === "all"
                       ? undefined
                       : value,
-                  )
-                }
+                  );
+                }}
               />
 
               <Select<DateRangeMode>
@@ -2640,6 +2648,7 @@ function ManagementDashboardPage() {
                   min="2026-07-01"
                   max={toDate}
                   onChange={(event) => {
+                    setAppointmentPage(1);
                     setFromDate(
                       event.target.value,
                     );
@@ -2661,6 +2670,7 @@ function ManagementDashboardPage() {
                   min={fromDate}
                   max="2026-07-30"
                   onChange={(event) => {
+                    setAppointmentPage(1);
                     setToDate(
                       event.target.value,
                     );
@@ -3118,7 +3128,10 @@ function ManagementDashboardPage() {
             prefix={<Search className="h-4 w-4 text-slate-400" />}
             placeholder="Tìm mã lịch, thai phụ, dịch vụ, bác sĩ..."
             className="mb-4 max-w-[420px]"
-            onChange={(event) => setKeyword(event.target.value)}
+            onChange={(event) => {
+              setAppointmentPage(1);
+              setKeyword(event.target.value);
+            }}
           />
 
           <Table<Appointment>
