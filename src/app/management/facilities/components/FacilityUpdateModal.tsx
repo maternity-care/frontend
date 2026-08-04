@@ -120,12 +120,35 @@ function PreviewLine({
   );
 }
 
+const DAY_LABELS: Record<
+  FacilityScheduleInput["days"][number],
+  string
+> = {
+  MON: "Thứ 2",
+  TUE: "Thứ 3",
+  WED: "Thứ 4",
+  THU: "Thứ 5",
+  FRI: "Thứ 6",
+  SAT: "Thứ 7",
+  SUN: "Chủ nhật",
+};
+
+function formatScheduleDays(
+  days: FacilityScheduleInput["days"],
+) {
+  return days
+    .map((day) => DAY_LABELS[day])
+    .join(", ");
+}
+
 function getScheduleSummary(schedules?: FacilityScheduleInput[]) {
   if (!schedules?.length) return "Chưa thiết lập";
 
   return schedules
     .map((schedule) => {
-      const days = schedule.days.join(", ") || "Chưa chọn ngày";
+      const days =
+        formatScheduleDays(schedule.days) ||
+        "Chưa chọn ngày";
       const time = schedule.isClosed
         ? "Đóng cửa"
         : `${schedule.openTime || "--:--"} - ${schedule.closeTime || "--:--"}`;
@@ -377,6 +400,14 @@ export function FacilityUpdateModal({
           onFinish={handleFinish}
           className="mt-5"
         >
+          <Form.Item name="latitude" hidden>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="longitude" hidden>
+            <Input />
+          </Form.Item>
+
           <div className="grid max-h-[70vh] gap-5 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="space-y-5">
               <Card
@@ -537,17 +568,6 @@ export function FacilityUpdateModal({
                     </Form.Item>
                   </Col>
   
-                  <Col xs={24} md={12}>
-                    <Form.Item name="latitude" label={FACILITY_MESSAGES.LATITUDE}>
-                      <Input size="large" placeholder="Ví dụ: 21.0285" />
-                    </Form.Item>
-                  </Col>
-  
-                  <Col xs={24} md={12}>
-                    <Form.Item name="longitude" label={FACILITY_MESSAGES.LONGITUDE}>
-                      <Input size="large" placeholder="Ví dụ: 105.8542" />
-                    </Form.Item>
-                  </Col>
                 </Row>
               </Card>
   
@@ -619,15 +639,6 @@ export function FacilityUpdateModal({
                   icon={<MapPin className="h-4 w-4" />}
                   label={FACILITY_MESSAGES.ADDRESS}
                   value={fullAddress}
-                />
-                <PreviewLine
-                  icon={<MapPin className="h-4 w-4" />}
-                  label={FACILITY_MESSAGES.COORDINATES}
-                  value={
-                    latitude || longitude
-                      ? `${latitude || "?"}, ${longitude || "?"}`
-                      : undefined
-                  }
                 />
                 <PreviewLine
                   icon={<Clock3 className="h-4 w-4" />}

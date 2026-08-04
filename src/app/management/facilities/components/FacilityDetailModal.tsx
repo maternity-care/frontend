@@ -250,17 +250,6 @@ export function FacilityDetailModal({
                     value={facility.ward}
                   />
                 </Col>
-                <Col xs={24} md={12}>
-                  <InfoItem
-                    icon={<MapPin className="h-4 w-4" />}
-                    label={FACILITY_MESSAGES.COORDINATES}
-                    value={
-                      facility.latitude || facility.longitude
-                        ? `${facility.latitude || "?"}, ${facility.longitude || "?"}`
-                        : FACILITY_MESSAGES.NOT_UPDATED
-                    }
-                  />
-                </Col>
                 <Col xs={24}>
                   <InfoItem
                     icon={<MapPin className="h-4 w-4" />}
@@ -376,10 +365,6 @@ export function FacilityDetailModal({
                         FACILITY_MESSAGES.NOT_UPDATED}
                     </p>
 
-                    <p className="mb-0 text-xs text-slate-400">
-                      Tọa độ:{" "}
-                      {googleMapLocation.coordinates}
-                    </p>
                   </div>
 
                   <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
