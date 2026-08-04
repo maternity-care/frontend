@@ -1,430 +1,3 @@
-// "use client";
-
-// import Link from "next/link";
-// import { useEffect, useMemo, useState } from "react";
-// import {
-//   Activity,
-//   ArrowUpRight,
-//   BriefcaseBusiness,
-//   Building2,
-//   CheckCircle2,
-//   Database,
-//   KeyRound,
-//   LockKeyhole,
-//   ShieldCheck,
-//   Users,
-// } from "lucide-react";
-// import { AdminLayout } from "@/management/components/layouts/AdminLayout";
-// import { Badge } from "@/management/components/ui/Badge";
-// import { Card, CardTitle } from "@/management/components/ui/Card";
-// import { PageHeader } from "@/management/components/ui/PageHeader";
-// import { StateBlock } from "@/management/components/ui/StateBlock";
-// import { useAuthStore } from "@/features/auth/auth.store";
-// import type { UserProfile } from "@/features/profile/profile.types";
-// import { getPermissions } from "@/management/features/permissions/permissions.api";
-// import type { Permission } from "@/management/features/permissions/permissions.types";
-// import { getRoles } from "@/management/features/roles/roles.api";
-// import type { Role } from "@/management/features/roles/roles.types";
-// import { getUsers } from "@/management/features/users/users.api";
-// import type { User } from "@/management/features/users/users.types";
-// import { cn, formatDate, getErrorMessage } from "@/lib/utils";
-
-// function permissionGroup(name: string) {
-//   return name.split(/[.:-]/)[0] || "general";
-// }
-
-// function SuperAdminDashboard() {
-//   const storeUser = useAuthStore((state) => state.user);
-//   const [cachedUser] = useState<UserProfile | null>(() => {
-//     if (typeof window === "undefined") return null;
-
-//     try {
-//       const value = window.localStorage.getItem("fe:user");
-//       return value ? (JSON.parse(value) as UserProfile) : null;
-//     } catch {
-//       return null;
-//     }
-//   });
-//   const [users, setUsers] = useState<User[]>([]);
-//   const [roles, setRoles] = useState<Role[]>([]);
-//   const [permissions, setPermissions] = useState<Permission[]>([]);
-//   const [loading, setLoading] = useState(true);
-//   const [error, setError] = useState<string | null>(null);
-
-//   useEffect(() => {
-//     let mounted = true;
-
-//     Promise.all([getUsers(), getRoles(), getPermissions()])
-//       .then(([usersData, rolesData, permissionsData]) => {
-//         if (!mounted) return;
-//         setUsers(usersData);
-//         setRoles(rolesData);
-//         setPermissions(permissionsData);
-//       })
-//       .catch((err) => {
-//         if (mounted) setError(getErrorMessage(err));
-//       })
-//       .finally(() => {
-//         if (mounted) setLoading(false);
-//       });
-
-//     return () => {
-//       mounted = false;
-//     };
-//   }, []);
-
-//   const currentUser = storeUser ?? cachedUser;
-
-//   const activeUsers = users.filter((item) => item.status === "active").length;
-//   const inactiveUsers = Math.max(users.length - activeUsers, 0);
-//   const userOverrides = users.reduce((count, item) => count + (item.permissionOverrides?.length ?? 0), 0);
-//   const permissionModules = useMemo(
-//     () => [...new Set(permissions.map((permission) => permissionGroup(permission.name)))],
-//     [permissions],
-//   );
-
-//   const topRoles = useMemo(
-//     () => [...roles].sort((a, b) => (b.permissions?.length ?? 0) - (a.permissions?.length ?? 0)).slice(0, 5),
-//     [roles],
-//   );
-
-//   const recentUsers = useMemo(
-//     () =>
-//       [...users]
-//         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-//         .slice(0, 5),
-//     [users],
-//   );
-
-//   const roleCoverage = roles.length && permissions.length
-//     ? Math.round(
-//         (roles.reduce((total, role) => total + (role.permissions?.length ?? 0), 0) / (roles.length * permissions.length)) * 100,
-//       )
-//     : 0;
-
-//   const stats = [
-//     {
-//       label: "Total users",
-//       value: users.length,
-//       detail: `${activeUsers} active, ${inactiveUsers} inactive`,
-//       href: "/management/users",
-//       icon: Users,
-//       accent: "bg-slate-950 text-white",
-//       panel: "bg-white",
-//     },
-//     {
-//       label: "Roles",
-//       value: roles.length,
-//       detail: `${roleCoverage}% avg permission coverage`,
-//       href: "/management/roles",
-//       icon: ShieldCheck,
-//       accent: "bg-emerald-600 text-white",
-//       panel: "bg-emerald-50/60 border-emerald-100",
-//     },
-//     {
-//       label: "Permissions",
-//       value: permissions.length,
-//       detail: `${permissionModules.length} modules`,
-//       href: "/management/permissions",
-//       icon: KeyRound,
-//       accent: "bg-blue-600 text-white",
-//       panel: "bg-blue-50/60 border-blue-100",
-//     },
-//     {
-//       label: "Overrides",
-//       value: userOverrides,
-//       detail: "direct user allow/deny rules",
-//       href: "/management/users",
-//       icon: BriefcaseBusiness,
-//       accent: "bg-amber-500 text-white",
-//       panel: "bg-amber-50/70 border-amber-100",
-//     },
-//   ];
-
-//   return (
-//     <AdminLayout>
-//       <PageHeader title="Dashboard" description="Operational view for users, roles, permissions, and access coverage." />
-
-//       {loading ? <StateBlock type="loading" title="Loading dashboard" /> : null}
-//       {error ? <StateBlock type="error" title="Cannot load dashboard" description={error} /> : null}
-
-//       {!loading && !error ? (
-//         <div className="space-y-6">
-//           <section className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950 text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]">
-//             <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
-//               <div className="p-6 lg:p-8">
-//                 <div className="flex flex-wrap items-center gap-2">
-//                   <Badge className="bg-cyan-400/15 text-cyan-100 ring-cyan-300/25">Live RBAC</Badge>
-//                   <Badge className="bg-white/10 text-slate-200 ring-white/15">NestJS API</Badge>
-//                 </div>
-//                 <h2 className="mt-5 max-w-2xl text-3xl font-semibold leading-tight tracking-normal lg:text-4xl">
-//                   Access control, users, and system permissions in one place.
-//                 </h2>
-//                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-//                   Track who has access, how roles are configured, and where user-level permission overrides are active.
-//                 </p>
-//                 <div className="mt-6 flex flex-wrap gap-3">
-//                   <Link
-//                     href="/management/users"
-//                     className="inline-flex h-10 items-center gap-2 rounded-md bg-white px-4 text-sm font-medium text-slate-950 shadow-sm transition hover:bg-slate-100"
-//                   >
-//                     Manage users
-//                     <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-//                   </Link>
-//                   <Link
-//                     href="/management/roles"
-//                     className="inline-flex h-10 items-center gap-2 rounded-md border border-white/15 px-4 text-sm font-medium text-white transition hover:bg-white/10"
-//                   >
-//                     Review roles
-//                     <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-//                   </Link>
-//                 </div>
-//               </div>
-
-//               <div className="border-t border-white/10 bg-white/[0.04] p-6 lg:border-l lg:border-t-0 lg:p-8">
-//                 <p className="text-sm font-medium text-slate-300">Access health</p>
-//                 <div className="mt-5 grid grid-cols-2 gap-3">
-//                   <div className="rounded-lg bg-white/10 p-4 ring-1 ring-inset ring-white/10">
-//                     <p className="text-3xl font-semibold">{roleCoverage}%</p>
-//                     <p className="mt-1 text-xs text-slate-300">role coverage</p>
-//                   </div>
-//                   <div className="rounded-lg bg-white/10 p-4 ring-1 ring-inset ring-white/10">
-//                     <p className="text-3xl font-semibold">{userOverrides}</p>
-//                     <p className="mt-1 text-xs text-slate-300">overrides</p>
-//                   </div>
-//                 </div>
-//                 <div className="mt-5 rounded-lg bg-cyan-400/10 p-4 ring-1 ring-inset ring-cyan-300/20">
-//                   <div className="flex items-center gap-2 text-cyan-100">
-//                     <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-//                     <p className="text-sm font-medium">Permission evaluation is active</p>
-//                   </div>
-//                   <p className="mt-2 text-xs leading-5 text-cyan-100/75">Role permissions are merged with user allow/deny overrides.</p>
-//                 </div>
-//               </div>
-//             </div>
-//           </section>
-
-//           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-//             {stats.map((item) => {
-//               const Icon = item.icon;
-//               return (
-//                 <Link key={item.label} href={item.href} className="block">
-//                   <Card className={cn("min-h-40 transition hover:-translate-y-0.5 hover:shadow-[0_16px_35px_rgba(15,23,42,0.1)]", item.panel)}>
-//                     <div className="flex items-start justify-between gap-4">
-//                       <div className="min-w-0">
-//                         <p className="truncate text-sm font-medium text-slate-600">{item.label}</p>
-//                         <p className="mt-3 text-4xl font-semibold text-slate-950">{item.value}</p>
-//                       </div>
-//                       <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-md", item.accent)}>
-//                         <Icon className="h-5 w-5" aria-hidden="true" />
-//                       </div>
-//                     </div>
-//                     <div className="mt-5 flex items-center justify-between gap-3">
-//                       <p className="text-sm text-slate-500">{item.detail}</p>
-//                       <ArrowUpRight className="h-4 w-4 text-slate-400" aria-hidden="true" />
-//                     </div>
-//                   </Card>
-//                 </Link>
-//               );
-//             })}
-//           </div>
-
-//           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-//             <Card className="p-0">
-//               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-//                 <div>
-//                   <CardTitle>Role Coverage</CardTitle>
-//                   <p className="mt-1 text-sm text-slate-500">Largest permission sets by role.</p>
-//                 </div>
-//                 <Activity className="h-5 w-5 text-slate-400" aria-hidden="true" />
-//               </div>
-//               <div className="space-y-4 p-5">
-//                 {topRoles.map((role) => {
-//                   const count = role.permissions?.length ?? 0;
-//                   const width = permissions.length ? Math.round((count / permissions.length) * 100) : 0;
-//                   return (
-//                     <div key={role.id} className="rounded-lg border border-slate-200 p-4">
-//                       <div className="mb-3 flex items-center justify-between gap-3">
-//                         <div className="min-w-0">
-//                           <p className="truncate text-sm font-semibold text-slate-950">{role.name}</p>
-//                           <p className="text-xs text-slate-500">Guard: {role.guardName}</p>
-//                         </div>
-//                         <Badge tone={width >= 80 ? "green" : width >= 30 ? "blue" : "neutral"}>{width}%</Badge>
-//                       </div>
-//                       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-//                         <div
-//                           className={cn("h-full rounded-full", width >= 80 ? "bg-emerald-600" : width >= 30 ? "bg-blue-600" : "bg-slate-400")}
-//                           style={{ width: `${width}%` }}
-//                         />
-//                       </div>
-//                       <div className="mt-3 flex flex-wrap gap-1.5">
-//                         {(role.permissions ?? []).slice(0, 4).map((permission) => (
-//                           <Badge key={permission.id}>{permission.name}</Badge>
-//                         ))}
-//                         {count > 4 ? <Badge>+{count - 4}</Badge> : null}
-//                       </div>
-//                     </div>
-//                   );
-//                 })}
-//               </div>
-//             </Card>
-
-//             <div className="space-y-5">
-//               <Card className="p-0">
-//                 <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-//                   <div>
-//                     <CardTitle>Permission Modules</CardTitle>
-//                     <p className="mt-1 text-sm text-slate-500">{permissionModules.length} active modules.</p>
-//                   </div>
-//                   <Database className="h-5 w-5 text-slate-400" aria-hidden="true" />
-//                 </div>
-//                 <div className="flex flex-wrap gap-2 p-5">
-//                   {permissionModules.map((moduleName) => (
-//                     <Badge key={moduleName} tone="blue">
-//                       {moduleName}
-//                     </Badge>
-//                   ))}
-//                 </div>
-//               </Card>
-
-//               <Card>
-//                 <div className="flex items-center gap-3">
-//                   <div className="flex h-11 w-11 items-center justify-center rounded-md bg-slate-950 text-white">
-//                     <LockKeyhole className="h-5 w-5" aria-hidden="true" />
-//                   </div>
-//                   <div className="min-w-0">
-//                     <CardTitle>Current Session</CardTitle>
-//                     <p className="truncate text-sm text-slate-500">{currentUser?.email ?? "Unknown user"}</p>
-//                   </div>
-//                 </div>
-//                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
-//                   <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-//                     <p className="text-xs font-medium uppercase text-slate-500">Name</p>
-//                     <p className="mt-1 truncate text-sm font-semibold text-slate-950">{currentUser?.name ?? "-"}</p>
-//                   </div>
-//                   <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-//                     <p className="text-xs font-medium uppercase text-slate-500">Status</p>
-//                     <div className="mt-1">
-//                       <Badge tone={currentUser?.status === "active" ? "green" : "neutral"}>
-//                         {currentUser?.status === "active" ? "Active" : "Inactive"}
-//                       </Badge>
-//                     </div>
-//                   </div>
-//                 </div>
-//                 <div className="mt-4 flex flex-wrap gap-2">
-//                   {currentUser?.roles?.length ? currentUser.roles.map((role) => <Badge key={role.id}>{role.name}</Badge>) : <span>-</span>}
-//                 </div>
-//               </Card>
-//             </div>
-//           </div>
-
-//           <Card className="overflow-hidden p-0">
-//             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-//               <div>
-//                 <CardTitle>Recent Users</CardTitle>
-//                 <p className="mt-1 text-sm text-slate-500">Latest user records from management API.</p>
-//               </div>
-//               <Link href="/management/users" className="text-sm font-medium text-cyan-700 hover:text-cyan-900">
-//                 View all
-//               </Link>
-//             </div>
-//             <div className="overflow-x-auto">
-//               <table className="w-full min-w-[760px] text-left text-sm">
-//                 <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-//                   <tr>
-//                     <th className="px-5 py-3 font-medium">User</th>
-//                     <th className="px-5 py-3 font-medium">Roles</th>
-//                     <th className="px-5 py-3 font-medium">Overrides</th>
-//                     <th className="px-5 py-3 font-medium">Created</th>
-//                     <th className="px-5 py-3 font-medium">Status</th>
-//                   </tr>
-//                 </thead>
-//                 <tbody className="divide-y divide-slate-200">
-//                   {recentUsers.map((item) => (
-//                     <tr key={item.id} className="bg-white">
-//                       <td className="px-5 py-3">
-//                         <div className="flex items-center gap-3">
-//                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-sm font-semibold text-white">
-//                             {item.name.slice(0, 1).toUpperCase()}
-//                           </div>
-//                           <div className="min-w-0">
-//                             <p className="truncate font-medium text-slate-950">{item.name}</p>
-//                             <p className="truncate text-xs text-slate-500">{item.email}</p>
-//                           </div>
-//                         </div>
-//                       </td>
-//                       <td className="px-5 py-3">
-//                         <div className="flex flex-wrap gap-1.5">
-//                           {(item.roles ?? []).slice(0, 2).map((role) => (
-//                             <Badge key={role.id}>{role.name}</Badge>
-//                           ))}
-//                         </div>
-//                       </td>
-//                       <td className="px-5 py-3 text-slate-600">{item.permissionOverrides?.length ?? 0}</td>
-//                       <td className="px-5 py-3 text-slate-600">{formatDate(item.createdAt)}</td>
-//                       <td className="px-5 py-3">
-//                         <Badge tone={item.status === "active" ? "green" : "neutral"}>{item.status === "active" ? "Active" : "Inactive"}</Badge>
-//                       </td>
-//                     </tr>
-//                   ))}
-//                 </tbody>
-//               </table>
-//             </div>
-//           </Card>
-//         </div>
-//       ) : null}
-//     </AdminLayout>
-//   );
-// }
-
-// function FacilityDashboard() {
-//   const user = useAuthStore((state) => state.user);
-//   const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
-//   const roles = useAuthStore((state) => state.roles);
-//   const activeFacility = user?.facilities?.find(
-//     (facility) => String(facility.id) === String(activeFacilityId),
-//   );
-
-//   return (
-//     <AdminLayout roles={["admin", "doctor", "nurse", "staff"]}>
-//       <PageHeader
-//         title="Tổng quan cơ sở"
-//         description={activeFacility?.name ?? "Chọn cơ sở làm việc để tiếp tục."}
-//       />
-//       <Card>
-//         <div className="flex items-start gap-4">
-//           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white">
-//             <Building2 className="h-5 w-5" aria-hidden="true" />
-//           </div>
-//           <div className="min-w-0">
-//             <CardTitle>{activeFacility?.name ?? "Chưa chọn cơ sở"}</CardTitle>
-//             <p className="mt-1 text-sm text-slate-500">
-//               {activeFacility?.code ?? "-"}
-//             </p>
-//             <div className="mt-4 flex flex-wrap gap-2">
-//               {roles.map((role) => (
-//                 <Badge key={role} tone="blue">
-//                   {role}
-//                 </Badge>
-//               ))}
-//             </div>
-//           </div>
-//         </div>
-//       </Card>
-//     </AdminLayout>
-//   );
-// }
-
-// export default function DashboardPage() {
-//   const roles = useAuthStore((state) => state.roles);
-
-//   return roles.includes("super_admin") ? (
-//     <SuperAdminDashboard />
-//   ) : (
-//     <FacilityDashboard />
-//   );
-// }
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -476,6 +49,7 @@ const { Text, Title } = Typography;
 const MOCK_TODAY = "2026-07-21";
 
 type PeriodValue = "today" | "7-days" | "30-days";
+type DateRangeMode = PeriodValue | "custom";
 type DashboardTab = "overview" | "revenue";
 type AppointmentStatus =
   | "confirmed"
@@ -631,13 +205,31 @@ const FACILITIES: Facility[] = [
     code: "BA-CG",
     address: "118 Trần Thái Tông, Cầu Giấy, Hà Nội",
   },
+  {
+    id: "facility-3",
+    name: "Phòng khám Mẹ Tròn Con Vuông",
+    code: "MC-HD",
+    address: "62 Nguyễn Văn Lộc, Hà Đông, Hà Nội",
+  },
+  {
+    id: "facility-4",
+    name: "Trung tâm Thai sản An Nhiên",
+    code: "AN-LB",
+    address: "15 Nguyễn Văn Cừ, Long Biên, Hà Nội",
+  },
+  {
+    id: "facility-5",
+    name: "Phòng khám Phụ sản Hạnh Phúc",
+    code: "HP-HBT",
+    address: "86 Bạch Mai, Hai Bà Trưng, Hà Nội",
+  },
 ];
 
 const APPOINTMENTS: Appointment[] = [
   {
     id: "appointment-01",
-    code: "LH-2107-001",
-    appointmentDate: MOCK_TODAY,
+    code: "LH-1507-001",
+    appointmentDate: "2026-07-15",
     time: "08:00",
     patientName: "Nguyễn Thu Trang",
     gestationalAge: "12 tuần 3 ngày",
@@ -650,8 +242,8 @@ const APPOINTMENTS: Appointment[] = [
   },
   {
     id: "appointment-02",
-    code: "LH-2107-002",
-    appointmentDate: MOCK_TODAY,
+    code: "LH-1707-002",
+    appointmentDate: "2026-07-17",
     time: "08:30",
     patientName: "Trần Ngọc Mai",
     gestationalAge: "22 tuần 1 ngày",
@@ -660,12 +252,12 @@ const APPOINTMENTS: Appointment[] = [
     doctorTitle: "BS.CKI",
     facilityId: "facility-1",
     roomName: "Phòng siêu âm 102",
-    status: "in-progress",
+    status: "completed",
   },
   {
     id: "appointment-03",
-    code: "LH-2107-003",
-    appointmentDate: MOCK_TODAY,
+    code: "LH-1907-003",
+    appointmentDate: "2026-07-19",
     time: "09:00",
     patientName: "Lê Minh Hằng",
     gestationalAge: "8 tuần 5 ngày",
@@ -690,25 +282,26 @@ const APPOINTMENTS: Appointment[] = [
     roomName: "Phòng khám 201",
     status: "confirmed",
   },
+
   {
     id: "appointment-05",
-    code: "LH-2107-005",
-    appointmentDate: MOCK_TODAY,
-    time: "10:00",
+    code: "LH-1507-005",
+    appointmentDate: "2026-07-15",
+    time: "08:15",
     patientName: "Đỗ Thanh Thảo",
     gestationalAge: "18 tuần",
     service: "Tư vấn kết quả xét nghiệm",
-    doctorName: "Nguyễn Minh Anh",
-    doctorTitle: "BS.CKII",
-    facilityId: "facility-1",
-    roomName: "Phòng khám 101",
-    status: "confirmed",
+    doctorName: "Đỗ Quang Huy",
+    doctorTitle: "ThS.BS",
+    facilityId: "facility-2",
+    roomName: "Phòng khám A01",
+    status: "completed",
   },
   {
     id: "appointment-06",
-    code: "LH-2107-006",
-    appointmentDate: MOCK_TODAY,
-    time: "13:30",
+    code: "LH-1607-006",
+    appointmentDate: "2026-07-16",
+    time: "10:00",
     patientName: "Bùi Khánh Linh",
     gestationalAge: "26 tuần 4 ngày",
     service: "Khám thai định kỳ",
@@ -716,12 +309,12 @@ const APPOINTMENTS: Appointment[] = [
     doctorTitle: "ThS.BS",
     facilityId: "facility-2",
     roomName: "Phòng khám A01",
-    status: "confirmed",
+    status: "completed",
   },
   {
     id: "appointment-07",
-    code: "LH-2107-007",
-    appointmentDate: MOCK_TODAY,
+    code: "LH-2007-007",
+    appointmentDate: "2026-07-20",
     time: "14:00",
     patientName: "Hoàng Thu Uyên",
     gestationalAge: "14 tuần 6 ngày",
@@ -746,6 +339,177 @@ const APPOINTMENTS: Appointment[] = [
     roomName: "Phòng khám A01",
     status: "cancelled",
   },
+
+  {
+    id: "appointment-09",
+    code: "LH-1507-009",
+    appointmentDate: "2026-07-15",
+    time: "07:45",
+    patientName: "Nguyễn Quỳnh Anh",
+    gestationalAge: "10 tuần 2 ngày",
+    service: "Khám thai lần đầu",
+    doctorName: "Nguyễn Hải Yến",
+    doctorTitle: "BS.CKI",
+    facilityId: "facility-3",
+    roomName: "Phòng khám M01",
+    status: "completed",
+  },
+  {
+    id: "appointment-10",
+    code: "LH-1707-010",
+    appointmentDate: "2026-07-17",
+    time: "09:15",
+    patientName: "Trịnh Mai Phương",
+    gestationalAge: "24 tuần",
+    service: "Siêu âm thai 4D",
+    doctorName: "Trần Gia Bảo",
+    doctorTitle: "ThS.BS",
+    facilityId: "facility-3",
+    roomName: "Phòng siêu âm M02",
+    status: "completed",
+  },
+  {
+    id: "appointment-11",
+    code: "LH-1807-011",
+    appointmentDate: "2026-07-18",
+    time: "13:30",
+    patientName: "Phan Khánh Vy",
+    gestationalAge: "29 tuần 5 ngày",
+    service: "Xét nghiệm sàng lọc trước sinh",
+    doctorName: "Lương Thu Giang",
+    doctorTitle: "BS.CKII",
+    facilityId: "facility-3",
+    roomName: "Phòng xét nghiệm M03",
+    status: "in-progress",
+  },
+  {
+    id: "appointment-12",
+    code: "LH-2107-012",
+    appointmentDate: MOCK_TODAY,
+    time: "15:00",
+    patientName: "Đặng Thu Hương",
+    gestationalAge: "36 tuần",
+    service: "Theo dõi thai kỳ nguy cơ cao",
+    doctorName: "Lương Thu Giang",
+    doctorTitle: "BS.CKII",
+    facilityId: "facility-3",
+    roomName: "Phòng khám M04",
+    status: "confirmed",
+  },
+
+  {
+    id: "appointment-13",
+    code: "LH-1607-013",
+    appointmentDate: "2026-07-16",
+    time: "08:40",
+    patientName: "Ngô Thanh Vân",
+    gestationalAge: "16 tuần 4 ngày",
+    service: "Khám thai định kỳ",
+    doctorName: "Phạm Minh Châu",
+    doctorTitle: "BS.CKI",
+    facilityId: "facility-4",
+    roomName: "Phòng khám N01",
+    status: "completed",
+  },
+  {
+    id: "appointment-14",
+    code: "LH-1807-014",
+    appointmentDate: "2026-07-18",
+    time: "10:20",
+    patientName: "Lê Hà My",
+    gestationalAge: "21 tuần",
+    service: "Siêu âm hình thái thai",
+    doctorName: "Đinh Quốc Hưng",
+    doctorTitle: "ThS.BS",
+    facilityId: "facility-4",
+    roomName: "Phòng siêu âm N02",
+    status: "cancelled",
+  },
+  {
+    id: "appointment-15",
+    code: "LH-2007-015",
+    appointmentDate: "2026-07-20",
+    time: "14:10",
+    patientName: "Đinh Ngọc Ánh",
+    gestationalAge: "32 tuần 3 ngày",
+    service: "Khám thai định kỳ",
+    doctorName: "Phạm Minh Châu",
+    doctorTitle: "BS.CKI",
+    facilityId: "facility-4",
+    roomName: "Phòng khám N01",
+    status: "waiting",
+  },
+  {
+    id: "appointment-16",
+    code: "LH-2107-016",
+    appointmentDate: MOCK_TODAY,
+    time: "16:00",
+    patientName: "Mai Thùy Linh",
+    gestationalAge: "7 tuần 6 ngày",
+    service: "Khám thai lần đầu",
+    doctorName: "Phạm Minh Châu",
+    doctorTitle: "BS.CKI",
+    facilityId: "facility-4",
+    roomName: "Phòng khám N03",
+    status: "confirmed",
+  },
+
+  {
+    id: "appointment-17",
+    code: "LH-1507-017",
+    appointmentDate: "2026-07-15",
+    time: "08:10",
+    patientName: "Tạ Ngọc Diệp",
+    gestationalAge: "13 tuần 2 ngày",
+    service: "Xét nghiệm sàng lọc trước sinh",
+    doctorName: "Võ Thu Hà",
+    doctorTitle: "BS.CKII",
+    facilityId: "facility-5",
+    roomName: "Phòng xét nghiệm H01",
+    status: "completed",
+  },
+  {
+    id: "appointment-18",
+    code: "LH-1707-018",
+    appointmentDate: "2026-07-17",
+    time: "09:50",
+    patientName: "Chu Minh Nguyệt",
+    gestationalAge: "20 tuần 5 ngày",
+    service: "Siêu âm thai 4D",
+    doctorName: "Nguyễn Đức Long",
+    doctorTitle: "ThS.BS",
+    facilityId: "facility-5",
+    roomName: "Phòng siêu âm H02",
+    status: "completed",
+  },
+  {
+    id: "appointment-19",
+    code: "LH-1907-019",
+    appointmentDate: "2026-07-19",
+    time: "13:45",
+    patientName: "Dương Hải Yến",
+    gestationalAge: "27 tuần",
+    service: "Gói quản lý thai kỳ",
+    doctorName: "Võ Thu Hà",
+    doctorTitle: "BS.CKII",
+    facilityId: "facility-5",
+    roomName: "Phòng khám H03",
+    status: "in-progress",
+  },
+  {
+    id: "appointment-20",
+    code: "LH-2107-020",
+    appointmentDate: MOCK_TODAY,
+    time: "15:30",
+    patientName: "Hà Phương Thảo",
+    gestationalAge: "38 tuần 1 ngày",
+    service: "Theo dõi thai kỳ nguy cơ cao",
+    doctorName: "Võ Thu Hà",
+    doctorTitle: "BS.CKII",
+    facilityId: "facility-5",
+    roomName: "Phòng theo dõi H04",
+    status: "waiting",
+  },
 ];
 
 const DOCTOR_SHIFTS: DoctorShift[] = [
@@ -758,7 +522,7 @@ const DOCTOR_SHIFTS: DoctorShift[] = [
     roomName: "Phòng khám 101",
     shiftType: "morning",
     timeRange: "08:00 - 12:00",
-    bookedAppointments: 5,
+    bookedAppointments: 7,
     maxAppointments: 8,
   },
   {
@@ -770,7 +534,7 @@ const DOCTOR_SHIFTS: DoctorShift[] = [
     roomName: "Phòng siêu âm 102",
     shiftType: "morning",
     timeRange: "08:00 - 12:00",
-    bookedAppointments: 4,
+    bookedAppointments: 5,
     maxAppointments: 6,
   },
   {
@@ -785,6 +549,7 @@ const DOCTOR_SHIFTS: DoctorShift[] = [
     bookedAppointments: 6,
     maxAppointments: 6,
   },
+
   {
     id: "shift-04",
     doctorName: "Đỗ Quang Huy",
@@ -815,10 +580,133 @@ const DOCTOR_SHIFTS: DoctorShift[] = [
     doctorTitle: null,
     specialty: "Sản phụ khoa",
     facilityId: "facility-2",
-    roomName: "Phòng khám A01",
+    roomName: "Phòng khám A03",
     shiftType: "evening",
     timeRange: "18:00 - 21:00",
     bookedAppointments: 0,
+    maxAppointments: 6,
+  },
+
+  {
+    id: "shift-07",
+    doctorName: "Nguyễn Hải Yến",
+    doctorTitle: "BS.CKI",
+    specialty: "Sản phụ khoa",
+    facilityId: "facility-3",
+    roomName: "Phòng khám M01",
+    shiftType: "morning",
+    timeRange: "07:30 - 11:30",
+    bookedAppointments: 8,
+    maxAppointments: 9,
+  },
+  {
+    id: "shift-08",
+    doctorName: "Trần Gia Bảo",
+    doctorTitle: "ThS.BS",
+    specialty: "Siêu âm sản",
+    facilityId: "facility-3",
+    roomName: "Phòng siêu âm M02",
+    shiftType: "morning",
+    timeRange: "08:00 - 12:00",
+    bookedAppointments: 7,
+    maxAppointments: 7,
+  },
+  {
+    id: "shift-09",
+    doctorName: "Lương Thu Giang",
+    doctorTitle: "BS.CKII",
+    specialty: "Thai kỳ nguy cơ cao",
+    facilityId: "facility-3",
+    roomName: "Phòng khám M04",
+    shiftType: "afternoon",
+    timeRange: "13:00 - 17:00",
+    bookedAppointments: 8,
+    maxAppointments: 10,
+  },
+  {
+    id: "shift-10",
+    doctorName: "Hoàng Ngọc Trâm",
+    doctorTitle: "BS.CKI",
+    specialty: "Xét nghiệm trước sinh",
+    facilityId: "facility-3",
+    roomName: "Phòng xét nghiệm M03",
+    shiftType: "evening",
+    timeRange: "17:30 - 20:30",
+    bookedAppointments: 4,
+    maxAppointments: 5,
+  },
+
+  {
+    id: "shift-11",
+    doctorName: "Phạm Minh Châu",
+    doctorTitle: "BS.CKI",
+    specialty: "Sản phụ khoa",
+    facilityId: "facility-4",
+    roomName: "Phòng khám N01",
+    shiftType: "morning",
+    timeRange: "08:00 - 12:00",
+    bookedAppointments: 3,
+    maxAppointments: 8,
+  },
+  {
+    id: "shift-12",
+    doctorName: "Đinh Quốc Hưng",
+    doctorTitle: "ThS.BS",
+    specialty: "Siêu âm sản",
+    facilityId: "facility-4",
+    roomName: "Phòng siêu âm N02",
+    shiftType: "afternoon",
+    timeRange: "13:30 - 17:30",
+    bookedAppointments: 2,
+    maxAppointments: 7,
+  },
+  {
+    id: "shift-13",
+    doctorName: null,
+    doctorTitle: null,
+    specialty: "Sản phụ khoa",
+    facilityId: "facility-4",
+    roomName: "Phòng khám N03",
+    shiftType: "evening",
+    timeRange: "18:00 - 21:00",
+    bookedAppointments: 0,
+    maxAppointments: 5,
+  },
+
+  {
+    id: "shift-14",
+    doctorName: "Võ Thu Hà",
+    doctorTitle: "BS.CKII",
+    specialty: "Thai kỳ nguy cơ cao",
+    facilityId: "facility-5",
+    roomName: "Phòng khám H03",
+    shiftType: "morning",
+    timeRange: "07:30 - 11:30",
+    bookedAppointments: 8,
+    maxAppointments: 8,
+  },
+  {
+    id: "shift-15",
+    doctorName: "Nguyễn Đức Long",
+    doctorTitle: "ThS.BS",
+    specialty: "Chẩn đoán hình ảnh",
+    facilityId: "facility-5",
+    roomName: "Phòng siêu âm H02",
+    shiftType: "afternoon",
+    timeRange: "13:00 - 17:00",
+    bookedAppointments: 6,
+    maxAppointments: 8,
+  },
+  {
+    id: "shift-16",
+    doctorName: "Bùi Ngọc Mai",
+    doctorTitle: "BS.CKI",
+    specialty: "Xét nghiệm trước sinh",
+    facilityId: "facility-5",
+    roomName: "Phòng xét nghiệm H01",
+    shiftType: "afternoon",
+    timeRange: "13:30 - 17:30",
+    bookedAppointments: 5,
     maxAppointments: 6,
   },
 ];
@@ -848,6 +736,27 @@ const METRICS_BY_PERIOD: Record<PeriodValue, DailyMetric[]> = {
     { date: "week-4", label: "Tuần 4", appointments: 181, completed: 91 },
   ],
 };
+
+const DAILY_APPOINTMENT_METRICS: DailyMetric[] =
+  Array.from({ length: 30 }, (_, index) => {
+    const day = index + 1;
+    const date = `2026-07-${String(day).padStart(2, "0")}`;
+    const weekdayFactor =
+      index % 7 === 5 ? -6 : index % 7 === 6 ? -10 : 0;
+    const appointments =
+      30 + ((index * 7) % 17) + weekdayFactor;
+    const completed = Math.max(
+      0,
+      appointments - (3 + (index % 6)),
+    );
+
+    return {
+      date,
+      label: `${String(day).padStart(2, "0")}/07`,
+      appointments,
+      completed,
+    };
+  });
 
 const ALERTS: DashboardAlert[] = [
   {
@@ -891,15 +800,39 @@ const FACILITY_UTILIZATION: FacilityUtilization[] = [
     maxAppointments: 32,
     activeDoctors: 3,
     roomsInUse: 3,
-    totalRooms: 3,
+    totalRooms: 4,
   },
   {
     facilityId: "facility-2",
-    appointments: 11,
+    appointments: 13,
     maxAppointments: 21,
     activeDoctors: 2,
     roomsInUse: 2,
-    totalRooms: 2,
+    totalRooms: 4,
+  },
+  {
+    facilityId: "facility-3",
+    appointments: 31,
+    maxAppointments: 38,
+    activeDoctors: 4,
+    roomsInUse: 4,
+    totalRooms: 5,
+  },
+  {
+    facilityId: "facility-4",
+    appointments: 8,
+    maxAppointments: 24,
+    activeDoctors: 2,
+    roomsInUse: 2,
+    totalRooms: 4,
+  },
+  {
+    facilityId: "facility-5",
+    appointments: 21,
+    maxAppointments: 30,
+    activeDoctors: 3,
+    roomsInUse: 3,
+    totalRooms: 5,
   },
 ];
 
@@ -955,6 +888,16 @@ const REVENUE_TREND_BY_PERIOD: Record<PeriodValue, RevenuePoint[]> = {
   ],
 };
 
+const DAILY_REVENUE_TREND: RevenuePoint[] =
+  REVENUE_TREND_BY_PERIOD["30-days"].map(
+    (item, index) => ({
+      ...item,
+      key: `2026-07-${String(
+        index + 1,
+      ).padStart(2, "0")}`,
+    }),
+  );
+
 const SERVICE_REVENUE_SEEDS: ServiceRevenueSeed[] = [
   {
     id: "service-01",
@@ -962,7 +905,7 @@ const SERVICE_REVENUE_SEEDS: ServiceRevenueSeed[] = [
     category: "examination",
     baseVisits: 64,
     baseRevenue: 35200000,
-    facilityRatio: { "facility-1": 0.58, "facility-2": 0.42 },
+    facilityRatio: { "facility-1": 0.25, "facility-2": 0.17, "facility-3": 0.24, "facility-4": 0.13, "facility-5": 0.21 },
   },
   {
     id: "service-02",
@@ -970,7 +913,7 @@ const SERVICE_REVENUE_SEEDS: ServiceRevenueSeed[] = [
     category: "ultrasound",
     baseVisits: 48,
     baseRevenue: 43200000,
-    facilityRatio: { "facility-1": 0.66, "facility-2": 0.34 },
+    facilityRatio: { "facility-1": 0.28, "facility-2": 0.15, "facility-3": 0.25, "facility-4": 0.11, "facility-5": 0.21 },
   },
   {
     id: "service-03",
@@ -978,7 +921,7 @@ const SERVICE_REVENUE_SEEDS: ServiceRevenueSeed[] = [
     category: "laboratory",
     baseVisits: 31,
     baseRevenue: 44950000,
-    facilityRatio: { "facility-1": 0.61, "facility-2": 0.39 },
+    facilityRatio: { "facility-1": 0.23, "facility-2": 0.16, "facility-3": 0.27, "facility-4": 0.12, "facility-5": 0.22 },
   },
   {
     id: "service-04",
@@ -986,7 +929,7 @@ const SERVICE_REVENUE_SEEDS: ServiceRevenueSeed[] = [
     category: "package",
     baseVisits: 18,
     baseRevenue: 75600000,
-    facilityRatio: { "facility-1": 0.72, "facility-2": 0.28 },
+    facilityRatio: { "facility-1": 0.29, "facility-2": 0.13, "facility-3": 0.26, "facility-4": 0.10, "facility-5": 0.22 },
   },
   {
     id: "service-05",
@@ -994,7 +937,7 @@ const SERVICE_REVENUE_SEEDS: ServiceRevenueSeed[] = [
     category: "examination",
     baseVisits: 27,
     baseRevenue: 17550000,
-    facilityRatio: { "facility-1": 0.55, "facility-2": 0.45 },
+    facilityRatio: { "facility-1": 0.22, "facility-2": 0.20, "facility-3": 0.23, "facility-4": 0.15, "facility-5": 0.20 },
   },
   {
     id: "service-06",
@@ -1002,7 +945,7 @@ const SERVICE_REVENUE_SEEDS: ServiceRevenueSeed[] = [
     category: "examination",
     baseVisits: 16,
     baseRevenue: 13600000,
-    facilityRatio: { "facility-1": 0.69, "facility-2": 0.31 },
+    facilityRatio: { "facility-1": 0.27, "facility-2": 0.14, "facility-3": 0.28, "facility-4": 0.09, "facility-5": 0.22 },
   },
   {
     id: "service-07",
@@ -1010,7 +953,7 @@ const SERVICE_REVENUE_SEEDS: ServiceRevenueSeed[] = [
     category: "ultrasound",
     baseVisits: 23,
     baseRevenue: 24150000,
-    facilityRatio: { "facility-1": 0.6, "facility-2": 0.4 },
+    facilityRatio: { "facility-1": 0.24, "facility-2": 0.17, "facility-3": 0.25, "facility-4": 0.12, "facility-5": 0.22 },
   },
 ];
 
@@ -1041,14 +984,37 @@ const SERVICE_CATEGORY_META: Record<
 };
 
 const FACILITY_REVENUE_SHARE: Record<string, number> = {
-  "facility-1": 0.62,
-  "facility-2": 0.38,
+  "facility-1": 0.26,
+  "facility-2": 0.17,
+  "facility-3": 0.25,
+  "facility-4": 0.12,
+  "facility-5": 0.2,
 };
 
-const PERIOD_OPTIONS: Array<{ value: PeriodValue; label: string }> = [
+const FACILITY_APPOINTMENT_SHARE: Record<string, number> = {
+  "facility-1": 0.24,
+  "facility-2": 0.16,
+  "facility-3": 0.28,
+  "facility-4": 0.11,
+  "facility-5": 0.21,
+};
+
+const FACILITY_ON_TIME_RATE: Record<string, number> = {
+  "facility-1": 97.2,
+  "facility-2": 93.8,
+  "facility-3": 98.1,
+  "facility-4": 89.6,
+  "facility-5": 95.4,
+};
+
+const PERIOD_OPTIONS: Array<{
+  value: DateRangeMode;
+  label: string;
+}> = [
   { value: "today", label: "Hôm nay" },
   { value: "7-days", label: "7 ngày" },
   { value: "30-days", label: "30 ngày" },
+  { value: "custom", label: "Tùy chọn ngày" },
 ];
 
 const STATUS_META: Record<
@@ -1113,6 +1079,78 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+function formatShortDate(value: string) {
+  const [year, month, day] =
+    value.split("-");
+
+  return `${day}/${month}/${year}`;
+}
+
+function addDaysToDateKey(
+  dateKey: string,
+  amount: number,
+) {
+  const [year, month, day] =
+    dateKey.split("-").map(Number);
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+  );
+
+  date.setDate(
+    date.getDate() + amount,
+  );
+
+  return [
+    date.getFullYear(),
+    String(
+      date.getMonth() + 1,
+    ).padStart(2, "0"),
+    String(
+      date.getDate(),
+    ).padStart(2, "0"),
+  ].join("-");
+}
+
+function getDateRangeDayCount(
+  fromDate: string,
+  toDate: string,
+) {
+  const start = new Date(
+    `${fromDate}T00:00:00`,
+  );
+  const end = new Date(
+    `${toDate}T00:00:00`,
+  );
+
+  return Math.max(
+    1,
+    Math.floor(
+      (end.getTime() -
+        start.getTime()) /
+        86_400_000,
+    ) + 1,
+  );
+}
+
+function getDateRangeDescription(
+  fromDate: string,
+  toDate: string,
+) {
+  if (fromDate === toDate) {
+    return `Dữ liệu ngày ${formatShortDate(
+      fromDate,
+    )}`;
+  }
+
+  return `Dữ liệu từ ${formatShortDate(
+    fromDate,
+  )} đến ${formatShortDate(
+    toDate,
+  )}`;
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -1147,16 +1185,20 @@ function getFacilityRevenueFactor(facilityId?: string) {
   return FACILITY_REVENUE_SHARE[facilityId] ?? 1;
 }
 
-function getVisitPeriodFactor(period: PeriodValue) {
+function getVisitPeriodFactor(
+  period: DateRangeMode,
+  dayCount: number,
+) {
   if (period === "today") return 0.16;
   if (period === "30-days") return 4.25;
-  return 1;
-}
+  if (period === "custom") {
+    return Math.max(
+      0.16,
+      dayCount / 7,
+    );
+  }
 
-function getPeriodDescription(period: PeriodValue) {
-  if (period === "today") return "Dữ liệu vận hành trong ngày hôm nay";
-  if (period === "7-days") return "Dữ liệu từ 20/07/2026 đến 26/07/2026";
-  return "Dữ liệu tổng hợp trong 30 ngày gần nhất";
+  return 1;
 }
 
 function getAlertVisual(level: AlertLevel) {
@@ -1252,6 +1294,12 @@ function StatCard({
 }
 
 function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
+  if (data.length === 0) {
+    return (
+      <Empty description="Không có dữ liệu lịch hẹn trong khoảng ngày đã chọn." />
+    );
+  }
+
   const maxValue = Math.max(...data.map((item) => item.appointments), 1);
 
   if (data.length === 1) {
@@ -1504,6 +1552,12 @@ function RevenueMetricCard({
 }
 
 function RevenueLineChart({ data }: { data: RevenuePoint[] }) {
+  if (data.length === 0) {
+    return (
+      <Empty description="Không có dữ liệu doanh thu trong khoảng ngày đã chọn." />
+    );
+  }
+
   const width = 920;
   const height = 278;
   const padding = { top: 18, right: 22, bottom: 40, left: 72 };
@@ -1650,12 +1704,27 @@ function RevenueMixDonut({
   items: RevenueMixItem[];
   totalRevenue: number;
 }) {
-  let cursor = 0;
-  const gradientStops = items.map((item) => {
-    const start = cursor;
-    cursor += item.percent;
-    return `${item.color} ${start}% ${cursor}%`;
-  });
+  const gradientStops = items.reduce<{
+    stops: string[];
+    totalPercent: number;
+  }>(
+    (result, item) => {
+      const start = result.totalPercent;
+      const end = start + item.percent;
+
+      return {
+        stops: [
+          ...result.stops,
+          `${item.color} ${start}% ${end}%`,
+        ],
+        totalPercent: end,
+      };
+    },
+    {
+      stops: [],
+      totalPercent: 0,
+    },
+  ).stops;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[210px_minmax(0,1fr)] lg:items-center">
@@ -1967,26 +2036,35 @@ function ManagementChatStatusCard() {
   );
 }
 
-export default function ManagementDashboardPage() {
+function ManagementDashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>();
-  const [period, setPeriod] = useState<PeriodValue>("7-days");
+  const [period, setPeriod] =
+    useState<DateRangeMode>("7-days");
+  const [fromDate, setFromDate] = useState(
+    addDaysToDateKey(MOCK_TODAY, -6),
+  );
+  const [toDate, setToDate] =
+    useState(MOCK_TODAY);
   const [keyword, setKeyword] = useState("");
   const [appointmentPage, setAppointmentPage] = useState(1);
   const [lastRefresh, setLastRefresh] = useState("18:20");
 
   const appointmentPageSize = 5;
 
-  useEffect(() => {
-    setAppointmentPage(1);
-  }, [keyword, selectedFacilityId]);
-
   const visibleAppointments = useMemo(() => {
     const search = keyword.trim().toLowerCase();
 
     return APPOINTMENTS.filter((appointment) => {
       const matchesFacility =
-        !selectedFacilityId || appointment.facilityId === selectedFacilityId;
+        !selectedFacilityId ||
+        appointment.facilityId ===
+          selectedFacilityId;
+      const matchesDate =
+        appointment.appointmentDate >=
+          fromDate &&
+        appointment.appointmentDate <=
+          toDate;
       const matchesKeyword =
         !search ||
         [
@@ -1997,9 +2075,18 @@ export default function ManagementDashboardPage() {
           appointment.roomName,
         ].some((value) => value.toLowerCase().includes(search));
 
-      return matchesFacility && matchesKeyword;
+      return (
+        matchesFacility &&
+        matchesDate &&
+        matchesKeyword
+      );
     });
-  }, [keyword, selectedFacilityId]);
+  }, [
+    keyword,
+    selectedFacilityId,
+    fromDate,
+    toDate,
+  ]);
 
   const visibleShifts = useMemo(
     () =>
@@ -2020,15 +2107,81 @@ export default function ManagementDashboardPage() {
   );
 
 
-  const revenueTrend = useMemo(() => {
-    const factor = getFacilityRevenueFactor(selectedFacilityId);
+  const dateRangeDays = useMemo(
+    () =>
+      getDateRangeDayCount(
+        fromDate,
+        toDate,
+      ),
+    [fromDate, toDate],
+  );
 
-    return REVENUE_TREND_BY_PERIOD[period].map((item) => ({
-      ...item,
-      revenue: roundCurrency(item.revenue * factor),
-      previousRevenue: roundCurrency(item.previousRevenue * factor),
-    }));
-  }, [period, selectedFacilityId]);
+  const appointmentTrend =
+    useMemo(() => {
+      const factor =
+        selectedFacilityId
+          ? FACILITY_APPOINTMENT_SHARE[
+              selectedFacilityId
+            ] ?? 1
+          : 1;
+
+      return DAILY_APPOINTMENT_METRICS
+        .filter(
+          (item) =>
+            item.date >= fromDate &&
+            item.date <= toDate,
+        )
+        .map((item) => ({
+          ...item,
+          appointments: Math.max(
+            0,
+            Math.round(
+              item.appointments *
+                factor,
+            ),
+          ),
+          completed: Math.max(
+            0,
+            Math.round(
+              item.completed *
+                factor,
+            ),
+          ),
+        }));
+    }, [
+      fromDate,
+      selectedFacilityId,
+      toDate,
+    ]);
+
+  const revenueTrend = useMemo(() => {
+    const factor =
+      getFacilityRevenueFactor(
+        selectedFacilityId,
+      );
+
+    return DAILY_REVENUE_TREND
+      .filter(
+        (item) =>
+          item.key >= fromDate &&
+          item.key <= toDate,
+      )
+      .map((item) => ({
+        ...item,
+        revenue: roundCurrency(
+          item.revenue * factor,
+        ),
+        previousRevenue:
+          roundCurrency(
+            item.previousRevenue *
+              factor,
+          ),
+      }));
+  }, [
+    fromDate,
+    selectedFacilityId,
+    toDate,
+  ]);
 
   const revenueSummary = useMemo(() => {
     const totalRevenue = revenueTrend.reduce(
@@ -2045,10 +2198,21 @@ export default function ManagementDashboardPage() {
       0,
       totalRevenue - collectedRevenue - outstandingRevenue,
     );
-    const baseTransactions = period === "today" ? 29 : period === "7-days" ? 213 : 902;
+    const baseTransactions =
+      Math.max(
+        12,
+        Math.round(
+          dateRangeDays * 31.5,
+        ),
+      );
     const transactions = Math.max(
       1,
-      Math.round(baseTransactions * getFacilityRevenueFactor(selectedFacilityId)),
+      Math.round(
+        baseTransactions *
+          getFacilityRevenueFactor(
+            selectedFacilityId,
+          ),
+      ),
     );
     const comparisonPercent =
       previousRevenue === 0
@@ -2067,10 +2231,18 @@ export default function ManagementDashboardPage() {
       collectionRate:
         totalRevenue === 0 ? 0 : (collectedRevenue / totalRevenue) * 100,
     };
-  }, [period, revenueTrend, selectedFacilityId]);
+  }, [
+    dateRangeDays,
+    revenueTrend,
+    selectedFacilityId,
+  ]);
 
   const servicePerformance = useMemo<ServicePerformance[]>(() => {
-    const visitFactor = getVisitPeriodFactor(period);
+    const visitFactor =
+      getVisitPeriodFactor(
+        period,
+        dateRangeDays,
+      );
     const rawRows = SERVICE_REVENUE_SEEDS.map((service) => {
       const facilityRatio = selectedFacilityId
         ? service.facilityRatio[selectedFacilityId] ?? 0
@@ -2113,7 +2285,12 @@ export default function ManagementDashboardPage() {
         };
       })
       .sort((first, second) => second.visits - first.visits);
-  }, [period, revenueSummary.totalRevenue, selectedFacilityId]);
+  }, [
+    dateRangeDays,
+    period,
+    revenueSummary.totalRevenue,
+    selectedFacilityId,
+  ]);
 
   const revenueMix = useMemo<RevenueMixItem[]>(() => {
     const grouped = new Map<ServiceCategory, number>();
@@ -2212,6 +2389,73 @@ export default function ManagementDashboardPage() {
 
     return { total, completed, waiting, cancelled };
   }, [visibleAppointments]);
+
+  const trackedPregnancies =
+    Math.max(
+      1,
+      Math.round(
+        1284 *
+          (selectedFacilityId
+            ? FACILITY_REVENUE_SHARE[
+                selectedFacilityId
+              ] ?? 1
+            : 1),
+      ),
+    );
+
+  const activeStaffCount =
+    selectedFacilityId
+      ? Math.max(
+          4,
+          visibleShifts.filter(
+            (shift) =>
+              shift.doctorName,
+          ).length * 3 + 2,
+        )
+      : 68;
+
+  const onTimeRate =
+    selectedFacilityId
+      ? FACILITY_ON_TIME_RATE[
+          selectedFacilityId
+        ] ?? 94.2
+      : 95.6;
+
+  function applyPeriod(
+    nextPeriod: DateRangeMode,
+  ) {
+    setAppointmentPage(1);
+    setPeriod(nextPeriod);
+
+    if (nextPeriod === "custom") {
+      return;
+    }
+
+    if (nextPeriod === "today") {
+      setFromDate(MOCK_TODAY);
+      setToDate(MOCK_TODAY);
+      return;
+    }
+
+    if (nextPeriod === "7-days") {
+      setFromDate(
+        addDaysToDateKey(
+          MOCK_TODAY,
+          -6,
+        ),
+      );
+      setToDate(MOCK_TODAY);
+      return;
+    }
+
+    setFromDate(
+      addDaysToDateKey(
+        MOCK_TODAY,
+        -29,
+      ),
+    );
+    setToDate(MOCK_TODAY);
+  }
 
   const appointmentColumns: ColumnsType<Appointment> = [
     {
@@ -2348,29 +2592,92 @@ export default function ManagementDashboardPage() {
                   : "Phân tích doanh thu"}
               </Title>
               <Text type="secondary">
-                {formatDate(MOCK_TODAY)} · {getPeriodDescription(period)}
+                {getDateRangeDescription(
+                  fromDate,
+                  toDate,
+                )}
               </Text>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end xl:justify-end">
               <Select
-                allowClear
-                value={selectedFacilityId}
+                value={
+                  selectedFacilityId ??
+                  "all"
+                }
                 className="w-full sm:w-[260px]"
-                placeholder="Tất cả cơ sở"
-                options={FACILITIES.map((facility) => ({
-                  value: facility.id,
-                  label: `${facility.name} (${facility.code})`,
-                }))}
-                onChange={setSelectedFacilityId}
+                options={[
+                  {
+                    value: "all",
+                    label: "Tất cả cơ sở",
+                  },
+                  ...FACILITIES.map(
+                    (facility) => ({
+                      value: facility.id,
+                      label: `${facility.name} (${facility.code})`,
+                    }),
+                  ),
+                ]}
+                onChange={(value) => {
+                  setAppointmentPage(1);
+                  setSelectedFacilityId(
+                    value === "all"
+                      ? undefined
+                      : value,
+                  );
+                }}
               />
 
-              <Select
+              <Select<DateRangeMode>
                 value={period}
-                className="w-full sm:w-[130px]"
+                className="w-full sm:w-[145px]"
                 options={PERIOD_OPTIONS}
-                onChange={setPeriod}
+                onChange={applyPeriod}
               />
+
+              <div className="w-full sm:w-[155px]">
+                <Text
+                  type="secondary"
+                  className="mb-1 block text-xs"
+                >
+                  Từ ngày
+                </Text>
+                <Input
+                  type="date"
+                  value={fromDate}
+                  min="2026-07-01"
+                  max={toDate}
+                  onChange={(event) => {
+                    setAppointmentPage(1);
+                    setFromDate(
+                      event.target.value,
+                    );
+                    setPeriod("custom");
+                  }}
+                />
+              </div>
+
+              <div className="w-full sm:w-[155px]">
+                <Text
+                  type="secondary"
+                  className="mb-1 block text-xs"
+                >
+                  Đến ngày
+                </Text>
+                <Input
+                  type="date"
+                  value={toDate}
+                  min={fromDate}
+                  max="2026-07-30"
+                  onChange={(event) => {
+                    setAppointmentPage(1);
+                    setToDate(
+                      event.target.value,
+                    );
+                    setPeriod("custom");
+                  }}
+                />
+              </div>
 
               <Tooltip title={`Cập nhật lần cuối lúc ${lastRefresh}`}>
                 <Button
@@ -2403,21 +2710,25 @@ export default function ManagementDashboardPage() {
           }
         >
           <StatCard
-            title="Lịch hẹn hôm nay"
-            value={selectedFacilityId ? visibleAppointments.length : 34}
+            title="Lịch hẹn trong kỳ"
+            value={visibleAppointments.length}
             icon={<CalendarCheck className="h-5 w-5" />}
             trend="+12,5%"
             trendDirection="up"
-            helper="so với thứ Ba tuần trước"
+            helper={`${dateRangeDays} ngày được chọn`}
             tone="blue"
           />
           <StatCard
             title="Thai phụ đang theo dõi"
-            value={1284}
+            value={trackedPregnancies}
             icon={<Baby className="h-5 w-5" />}
             trend="+38 hồ sơ"
             trendDirection="up"
-            helper="trong 30 ngày gần nhất"
+            helper={
+              selectedFacilityId
+                ? "tại cơ sở đang chọn"
+                : "trên toàn hệ thống"
+            }
             tone="violet"
           />
           <StatCard
@@ -2693,7 +3004,9 @@ export default function ManagementDashboardPage() {
             </Tag>
           }
         >
-          <AppointmentTrendChart data={METRICS_BY_PERIOD[period]} />
+          <AppointmentTrendChart
+            data={appointmentTrend}
+          />
         </Card>
 
         <Card
@@ -2801,10 +3114,10 @@ export default function ManagementDashboardPage() {
           title={
             <div>
               <p className="mb-0 text-base font-semibold text-slate-950">
-                Lịch hẹn hôm nay
+                Lịch hẹn trong khoảng ngày
               </p>
               <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                Danh sách các lịch hẹn gần nhất cần tiếp nhận và theo dõi.
+                Danh sách lịch hẹn phù hợp cơ sở và khoảng ngày đang chọn.
               </p>
             </div>
           }
@@ -2815,7 +3128,10 @@ export default function ManagementDashboardPage() {
             prefix={<Search className="h-4 w-4 text-slate-400" />}
             placeholder="Tìm mã lịch, thai phụ, dịch vụ, bác sĩ..."
             className="mb-4 max-w-[420px]"
-            onChange={(event) => setKeyword(event.target.value)}
+            onChange={(event) => {
+              setAppointmentPage(1);
+              setKeyword(event.target.value);
+            }}
           />
 
           <Table<Appointment>
@@ -2946,7 +3262,7 @@ export default function ManagementDashboardPage() {
             </div>
           }
         >
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {visibleFacilityUtilization.map((item) => {
               const facility = getFacility(item.facilityId);
               const appointmentPercent = Math.round(
@@ -3015,14 +3331,21 @@ export default function ManagementDashboardPage() {
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-slate-50 p-4 text-center">
               <Users className="mx-auto h-5 w-5 text-slate-500" />
-              <div className="mt-2 text-xl font-bold text-slate-950">42</div>
+              <div className="mt-2 text-xl font-bold text-slate-950">
+                {activeStaffCount}
+              </div>
               <Text type="secondary" className="text-xs">
                 Nhân sự hoạt động
               </Text>
             </div>
             <div className="rounded-xl bg-slate-50 p-4 text-center">
               <HeartPulse className="mx-auto h-5 w-5 text-slate-500" />
-              <div className="mt-2 text-xl font-bold text-slate-950">96,8%</div>
+              <div className="mt-2 text-xl font-bold text-slate-950">
+                {onTimeRate
+                  .toFixed(1)
+                  .replace(".", ",")}
+                %
+              </div>
               <Text type="secondary" className="text-xs">
                 Lịch khám đúng giờ
               </Text>
@@ -3056,7 +3379,10 @@ export default function ManagementDashboardPage() {
                   Tỷ lệ hoàn thành lịch
                 </Text>
                 <Text strong className="text-lg text-slate-950">
-                  94,2%
+                  {onTimeRate
+                    .toFixed(1)
+                    .replace(".", ",")}
+                  %
                 </Text>
               </div>
             </div>
@@ -3071,7 +3397,7 @@ export default function ManagementDashboardPage() {
                   Bác sĩ có lịch hôm nay
                 </Text>
                 <Text strong className="text-lg text-slate-950">
-                  12 bác sĩ
+                  {activeDoctors} bác sĩ
                 </Text>
               </div>
             </div>
@@ -3086,7 +3412,20 @@ export default function ManagementDashboardPage() {
                   Phòng đang sử dụng
                 </Text>
                 <Text strong className="text-lg text-slate-950">
-                  5 / 7 phòng
+                  {visibleFacilityUtilization.reduce(
+                    (sum, item) =>
+                      sum +
+                      item.roomsInUse,
+                    0,
+                  )}{" "}
+                  /{" "}
+                  {visibleFacilityUtilization.reduce(
+                    (sum, item) =>
+                      sum +
+                      item.totalRooms,
+                    0,
+                  )}{" "}
+                  phòng
                 </Text>
               </div>
             </div>
@@ -3097,3 +3436,5 @@ export default function ManagementDashboardPage() {
     </AdminLayout>
   );
 }
+
+export default ManagementDashboardPage;
