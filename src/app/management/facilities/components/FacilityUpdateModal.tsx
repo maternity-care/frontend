@@ -400,6 +400,14 @@ export function FacilityUpdateModal({
           onFinish={handleFinish}
           className="mt-5"
         >
+          <Form.Item name="latitude" hidden>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="longitude" hidden>
+            <Input />
+          </Form.Item>
+
           <div className="grid max-h-[70vh] gap-5 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="space-y-5">
               <Card
@@ -560,17 +568,6 @@ export function FacilityUpdateModal({
                     </Form.Item>
                   </Col>
   
-                  <Col xs={24} md={12}>
-                    <Form.Item name="latitude" label={FACILITY_MESSAGES.LATITUDE}>
-                      <Input size="large" placeholder="Ví dụ: 21.0285" />
-                    </Form.Item>
-                  </Col>
-  
-                  <Col xs={24} md={12}>
-                    <Form.Item name="longitude" label={FACILITY_MESSAGES.LONGITUDE}>
-                      <Input size="large" placeholder="Ví dụ: 105.8542" />
-                    </Form.Item>
-                  </Col>
                 </Row>
               </Card>
   
@@ -642,15 +639,6 @@ export function FacilityUpdateModal({
                   icon={<MapPin className="h-4 w-4" />}
                   label={FACILITY_MESSAGES.ADDRESS}
                   value={fullAddress}
-                />
-                <PreviewLine
-                  icon={<MapPin className="h-4 w-4" />}
-                  label={FACILITY_MESSAGES.COORDINATES}
-                  value={
-                    latitude || longitude
-                      ? `${latitude || "?"}, ${longitude || "?"}`
-                      : undefined
-                  }
                 />
                 <PreviewLine
                   icon={<Clock3 className="h-4 w-4" />}
