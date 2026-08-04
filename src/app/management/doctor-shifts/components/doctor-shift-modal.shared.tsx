@@ -52,7 +52,7 @@ export type RoomOption = {
 export type DoctorOption = {
   id: string;
   staffId: string;
-  roleId: number;
+  roleId: string;
   name: string;
   title: string;
   specialty: string;
@@ -973,7 +973,7 @@ export function DoctorShiftFormModalBase({
                 doctor.id === assignment.doctorId,
             );
 
-            if (!selectedDoctor?.staffId) {
+            if (!selectedDoctor?.staffId || !selectedDoctor.roleId) {
               form.setFields([
                 {
                   name: [
@@ -1103,7 +1103,7 @@ export function DoctorShiftFormModalBase({
             doctor.id === assignment.doctorId,
         );
 
-        if (!selectedDoctor?.staffId) {
+        if (!selectedDoctor?.staffId || !selectedDoctor.roleId) {
           form.setFields([
             {
               name: ["assignments", 0, "doctorId"],
