@@ -102,7 +102,7 @@ export function Header() {
 
           <div className="flex min-w-0 items-center gap-2 text-sm">
             <span className="hidden font-medium text-slate-500 sm:inline">
-              Management
+              Quản lý
             </span>
             <span className="hidden text-slate-300 sm:inline">/</span>
             <span className="truncate font-semibold text-slate-800">
