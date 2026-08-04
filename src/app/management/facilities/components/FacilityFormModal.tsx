@@ -506,13 +506,13 @@ export function FacilityFormModal({
         modal.success({
           title: "Đã lấy vị trí hiện tại",
           content:
-            "Địa chỉ và tọa độ đã được tự động điền. Vui lòng kiểm tra lại trước khi lưu.",
+            "Địa chỉ đã được tự động điền. Vui lòng kiểm tra lại trước khi lưu.",
           okText: RESPONSE_MESSAGES.COMMON.CLOSE,
           centered: true,
         });
       } catch (reverseError) {
         modal.warning({
-          title: "Đã lấy được tọa độ",
+          title: "Đã lấy được vị trí",
           content:
             reverseError instanceof Error
               ? `${reverseError.message} Bạn có thể nhập địa chỉ thủ công.`
@@ -611,6 +611,14 @@ export function FacilityFormModal({
           onFinish={handleFinish}
           className="mt-5"
         >
+          <Form.Item name="latitude" hidden>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="longitude" hidden>
+            <Input />
+          </Form.Item>
+
           <div className="grid max-h-[70vh] gap-5 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="space-y-5">
               <Card
@@ -785,17 +793,6 @@ export function FacilityFormModal({
                     </Form.Item>
                   </Col>
   
-                  <Col xs={24} md={12}>
-                    <Form.Item name="latitude" label={FACILITY_MESSAGES.LATITUDE}>
-                      <Input size="large" placeholder="Ví dụ: 21.0285" />
-                    </Form.Item>
-                  </Col>
-  
-                  <Col xs={24} md={12}>
-                    <Form.Item name="longitude" label={FACILITY_MESSAGES.LONGITUDE}>
-                      <Input size="large" placeholder="Ví dụ: 105.8542" />
-                    </Form.Item>
-                  </Col>
                 </Row>
 
                 <div className="mt-1">
@@ -854,12 +851,6 @@ export function FacilityFormModal({
                               FACILITY_MESSAGES.NOT_ENTERED}
                           </p>
 
-                          <p className="mb-0 text-xs text-slate-400">
-                            Tọa độ:{" "}
-                            {
-                              googleMapLocation.coordinates
-                            }
-                          </p>
                         </div>
 
                         <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
@@ -958,15 +949,6 @@ export function FacilityFormModal({
                   icon={<MapPin className="h-4 w-4" />}
                   label={FACILITY_MESSAGES.ADDRESS}
                   value={fullAddress}
-                />
-                <PreviewLine
-                  icon={<MapPin className="h-4 w-4" />}
-                  label={FACILITY_MESSAGES.COORDINATES}
-                  value={
-                    latitude || longitude
-                      ? `${latitude || "?"}, ${longitude || "?"}`
-                      : undefined
-                  }
                 />
                 <PreviewLine
                   icon={<Clock3 className="h-4 w-4" />}
