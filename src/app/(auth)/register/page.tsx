@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Button,
   Card,
+  Checkbox,
   Form,
   Input,
   message,
@@ -41,6 +42,8 @@ function RegisterForm() {
   const [isRequestingOtp, setIsRequestingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
+
+  const acceptTerms = Form.useWatch("acceptTerms", form);
 
   const handleRequestOtp = async () => {
     setIsRequestingOtp(true);
@@ -327,6 +330,36 @@ function RegisterForm() {
               autoComplete="one-time-code"
               disabled={!otpSent}
             />
+          </Form.Item>
+
+          <Form.Item
+            name="acceptTerms"
+            valuePropName="checked"
+            rules={[
+              {
+                validator: (_, value) =>
+                  value
+                    ? Promise.resolve()
+                    : Promise.reject(
+                        new Error(
+                          "Bạn phải đồng ý với điều khoản để tiếp tục.",
+                        ),
+                      ),
+              },
+            ]}
+            className="!mb-4"
+          >
+            <Checkbox>
+              Tôi đã đọc và đồng ý với{" "}
+              <Link
+                href="/legal"
+                target="_blank"
+                className="text-teal-700 hover:text-teal-900 hover:underline font-medium"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Điều khoản & Chính sách
+              </Link>
+            </Checkbox>
           </Form.Item>
 
           <Form.Item className="!mb-4">
