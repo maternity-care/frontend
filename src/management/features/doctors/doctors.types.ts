@@ -34,6 +34,12 @@ export interface BackendDoctorStaff {
   status?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  roles?: BackendDoctorRole[] | null;
+}
+
+export interface BackendDoctorRole {
+  id?: string | number | null;
+  name?: string | null;
 }
 
 export interface BackendDoctor {
@@ -93,6 +99,8 @@ export interface Doctor {
 
   facilityId: string;
   facilityIds: string[];
+  roleId: string;
+  roleName: string;
 
   licenseNo: string;
   title: string;

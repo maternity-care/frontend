@@ -54,6 +54,10 @@ function toNumberValue(value: unknown): number {
     : 0;
 }
 
+function toIdRequestValue(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
 function normalizeTime(value: string): string {
   const [hour = "00", minute = "00"] = String(
     value ?? "",
@@ -93,7 +97,7 @@ function normalizeDoctorShift(
     id: toStringValue(shift.id),
     doctorId: toStringValue(shift.doctorId),
     staffId: toStringValue(shift.staffId),
-    roleId: toNumberValue(shift.roleId),
+    roleId: toStringValue(shift.roleId),
     slotId: toStringValue(shift.slotId),
     facilityId: toStringValue(shift.facilityId),
     roomId: toStringValue(shift.roomId),
@@ -233,7 +237,7 @@ function toCreatePayload(
   return {
     doctorId: input.doctorId.trim(),
     staffId: input.staffId.trim(),
-    roleId: input.roleId,
+    roleId: toIdRequestValue(input.roleId),
     facilityId: input.facilityId.trim(),
     roomId: input.roomId.trim(),
     slotId: input.slotId.trim(),
@@ -250,7 +254,10 @@ function toUpdatePayload(
   return compactObject({
     doctorId: input.doctorId?.trim(),
     staffId: input.staffId?.trim(),
-    roleId: input.roleId,
+    roleId:
+      input.roleId === undefined
+        ? undefined
+        : toIdRequestValue(input.roleId),
     facilityId: input.facilityId?.trim(),
     roomId: input.roomId?.trim(),
     slotId: input.slotId?.trim(),
@@ -266,7 +273,7 @@ function toConflictPayload(
   return compactObject({
     doctorId: input.doctorId.trim(),
     staffId: input.staffId.trim(),
-    roleId: input.roleId,
+    roleId: toIdRequestValue(input.roleId),
     facilityId: input.facilityId.trim(),
     roomId: input.roomId.trim(),
     slotId: input.slotId.trim(),
