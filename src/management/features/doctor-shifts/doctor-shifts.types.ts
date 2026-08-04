@@ -64,7 +64,7 @@ export interface DoctorShiftItem {
   id: string;
   doctorId: string;
   staffId: string;
-  roleId: number;
+  roleId: string;
   slotId: string;
   facilityId: string;
   roomId: string;
@@ -105,7 +105,7 @@ export interface GetDoctorShiftsParams {
 export interface CreateDoctorShiftInput {
   doctorId: string;
   staffId: string;
-  roleId: number;
+  roleId: string;
   facilityId: string;
   roomId: string;
   slotId: string;
@@ -121,7 +121,7 @@ export interface CreateDoctorShiftInput {
 export interface UpdateDoctorShiftInput {
   doctorId?: string;
   staffId?: string;
-  roleId?: number;
+  roleId?: string;
   facilityId?: string;
   roomId?: string;
   slotId?: string;
@@ -133,7 +133,7 @@ export interface UpdateDoctorShiftInput {
 export interface CheckDoctorShiftConflictsInput {
   doctorId: string;
   staffId: string;
-  roleId: number;
+  roleId: string;
   facilityId: string;
   roomId: string;
   slotId: string;

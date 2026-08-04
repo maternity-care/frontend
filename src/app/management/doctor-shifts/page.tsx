@@ -63,8 +63,6 @@ import type {
 
 const { Text, Title } = Typography;
 
-const DOCTOR_ROLE_ID = 3;
-
 type ViewMode = "day" | "week" | "month";
 
 type WeeklyScheduleRow = {
@@ -432,7 +430,7 @@ export default function DoctorShiftPage() {
               return {
                 id: doctor.id,
                 staffId: doctor.staffId,
-                roleId: DOCTOR_ROLE_ID,
+                roleId: doctor.roleId,
                 name:
                   doctor.name ||
                   shiftDoctor?.name ||
@@ -895,7 +893,7 @@ export default function DoctorShiftPage() {
         (item) => item.id === doctorId,
       );
 
-      if (!selectedDoctor?.staffId) {
+      if (!selectedDoctor?.staffId || !selectedDoctor.roleId) {
         throw new Error(
           "Bác sĩ chưa có staffId hợp lệ.",
         );

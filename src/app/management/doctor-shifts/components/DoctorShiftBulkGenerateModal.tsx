@@ -217,6 +217,7 @@ export function DoctorShiftBulkGenerateModal({
           (doctor) =>
             doctor.status === "active" &&
             doctor.staffId &&
+            doctor.roleId &&
             doctor.facilityIds.includes(
               watchedFacilityId,
             ),

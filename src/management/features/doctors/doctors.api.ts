@@ -82,6 +82,11 @@ function normalizeDoctor(
 ): Doctor {
   const staff =
     doctor.staff ?? null;
+  const doctorRole = staff?.roles?.find(
+    (role) =>
+      normalizeText(role.name).toLowerCase() ===
+      "doctor",
+  );
 
   const id = normalizeText(
     doctor.id,
@@ -146,6 +151,8 @@ function normalizeDoctor(
     facilityIds: facilityId
       ? [facilityId]
       : [],
+    roleId: normalizeText(doctorRole?.id),
+    roleName: normalizeText(doctorRole?.name),
 
     licenseNo: normalizeText(
       doctor.licenseNo,
