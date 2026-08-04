@@ -1169,13 +1169,13 @@ export default function DoctorManagementPage() {
               prefix={
                 <Search className="h-4 w-4 text-slate-400" />
               }
-              placeholder="Tìm..."
+              placeholder="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
               title="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
               style={{
-                width: 100,
-                minWidth: 100,
-                maxWidth: 100,
-                flex: "0 0 100px",
+                width: 300,
+                minWidth: 300,
+                maxWidth: 300,
+                flex: "0 0 300px",
               }}
               onChange={(event) => {
                 const value =
@@ -1276,10 +1276,10 @@ export default function DoctorManagementPage() {
                 EXPERIENCE_SORT_OPTIONS
               }
               style={{
-                width: 220,
-                minWidth: 220,
-                maxWidth: 220,
-                flex: "0 0 220px",
+                width: 210,
+                minWidth: 210,
+                maxWidth: 210,
+                flex: "0 0 210px",
               }}
               onChange={(value) => {
                 setExperienceSort(
