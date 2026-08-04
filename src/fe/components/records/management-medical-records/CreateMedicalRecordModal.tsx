@@ -383,9 +383,6 @@ export function CreateMedicalRecordModal({
               Chọn file & Upload
             </Button>
           </Upload>
-          <Text type="secondary" style={{ display: "block", marginTop: 8 }}>
-            File sẽ được upload lên S3 qua presign, sau đó gắn vào lần khám.
-          </Text>
         </Form.Item>
       </Form>
     </Modal>
