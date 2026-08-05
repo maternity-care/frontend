@@ -41,6 +41,7 @@ export interface User {
   createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;
+  deletedReason?: string | null;
   pregnancyProfiles?: PregnancyProfile[];
 }
 
@@ -72,14 +73,20 @@ export interface CreateUserDto {
   emergencyContactPhone?: string;
 }
 
+/** Khớp schema PATCH /management/users/{id} */
 export interface UpdateUserDto {
   name?: string;
   dateOfBirth?: string;
   address?: string;
   province?: string;
   ward?: string;
+  status?: UserStatus;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+}
+
+export interface LockUserDto {
+  reason: string;
 }
 
 export interface UsersListData {
