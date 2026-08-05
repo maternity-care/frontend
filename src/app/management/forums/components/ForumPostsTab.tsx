@@ -726,15 +726,15 @@ export function ForumPostsTab({
             },
           }}
         >
-          <div className="flex min-w-0 flex-col gap-4">
+          <div className="min-w-0 overflow-hidden">
             <div className="max-w-full">
               {navigation}
             </div>
 
-            <div className="h-px bg-slate-100" />
+            <div className="my-4 h-px bg-slate-100" />
 
-            <div className="flex min-w-0 flex-wrap items-center gap-3">
-              <div className="min-w-[220px] flex-[1.5_1_280px]">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,0.95fr)_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden">
+              <div className="min-w-0">
                 <Input
                   allowClear
                   className="w-full"
@@ -748,7 +748,7 @@ export function ForumPostsTab({
                 />
               </div>
 
-              <div className="min-w-[150px] flex-[1_1_170px]">
+              <div className="min-w-0">
                 <Select
                   allowClear
                   className="w-full"
@@ -762,7 +762,7 @@ export function ForumPostsTab({
                 />
               </div>
 
-              <div className="min-w-[180px] flex-[1.2_1_210px]">
+              <div className="min-w-0">
                 <Select
                   allowClear
                   showSearch
@@ -781,7 +781,7 @@ export function ForumPostsTab({
                 />
               </div>
 
-              <div className="min-w-[150px] flex-[1_1_170px]">
+              <div className="min-w-0">
                 <Select
                   allowClear
                   className="w-full"
@@ -795,7 +795,7 @@ export function ForumPostsTab({
                 />
               </div>
 
-              <div className="min-w-[170px] flex-[1_1_190px]">
+              <div className="min-w-0">
                 <Select
                   allowClear
                   className="w-full"
@@ -810,7 +810,7 @@ export function ForumPostsTab({
               </div>
 
               <Button
-                className="shrink-0"
+                className="shrink-0 whitespace-nowrap"
                 icon={<X className="h-4 w-4" />}
                 onClick={resetFilters}
               >
