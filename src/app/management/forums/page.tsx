@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Alert, Card, Col, Row, Segmented, Statistic } from "antd";
+import { Card, Col, Row, Segmented, Statistic } from "antd";
 import {
   CircleAlert,
   FileText,
@@ -61,13 +61,6 @@ export default function ForumManagementPage() {
       />
 
       <div className="mt-6 flex flex-col gap-5">
-        <Alert
-          type="info"
-          showIcon
-          title="Dữ liệu được tải trực tiếp từ Management - Forums"
-          description="Bình luận được kiểm duyệt trong chi tiết bài viết. Swagger hiện không có API danh sách bình luận riêng nên tab Bình luận đã được loại bỏ."
-        />
-
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} xl={6}>
             <Card>
