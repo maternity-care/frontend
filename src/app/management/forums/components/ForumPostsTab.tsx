@@ -577,14 +577,14 @@ export function ForumPostsTab({
   const columns: ColumnsType<ForumPost> = [
     {
       title: "STT",
-      width: 64,
+      width: 56,
       align: "center",
       render: (_value, _record, index) =>
         (page - 1) * pageSize + index + 1,
     },
     {
       title: "Bài viết",
-      width: 380,
+      width: "38%",
       render: (_value, post) => (
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -609,7 +609,7 @@ export function ForumPostsTab({
     },
     {
       title: "Chủ đề",
-      width: 190,
+      width: "20%",
       render: (_value, post) => (
         <Tag color="blue">
           {post.topicTitle ||
@@ -620,7 +620,7 @@ export function ForumPostsTab({
     },
     {
       title: "Tác giả",
-      width: 210,
+      width: "20%",
       render: (_value, post) => (
         <div>
           <Text strong>{post.authorName}</Text>
@@ -632,31 +632,13 @@ export function ForumPostsTab({
     },
     {
       title: "Trạng thái",
-      width: 140,
+      width: 125,
       align: "center",
       render: (_value, post) => postStatusTag(post.status),
     },
     {
-      title: "Tương tác",
-      width: 130,
-      render: (_value, post) => (
-        <div className="text-xs text-slate-600">
-          <div>{post.viewCount} lượt xem</div>
-          <div>{post.commentCount} bình luận</div>
-          <div>{post.reportCount} báo cáo</div>
-        </div>
-      ),
-    },
-    {
-      title: "Ngày gửi",
-      dataIndex: "createdAt",
-      width: 170,
-      render: (value: string) => formatDateTime(value),
-    },
-    {
       title: "Thao tác",
-      width: 210,
-      fixed: "right",
+      width: 170,
       align: "center",
       render: (_value, post) => (
         <Space size={6}>
@@ -813,7 +795,6 @@ export function ForumPostsTab({
             loading={loading}
             columns={columns}
             dataSource={posts}
-            scroll={{ x: 1500 }}
             pagination={{
               current: page,
               pageSize,
