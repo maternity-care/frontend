@@ -1,10 +1,21 @@
 "use client";
 
 import { useEffect } from "react";
-import { Card, Col, Form, Input, Modal, Row } from "antd";
-import { CreateUserDto, UpdateUserDto, User } from "@/management/features/management-users/management-user.types";
+import { Card, Col, Form, Input, Modal, Row, Select } from "antd";
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  User,
+  UserStatus,
+} from "@/management/features/management-users/management-user.types";
 
 const { TextArea } = Input;
+
+const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
+  { value: "active", label: "Đang hoạt động" },
+  { value: "inactive", label: "Ngừng hoạt động" },
+  { value: "locked", label: "Đã khóa" },
+];
 
 interface Props {
   open: boolean;
@@ -34,6 +45,7 @@ export function UserFormModal({
           address: user.address ?? undefined,
           province: user.province ?? undefined,
           ward: user.ward ?? undefined,
+          status: user.status,
           emergencyContactName: user.emergencyContactName ?? undefined,
           emergencyContactPhone: user.emergencyContactPhone ?? undefined,
         });
@@ -73,14 +85,22 @@ export function UserFormModal({
         requiredMark="optional"
         onFinish={onSave}
       >
-        <Card size="small" className="mb-5 border-slate-200" title="Thông tin cơ bản">
+        <Card
+          size="small"
+          className="mb-5 border-slate-200"
+          title="Thông tin cơ bản"
+        >
           <Row gutter={[16, 0]}>
             <Col xs={24} md={12}>
               <Form.Item
                 name="name"
                 label="Họ và tên"
                 rules={[
-                  { required: true, whitespace: true, message: "Vui lòng nhập họ và tên." },
+                  {
+                    required: true,
+                    whitespace: true,
+                    message: "Vui lòng nhập họ và tên.",
+                  },
                 ]}
               >
                 <Input size="large" placeholder="Nhập họ và tên" />
@@ -95,7 +115,10 @@ export function UserFormModal({
                     label="Email"
                     rules={[
                       { required: true, message: "Vui lòng nhập email." },
-                      { type: "email", message: "Email không đúng định dạng." },
+                      {
+                        type: "email",
+                        message: "Email không đúng định dạng.",
+                      },
                     ]}
                   >
                     <Input size="large" placeholder="name@example.com" />
@@ -108,10 +131,17 @@ export function UserFormModal({
                     label="Căn cước công dân"
                     rules={[
                       { required: true, message: "Vui lòng nhập CCCD." },
-                      { pattern: /^\d{12}$/, message: "CCCD phải gồm 12 chữ số." },
+                      {
+                        pattern: /^\d{12}$/,
+                        message: "CCCD phải gồm 12 chữ số.",
+                      },
                     ]}
                   >
-                    <Input size="large" maxLength={12} placeholder="Nhập 12 chữ số" />
+                    <Input
+                      size="large"
+                      maxLength={12}
+                      placeholder="Nhập 12 chữ số"
+                    />
                   </Form.Item>
                 </Col>
 
@@ -120,7 +150,10 @@ export function UserFormModal({
                     name="phone"
                     label="Số điện thoại"
                     rules={[
-                      { required: true, message: "Vui lòng nhập số điện thoại." },
+                      {
+                        required: true,
+                        message: "Vui lòng nhập số điện thoại.",
+                      },
                       {
                         pattern: /^(0|\+84)[0-9]{9,10}$/,
                         message: "Số điện thoại không hợp lệ.",
@@ -140,7 +173,10 @@ export function UserFormModal({
                       { min: 6, message: "Mật khẩu tối thiểu 6 ký tự." },
                     ]}
                   >
-                    <Input.Password size="large" placeholder="Nhập mật khẩu" />
+                    <Input.Password
+                      size="large"
+                      placeholder="Nhập mật khẩu"
+                    />
                   </Form.Item>
                 </Col>
               </>
@@ -151,6 +187,21 @@ export function UserFormModal({
                 <Input size="large" type="date" />
               </Form.Item>
             </Col>
+
+            {/* Đổi status khi cập nhật */}
+            {user && (
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="status"
+                  label="Trạng thái tài khoản"
+                  rules={[
+                    { required: true, message: "Vui lòng chọn trạng thái." },
+                  ]}
+                >
+                  <Select size="large" options={STATUS_OPTIONS} />
+                </Form.Item>
+              </Col>
+            )}
           </Row>
         </Card>
 
@@ -158,7 +209,12 @@ export function UserFormModal({
           <Row gutter={[16, 0]}>
             <Col xs={24}>
               <Form.Item name="address" label="Địa chỉ">
-                <TextArea rows={2} maxLength={300} showCount placeholder="Số nhà, đường..." />
+                <TextArea
+                  rows={2}
+                  maxLength={300}
+                  showCount
+                  placeholder="Số nhà, đường..."
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
@@ -174,10 +230,17 @@ export function UserFormModal({
           </Row>
         </Card>
 
-        <Card size="small" className="mb-5 border-slate-200" title="Liên hệ khẩn cấp">
+        <Card
+          size="small"
+          className="mb-5 border-slate-200"
+          title="Liên hệ khẩn cấp"
+        >
           <Row gutter={[16, 0]}>
             <Col xs={24} md={12}>
-              <Form.Item name="emergencyContactName" label="Người liên hệ khẩn cấp">
+              <Form.Item
+                name="emergencyContactName"
+                label="Người liên hệ khẩn cấp"
+              >
                 <Input size="large" placeholder="Họ và tên" />
               </Form.Item>
             </Col>

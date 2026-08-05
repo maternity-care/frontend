@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { App, Modal } from "antd";
+import { App, Input, Modal } from "antd";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
@@ -40,6 +40,8 @@ export default function UserManagementPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formModalOpen, setFormModalOpen] = useState(false);
+
+  const [lockReason, setLockReason] = useState("");
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -120,6 +122,7 @@ export default function UserManagementPage() {
     setSubmitting(true);
     try {
       if (editingUser) {
+        // Gửi name + status + các field khác theo schema PATCH
         await updateUser(editingUser.id, values as UpdateUserDto);
         messageApi.success("Cập nhật người dùng thành công.");
       } else {
@@ -139,35 +142,61 @@ export default function UserManagementPage() {
   }
 
   function handleLock(user: User) {
-    if (user.status === "locked") {
-      messageApi.info("Tài khoản này đã bị khóa.");
-      return;
-    }
+    if (user.status !== "active") return;
 
+    setLockReason("");
     modal.confirm({
       centered: true,
       title: "Khóa tài khoản?",
-      content: `Tài khoản của ${user.name} sẽ bị khóa và không thể đăng nhập cho đến khi được mở khóa.`,
+      content: (
+        <div className="space-y-3 pt-1">
+          <p className="mb-0 text-sm text-slate-600">
+            Tài khoản của <strong>{user.name}</strong> sẽ bị khóa và không thể
+            đăng nhập cho đến khi được mở khóa.
+          </p>
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-700">
+              Lý do khóa <span className="text-red-500">*</span>
+            </p>
+            <Input.TextArea
+              rows={3}
+              placeholder="Nhập lý do khóa tài khoản..."
+              maxLength={300}
+              showCount
+              onChange={(e) => setLockReason(e.target.value)}
+            />
+          </div>
+        </div>
+      ),
       okText: "Khóa tài khoản",
       okButtonProps: { danger: true },
       cancelText: "Hủy",
       onOk: async () => {
-        try {
-          await lockUser(user.id);
-          messageApi.success("Đã khóa tài khoản người dùng.");
+        const reason = lockReason.trim();
+        if (!reason) {
+          messageApi.error("Vui lòng nhập lý do khóa tài khoản.");
+          return Promise.reject();
+        }
 
-          // Cập nhật local state
+        try {
+          await lockUser(user.id, { reason });
+          messageApi.success("Đã khóa tài khoản người dùng.");
           setUsers((prev) =>
             prev.map((u) =>
-              u.id === user.id ? { ...u, status: "locked" } : u
+              u.id === user.id
+                ? { ...u, status: "locked", deletedReason: reason }
+                : u
             )
           );
           setSelectedUser((prev) =>
-            prev?.id === user.id ? { ...prev, status: "locked" } : prev
+            prev?.id === user.id
+              ? { ...prev, status: "locked", deletedReason: reason }
+              : prev
           );
         } catch (err) {
           const error = err as ApiClientError;
           messageApi.error(error.message || "Khóa tài khoản thất bại.");
+          return Promise.reject();
         }
       },
     });
