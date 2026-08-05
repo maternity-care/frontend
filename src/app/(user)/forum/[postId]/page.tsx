@@ -970,7 +970,7 @@ export default function ForumPostDetailPage() {
           closable:
             !reportSubmitting,
         }}
-        destroyOnHidden
+        forceRender
       >
         <Form<ReportFormValues>
           form={reportForm}
