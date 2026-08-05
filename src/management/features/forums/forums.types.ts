@@ -90,8 +90,15 @@ export interface BackendForumComment {
   authorEmail?: unknown;
   authorRole?: unknown;
   role?: unknown;
+  parentId?: unknown;
+  messageType?: unknown;
   content?: unknown;
+  isDoctorAnswer?: unknown;
   status?: unknown;
+  moderatedBy?: unknown;
+  moderatedAt?: unknown;
+  moderationReason?: unknown;
+  deletedAt?: unknown;
   reportCount?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
@@ -104,11 +111,43 @@ export interface ForumComment {
   authorName: string;
   authorEmail: string;
   authorRole: ForumAuthorRole;
+  parentId: string;
+  messageType: string;
   content: string;
+  isDoctorAnswer: boolean;
   status: ForumPostStatus;
+  moderatedBy: string;
+  moderatedAt: string;
+  moderationReason: string;
+  deletedAt: string;
   reportCount: number;
   createdAt: string;
   updatedAt: string;
+  replies: ForumComment[];
+}
+
+export interface BackendForumModerationLog {
+  id?: unknown;
+  targetType?: unknown;
+  targetId?: unknown;
+  action?: unknown;
+  actorId?: unknown;
+  actorRole?: unknown;
+  reason?: unknown;
+  metadata?: unknown;
+  createdAt?: unknown;
+}
+
+export interface ForumModerationLog {
+  id: string;
+  targetType: string;
+  targetId: string;
+  action: string;
+  actorId: string;
+  actorRole: ForumAuthorRole;
+  reason: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
 }
 
 export interface BackendForumPostTopic {
@@ -157,6 +196,12 @@ export interface BackendForumPost {
   reportsCount?: unknown;
   interactionCount?: unknown;
   comments?: unknown;
+  approvedBy?: unknown;
+  approvedAt?: unknown;
+  moderatedBy?: unknown;
+  moderatedAt?: unknown;
+  moderationReason?: unknown;
+  deletedAt?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
   publishedAt?: unknown;
@@ -185,9 +230,24 @@ export interface ForumPost {
   reportCount: number;
   interactionCount: number;
   comments: ForumComment[];
+  medicalDisclaimer: string;
+  moderationLogs: ForumModerationLog[];
+  approvedBy: string;
+  approvedAt: string;
+  moderatedBy: string;
+  moderatedAt: string;
+  moderationReason: string;
+  deletedAt: string;
   createdAt: string;
   updatedAt: string;
   publishedAt: string;
+}
+
+export interface BackendForumPostDetailData {
+  medicalDisclaimer?: unknown;
+  post?: BackendForumPost | null;
+  comments?: unknown;
+  logs?: unknown;
 }
 
 export interface GetForumPostsParams {
