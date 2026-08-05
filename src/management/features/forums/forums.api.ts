@@ -6,12 +6,15 @@ import {
 import type {
   BackendForumComment,
   BackendForumPost,
+  BackendForumPostDetailData,
+  BackendForumModerationLog,
   BackendForumReport,
   BackendForumTopic,
   CreateForumTopicInput,
   ForumAuthorRole,
   ForumCategory,
   ForumComment,
+  ForumModerationLog,
   ForumPost,
   ForumPostListResult,
   ForumPostStatus,
@@ -236,11 +239,32 @@ function normalizeComment(
     authorRole: normalizeAuthorRole(
       item.authorRole ?? item.role,
     ),
+    parentId: normalizeText(
+      item.parentId,
+    ),
+    messageType:
+      normalizeText(item.messageType) ||
+      "text",
     content: normalizeText(
       item.content,
     ),
+    isDoctorAnswer: normalizeBoolean(
+      item.isDoctorAnswer,
+    ),
     status: normalizePostStatus(
       item.status,
+    ),
+    moderatedBy: normalizeText(
+      item.moderatedBy,
+    ),
+    moderatedAt: normalizeText(
+      item.moderatedAt,
+    ),
+    moderationReason: normalizeText(
+      item.moderationReason,
+    ),
+    deletedAt: normalizeText(
+      item.deletedAt,
     ),
     reportCount: Math.max(
       0,
@@ -254,6 +278,7 @@ function normalizeComment(
     updatedAt: normalizeText(
       item.updatedAt,
     ),
+    replies: [],
   };
 }
 
@@ -265,7 +290,7 @@ function readCommentArray(
     return [];
   }
 
-  return value
+  const comments = value
     .filter(isRecord)
     .map((item) =>
       normalizeComment(
@@ -273,10 +298,84 @@ function readCommentArray(
         postId,
       ),
     );
+
+  const commentById = new Map(
+    comments.map((comment) => [
+      comment.id,
+      comment,
+    ]),
+  );
+  const rootComments: ForumComment[] = [];
+
+  comments.forEach((comment) => {
+    const parent = comment.parentId
+      ? commentById.get(
+          comment.parentId,
+        )
+      : undefined;
+
+    if (parent) {
+      parent.replies.push(comment);
+      return;
+    }
+
+    rootComments.push(comment);
+  });
+
+  return rootComments;
+}
+
+function normalizeModerationLog(
+  item: BackendForumModerationLog,
+): ForumModerationLog {
+  return {
+    id: normalizeText(item.id),
+    targetType: normalizeText(
+      item.targetType,
+    ),
+    targetId: normalizeText(
+      item.targetId,
+    ),
+    action: normalizeText(
+      item.action,
+    ),
+    actorId: normalizeText(
+      item.actorId,
+    ),
+    actorRole: normalizeAuthorRole(
+      item.actorRole,
+    ),
+    reason: normalizeText(
+      item.reason,
+    ),
+    metadata: isRecord(item.metadata)
+      ? item.metadata
+      : null,
+    createdAt: normalizeText(
+      item.createdAt,
+    ),
+  };
+}
+
+function readModerationLogs(
+  value: unknown,
+) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(isRecord)
+    .map(normalizeModerationLog);
 }
 
 function normalizePost(
   item: BackendForumPost,
+  detail?: {
+    comments?: unknown;
+    logs?: unknown;
+    medicalDisclaimer?: unknown;
+  },
 ): ForumPost {
   const id = normalizeText(item.id);
   const forumTopic = isRecord(
@@ -358,7 +457,11 @@ function normalizePost(
       ),
     ),
     commentCount: Math.max(
-      0,
+      readCommentArray(
+        detail?.comments ??
+          item.comments,
+        id,
+      ).length,
       normalizeNumber(
         item.commentCount ??
           item.commentsCount,
@@ -386,8 +489,33 @@ function normalizePost(
       ),
     ),
     comments: readCommentArray(
-      item.comments,
+      detail?.comments ??
+        item.comments,
       id,
+    ),
+    medicalDisclaimer: normalizeText(
+      detail?.medicalDisclaimer,
+    ),
+    moderationLogs: readModerationLogs(
+      detail?.logs,
+    ),
+    approvedBy: normalizeText(
+      item.approvedBy,
+    ),
+    approvedAt: normalizeText(
+      item.approvedAt,
+    ),
+    moderatedBy: normalizeText(
+      item.moderatedBy,
+    ),
+    moderatedAt: normalizeText(
+      item.moderatedAt,
+    ),
+    moderationReason: normalizeText(
+      item.moderationReason,
+    ),
+    deletedAt: normalizeText(
+      item.deletedAt,
     ),
     createdAt: normalizeText(
       item.createdAt,
@@ -751,15 +879,37 @@ export async function getForumPost(
   id: string,
 ) {
   const data =
-    await unwrapApiData<
-      BackendForumPost
-    >(
+    await unwrapApiData<unknown>(
       apiClient.get(
         `${ENDPOINT}/posts/${id}`,
       ),
     );
 
-  return normalizePost(data);
+  if (!isRecord(data)) {
+    throw new Error(
+      "Dữ liệu chi tiết bài viết không hợp lệ.",
+    );
+  }
+
+  const detail =
+    data as BackendForumPostDetailData;
+  const postSource = isRecord(
+    detail.post,
+  )
+    ? detail.post
+    : data;
+
+  return normalizePost(
+    postSource,
+    {
+      comments:
+        detail.comments ??
+        postSource.comments,
+      logs: detail.logs,
+      medicalDisclaimer:
+        detail.medicalDisclaimer,
+    },
+  );
 }
 
 export async function moderateForumPost(
