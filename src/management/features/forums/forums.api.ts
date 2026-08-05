@@ -228,6 +228,7 @@ function normalizeComment(
     ),
     authorName:
       normalizeText(item.authorName) ||
+      normalizeText(item.author) ||
       "Không rõ tác giả",
     authorEmail: normalizeText(
       item.authorEmail,
@@ -278,15 +279,35 @@ function normalizePost(
   item: BackendForumPost,
 ): ForumPost {
   const id = normalizeText(item.id);
+  const forumTopic = isRecord(
+    item.forumTopic,
+  )
+    ? item.forumTopic
+    : {};
+  const rawLocked =
+    item.isLocked ?? item.locked;
+  const commentable =
+    item.commentable !== undefined
+      ? normalizeBoolean(
+          item.commentable,
+        )
+      : rawLocked !== undefined
+        ? !normalizeBoolean(rawLocked)
+        : true;
 
   return {
     id,
-    topicId: normalizeText(
-      item.topicId,
-    ),
-    topicTitle: normalizeText(
-      item.topicTitle,
-    ),
+    topicId:
+      normalizeText(item.topicId) ||
+      normalizeText(
+        item.forumTopicId,
+      ) ||
+      normalizeText(forumTopic.id),
+    topicTitle:
+      normalizeText(item.topicTitle) ||
+      normalizeText(
+        forumTopic.title,
+      ),
     title:
       normalizeText(item.title) ||
       `Bài viết #${id}`,
@@ -298,14 +319,19 @@ function normalizePost(
     content: normalizeText(
       item.content,
     ),
+    coverImageUrl: normalizeText(
+      item.coverImageUrl,
+    ),
     category: normalizeCategory(
-      item.category,
+      item.category ??
+        forumTopic.category,
     ),
     authorId: normalizeText(
       item.authorId,
     ),
     authorName:
       normalizeText(item.authorName) ||
+      normalizeText(item.author) ||
       "Không rõ tác giả",
     authorEmail: normalizeText(
       item.authorEmail,
@@ -323,9 +349,8 @@ function normalizePost(
       item.isFeatured ??
         item.featured,
     ),
-    isLocked: normalizeBoolean(
-      item.isLocked ?? item.locked,
-    ),
+    isLocked: !commentable,
+    commentable,
     viewCount: Math.max(
       0,
       normalizeNumber(
@@ -344,6 +369,20 @@ function normalizePost(
       normalizeNumber(
         item.reportCount ??
           item.reportsCount,
+      ),
+    ),
+    interactionCount: Math.max(
+      0,
+      normalizeNumber(
+        item.interactionCount,
+        normalizeNumber(
+          item.commentCount ??
+            item.commentsCount,
+        ) +
+          normalizeNumber(
+            item.reportCount ??
+              item.reportsCount,
+          ),
       ),
     ),
     comments: readCommentArray(
