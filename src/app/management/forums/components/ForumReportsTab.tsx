@@ -239,7 +239,7 @@ export function ForumReportsTab({
   const columns: ColumnsType<ForumReport> = [
     {
       title: "STT",
-      width: 64,
+      width: "5%",
       align: "center",
       render: (
         _value,
@@ -254,16 +254,20 @@ export function ForumReportsTab({
     {
       title: "Mã báo cáo",
       dataIndex: "id",
-      width: 150,
+      width: "9%",
       render: (value: string) => (
-        <Text strong className="font-mono">
+        <Text
+          strong
+          ellipsis
+          className="block font-mono"
+        >
           {value}
         </Text>
       ),
     },
     {
       title: "Đối tượng",
-      width: 180,
+      width: "12%",
       render: (_value, report) => (
         <div>
           <Tag
@@ -289,7 +293,7 @@ export function ForumReportsTab({
     },
     {
       title: "Lý do",
-      width: 330,
+      width: "24%",
       render: (_value, report) => (
         <div>
           <Tag color="red">{report.reason || "Không rõ lý do"}</Tag>
@@ -301,11 +305,21 @@ export function ForumReportsTab({
     },
     {
       title: "Người báo cáo",
-      width: 210,
+      width: "17%",
       render: (_value, report) => (
         <div>
-          <Text strong>{report.reporterName}</Text>
-          <Text type="secondary" className="block text-xs">
+          <Text
+            strong
+            ellipsis
+            className="block"
+          >
+            {report.reporterName}
+          </Text>
+          <Text
+            type="secondary"
+            ellipsis
+            className="block text-xs"
+          >
             {report.reporterEmail}
           </Text>
         </div>
@@ -314,7 +328,7 @@ export function ForumReportsTab({
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: 140,
+      width: "10%",
       align: "center",
       render: (value: string) => (
         <Tag color={isResolvedStatus(value) ? "green" : "red"}>
@@ -325,13 +339,12 @@ export function ForumReportsTab({
     {
       title: "Ngày gửi",
       dataIndex: "createdAt",
-      width: 170,
+      width: "11%",
       render: (value: string) => formatDateTime(value),
     },
     {
       title: "Hành động",
-      width: 150,
-      fixed: "right",
+      width: "12%",
       align: "center",
       render: (_value, report) => {
         const disabled = isResolvedStatus(
@@ -342,7 +355,6 @@ export function ForumReportsTab({
           <Space size={6}>
             <Tooltip title="Ẩn nội dung">
               <Button
-                size="small"
                 disabled={disabled}
                 icon={
                   <EyeOff className="h-4 w-4" />
@@ -359,7 +371,6 @@ export function ForumReportsTab({
             <Tooltip title="Xóa nội dung">
               <Button
                 danger
-                size="small"
                 disabled={disabled}
                 icon={
                   <Trash2 className="h-4 w-4" />
@@ -375,7 +386,6 @@ export function ForumReportsTab({
 
             <Tooltip title="Bỏ qua báo cáo">
               <Button
-                size="small"
                 disabled={disabled}
                 icon={
                   <XCircle className="h-4 w-4" />
@@ -419,7 +429,6 @@ export function ForumReportsTab({
             loading={loading}
             columns={columns}
             dataSource={reports}
-            scroll={{ x: 1300 }}
             pagination={{
               current: page,
               pageSize,
