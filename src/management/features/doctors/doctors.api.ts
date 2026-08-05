@@ -385,20 +385,7 @@ function toCreatePayload(
   input: CreateDoctorInput,
 ) {
   return {
-    name: input.name.trim(),
-    personalEmail:
-      input.personalEmail.trim(),
-    phone: input.phone.trim(),
-    roleIds: input.roleIds,
-    facilityAssignments:
-      input.facilityAssignments.map(
-        (assignment) => ({
-          facilityId:
-            assignment.facilityId.trim(),
-          roles:
-            assignment.roles,
-        }),
-      ),
+    staffId: input.staffId.trim(),
     licenseNo:
       input.licenseNo.trim(),
     title: input.title.trim(),
@@ -409,9 +396,7 @@ function toCreatePayload(
     bio:
       input.bio?.trim() ||
       undefined,
-    permissionOverrides:
-      input.permissionOverrides ??
-      [],
+    status: input.status,
   };
 }
 

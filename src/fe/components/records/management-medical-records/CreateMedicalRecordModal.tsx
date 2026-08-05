@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dayjs from "dayjs";
 import {
   Button,
@@ -8,22 +8,32 @@ import {
   Form,
   Input,
   Modal,
+  Select,
   Upload,
   message,
   Typography,
   Space,
+  Spin,
 } from "antd";
 import type { UploadFile, UploadProps } from "antd";
 import { Upload as UploadIcon } from "lucide-react";
+import { io, type Socket } from "socket.io-client";
 
 import { createManagementPresignedUpload } from "@/management/features/uploads/uploads.api";
+import { API_BASE_URL } from "@/lib/constants";
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   CreateMedicalRecordFileInput,
   CreateMedicalRecordInput,
+  Appointment,
+  PendingMedicalRecordFile,
 } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.types";
-import { createManagementMedicalRecord } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
+import {
+  createManagementMedicalRecord,
+  getAppointmentsByPregnancyProfileId,
+  getPendingMedicalRecordFiles,
+} from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -31,6 +41,7 @@ const { Text } = Typography;
 interface Props {
   open: boolean;
   profile: ManagementPregnancyProfile | null;
+  initialAppointmentId?: string | null;
   loading?: boolean;
   onCancel: () => void;
   onSuccess: () => void;
@@ -48,6 +59,7 @@ interface FormValues {
 export function CreateMedicalRecordModal({
   open,
   profile,
+  initialAppointmentId,
   onCancel,
   onSuccess,
 }: Props) {
@@ -56,16 +68,136 @@ export function CreateMedicalRecordModal({
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  const { doctorId, user } = useCurrentUser();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
 
-  // Tự điền doctorId khi mở modal hoặc khi đã có user
+  const { doctorId, user } = useCurrentUser();
+  const selectedAppointmentId = Form.useWatch("appointmentId", form);
+
+  const appendPendingFiles = useCallback((pendingFiles: PendingMedicalRecordFile[]) => {
+    if (!pendingFiles.length) return;
+
+    setFileList((currentFiles) => {
+      const existingUrls = new Set(
+        currentFiles
+          .map((file) => file.response?.publicUrl || file.url)
+          .filter(Boolean),
+      );
+
+      const helperFiles = pendingFiles
+        .filter((file) => file.fileUrl && !existingUrls.has(file.fileUrl))
+        .map<UploadFile>((file) => ({
+          uid: `helper-${file.id}`,
+          name: file.fileName,
+          status: "done",
+          url: file.fileUrl,
+          type: file.mimeType,
+          response: {
+            publicUrl: file.fileUrl,
+            helperPendingId: file.id,
+          },
+        }));
+
+      return helperFiles.length ? [...currentFiles, ...helperFiles] : currentFiles;
+    });
+  }, []);
+
+  // Tự điền doctorId
   useEffect(() => {
     if (!open) return;
-
     if (doctorId) {
       form.setFieldsValue({ doctorId });
     }
   }, [open, doctorId, form]);
+
+  useEffect(() => {
+    if (!open || !initialAppointmentId) return;
+    form.setFieldsValue({ appointmentId: String(initialAppointmentId) });
+  }, [form, initialAppointmentId, open]);
+
+  useEffect(() => {
+    const appointmentId = String(selectedAppointmentId || "").trim();
+    if (!open || !appointmentId) return;
+
+    let cancelled = false;
+    void getPendingMedicalRecordFiles(appointmentId)
+      .then((files) => {
+        if (!cancelled) appendPendingFiles(files);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          message.warning("Không tải được file helper đang chờ của lịch hẹn.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appendPendingFiles, open, selectedAppointmentId]);
+
+  useEffect(() => {
+    const appointmentId = String(selectedAppointmentId || "").trim();
+    if (!open || !appointmentId) return;
+
+    const socket: Socket = io(`${API_BASE_URL}/realtime`, {
+      transports: ["websocket", "polling"],
+    });
+
+    socket.on("connect", () => {
+      socket.emit("appointment:join", { appointmentId });
+    });
+
+    socket.on("medical-record:file.pending", (file: PendingMedicalRecordFile) => {
+      if (String(file.appointmentId) !== appointmentId) return;
+      appendPendingFiles([file]);
+      message.success(`Helper đã thêm file: ${file.fileName}`);
+    });
+
+    return () => {
+      socket.emit("appointment:leave", { appointmentId });
+      socket.disconnect();
+    };
+  }, [appendPendingFiles, open, selectedAppointmentId]);
+
+  // Load appointments theo pregnancyProfileId
+  useEffect(() => {
+    if (!open || !profile?.id) {
+      setAppointments([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAppointments = async () => {
+      setLoadingAppointments(true);
+      try {
+        const data = await getAppointmentsByPregnancyProfileId(profile.id);
+        if (!cancelled) {
+          setAppointments(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error(err);
+          message.error(
+            err instanceof Error
+              ? err.message
+              : "Không tải được danh sách lịch hẹn",
+          );
+          setAppointments([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingAppointments(false);
+        }
+      }
+    };
+
+    void loadAppointments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, profile?.id]);
 
   const handleUpload: UploadProps["customRequest"] = async (options) => {
     const { file, onSuccess: onUploadSuccess, onError } = options;
@@ -150,9 +282,9 @@ export function CreateMedicalRecordModal({
         }));
 
       const input: CreateMedicalRecordInput = {
-        appointmentId: values.appointmentId.trim(),
+        appointmentId: String(values.appointmentId).trim(),
         pregnancyProfileId: profile.id,
-        doctorId, // luôn lấy từ user đang đăng nhập
+        doctorId,
         diagnosis: values.diagnosis.trim(),
         conclusion: values.conclusion?.trim() || null,
         recommendation: values.recommendation?.trim() || null,
@@ -202,7 +334,9 @@ export function CreateMedicalRecordModal({
       afterClose={() => {
         form.resetFields();
         setFileList([]);
+        setAppointments([]);
       }}
+      destroyOnHidden
     >
       {profile && (
         <div style={{ marginBottom: 16 }}>
@@ -216,10 +350,50 @@ export function CreateMedicalRecordModal({
       <Form form={form} layout="vertical" disabled={submitting}>
         <Form.Item
           name="appointmentId"
-          label="Mã lịch hẹn (appointmentId)"
-          rules={[{ required: true, message: "Vui lòng nhập mã lịch hẹn" }]}
+          label="Lịch hẹn"
+          rules={[{ required: true, message: "Vui lòng chọn lịch hẹn" }]}
         >
-          <Input placeholder="Ví dụ: 2" />
+          <Select
+            placeholder={
+              loadingAppointments
+                ? "Đang tải danh sách lịch hẹn..."
+                : appointments.length === 0
+                  ? "Không có lịch hẹn nào"
+                  : "Chọn lịch hẹn"
+            }
+            loading={loadingAppointments}
+            // Chỉ disable khi đang load, KHÔNG disable khi rỗng
+            disabled={loadingAppointments}
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            // Quan trọng: fix dropdown bị ẩn trong Modal
+            getPopupContainer={(trigger) =>
+              trigger.parentElement || document.body
+            }
+            notFoundContent={
+              loadingAppointments ? (
+                <div style={{ textAlign: "center", padding: 12 }}>
+                  <Spin size="small" />
+                </div>
+              ) : (
+                "Không có lịch hẹn nào"
+              )
+            }
+            options={appointments.map((item) => {
+              const id = String(item.id); // luôn dùng string
+              const timeLabel = item.appointmentAt
+                ? dayjs(item.appointmentAt).format("DD/MM/YYYY HH:mm")
+                : "Chưa có giờ";
+
+              return {
+                value: id,
+                label: `#${id} • ${timeLabel}${
+                  item.status ? ` • ${item.status}` : ""
+                }`,
+              };
+            })}
+          />
         </Form.Item>
 
         <Form.Item
@@ -230,7 +404,9 @@ export function CreateMedicalRecordModal({
           <Space.Compact style={{ width: "100%" }}>
             <Input
               disabled
-              placeholder={doctorId ? `ID: ${doctorId}` : "Không xác định được bác sĩ"}
+              placeholder={
+                doctorId ? `ID: ${doctorId}` : "Không xác định được bác sĩ"
+              }
               style={{ flex: 1 }}
             />
             {user?.name ? (
@@ -291,9 +467,6 @@ export function CreateMedicalRecordModal({
               Chọn file & Upload
             </Button>
           </Upload>
-          <Text type="secondary" style={{ display: "block", marginTop: 8 }}>
-            File sẽ được upload lên S3 qua presign, sau đó gắn vào lần khám.
-          </Text>
         </Form.Item>
       </Form>
     </Modal>

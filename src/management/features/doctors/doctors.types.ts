@@ -83,6 +83,7 @@ export interface Doctor {
   email: string;
   phone: string;
   address: string;
+  workingRoomTypeId?: string | null;
 
   facilityId: string;
   facilityIds: string[];
@@ -135,27 +136,31 @@ export interface DoctorPermissionOverrideInput {
 }
 
 export interface CreateDoctorInput {
-  name: string;
-  personalEmail: string;
-  phone: string;
-  roleIds: string[];
-  facilityAssignments:
-    DoctorFacilityAssignment[];
+  staffId: string;
+  name?: string;
+  personalEmail?: string;
+  phone?: string;
+  address?: string;
   licenseNo: string;
   title: string;
   specialty: string;
   yearsOfExperience: number;
+  workingRoomTypeId?: string;
   bio?: string;
-  permissionOverrides?:
-    DoctorPermissionOverrideInput[];
+  status?: DoctorStatus;
 }
 
 export interface UpdateDoctorInput {
   staffId?: string;
+  name?: string;
+  personalEmail?: string;
+  phone?: string;
+  address?: string;
   licenseNo?: string;
   title?: string;
   specialty?: string;
   yearsOfExperience?: number;
+  workingRoomTypeId?: string;
   bio?: string;
   status?: DoctorStatus;
 }

@@ -9,6 +9,7 @@ import type {
   StaffProfile,
   User,
   UsersListData,
+  Permission,
 } from "./users.types";
 
 type BackendUsersPayload =
@@ -114,6 +115,10 @@ export async function getUsers(params?: GetUsersParams) {
   const data = await getUsersPage(params);
 
   return data.users;
+}
+
+export function getPermissions() {
+  return unwrapApiData<Permission[]>(apiClient.get("/management/permissions"));
 }
 
 export function createUser(input: CreateUserInput) {

@@ -6,6 +6,7 @@ import type {
   BackendMedicalRecordFile,
   BackendPregnancyConsultationRecord,
   BackendPregnancyProfilePdfRecord,
+  CreateManagementPregnancyProfileInput,
   DeleteManagementPregnancyProfileInput,
   GetManagementPregnancyProfilesParams,
   ManagementMedicalRecord,
@@ -421,6 +422,20 @@ export async function getManagementPregnancyProfileById(
     | BackendManagementPregnancyProfile
     | ApiEnvelope<BackendManagementPregnancyProfile>
   >(`${MANAGEMENT_PREGNANCY_PROFILES_URL}/${id}`);
+
+  return normalizeManagementPregnancyProfile(
+    unwrapData(response.data),
+  );
+}
+
+export async function createManagementPregnancyProfile(
+  input: CreateManagementPregnancyProfileInput,
+): Promise<ManagementPregnancyProfile> {
+  const { patientId, ...payload } = input;
+  const response = await apiClient.post<
+    | BackendManagementPregnancyProfile
+    | ApiEnvelope<BackendManagementPregnancyProfile>
+  >(`${MANAGEMENT_PREGNANCY_PROFILES_URL}/patients/${patientId}`, payload);
 
   return normalizeManagementPregnancyProfile(
     unwrapData(response.data),

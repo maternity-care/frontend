@@ -37,6 +37,19 @@ export interface MedicalRecordFile {
   updatedAt?: string | null;
 }
 
+export interface PendingMedicalRecordFile {
+  id: string;
+  appointmentId: string;
+  pregnancyProfileId?: string | null;
+  doctorId?: string | null;
+  fileType: MedicalRecordFileType;
+  fileName: string;
+  fileUrl: string;
+  mimeType: string;
+  sourcePath?: string | null;
+  createdAt?: string | null;
+}
+
 export interface MedicalRecord {
   id: string;
   appointmentId: string | null;
@@ -75,6 +88,38 @@ export interface BackendMedicalRecord {
   recommendation?: string | null;
   nextAppointmentSuggestedAt?: string | null;
   files?: BackendMedicalRecordFile[] | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+/* ===== Appointment types ===== */
+
+export type AppointmentStatus =
+  | "pending"
+  | "confirmed"
+  | "completed"
+  | "cancelled"
+  | "no_show"
+  | string;
+
+export interface Appointment {
+  id: string;
+  pregnancyProfileId: string | null;
+  doctorId: string | null;
+  appointmentAt: string | null;          
+  status: AppointmentStatus | null;
+  note?: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface BackendAppointment {
+  id?: string | number;
+  pregnancyProfileId?: string | number | null;
+  doctorId?: string | number | null;
+  appointmentAt?: string | null;
+  status?: string | null;
+  note?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }

@@ -4,23 +4,26 @@ import { useCallback, useEffect, useState } from "react";
 
 import { App, Button, Card, Space, Typography } from "antd";
 
-import { RefreshCcw } from "lucide-react";
+import { Plus, RefreshCcw } from "lucide-react";
 
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 
 import {
+  createManagementPregnancyProfile,
   deleteManagementPregnancyProfile,
   getManagementPregnancyProfiles,
   updateManagementPregnancyProfile,
 } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.api";
 
 import type {
+  CreateManagementPregnancyProfileInput,
   GetManagementPregnancyProfilesParams,
   ManagementPregnancyProfile,
   UpdateManagementPregnancyProfileInput,
 } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { PregnancyProfilesTable } from "@/fe/components/records/management/PregnancyProfilesTable";
 import { PregnancyProfileDetailModal } from "@/fe/components/records/management/PregnancyProfileDetailModal";
+import { CreatePregnancyProfileModal } from "@/fe/components/records/management/CreatePregnancyProfileModal";
 import { UpdatePregnancyProfileModal } from "@/fe/components/records/management/UpdatePregnancyProfileModal";
 import {
   TableFilter,
@@ -126,6 +129,7 @@ export default function ManagementPregnancyProfilesPage() {
   const [profiles, setProfiles] = useState<ManagementPregnancyProfile[]>([]);
 
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
 
   const [page, setPage] = useState(1);
@@ -138,6 +142,8 @@ export default function ManagementPregnancyProfilesPage() {
 
   const [creatingMedicalRecordFor, setCreatingMedicalRecordFor] =
     useState<ManagementPregnancyProfile | null>(null);
+
+  const [createProfileOpen, setCreateProfileOpen] = useState(false);
 
   const [detailProfile, setDetailProfile] =
     useState<ManagementPregnancyProfile | null>(null);
@@ -219,6 +225,23 @@ export default function ManagementPregnancyProfilesPage() {
     }
 
     setPage(nextPage);
+  };
+
+  const handleCreate = async (input: CreateManagementPregnancyProfileInput) => {
+    setCreating(true);
+
+    try {
+      await createManagementPregnancyProfile(input);
+      message.success("Tạo hồ sơ thai kỳ thành công.");
+      setCreateProfileOpen(false);
+      setPage(1);
+      await loadProfiles();
+    } catch (error) {
+      message.error(getErrorMessage(error));
+      throw error;
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleUpdate = async (
@@ -318,13 +341,23 @@ export default function ManagementPregnancyProfilesPage() {
             </Text>
           </div>
 
-          <Button
-            icon={<RefreshCcw size={16} />}
-            loading={loading}
-            onClick={() => void loadProfiles()}
-          >
-            Làm mới
-          </Button>
+          <Space wrap>
+            <Button
+              type="primary"
+              icon={<Plus size={16} />}
+              onClick={() => setCreateProfileOpen(true)}
+            >
+              Thêm hồ sơ
+            </Button>
+
+            <Button
+              icon={<RefreshCcw size={16} />}
+              loading={loading}
+              onClick={() => void loadProfiles()}
+            >
+              Làm mới
+            </Button>
+          </Space>
         </div>
 
         <TableFilter
@@ -362,6 +395,17 @@ export default function ManagementPregnancyProfilesPage() {
           setDetailProfile(null);
           setEditingProfile(profile);
         }}
+      />
+
+      <CreatePregnancyProfileModal
+        open={createProfileOpen}
+        loading={creating}
+        onCancel={() => {
+          if (!creating) {
+            setCreateProfileOpen(false);
+          }
+        }}
+        onSubmit={handleCreate}
       />
 
       <UpdatePregnancyProfileModal

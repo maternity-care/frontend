@@ -16,6 +16,7 @@ import {
   Row,
   Select,
   Space,
+  Tabs,
   Tag,
   Typography,
 } from "antd";
@@ -27,13 +28,18 @@ import {
   Phone,
   Save,
   ShieldCheck,
+  ShieldPlus,
   UserRound,
   Users,
   X,
 } from "lucide-react";
-import { createUser, updateUser } from "@/management/features/users/users.api";
+import { createUser, getPermissions, updateUser } from "@/management/features/users/users.api";
 import type { User as BackendUser } from "@/management/features/users/users.types";
-import type { StaffPosition } from "@/management/features/users/users.types";
+import type {
+  Permission,
+  StaffPosition,
+  UserPermissionOverrideInput,
+} from "@/management/features/users/users.types";
 import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { ApiClientError } from "@/lib/axios";
 
@@ -56,6 +62,7 @@ export interface UserAccount {
   createdAt: string;
   lastLogin?: string;
   staffProfile?: BackendUser["staffProfile"];
+  permissionOverrides?: BackendUser["permissionOverrides"];
 }
 
 export interface UserFormValues {
@@ -72,6 +79,8 @@ export interface UserFormValues {
   specialty?: string;
   yearsOfExperience?: number;
   bio?: string;
+  allowPermissionIds?: string[];
+  denyPermissionIds?: string[];
 }
 
 export const roleOptions = [
@@ -175,19 +184,6 @@ function getResponseData<T>(response: ApiResponseData<T>): T {
   return response as T;
 }
 
-function toBackendRoleId(role: UserRole) {
-  const roleIdMap: Record<UserRole, string> = {
-    admin: "2",
-    doctor: "3",
-    nurse: "4",
-    staff: "5",
-    pregnant: "6",
-    owner: "7",
-  };
-
-  return roleIdMap[role];
-}
-
 function toBackendStatus(status: UserStatus) {
   return status === "active" ? "active" : "locked";
 }
@@ -239,9 +235,45 @@ function deriveAccountType(roleName?: string): AccountType {
   return "customer";
 }
 
+type StaffListUser = BackendUser & {
+  facilityId?: string | number | null;
+  personalEmail?: string | null;
+  employeeCode?: string | null;
+};
+
+function getStaffProfile(user: StaffListUser): BackendUser["staffProfile"] {
+  if (user.staffProfile) return user.staffProfile;
+
+  const facilityId = user.facilityId === null || user.facilityId === undefined
+    ? ""
+    : String(user.facilityId);
+  const roles = (user.roles ?? [])
+    .map((role) => role.name)
+    .filter((role): role is StaffPosition =>
+      role === "admin" || role === "doctor" || role === "nurse" || role === "staff",
+    );
+
+  if (!facilityId && !user.personalEmail && !user.employeeCode && roles.length === 0) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    staffId: user.id,
+    personalEmail: user.personalEmail || user.email,
+    employeeCode: user.employeeCode || "",
+    status: user.status,
+    facilityAssignments: facilityId
+      ? [{ facilityId, roles: roles.length ? roles : ["staff"] }]
+      : [],
+    doctor: null,
+  };
+}
+
 function normalizeUser(user: BackendUser): UserAccount {
   const firstRole = user.roles?.[0];
-  const roleName = user.staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
+  const staffProfile = getStaffProfile(user);
+  const roleName = staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
   const accountType = deriveAccountType(roleName);
 
   return {
@@ -256,6 +288,8 @@ function normalizeUser(user: BackendUser): UserAccount {
     status: toUiStatus(user.status),
     createdAt: user.createdAt,
     lastLogin: undefined,
+    staffProfile,
+    permissionOverrides: user.permissionOverrides ?? [],
   };
 }
 
@@ -296,6 +330,8 @@ export function UserAccountFormModal({
   const [facilityOptions, setFacilityOptions] = useState<
     Array<{ value: string; label: string }>
   >([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
 
   const fullName = Form.useWatch("fullName", form);
   const email = Form.useWatch("email", form);
@@ -307,6 +343,149 @@ export function UserAccountFormModal({
   );
   const accountType = Form.useWatch("accountType", form);
   const status = Form.useWatch("status", form);
+  const watchedAllowPermissionIds = Form.useWatch("allowPermissionIds", form);
+  const watchedDenyPermissionIds = Form.useWatch("denyPermissionIds", form);
+  const allowPermissionIds = useMemo(
+    () => watchedAllowPermissionIds ?? [],
+    [watchedAllowPermissionIds],
+  );
+  const denyPermissionIds = useMemo(
+    () => watchedDenyPermissionIds ?? [],
+    [watchedDenyPermissionIds],
+  );
+
+  const permissionModuleGroups = useMemo(() => {
+    const groups = new Map<string, Permission[]>();
+    const actionOrder = [
+      "view",
+      "medical_view",
+      "sensitive_view",
+      "create",
+      "update",
+      "delete",
+      "assign_role",
+      "assign_doctor",
+      "approve",
+      "cancel",
+      "reply",
+      "close",
+      "publish",
+      "moderate",
+      "resolve",
+      "refund",
+      "export",
+      "share",
+    ];
+
+    permissions.forEach((permission) => {
+      const moduleName = permission.name.split(".")[0] || "other";
+      const modulePermissions = groups.get(moduleName) ?? [];
+      modulePermissions.push(permission);
+      groups.set(moduleName, modulePermissions);
+    });
+
+    return Array.from(groups.entries())
+      .map(([name, items]) => ({
+        name,
+        label: name
+          .split("_")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" "),
+        permissions: items.sort((left, right) => {
+          const leftAction = left.name.split(".")[1] ?? "";
+          const rightAction = right.name.split(".")[1] ?? "";
+          const leftIndex = actionOrder.indexOf(leftAction);
+          const rightIndex = actionOrder.indexOf(rightAction);
+
+          if (leftIndex !== rightIndex) {
+            return (
+              (leftIndex === -1 ? actionOrder.length : leftIndex) -
+              (rightIndex === -1 ? actionOrder.length : rightIndex)
+            );
+          }
+
+          return left.name.localeCompare(right.name);
+        }),
+      }))
+      .map((group) => ({
+        ...group,
+        permissionIds: group.permissions.map((permission) => permission.id),
+        options: group.permissions.map((permission) => ({
+          value: permission.id,
+          label: permission.name,
+        })),
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [permissions]);
+
+  const allowPermissionOptions = useMemo(
+    () =>
+      permissionModuleGroups
+        .map((group) => ({
+          label: group.label,
+          options: group.options.filter(
+            (option) => !denyPermissionIds.includes(option.value),
+          ),
+        }))
+        .filter((group) => group.options.length > 0),
+    [denyPermissionIds, permissionModuleGroups],
+  );
+
+  const denyPermissionOptions = useMemo(
+    () =>
+      permissionModuleGroups
+        .map((group) => ({
+          label: group.label,
+          options: group.options.filter(
+            (option) => !allowPermissionIds.includes(option.value),
+          ),
+        }))
+        .filter((group) => group.options.length > 0),
+    [allowPermissionIds, permissionModuleGroups],
+  );
+
+  function selectPermissionModule(
+    effect: "allow" | "deny",
+    permissionIds: string[],
+  ) {
+    const currentAllowIds = new Set(allowPermissionIds);
+    const currentDenyIds = new Set(denyPermissionIds);
+
+    permissionIds.forEach((permissionId) => {
+      if (effect === "allow") {
+        currentAllowIds.add(permissionId);
+        currentDenyIds.delete(permissionId);
+      } else {
+        currentDenyIds.add(permissionId);
+        currentAllowIds.delete(permissionId);
+      }
+    });
+
+    form.setFieldsValue({
+      allowPermissionIds: Array.from(currentAllowIds),
+      denyPermissionIds: Array.from(currentDenyIds),
+    });
+  }
+
+  function buildPermissionOverrides(
+    values: UserFormValues,
+  ): UserPermissionOverrideInput[] {
+    const allowIds = new Set(values.allowPermissionIds ?? []);
+    const denyIds = new Set(values.denyPermissionIds ?? []);
+
+    return [
+      ...Array.from(allowIds)
+        .filter((permissionId) => !denyIds.has(permissionId))
+        .map((permissionId) => ({
+          permissionId,
+          effect: "allow" as const,
+        })),
+      ...Array.from(denyIds).map((permissionId) => ({
+        permissionId,
+        effect: "deny" as const,
+      })),
+    ];
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -330,6 +509,20 @@ export function UserAccountFormModal({
         );
       });
 
+    setPermissionsLoading(true);
+    void getPermissions()
+      .then(setPermissions)
+      .catch((permissionError) => {
+        void messageApi.error(
+          permissionError instanceof Error
+            ? permissionError.message
+            : "Không tải được danh sách quyền.",
+        );
+      })
+      .finally(() => {
+        setPermissionsLoading(false);
+      });
+
     const timer = window.setTimeout(() => {
       if (editingUser) {
         form.setFieldsValue({
@@ -342,6 +535,12 @@ export function UserAccountFormModal({
           status: editingUser.status,
           facilityAssignments:
             editingUser.staffProfile?.facilityAssignments ?? initialValues.facilityAssignments,
+          allowPermissionIds: (editingUser.permissionOverrides ?? [])
+            .filter((override) => override.effect === "allow")
+            .map((override) => override.permission.id),
+          denyPermissionIds: (editingUser.permissionOverrides ?? [])
+            .filter((override) => override.effect === "deny")
+            .map((override) => override.permission.id),
         });
 
         return;
@@ -385,7 +584,7 @@ export function UserAccountFormModal({
           email: values.email.trim(),
           password: password || undefined,
           status: values.status ? toBackendStatus(values.status) : undefined,
-          permissionOverrides: [],
+          permissionOverrides: buildPermissionOverrides(values),
           facilityAssignments: values.facilityAssignments,
           licenseNo: values.licenseNo,
           title: values.title,
@@ -413,7 +612,7 @@ export function UserAccountFormModal({
         name: values.fullName.trim(),
         personalEmail: values.email.trim(),
         phone: values.phone.trim(),
-        permissionOverrides: [],
+        permissionOverrides: buildPermissionOverrides(values),
         facilityAssignments: values.facilityAssignments ?? [],
         licenseNo: values.licenseNo,
         title: values.title,
@@ -733,6 +932,116 @@ export function UserAccountFormModal({
                   </Col>
                 </Row>
               ) : null}
+            </Card>
+
+            <Card
+              size="small"
+              className="border-slate-200"
+              styles={{
+                header: {
+                  padding: "8px 12px",
+                  minHeight: 46,
+                },
+                body: {
+                  padding: "12px 12px 0",
+                },
+              }}
+              title={
+                <Space size={10}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                    <ShieldPlus className="h-4 w-4" />
+                  </span>
+
+                  <span>
+                    <p className="mb-0 text-base font-semibold text-slate-950">
+                      Phân quyền riêng
+                    </p>
+                    <p className="mb-0 text-xs font-normal text-slate-500">
+                      Tùy chỉnh quyền cộng thêm hoặc chặn riêng cho tài khoản.
+                    </p>
+                  </span>
+                </Space>
+              }
+            >
+              <Tabs
+                items={[
+                  {
+                    key: "allow",
+                    label: "Cấp thêm",
+                    children: (
+                      <div>
+                        <div className="mb-3">
+                          <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
+                            Chọn nhanh theo module
+                          </p>
+                          <Space size={[6, 6]} wrap>
+                            {permissionModuleGroups.map((group) => (
+                              <Button
+                                key={group.name}
+                                size="small"
+                                onClick={() =>
+                                  selectPermissionModule("allow", group.permissionIds)
+                                }
+                              >
+                                {group.label}
+                              </Button>
+                            ))}
+                          </Space>
+                        </div>
+                      <Form.Item name="allowPermissionIds" label="Quyền được cấp thêm">
+                        <Select
+                          mode="multiple"
+                          showSearch
+                          options={allowPermissionOptions}
+                          optionFilterProp="label"
+                          loading={permissionsLoading}
+                          placeholder="Chọn quyền cần cấp thêm"
+                          maxTagCount="responsive"
+                        />
+                      </Form.Item>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "deny",
+                    label: "Chặn quyền",
+                    children: (
+                      <div>
+                        <div className="mb-3">
+                          <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
+                            Chọn nhanh theo module
+                          </p>
+                          <Space size={[6, 6]} wrap>
+                            {permissionModuleGroups.map((group) => (
+                              <Button
+                                key={group.name}
+                                size="small"
+                                danger
+                                onClick={() =>
+                                  selectPermissionModule("deny", group.permissionIds)
+                                }
+                              >
+                                {group.label}
+                              </Button>
+                            ))}
+                          </Space>
+                        </div>
+                      <Form.Item name="denyPermissionIds" label="Quyền bị chặn">
+                        <Select
+                          mode="multiple"
+                          showSearch
+                          options={denyPermissionOptions}
+                          optionFilterProp="label"
+                          loading={permissionsLoading}
+                          placeholder="Chọn quyền cần chặn"
+                          maxTagCount="responsive"
+                        />
+                      </Form.Item>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
             </Card>
           </div>
 
