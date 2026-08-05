@@ -10,7 +10,10 @@ import type {
   BackendForumModerationLog,
   BackendForumReport,
   BackendForumTopic,
+  CreateForumPostInput,
   CreateForumTopicInput,
+  DeleteForumCommentInput,
+  DeleteForumPostInput,
   ForumAuthorRole,
   ForumCategory,
   ForumComment,
@@ -28,6 +31,8 @@ import type {
   ModerateForumCommentInput,
   ModerateForumPostInput,
   ResolveForumReportInput,
+  UpdateForumCommentInput,
+  UpdateForumPostInput,
   UpdateForumTopicInput,
 } from "./forums.types";
 
@@ -529,6 +534,38 @@ function normalizePost(
   };
 }
 
+function readPostMutationData(
+  value: unknown,
+): BackendForumPost {
+  if (!isRecord(value)) {
+    throw new Error(
+      "Dữ liệu bài viết trả về không hợp lệ.",
+    );
+  }
+
+  if (isRecord(value.post)) {
+    return value.post;
+  }
+
+  return value;
+}
+
+function readCommentMutationData(
+  value: unknown,
+): BackendForumComment {
+  if (!isRecord(value)) {
+    throw new Error(
+      "Dữ liệu bình luận trả về không hợp lệ.",
+    );
+  }
+
+  if (isRecord(value.comment)) {
+    return value.comment;
+  }
+
+  return value;
+}
+
 function normalizeReportTargetType(
   value: unknown,
 ): ForumReportTargetType {
@@ -912,6 +949,91 @@ export async function getForumPost(
   );
 }
 
+export async function createForumPost(
+  input: CreateForumPostInput,
+) {
+  const response =
+    await unwrapApiResponse<unknown>(
+      apiClient.post(
+        `${ENDPOINT}/posts`,
+        compactObject({
+          topicId: input.topicId.trim(),
+          title: input.title.trim(),
+          content: input.content.trim(),
+          coverImageUrl:
+            input.coverImageUrl?.trim(),
+          status: input.status,
+          commentable: input.commentable,
+          isPinned: input.isPinned,
+          isFeatured: input.isFeatured,
+          moderationReason:
+            input.moderationReason?.trim(),
+        }),
+      ),
+    );
+
+  return {
+    ...response,
+    data: normalizePost(
+      readPostMutationData(
+        response.data,
+      ),
+    ),
+  };
+}
+
+export async function updateForumPost(
+  id: string,
+  input: UpdateForumPostInput,
+) {
+  const response =
+    await unwrapApiResponse<unknown>(
+      apiClient.patch(
+        `${ENDPOINT}/posts/${id}`,
+        compactObject({
+          topicId:
+            input.topicId?.trim(),
+          title: input.title?.trim(),
+          content: input.content?.trim(),
+          coverImageUrl:
+            input.coverImageUrl?.trim(),
+          status: input.status,
+          commentable:
+            input.commentable,
+          isPinned: input.isPinned,
+          isFeatured: input.isFeatured,
+          moderationReason:
+            input.moderationReason?.trim(),
+        }),
+      ),
+    );
+
+  return {
+    ...response,
+    data: normalizePost(
+      readPostMutationData(
+        response.data,
+      ),
+    ),
+  };
+}
+
+export async function deleteForumPost(
+  id: string,
+  input: DeleteForumPostInput,
+) {
+  return unwrapApiResponse<unknown>(
+    apiClient.delete(
+      `${ENDPOINT}/posts/${id}`,
+      {
+        params: {
+          reason: input.reason.trim(),
+        },
+      },
+    ),
+  );
+}
+
 export async function moderateForumPost(
   id: string,
   input: ModerateForumPostInput,
@@ -960,6 +1082,51 @@ export async function moderateForumComment(
       response.data,
     ),
   };
+}
+
+export async function updateForumComment(
+  id: string,
+  input: UpdateForumCommentInput,
+) {
+  const response =
+    await unwrapApiResponse<unknown>(
+      apiClient.patch(
+        `${ENDPOINT}/comments/${id}`,
+        compactObject({
+          content:
+            input.content?.trim(),
+          parentId:
+            input.parentId?.trim(),
+          messageType:
+            input.messageType?.trim(),
+        }),
+      ),
+    );
+
+  return {
+    ...response,
+    data: normalizeComment(
+      readCommentMutationData(
+        response.data,
+      ),
+    ),
+  };
+}
+
+export async function deleteForumComment(
+  id: string,
+  input: DeleteForumCommentInput,
+) {
+  return unwrapApiResponse<unknown>(
+    apiClient.delete(
+      `${ENDPOINT}/comments/${id}`,
+      {
+        params: {
+          reason: input.reason.trim(),
+        },
+      },
+    ),
+  );
 }
 
 export async function getForumReports(
@@ -1035,7 +1202,14 @@ export const forumApi = {
   updateTopic: updateForumTopic,
   getPosts: getForumPosts,
   getPost: getForumPost,
+  createPost: createForumPost,
+  updatePost: updateForumPost,
+  deletePost: deleteForumPost,
   moderatePost: moderateForumPost,
+  updateComment:
+    updateForumComment,
+  deleteComment:
+    deleteForumComment,
   moderateComment:
     moderateForumComment,
   getReports: getForumReports,
