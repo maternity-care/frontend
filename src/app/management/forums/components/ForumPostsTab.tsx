@@ -142,6 +142,16 @@ function formatDateTime(value?: string) {
   });
 }
 
+function getPostCreatedTime(post: ForumPost) {
+  const createdTime = new Date(
+    post.createdAt,
+  ).getTime();
+
+  return Number.isNaN(createdTime)
+    ? 0
+    : createdTime;
+}
+
 function categoryLabel(category: ForumCategory) {
   return (
     CATEGORY_OPTIONS.find((item) => item.value === category)?.label ?? category
@@ -512,13 +522,13 @@ function PostDetailModal({
       onCancel={onClose}
       styles={{
         body: {
-          maxHeight: "82vh",
-          overflowY: "auto",
+          overflow: "hidden",
+          paddingTop: 8,
         },
       }}
     >
       {post ? (
-        <div>
+        <div className="mt-6 max-h-[calc(82vh-3rem)] overflow-y-auto pr-2">
           <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 lg:flex-row">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -975,13 +985,24 @@ export function ForumPostsTab({
         status: statusFilter,
       });
 
-      setPosts(result.items);
+      const newestPosts = [
+        ...result.items,
+      ].sort(
+        (left, right) =>
+          getPostCreatedTime(right) -
+          getPostCreatedTime(left),
+      );
+
+      setPosts(newestPosts);
       setTotal(result.total);
       setPage(result.page);
       setPageSize(result.limit);
       onSummaryChange({
         total: result.total,
-        pending: result.items.filter((post) => post.status === "pending").length,
+        pending: newestPosts.filter(
+          (post) =>
+            post.status === "pending",
+        ).length,
       });
     } catch (loadError) {
       setError(getErrorMessage(loadError));
