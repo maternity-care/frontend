@@ -951,7 +951,7 @@ export default function ForumPage() {
           closable:
             !submitting,
         }}
-        destroyOnHidden
+        forceRender
       >
         <Form<CreatePostValues>
           form={form}
