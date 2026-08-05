@@ -8,12 +8,18 @@ import {
   Card,
   Input,
   Modal,
-  Select,
+  Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import {
+  EyeOff,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 
 import {
   getForumReports,
@@ -36,6 +42,7 @@ type ForumReportsTabProps = {
 
 type ReportResolveRequest = {
   report: ForumReport;
+  action: ForumReportResolveAction;
 };
 
 const REPORT_ACTION_OPTIONS: Array<{
@@ -86,14 +93,12 @@ function ReportResolveModal({
     note: string,
   ) => Promise<void>;
 }) {
-  const [action, setAction] = useState<ForumReportResolveAction>("hide");
   const [note, setNote] = useState("");
 
   useEffect(() => {
     if (!request) return;
 
     const timer = window.setTimeout(() => {
-      setAction("hide");
       setNote("");
     }, 0);
 
@@ -113,7 +118,12 @@ function ReportResolveModal({
       confirmLoading={submitting}
       okButtonProps={{ disabled: !note.trim() }}
       onCancel={onClose}
-      onOk={() => void onConfirm(action, note.trim())}
+      onOk={() =>
+        void onConfirm(
+          request.action,
+          note.trim(),
+        )
+      }
       mask={{ closable: !submitting }}
     >
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -129,13 +139,20 @@ function ReportResolveModal({
       </div>
 
       <div className="mt-4">
-        <label className="mb-2 block text-sm font-semibold">Hành động</label>
-        <Select
-          className="w-full"
-          value={action}
-          options={REPORT_ACTION_OPTIONS}
-          onChange={setAction}
-        />
+        <Tag
+          color={
+            request.action === "dismiss"
+              ? "default"
+              : "red"
+          }
+          className="!mr-0"
+        >
+          {REPORT_ACTION_OPTIONS.find(
+            (item) =>
+              item.value ===
+              request.action,
+          )?.label ?? request.action}
+        </Tag>
       </div>
 
       <div className="mt-4">
@@ -312,19 +329,68 @@ export function ForumReportsTab({
       render: (value: string) => formatDateTime(value),
     },
     {
-      title: "Thao tác",
-      width: 120,
+      title: "Hành động",
+      width: 150,
       fixed: "right",
       align: "center",
-      render: (_value, report) => (
-        <Button
-          type="primary"
-          disabled={isResolvedStatus(report.status)}
-          onClick={() => setResolveRequest({ report })}
-        >
-          Xử lý
-        </Button>
-      ),
+      render: (_value, report) => {
+        const disabled = isResolvedStatus(
+          report.status,
+        );
+
+        return (
+          <Space size={6}>
+            <Tooltip title="Ẩn nội dung">
+              <Button
+                size="small"
+                disabled={disabled}
+                icon={
+                  <EyeOff className="h-4 w-4" />
+                }
+                onClick={() =>
+                  setResolveRequest({
+                    report,
+                    action: "hide",
+                  })
+                }
+              />
+            </Tooltip>
+
+            <Tooltip title="Xóa nội dung">
+              <Button
+                danger
+                size="small"
+                disabled={disabled}
+                icon={
+                  <Trash2 className="h-4 w-4" />
+                }
+                onClick={() =>
+                  setResolveRequest({
+                    report,
+                    action: "delete",
+                  })
+                }
+              />
+            </Tooltip>
+
+            <Tooltip title="Bỏ qua báo cáo">
+              <Button
+                size="small"
+                disabled={disabled}
+                icon={
+                  <XCircle className="h-4 w-4" />
+                }
+                onClick={() =>
+                  setResolveRequest({
+                    report,
+                    action: "dismiss",
+                  })
+                }
+              />
+            </Tooltip>
+          </Space>
+        );
+      },
     },
   ];
 
