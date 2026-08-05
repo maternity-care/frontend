@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   Alert,
   App,
@@ -51,6 +52,7 @@ const { TextArea } = Input;
 
 type ForumPostsTabProps = {
   topics: ForumTopic[];
+  navigation: ReactNode;
   onSummaryChange: (summary: {
     total: number;
     pending: number;
@@ -438,6 +440,7 @@ function PostDetailModal({
 
 export function ForumPostsTab({
   topics,
+  navigation,
   onSummaryChange,
 }: ForumPostsTabProps) {
   const { message } = App.useApp();
@@ -715,71 +718,105 @@ export function ForumPostsTab({
           />
         ) : null}
 
-        <Card className="border-slate-200 bg-white">
-          <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_190px_230px_180px_190px_auto]">
-            <Input
-              allowClear
-              value={keyword}
-              prefix={<Search className="h-4 w-4 text-slate-400" />}
-              placeholder="Tìm bài viết..."
-              onChange={(event) => {
-                setPage(1);
-                setKeyword(event.target.value);
-              }}
-            />
+        <Card
+          className="overflow-hidden border-slate-200 bg-white"
+          styles={{
+            body: {
+              padding: 20,
+            },
+          }}
+        >
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="max-w-full">
+              {navigation}
+            </div>
 
-            <Select
-              allowClear
-              value={categoryFilter}
-              placeholder="Danh mục"
-              options={CATEGORY_OPTIONS}
-              onChange={(value) => {
-                setPage(1);
-                setCategoryFilter(value);
-              }}
-            />
+            <div className="h-px bg-slate-100" />
 
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              value={topicFilter}
-              placeholder="Chủ đề"
-              options={topics.map((topic) => ({
-                value: topic.id,
-                label: topic.title,
-              }))}
-              onChange={(value) => {
-                setPage(1);
-                setTopicFilter(value);
-              }}
-            />
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <div className="min-w-[220px] flex-[1.5_1_280px]">
+                <Input
+                  allowClear
+                  className="w-full"
+                  value={keyword}
+                  prefix={<Search className="h-4 w-4 text-slate-400" />}
+                  placeholder="Tìm bài viết..."
+                  onChange={(event) => {
+                    setPage(1);
+                    setKeyword(event.target.value);
+                  }}
+                />
+              </div>
 
-            <Select
-              allowClear
-              value={statusFilter}
-              placeholder="Trạng thái"
-              options={POST_STATUS_OPTIONS}
-              onChange={(value) => {
-                setPage(1);
-                setStatusFilter(value);
-              }}
-            />
+              <div className="min-w-[150px] flex-[1_1_170px]">
+                <Select
+                  allowClear
+                  className="w-full"
+                  value={categoryFilter}
+                  placeholder="Danh mục"
+                  options={CATEGORY_OPTIONS}
+                  onChange={(value) => {
+                    setPage(1);
+                    setCategoryFilter(value);
+                  }}
+                />
+              </div>
 
-            <Select
-              allowClear
-              value={authorRoleFilter}
-              placeholder="Vai trò tác giả"
-              options={AUTHOR_ROLE_OPTIONS}
-              onChange={(value) => {
-                setPage(1);
-                setAuthorRoleFilter(value);
-              }}
-            />
+              <div className="min-w-[180px] flex-[1.2_1_210px]">
+                <Select
+                  allowClear
+                  showSearch
+                  className="w-full"
+                  optionFilterProp="label"
+                  value={topicFilter}
+                  placeholder="Chủ đề"
+                  options={topics.map((topic) => ({
+                    value: topic.id,
+                    label: topic.title,
+                  }))}
+                  onChange={(value) => {
+                    setPage(1);
+                    setTopicFilter(value);
+                  }}
+                />
+              </div>
 
-            <Button icon={<X className="h-4 w-4" />} onClick={resetFilters}>
-              Xóa lọc
-            </Button>
+              <div className="min-w-[150px] flex-[1_1_170px]">
+                <Select
+                  allowClear
+                  className="w-full"
+                  value={statusFilter}
+                  placeholder="Trạng thái"
+                  options={POST_STATUS_OPTIONS}
+                  onChange={(value) => {
+                    setPage(1);
+                    setStatusFilter(value);
+                  }}
+                />
+              </div>
+
+              <div className="min-w-[170px] flex-[1_1_190px]">
+                <Select
+                  allowClear
+                  className="w-full"
+                  value={authorRoleFilter}
+                  placeholder="Vai trò tác giả"
+                  options={AUTHOR_ROLE_OPTIONS}
+                  onChange={(value) => {
+                    setPage(1);
+                    setAuthorRoleFilter(value);
+                  }}
+                />
+              </div>
+
+              <Button
+                className="shrink-0"
+                icon={<X className="h-4 w-4" />}
+                onClick={resetFilters}
+              >
+                Xóa lọc
+              </Button>
+            </div>
           </div>
         </Card>
 
