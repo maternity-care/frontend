@@ -201,7 +201,30 @@ export interface UpdateFacilityInput {
   ward?: string;
   latitude?: string;
   longitude?: string;
-  status?: FacilityStatus;
+}
+
+export interface SuspendResourceInput {
+  inactiveUntil?: string | null;
+  reason?: string;
+}
+
+export interface FacilitySuspendImpact {
+  affectedRooms: number;
+  affectedShifts: number;
+  affectedAppointments: number;
+  suspendedRooms?: number;
+  cancelledShifts?: number;
+  reactivatedRooms?: number;
+}
+
+export interface FacilitySuspendResult {
+  facility: BackendFacility;
+  impact: FacilitySuspendImpact;
+}
+
+export interface FacilityReactivateResult {
+  facility: BackendFacility;
+  impact?: Pick<FacilitySuspendImpact, "reactivatedRooms">;
 }
 
 export interface UpdateFacilityOperatingHoursInput {

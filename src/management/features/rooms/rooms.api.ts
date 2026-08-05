@@ -13,9 +13,13 @@ import type {
   GetRoomTypeLookupParams,
   GetRoomTypesParams,
   RoomListResult,
+  RoomReactivateResult,
   RoomStatus,
+  RoomSuspendImpact,
+  RoomSuspendResult,
   RoomType,
   RoomTypeListResult,
+  SuspendResourceInput,
   UpdateRoomInput,
   UpdateRoomTypeInput,
 } from "./rooms.types";
@@ -319,7 +323,6 @@ function toUpdateRoomPayload(
     roomTypeId:
       input.roomTypeId?.trim(),
     floor: input.floor?.trim(),
-    status: input.status,
   });
 }
 
@@ -410,6 +413,55 @@ export async function updateRoom(
   return {
     ...result,
     data: normalizeRoom(result.data),
+  };
+}
+
+export async function suspendRoom(
+  id: string,
+  input: SuspendResourceInput,
+): Promise<ApiResponse<RoomSuspendResult>> {
+  const response = await apiClient.patch<
+    ApiEnvelope<{
+      room: BackendRoom;
+      impact: RoomSuspendImpact;
+    }>
+  >(`${ROOM_ENDPOINT}/${id}/suspend`, {
+    inactiveUntil: input.inactiveUntil || null,
+    reason: input.reason?.trim() || undefined,
+  });
+
+  const result = unwrapResponse<{
+    room: BackendRoom;
+    impact: RoomSuspendImpact;
+  }>(response.data, "Tạm ngưng phòng thành công");
+
+  return {
+    ...result,
+    data: {
+      ...result.data,
+      room: normalizeRoom(result.data.room),
+    },
+  };
+}
+
+export async function reactivateRoom(
+  id: string,
+): Promise<ApiResponse<RoomReactivateResult>> {
+  const response = await apiClient.patch<
+    ApiEnvelope<{
+      room: BackendRoom;
+    }>
+  >(`${ROOM_ENDPOINT}/${id}/reactivate`, {});
+
+  const result = unwrapResponse<{
+    room: BackendRoom;
+  }>(response.data, "Mở lại phòng thành công");
+
+  return {
+    ...result,
+    data: {
+      room: normalizeRoom(result.data.room),
+    },
   };
 }
 
