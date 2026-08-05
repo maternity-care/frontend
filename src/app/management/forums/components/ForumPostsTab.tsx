@@ -250,6 +250,157 @@ function ModerationModal({
   );
 }
 
+function commentStatusTag(
+  status: ForumPostStatus,
+) {
+  return postStatusTag(status);
+}
+
+function CommentItem({
+  comment,
+  nested = false,
+  onModerateComment,
+}: {
+  comment: ForumComment;
+  nested?: boolean;
+  onModerateComment: (
+    comment: ForumComment,
+    action: ForumCommentModerationAction,
+  ) => void;
+}) {
+  const canModerate =
+    comment.status !== "deleted";
+
+  return (
+    <div
+      className={[
+        "rounded-xl border p-4",
+        nested
+          ? "ml-6 border-blue-100 bg-blue-50/30"
+          : "border-slate-200 bg-white",
+      ].join(" ")}
+    >
+      <div className="flex flex-col justify-between gap-3 sm:flex-row">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Text strong>
+              {comment.authorName}
+            </Text>
+
+            {commentStatusTag(
+              comment.status,
+            )}
+
+            {comment.isDoctorAnswer ? (
+              <Tag color="blue">
+                Trả lời bác sĩ
+              </Tag>
+            ) : null}
+
+            {comment.parentId ? (
+              <Tag>Phản hồi</Tag>
+            ) : null}
+          </div>
+
+          <Text
+            type="secondary"
+            className="mt-1 block text-xs"
+          >
+            {authorRoleLabel(
+              comment.authorRole,
+            )} ·{" "}
+            {formatDateTime(
+              comment.createdAt,
+            )}
+            {comment.reportCount > 0
+              ? ` · ${comment.reportCount} báo cáo`
+              : ""}
+          </Text>
+        </div>
+
+        {canModerate ? (
+          <Space wrap>
+            {comment.status !==
+            "published" ? (
+              <Button
+                size="small"
+                type="primary"
+                onClick={() =>
+                  onModerateComment(
+                    comment,
+                    "approve",
+                  )
+                }
+              >
+                Duyệt
+              </Button>
+            ) : (
+              <Button
+                size="small"
+                onClick={() =>
+                  onModerateComment(
+                    comment,
+                    "hide",
+                  )
+                }
+              >
+                Ẩn
+              </Button>
+            )}
+
+            <Button
+              size="small"
+              danger
+              onClick={() =>
+                onModerateComment(
+                  comment,
+                  "delete",
+                )
+              }
+            >
+              Xóa
+            </Button>
+          </Space>
+        ) : null}
+      </div>
+
+      <Paragraph className="!mb-0 !mt-3 !whitespace-pre-wrap">
+        {comment.content ||
+          "Bình luận không có nội dung."}
+      </Paragraph>
+
+      {comment.moderationReason ? (
+        <Alert
+          type="warning"
+          showIcon
+          className="mt-3"
+          title="Lý do kiểm duyệt"
+          description={
+            comment.moderationReason
+          }
+        />
+      ) : null}
+
+      {comment.replies.length > 0 ? (
+        <div className="mt-3 space-y-3">
+          {comment.replies.map(
+            (reply) => (
+              <CommentItem
+                key={reply.id}
+                comment={reply}
+                nested
+                onModerateComment={
+                  onModerateComment
+                }
+              />
+            ),
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PostDetailModal({
   post,
   loading,
@@ -273,80 +424,204 @@ function PostDetailModal({
     <Modal
       open={Boolean(post)}
       centered
-      width={1040}
+      width={1080}
       title={null}
       footer={null}
       loading={loading}
       onCancel={onClose}
-      styles={{ body: { maxHeight: "82vh", overflowY: "auto" } }}
+      styles={{
+        body: {
+          maxHeight: "82vh",
+          overflowY: "auto",
+        },
+      }}
     >
       {post ? (
         <div>
           <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 lg:flex-row">
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <Title level={3} className="!mb-0">
+                <Title
+                  level={3}
+                  className="!mb-0"
+                >
                   {post.title}
                 </Title>
-                {postStatusTag(post.status)}
+
+                {postStatusTag(
+                  post.status,
+                )}
+
                 {post.isPinned ? (
-                  <Tag color="blue" icon={<Pin className="h-3.5 w-3.5" />}>
+                  <Tag
+                    color="blue"
+                    icon={
+                      <Pin className="h-3.5 w-3.5" />
+                    }
+                  >
                     Đã ghim
                   </Tag>
                 ) : null}
+
                 {post.isFeatured ? (
-                  <Tag color="gold" icon={<Star className="h-3.5 w-3.5" />}>
+                  <Tag
+                    color="gold"
+                    icon={
+                      <Star className="h-3.5 w-3.5" />
+                    }
+                  >
                     Nổi bật
                   </Tag>
                 ) : null}
-                {post.isLocked ? (
-                  <Tag icon={<Lock className="h-3.5 w-3.5" />}>Đã khóa</Tag>
-                ) : null}
+
+                <Tag
+                  color={
+                    post.commentable
+                      ? "green"
+                      : "default"
+                  }
+                >
+                  {post.commentable
+                    ? "Cho phép bình luận"
+                    : "Đã khóa bình luận"}
+                </Tag>
               </div>
 
-              <Text type="secondary" className="mt-2 block">
-                {post.authorName} · {authorRoleLabel(post.authorRole)} ·{" "}
-                {formatDateTime(post.createdAt)}
+              <Text
+                type="secondary"
+                className="mt-2 block"
+              >
+                {post.authorName} ·{" "}
+                {authorRoleLabel(
+                  post.authorRole,
+                )}{" "}
+                ·{" "}
+                {formatDateTime(
+                  post.createdAt,
+                )}
+              </Text>
+
+              <Text
+                type="secondary"
+                className="mt-1 block text-xs"
+              >
+                Chủ đề:{" "}
+                {post.topicTitle ||
+                  post.topicId ||
+                  "Chưa cập nhật"}
               </Text>
             </div>
 
             <Space wrap>
-              {post.status !== "published" ? (
+              {post.status !==
+              "published" ? (
                 <Button
                   type="primary"
-                  icon={<CheckCircle2 className="h-4 w-4" />}
-                  onClick={() => onModeratePost(post, "approve")}
+                  icon={
+                    <CheckCircle2 className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    onModeratePost(
+                      post,
+                      "approve",
+                    )
+                  }
                 >
                   Duyệt bài
                 </Button>
               ) : (
                 <Button
-                  icon={<EyeOff className="h-4 w-4" />}
-                  onClick={() => onModeratePost(post, "hide")}
+                  icon={
+                    <EyeOff className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    onModeratePost(
+                      post,
+                      "hide",
+                    )
+                  }
                 >
                   Ẩn bài
                 </Button>
               )}
 
               <Button
-                icon={<Lock className="h-4 w-4" />}
-                onClick={() => onModeratePost(post, "lock")}
+                icon={
+                  <Lock className="h-4 w-4" />
+                }
+                onClick={() =>
+                  onModeratePost(
+                    post,
+                    "lock",
+                  )
+                }
               >
                 Khóa
               </Button>
 
               <Button
-                icon={<Pin className="h-4 w-4" />}
-                onClick={() => onModeratePost(post, "pin")}
+                icon={
+                  <Pin className="h-4 w-4" />
+                }
+                onClick={() =>
+                  onModeratePost(
+                    post,
+                    "pin",
+                  )
+                }
               >
                 Ghim
               </Button>
             </Space>
           </div>
 
-          <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_300px]">
+          {post.medicalDisclaimer ? (
+            <Alert
+              type="warning"
+              showIcon
+              className="mt-4"
+              title={
+                post.medicalDisclaimer
+              }
+            />
+          ) : null}
+
+          {post.moderationReason ? (
+            <Alert
+              type="info"
+              showIcon
+              className="mt-4"
+              title="Lý do kiểm duyệt gần nhất"
+              description={
+                post.moderationReason
+              }
+            />
+          ) : null}
+
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="rounded-xl border border-slate-200 p-5">
-              <Tag color="blue">{categoryLabel(post.category)}</Tag>
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag color="blue">
+                  {categoryLabel(
+                    post.category,
+                  )}
+                </Tag>
+
+                {post.topicTitle ? (
+                  <Tag>
+                    {post.topicTitle}
+                  </Tag>
+                ) : null}
+              </div>
+
+              {post.coverImageUrl ? (
+                <div
+                  className="mt-4 h-64 rounded-xl bg-cover bg-center"
+                  style={{
+                    backgroundImage: `url("${post.coverImageUrl}")`,
+                  }}
+                />
+              ) : null}
 
               {post.excerpt ? (
                 <Paragraph className="!mt-4 !font-medium">
@@ -354,81 +629,137 @@ function PostDetailModal({
                 </Paragraph>
               ) : null}
 
-              <Paragraph className="!mb-0 whitespace-pre-wrap leading-7 text-slate-700">
-                {stripHtml(post.content) ||
-                  "Nội dung bài viết chưa được backend trả về."}
+              <Paragraph className="!mb-0 !mt-4 !whitespace-pre-wrap !leading-7 !text-slate-700">
+                {stripHtml(
+                  post.content,
+                ) ||
+                  "Nội dung bài viết chưa được cập nhật."}
               </Paragraph>
             </div>
 
             <div className="space-y-3">
               {[
-                ["Lượt xem", post.viewCount],
-                ["Bình luận", post.commentCount],
-                ["Báo cáo", post.reportCount],
+                [
+                  "Lượt xem",
+                  post.viewCount,
+                ],
+                [
+                  "Bình luận",
+                  post.commentCount,
+                ],
+                [
+                  "Báo cáo",
+                  post.reportCount,
+                ],
               ].map(([label, value]) => (
-                <Card size="small" key={String(label)}>
-                  <div className="text-sm text-slate-500">{label}</div>
-                  <div className="mt-1 text-2xl font-bold">{value}</div>
+                <Card
+                  size="small"
+                  key={String(label)}
+                >
+                  <div className="text-sm text-slate-500">
+                    {label}
+                  </div>
+                  <div className="mt-1 text-2xl font-bold">
+                    {value}
+                  </div>
                 </Card>
               ))}
             </div>
           </div>
 
           <div className="mt-5">
-            <Title level={5}>Bình luận trong bài</Title>
+            <div className="mb-3 flex items-center justify-between">
+              <Title
+                level={5}
+                className="!mb-0"
+              >
+                Bình luận trong bài
+              </Title>
+
+              <Text type="secondary">
+                {post.commentCount} bình luận
+              </Text>
+            </div>
 
             {post.comments.length > 0 ? (
               <div className="space-y-3">
-                {post.comments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="rounded-xl border border-slate-200 p-4"
-                  >
-                    <div className="flex flex-col justify-between gap-3 sm:flex-row">
-                      <div>
-                        <Text strong>{comment.authorName}</Text>
-                        <Text type="secondary" className="ml-2 text-xs">
-                          {formatDateTime(comment.createdAt)}
-                        </Text>
-                      </div>
-
-                      <Space>
-                        <Button
-                          size="small"
-                          type="primary"
-                          onClick={() => onModerateComment(comment, "approve")}
-                        >
-                          Duyệt
-                        </Button>
-                        <Button
-                          size="small"
-                          onClick={() => onModerateComment(comment, "hide")}
-                        >
-                          Ẩn
-                        </Button>
-                        <Button
-                          size="small"
-                          danger
-                          onClick={() => onModerateComment(comment, "delete")}
-                        >
-                          Xóa
-                        </Button>
-                      </Space>
-                    </div>
-
-                    <Paragraph className="!mb-0 !mt-3">
-                      {comment.content}
-                    </Paragraph>
-                  </div>
-                ))}
+                {post.comments.map(
+                  (comment) => (
+                    <CommentItem
+                      key={comment.id}
+                      comment={comment}
+                      onModerateComment={
+                        onModerateComment
+                      }
+                    />
+                  ),
+                )}
               </div>
             ) : (
-              <Empty description="API chi tiết bài viết chưa trả về danh sách bình luận." />
+              <Empty description="Bài viết chưa có bình luận." />
             )}
           </div>
 
+          {post.moderationLogs.length >
+          0 ? (
+            <div className="mt-5">
+              <Title level={5}>
+                Lịch sử kiểm duyệt
+              </Title>
+
+              <div className="space-y-2">
+                {post.moderationLogs.map(
+                  (log) => (
+                    <div
+                      key={log.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Space wrap>
+                          <Tag color="blue">
+                            {log.targetType ||
+                              "nội dung"}
+                          </Tag>
+                          <Text strong>
+                            {log.action ||
+                              "Cập nhật"}
+                          </Text>
+                          <Text type="secondary">
+                            bởi{" "}
+                            {authorRoleLabel(
+                              log.actorRole,
+                            )}{" "}
+                            #{log.actorId}
+                          </Text>
+                        </Space>
+
+                        <Text
+                          type="secondary"
+                          className="text-xs"
+                        >
+                          {formatDateTime(
+                            log.createdAt,
+                          )}
+                        </Text>
+                      </div>
+
+                      {log.reason ? (
+                        <Paragraph className="!mb-0 !mt-2 !text-sm">
+                          {log.reason}
+                        </Paragraph>
+                      ) : null}
+                    </div>
+                  ),
+                )}
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-5 flex justify-end">
-            <Button type="primary" onClick={onClose}>
+            <Button
+              type="primary"
+              onClick={onClose}
+            >
               Đóng
             </Button>
           </div>
