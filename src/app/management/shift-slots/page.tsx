@@ -13,7 +13,6 @@ import {
   Card,
   Empty,
   Input,
-  Modal,
   Select,
   Space,
   Statistic,
@@ -92,6 +91,12 @@ export default function ShiftSlotsPage() {
     useState<string>();
   const [statusFilter, setStatusFilter] =
     useState<ShiftSlotStatus>();
+  const [currentPage, setCurrentPage] =
+    useState(1);
+  const [pageSize, setPageSize] =
+    useState(20);
+  const [reloadKey, setReloadKey] =
+    useState(0);
 
   const [createModalOpen, setCreateModalOpen] =
     useState(false);
@@ -109,7 +114,10 @@ export default function ShiftSlotsPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedSearch(searchInput.trim());
+      setDebouncedSearch(
+        searchInput.trim(),
+      );
+      setCurrentPage(1);
     }, 350);
 
     return () => {
@@ -161,8 +169,8 @@ export default function ShiftSlotsPage() {
               debouncedSearch || undefined,
             facilityId: facilityFilter,
             status: statusFilter,
-            page: 1,
-            limit: 30,
+            page: currentPage,
+            limit: pageSize,
           });
 
           if (cancelled) return;
@@ -191,25 +199,39 @@ export default function ShiftSlotsPage() {
       window.clearTimeout(timer);
     };
   }, [
+    currentPage,
     debouncedSearch,
     facilityFilter,
+    pageSize,
+    reloadKey,
     statusFilter,
   ]);
 
   const stats = useMemo(
     () => ({
-      total: slots.length,
-      active: slots.filter(
+      total: totalSlots,
+      activeOnPage: slots.filter(
         (slot) => slot.status === "active",
       ).length,
-      inactive: slots.filter(
+      inactiveOnPage: slots.filter(
         (slot) => slot.status === "inactive",
       ).length,
-      overnight: slots.filter(
+      overnightOnPage: slots.filter(
         (slot) => slot.isOvernight,
       ).length,
     }),
-    [slots],
+    [slots, totalSlots],
+  );
+
+  const facilityById = useMemo(
+    () =>
+      new Map(
+        facilities.map((facility) => [
+          facility.id,
+          facility,
+        ]),
+      ),
+    [facilities],
   );
 
   async function openDetail(slot: ShiftSlot) {
@@ -235,28 +257,23 @@ export default function ShiftSlotsPage() {
     }
   }
 
-  function handleCreated(slot: ShiftSlot) {
-    setSlots((current) => [
-      slot,
-      ...current.filter(
-        (item) => item.id !== slot.id,
-      ),
-    ]);
-    setTotalSlots((current) => current + 1);
+  function refreshSlots() {
+    setReloadKey(
+      (current) => current + 1,
+    );
   }
 
-  function handleUpdated(slot: ShiftSlot) {
-    setSlots((current) =>
-      current.map((item) =>
-        item.id === slot.id ? slot : item,
-      ),
-    );
+  function handleCreated(
+    _slot: ShiftSlot,
+  ) {
+    setCurrentPage(1);
+    refreshSlots();
+  }
 
-    setDetailSlot((current) =>
-      current?.id === slot.id
-        ? slot
-        : current,
-    );
+  function handleUpdated(
+    _slot: ShiftSlot,
+  ) {
+    refreshSlots();
   }
 
   function confirmDelete(slot: ShiftSlot) {
@@ -282,7 +299,14 @@ export default function ShiftSlotsPage() {
               {slot.startTime} -{" "}
               {slot.endTime} ·{" "}
               {slot.facilityName ||
-                slot.facilityCode}
+                facilityById.get(
+                  slot.facilityId,
+                )?.name ||
+                slot.facilityCode ||
+                facilityById.get(
+                  slot.facilityId,
+                )?.code ||
+                `Cơ sở #${slot.facilityId}`}
             </Text>
           </div>
         </div>
@@ -300,21 +324,18 @@ export default function ShiftSlotsPage() {
           const response =
             await deleteShiftSlot(slot.id);
 
-          setSlots((current) =>
-            current.filter(
-              (item) =>
-                item.id !== slot.id,
-            ),
-          );
-          setTotalSlots((current) =>
-            Math.max(0, current - 1),
-          );
+          setDetailSlot(null);
 
-          setDetailSlot((current) =>
-            current?.id === slot.id
-              ? null
-              : current,
-          );
+          if (
+            slots.length === 1 &&
+            currentPage > 1
+          ) {
+            setCurrentPage(
+              (current) => current - 1,
+            );
+          } else {
+            refreshSlots();
+          }
 
           messageApi.success(
             response.message ||
@@ -338,6 +359,7 @@ export default function ShiftSlotsPage() {
     setDebouncedSearch("");
     setFacilityFilter(undefined);
     setStatusFilter(undefined);
+    setCurrentPage(1);
   }
 
   const columns: ColumnsType<ShiftSlot> = [
@@ -346,7 +368,10 @@ export default function ShiftSlotsPage() {
       width: 65,
       align: "center",
       render: (_value, _record, index) =>
-        index + 1,
+        (currentPage - 1) *
+          pageSize +
+        index +
+        1,
     },
     {
       title: "Khung ca",
@@ -373,25 +398,33 @@ export default function ShiftSlotsPage() {
     {
       title: "Cơ sở",
       width: 245,
-      render: (_value, slot) => (
-        <div className="min-w-0">
-          <Text
-            strong
-            className="block truncate"
-          >
-            {slot.facilityName ||
-              "Chưa cập nhật"}
-          </Text>
+      render: (_value, slot) => {
+        const facility = facilityById.get(
+          slot.facilityId,
+        );
 
-          <Text
-            type="secondary"
-            className="block truncate text-xs"
-          >
-            {slot.facilityCode ||
-              `Facility ID: ${slot.facilityId}`}
-          </Text>
-        </div>
-      ),
+        return (
+          <div className="min-w-0">
+            <Text
+              strong
+              className="block truncate"
+            >
+              {slot.facilityName ||
+                facility?.name ||
+                "Chưa cập nhật"}
+            </Text>
+
+            <Text
+              type="secondary"
+              className="block truncate text-xs"
+            >
+              {slot.facilityCode ||
+                facility?.code ||
+                `Facility ID: ${slot.facilityId}`}
+            </Text>
+          </div>
+        );
+      },
     },
     {
       title: "Thời gian",
@@ -512,22 +545,28 @@ export default function ShiftSlotsPage() {
 
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
-              title="Đang hoạt động"
-              value={stats.active}
+              title="Hoạt động trên trang"
+              value={
+                stats.activeOnPage
+              }
             />
           </Card>
 
           <Card className="border-red-100 bg-red-50/60">
             <Statistic
-              title="Ngừng hoạt động"
-              value={stats.inactive}
+              title="Ngừng hoạt động trên trang"
+              value={
+                stats.inactiveOnPage
+              }
             />
           </Card>
 
           <Card className="border-violet-100 bg-violet-50/60">
             <Statistic
-              title="Khung ca qua đêm"
-              value={stats.overnight}
+              title="Qua đêm trên trang"
+              value={
+                stats.overnightOnPage
+              }
               prefix={
                 <Moon className="h-5 w-5" />
               }
@@ -564,7 +603,10 @@ export default function ShiftSlotsPage() {
                     label: facility.name,
                   }),
                 )}
-                onChange={setFacilityFilter}
+                onChange={(value) => {
+                  setFacilityFilter(value);
+                  setCurrentPage(1);
+                }}
               />
 
               <Select
@@ -581,7 +623,10 @@ export default function ShiftSlotsPage() {
                     label: "Ngừng hoạt động",
                   },
                 ]}
-                onChange={setStatusFilter}
+                onChange={(value) => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
               />
             </div>
 
@@ -643,15 +688,36 @@ export default function ShiftSlotsPage() {
               x: 1030,
             }}
             pagination={{
-              pageSize: 10,
+              current: currentPage,
+              pageSize,
+              total: totalSlots,
               showSizeChanger: true,
               pageSizeOptions: [
                 10,
                 20,
                 30,
+                50,
               ],
-              showTotal: (total) =>
-                `Tổng ${total} khung ca`,
+              showQuickJumper: true,
+              showTotal: (
+                total,
+                range,
+              ) =>
+                `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} khung ca`,
+              onChange: (
+                page,
+                nextPageSize,
+              ) => {
+                setCurrentPage(
+                  nextPageSize !==
+                    pageSize
+                    ? 1
+                    : page,
+                );
+                setPageSize(
+                  nextPageSize,
+                );
+              },
             }}
             locale={{
               emptyText: (

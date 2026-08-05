@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LockKeyhole } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { managementLogin } from "@/features/auth/auth.api";
@@ -27,6 +27,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const setSession = useAuthStore((state) => state.setSession);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -36,7 +37,7 @@ function LoginForm() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "admin@example.com",
-      password: "password",
+      password: "Password@123",
       rememberMe: true,
     },
   });
@@ -79,13 +80,27 @@ function LoginForm() {
             error={errors.email?.message}
             {...register("email")}
           />
-          <Input
-            label="Password"
-            type="password"
-            autoComplete="current-password"
-            error={errors.password?.message}
-            {...register("password")}
-          />
+          <div className="relative">
+            <Input
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              error={errors.password?.message}
+              {...register("password")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-700 focus:outline-none"
+              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            >
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+          </div>
 
           <div className="flex items-center justify-between gap-4">
             <label className="inline-flex items-center gap-2 text-sm text-slate-600">

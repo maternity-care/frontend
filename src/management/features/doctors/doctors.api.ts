@@ -82,6 +82,11 @@ function normalizeDoctor(
 ): Doctor {
   const staff =
     doctor.staff ?? null;
+  const doctorRole = staff?.roles?.find(
+    (role) =>
+      normalizeText(role.name).toLowerCase() ===
+      "doctor",
+  );
 
   const id = normalizeText(
     doctor.id,
@@ -146,6 +151,8 @@ function normalizeDoctor(
     facilityIds: facilityId
       ? [facilityId]
       : [],
+    roleId: normalizeText(doctorRole?.id),
+    roleName: normalizeText(doctorRole?.name),
 
     licenseNo: normalizeText(
       doctor.licenseNo,
@@ -158,6 +165,11 @@ function normalizeDoctor(
     specialty: normalizeText(
       doctor.specialty,
     ),
+
+    workingRoomTypeId:
+      normalizeText(
+        doctor.workingRoomTypeId,
+      ),
 
     yearsOfExperience:
       Number.isFinite(
@@ -361,6 +373,8 @@ function compactParams(
       facilityId:
         params?.facilityId?.trim(),
       status: params?.status,
+      filterYearsOfExperienceLevel:
+        params?.filterYearsOfExperienceLevel,
       sortYearsOfExperience:
         params?.sortYearsOfExperience ??
         "desc",
@@ -393,6 +407,8 @@ function toCreatePayload(
       input.specialty.trim(),
     yearsOfExperience:
       input.yearsOfExperience,
+    workingRoomTypeId:
+      input.workingRoomTypeId.trim(),
     bio:
       input.bio?.trim() ||
       undefined,
@@ -406,6 +422,14 @@ function toUpdatePayload(
   const payload = {
     staffId:
       input.staffId?.trim(),
+    name:
+      input.name?.trim(),
+    personalEmail:
+      input.personalEmail?.trim(),
+    phone:
+      input.phone?.trim(),
+    address:
+      input.address?.trim(),
     licenseNo:
       input.licenseNo?.trim(),
     title:
@@ -414,6 +438,8 @@ function toUpdatePayload(
       input.specialty?.trim(),
     yearsOfExperience:
       input.yearsOfExperience,
+    workingRoomTypeId:
+      input.workingRoomTypeId?.trim(),
     bio: input.bio?.trim(),
     status: input.status,
   };

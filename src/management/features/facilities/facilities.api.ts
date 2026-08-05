@@ -22,6 +22,9 @@ import type {
   GetFacilityAdminOptionsParams,
   GetFacilityRoomTypesParams,
   GetFacilityLookupParams,
+  FacilityReactivateResult,
+  FacilitySuspendResult,
+  SuspendResourceInput,
   UpdateFacilityInput,
   UpdateFacilityOperatingHoursInput,
 } from "./facilities.types";
@@ -256,8 +259,6 @@ function toUpdatePayload(input: UpdateFacilityInput) {
     ward: input.ward?.trim(),
     latitude: input.latitude?.trim(),
     longitude: input.longitude?.trim(),
-    status:
-      input.status === undefined ? undefined : toBackendStatus(input.status),
   });
 }
 
@@ -638,6 +639,38 @@ export async function updateFacility(id: string, input: UpdateFacilityInput) {
   });
 }
 
+export async function suspendFacility(
+  id: string,
+  input: SuspendResourceInput,
+) {
+  const response = await unwrapApiResponse<FacilitySuspendResult>(
+    apiClient.patch(`/management/facilities/${id}/suspend`, {
+      inactiveUntil: input.inactiveUntil || null,
+      reason: input.reason?.trim() || undefined,
+    }),
+  );
+
+  return Object.assign({}, response, {
+    data: {
+      ...response.data,
+      facility: normalizeFacility(response.data.facility),
+    },
+  });
+}
+
+export async function reactivateFacility(id: string) {
+  const response = await unwrapApiResponse<FacilityReactivateResult>(
+    apiClient.patch(`/management/facilities/${id}/reactivate`, {}),
+  );
+
+  return Object.assign({}, response, {
+    data: {
+      ...response.data,
+      facility: normalizeFacility(response.data.facility),
+    },
+  });
+}
+
 export async function getFacilityOperatingHours(id: string) {
   const data = await unwrapApiData<BackendOperatingHoursResponse>(
     apiClient.get(`/management/facilities/${id}/operating-hours`),
@@ -668,16 +701,6 @@ export function previewFacilityOperatingHours(
       schedules: normalizeSchedules(input.schedules),
     }),
   );
-}
-
-export async function deactivateFacility(id: string) {
-  const response = await unwrapApiResponse<BackendFacility>(
-    apiClient.patch(`/management/facilities/${id}/deactivate`, {}),
-  );
-
-  return Object.assign({}, response, {
-    data: normalizeFacility(response.data),
-  });
 }
 
 export function deleteFacility(id: string, reason: string) {

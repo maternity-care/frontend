@@ -47,7 +47,6 @@ function RoomEditModalContent({
       name: input.name,
       roomTypeId: input.roomTypeId,
       floor: input.floor,
-      status: input.status,
     };
 
     const response = await updateRoom(

@@ -2,7 +2,6 @@
 
 import {
   createShiftSlot,
-  getShiftSlot,
 } from "@/management/features/shift-slots/shift-slots.api";
 import type {
   ShiftSlot,
@@ -37,17 +36,7 @@ export function ShiftSlotCreateModal({
         const response =
           await createShiftSlot(input);
 
-        let createdSlot = response.data;
-
-        try {
-          createdSlot = await getShiftSlot(
-            response.data.id,
-          );
-        } catch {
-          
-        }
-
-        onCreated(createdSlot);
+        onCreated(response.data);
 
         return (
           response.message ||

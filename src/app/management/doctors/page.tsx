@@ -51,8 +51,15 @@ import {
   getDoctor,
   getDoctors,
 } from "@/management/features/doctors/doctors.api";
+import {
+  getFacilities,
+} from "@/management/features/facilities/facilities.api";
+import {
+  getRoomTypeLookup,
+} from "@/management/features/rooms/rooms.api";
 import type {
   Doctor,
+  DoctorExperienceLevel,
   DoctorExperienceSort,
   DoctorStatus,
   GetDoctorsParams,
@@ -79,9 +86,33 @@ type DoctorFilters = {
   keyword?: string;
   specialty?: string;
   status?: DoctorStatus;
+  experienceLevel?:
+    DoctorExperienceLevel;
   sortYearsOfExperience:
     DoctorExperienceSort;
 };
+
+const EXPERIENCE_LEVEL_OPTIONS: Array<{
+  value: DoctorExperienceLevel;
+  label: string;
+}> = [
+  {
+    value: 1,
+    label: "Kinh nghiệm 1 - 5 năm",
+  },
+  {
+    value: 2,
+    label: "Kinh nghiệm 6 - 10 năm",
+  },
+  {
+    value: 3,
+    label: "Kinh nghiệm 11 - 20 năm",
+  },
+  {
+    value: 4,
+    label: "Kinh nghiệm trên 20 năm",
+  },
+];
 
 const EXPERIENCE_SORT_OPTIONS: Array<{
   value: DoctorExperienceSort;
@@ -236,6 +267,9 @@ function mergeDoctorDetail(
       detail.facilityIds.length > 0
         ? detail.facilityIds
         : current.facilityIds,
+    workingRoomTypeId:
+      detail.workingRoomTypeId ||
+      current.workingRoomTypeId,
   };
 }
 
@@ -307,6 +341,8 @@ function toApiParams(
       filters.specialty?.trim() ||
       undefined,
     status: filters.status,
+    filterYearsOfExperienceLevel:
+      filters.experienceLevel,
     sortYearsOfExperience:
       filters.sortYearsOfExperience,
     page,
@@ -339,6 +375,14 @@ export default function DoctorManagementPage() {
   ] =
     useState<
       DoctorStatus | undefined
+    >();
+
+  const [
+    experienceLevel,
+    setExperienceLevel,
+  ] =
+    useState<
+      DoctorExperienceLevel | undefined
     >();
 
   const [
@@ -420,6 +464,16 @@ export default function DoctorManagementPage() {
   const [total, setTotal] =
     useState(0);
 
+  const [
+    facilityNameById,
+    setFacilityNameById,
+  ] = useState<Record<string, string>>({});
+
+  const [
+    roomTypeNameById,
+    setRoomTypeNameById,
+  ] = useState<Record<string, string>>({});
+
   useEffect(() => {
     let cancelled = false;
 
@@ -463,6 +517,134 @@ export default function DoctorManagementPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDisplayLookups() {
+      const [
+        facilityResult,
+        roomTypeResult,
+      ] = await Promise.allSettled([
+        getFacilities({
+          page: 1,
+          limit: 100,
+        }),
+        getRoomTypeLookup({
+          status: "active",
+          limit: 50,
+        }),
+      ]);
+
+      if (cancelled) return;
+
+      if (
+        facilityResult.status ===
+        "fulfilled"
+      ) {
+        setFacilityNameById(
+          Object.fromEntries(
+            facilityResult.value.map(
+              (facility) => [
+                facility.id,
+                facility.name,
+              ],
+            ),
+          ),
+        );
+      }
+
+      if (
+        roomTypeResult.status ===
+        "fulfilled"
+      ) {
+        setRoomTypeNameById(
+          Object.fromEntries(
+            roomTypeResult.value.map(
+              (roomType) => [
+                roomType.id,
+                roomType.name,
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    void loadDisplayLookups();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const detailFacilityName =
+    useMemo(() => {
+      if (!detailDoctor) {
+        return "";
+      }
+
+      const facilityIds =
+        detailDoctor.facilityIds.length >
+        0
+          ? detailDoctor.facilityIds
+          : detailDoctor.facilityId
+            ? [
+                detailDoctor.facilityId,
+              ]
+            : [];
+
+      if (facilityIds.length === 0) {
+        return "Chưa được gán";
+      }
+
+      const names = Array.from(
+        new Set(facilityIds),
+      )
+        .map(
+          (facilityId) =>
+            facilityNameById[
+              facilityId
+            ],
+        )
+        .filter(
+          (
+            name,
+          ): name is string =>
+            Boolean(name),
+        );
+
+      return names.length > 0
+        ? names.join(", ")
+        : "Không tìm thấy tên cơ sở";
+    }, [
+      detailDoctor,
+      facilityNameById,
+    ]);
+
+  const detailRoomTypeName =
+    useMemo(() => {
+      if (!detailDoctor) {
+        return "";
+      }
+
+      if (
+        !detailDoctor.workingRoomTypeId
+      ) {
+        return "Chưa cập nhật";
+      }
+
+      return (
+        roomTypeNameById[
+          detailDoctor
+            .workingRoomTypeId
+        ] ||
+        "Không tìm thấy tên loại phòng"
+      );
+    }, [
+      detailDoctor,
+      roomTypeNameById,
+    ]);
+
   const stats = useMemo(() => {
     const active = doctors.filter(
       (doctor) =>
@@ -488,6 +670,7 @@ export default function DoctorManagementPage() {
         specialtyFilter.trim() ||
         undefined,
       status: statusFilter,
+      experienceLevel,
       sortYearsOfExperience:
         experienceSort,
       ...overrides,
@@ -553,6 +736,7 @@ export default function DoctorManagementPage() {
     setSearchValue("");
     setSpecialtyFilter("");
     setStatusFilter(undefined);
+    setExperienceLevel(undefined);
     setExperienceSort("desc");
 
     const nextFilters: DoctorFilters =
@@ -744,9 +928,9 @@ export default function DoctorManagementPage() {
     [
       {
         title: "STT",
-        width: 64,
+        width: 56,
         align: "center",
-        fixed: "left",
+        responsive: ["md"],
         render: (
           _value,
           _record,
@@ -759,8 +943,7 @@ export default function DoctorManagementPage() {
       },
       {
         title: "Bác sĩ",
-        width: 260,
-        fixed: "left",
+        width: "26%",
         render: (
           _value,
           doctor,
@@ -794,7 +977,8 @@ export default function DoctorManagementPage() {
       },
       {
         title: "Liên hệ",
-        width: 230,
+        width: "24%",
+        responsive: ["md"],
         render: (
           _value,
           doctor,
@@ -808,7 +992,7 @@ export default function DoctorManagementPage() {
 
             <Text
               type="secondary"
-              className="block text-xs"
+              className="block truncate text-xs"
             >
               {doctor.phone ||
                 "Chưa cập nhật số điện thoại"}
@@ -817,45 +1001,21 @@ export default function DoctorManagementPage() {
         ),
       },
       {
-        title: "Mã cơ sở",
-        dataIndex:
-          "facilityId",
-        width: 140,
-        ellipsis: true,
-        render: (
-          value: string,
-        ) =>
-          value ||
-          "Chưa được gán",
-      },
-      {
-        title: "Giấy phép",
-        dataIndex:
-          "licenseNo",
-        width: 150,
-        ellipsis: true,
-        render: (
-          value: string,
-        ) =>
-          value ||
-          "Chưa cập nhật",
-      },
-      {
         title: "Chuyên khoa",
-        width: 190,
+        width: "20%",
         render: (
           _value,
           doctor,
         ) => (
           <div>
-            <Text className="block">
+            <Text className="block truncate">
               {doctor.specialty ||
                 "Chưa cập nhật"}
             </Text>
 
             <Text
               type="secondary"
-              className="block text-xs"
+              className="block truncate text-xs"
             >
               {doctor.title ||
                 "Chưa cập nhật chức danh"}
@@ -867,8 +1027,9 @@ export default function DoctorManagementPage() {
         title: "Kinh nghiệm",
         dataIndex:
           "yearsOfExperience",
-        width: 125,
+        width: 105,
         align: "center",
+        responsive: ["lg"],
         render: (
           value: number,
         ) =>
@@ -877,7 +1038,7 @@ export default function DoctorManagementPage() {
       {
         title: "Trạng thái",
         dataIndex: "status",
-        width: 140,
+        width: 125,
         align: "center",
         render: (
           status: DoctorStatus,
@@ -887,14 +1048,13 @@ export default function DoctorManagementPage() {
       {
         title: "Thao tác",
         key: "actions",
-        width: 150,
+        width: 132,
         align: "center",
-        fixed: "right",
         render: (
           _value,
           doctor,
         ) => (
-          <Space size={6}>
+          <Space size={4}>
             <Tooltip title="Xem chi tiết">
               <Button
                 icon={
@@ -1009,13 +1169,13 @@ export default function DoctorManagementPage() {
               prefix={
                 <Search className="h-4 w-4 text-slate-400" />
               }
-              placeholder="Tìm..."
+              placeholder="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
               title="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
               style={{
-                width: 100,
-                minWidth: 100,
-                maxWidth: 100,
-                flex: "0 0 100px",
+                width: 300,
+                minWidth: 300,
+                maxWidth: 300,
+                flex: "0 0 300px",
               }}
               onChange={(event) => {
                 const value =
@@ -1087,16 +1247,39 @@ export default function DoctorManagementPage() {
               }}
             />
 
+            <Select<DoctorExperienceLevel>
+              allowClear
+              value={experienceLevel}
+              options={
+                EXPERIENCE_LEVEL_OPTIONS
+              }
+              placeholder="Mức kinh nghiệm"
+              style={{
+                width: 190,
+                minWidth: 190,
+                maxWidth: 190,
+                flex: "0 0 190px",
+              }}
+              onChange={(value) => {
+                setExperienceLevel(value);
+
+                applyFilters({
+                  experienceLevel:
+                    value,
+                });
+              }}
+            />
+
             <Select<DoctorExperienceSort>
               value={experienceSort}
               options={
                 EXPERIENCE_SORT_OPTIONS
               }
               style={{
-                width: 220,
-                minWidth: 220,
-                maxWidth: 220,
-                flex: "0 0 220px",
+                width: 210,
+                minWidth: 210,
+                maxWidth: 210,
+                flex: "0 0 210px",
               }}
               onChange={(value) => {
                 setExperienceSort(
@@ -1129,13 +1312,6 @@ export default function DoctorManagementPage() {
               />
             </Tooltip>
           </div>
-
-          <Text
-            type="secondary"
-            className="mt-2 block text-xs"
-          >
-            Nhấn Enter sau khi nhập từ khóa hoặc chuyên khoa. Trạng thái và sắp xếp được áp dụng ngay.
-          </Text>
         </Card>
 
         <Card
@@ -1174,9 +1350,6 @@ export default function DoctorManagementPage() {
             columns={columns}
             dataSource={doctors}
             className="management-table [&_.ant-table-cell]:px-3"
-            scroll={{
-              x: 1480,
-            }}
             onRow={(doctor) => ({
               className:
                 "cursor-pointer",
@@ -1242,8 +1415,9 @@ export default function DoctorManagementPage() {
         width={900}
         centered
         title={null}
+        closable={false}
         footer={
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-2">
             {detailDoctor ? (
               <Button
                 icon={
@@ -1286,54 +1460,79 @@ export default function DoctorManagementPage() {
           closable:
             !detailLoading,
         }}
+        styles={{
+          body: {
+            padding: 0,
+          },
+        }}
       >
         {detailDoctor ? (
-          <div>
-            <div className="mb-5 flex items-start gap-4 border-b border-slate-200 pb-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
-                <Stethoscope className="h-6 w-6" />
+          <div className="flex max-h-[78vh] flex-col">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-[18px] py-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                  <Stethoscope className="h-5 w-5" />
+                </div>
+
+                <div className="min-w-0">
+                  <Title
+                    level={4}
+                    className="!mb-0.5 !text-slate-950"
+                  >
+                    {detailDoctor.name}
+                  </Title>
+
+                  <Text
+                    type="secondary"
+                    className="mb-2 block"
+                  >
+                    {detailDoctor.title ||
+                      "Bác sĩ"}{" "}
+                    ·{" "}
+                    {detailDoctor.specialty ||
+                      "Chưa cập nhật chuyên khoa"}
+                  </Text>
+
+                  <Space size={8} wrap>
+                    {renderStatus(
+                      detailDoctor.status,
+                    )}
+
+                    <Tag color="blue">
+                      {detailDoctor.licenseNo ||
+                        "Chưa có giấy phép"}
+                    </Tag>
+                  </Space>
+                </div>
               </div>
 
-              <div className="min-w-0">
-                <Title
-                  level={3}
-                  className="!mb-1 !text-slate-950"
-                >
-                  {detailDoctor.name}
-                </Title>
-
-                <Text
-                  type="secondary"
-                  className="mb-2 block"
-                >
-                  {detailDoctor.title ||
-                    "Bác sĩ"}{" "}
-                  ·{" "}
-                  {detailDoctor.specialty ||
-                    "Chưa cập nhật chuyên khoa"}
-                </Text>
-
-                <Space size={8} wrap>
-                  {renderStatus(
-                    detailDoctor.status,
-                  )}
-
-                  <Tag color="blue">
-                    {detailDoctor.licenseNo ||
-                      "Chưa có giấy phép"}
-                  </Tag>
-                </Space>
-              </div>
+              <Button
+                type="text"
+                shape="circle"
+                aria-label="Đóng"
+                title="Đóng"
+                icon={
+                  <X className="h-5 w-5" />
+                }
+                className="shrink-0"
+                onClick={() =>
+                  setDetailDoctor(null)
+                }
+              />
             </div>
 
+            <div className="min-h-0 overflow-y-auto px-[18px] py-4 pr-3">
             <Descriptions
               bordered
               column={2}
-              size="middle"
+              size="small"
               styles={{
                 label: {
-                  width: 185,
+                  width: 145,
                   fontWeight: 600,
+                },
+                content: {
+                  minWidth: 0,
                 },
               }}
             >
@@ -1401,11 +1600,10 @@ export default function DoctorManagementPage() {
               </Descriptions.Item>
 
               <Descriptions.Item
-                label="Mã cơ sở"
+                label="Cơ sở làm việc"
                 span={1}
               >
-                {detailDoctor.facilityId ||
-                  "Chưa được gán"}
+                {detailFacilityName}
               </Descriptions.Item>
 
               <Descriptions.Item
@@ -1444,6 +1642,13 @@ export default function DoctorManagementPage() {
               </Descriptions.Item>
 
               <Descriptions.Item
+                label="Loại phòng làm việc"
+                span={1}
+              >
+                {detailRoomTypeName}
+              </Descriptions.Item>
+
+              <Descriptions.Item
                 label="Trạng thái bác sĩ"
                 span={1}
               >
@@ -1454,7 +1659,7 @@ export default function DoctorManagementPage() {
 
               <Descriptions.Item
                 label="Trạng thái nhân sự"
-                span={1}
+                span={2}
               >
                 {renderStatus(
                   detailDoctor.staffStatus,
@@ -1507,6 +1712,7 @@ export default function DoctorManagementPage() {
                 </Space>
               </Descriptions.Item>
             </Descriptions>
+            </div>
           </div>
         ) : null}
       </Modal>

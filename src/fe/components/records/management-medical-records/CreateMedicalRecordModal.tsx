@@ -161,41 +161,43 @@ export function CreateMedicalRecordModal({
 
   // Load appointments theo pregnancyProfileId
   useEffect(() => {
-    if (!open || !profile?.id) {
-      setAppointments([]);
-      return;
-    }
-
     let cancelled = false;
-
-    const loadAppointments = async () => {
-      setLoadingAppointments(true);
-      try {
-        const data = await getAppointmentsByPregnancyProfileId(profile.id);
-        if (!cancelled) {
-          setAppointments(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error(err);
-          message.error(
-            err instanceof Error
-              ? err.message
-              : "Không tải được danh sách lịch hẹn",
-          );
-          setAppointments([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingAppointments(false);
-        }
+    const timer = window.setTimeout(() => {
+      if (!open || !profile?.id) {
+        setAppointments([]);
+        return;
       }
-    };
 
-    void loadAppointments();
+      const loadAppointments = async () => {
+        setLoadingAppointments(true);
+        try {
+          const data = await getAppointmentsByPregnancyProfileId(profile.id);
+          if (!cancelled) {
+            setAppointments(Array.isArray(data) ? data : []);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.error(err);
+            message.error(
+              err instanceof Error
+                ? err.message
+                : "Không tải được danh sách lịch hẹn",
+            );
+            setAppointments([]);
+          }
+        } finally {
+          if (!cancelled) {
+            setLoadingAppointments(false);
+          }
+        }
+      };
+
+      void loadAppointments();
+    }, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [open, profile?.id]);
 

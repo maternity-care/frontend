@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  getShiftSlot,
   updateShiftSlot,
 } from "@/management/features/shift-slots/shift-slots.api";
 import type {
@@ -59,19 +58,7 @@ function ShiftSlotEditModalContent({
           updateInput,
         );
 
-        let updatedSlot: ShiftSlot = {
-          ...slot,
-          ...response.data,
-        };
-
-        try {
-          updatedSlot = await getShiftSlot(
-            response.data.id || slot.id,
-          );
-        } catch {
-        }
-
-        onUpdated(updatedSlot);
+        onUpdated(response.data);
 
         return (
           response.message ||

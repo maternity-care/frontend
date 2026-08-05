@@ -529,7 +529,7 @@ export default function ManagementDashboardPage() {
     }
 
     if (shiftsResult.status === "fulfilled") {
-      nextState.shifts = shiftsResult.value;
+      nextState.shifts = shiftsResult.value.items;
     } else {
       errors.push(`Ca trực: ${getErrorMessage(shiftsResult.reason)}`);
     }
