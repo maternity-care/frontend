@@ -268,6 +268,10 @@ function CommentItem({
     action: ForumCommentModerationAction,
   ) => void;
 }) {
+  const [
+    showModerationReason,
+    setShowModerationReason,
+  ] = useState(false);
   const canModerate =
     comment.status !== "deleted";
 
@@ -370,15 +374,41 @@ function CommentItem({
       </Paragraph>
 
       {comment.moderationReason ? (
-        <Alert
-          type="warning"
-          showIcon
-          className="mt-3"
-          title="Lý do kiểm duyệt"
-          description={
-            comment.moderationReason
-          }
-        />
+        <div className="mt-3">
+          <Button
+            type="text"
+            size="small"
+            className="!h-auto !px-0 !text-amber-700"
+            icon={
+              showModerationReason ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )
+            }
+            onClick={() =>
+              setShowModerationReason(
+                (current) => !current,
+              )
+            }
+          >
+            {showModerationReason
+              ? "Ẩn lý do kiểm duyệt"
+              : "Xem lý do kiểm duyệt"}
+          </Button>
+
+          {showModerationReason ? (
+            <Alert
+              type="warning"
+              showIcon
+              className="mt-2 !rounded-xl !border-amber-200 !bg-amber-50"
+              title="Lý do kiểm duyệt"
+              description={
+                comment.moderationReason
+              }
+            />
+          ) : null}
+        </div>
       ) : null}
 
       {comment.replies.length > 0 ? (
