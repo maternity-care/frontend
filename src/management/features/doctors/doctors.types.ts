@@ -153,11 +153,13 @@ export interface DoctorPermissionOverrideInput {
 }
 
 export interface CreateDoctorInput {
-  name: string;
-  personalEmail: string;
-  phone: string;
-  roleIds: string[];
-  facilityAssignments:
+  staffId: string;
+  name?: string;
+  personalEmail?: string;
+  phone?: string;
+  address?: string;
+  roleIds?: string[];
+  facilityAssignments?:
     DoctorFacilityAssignment[];
   licenseNo: string;
   title: string;
@@ -167,6 +169,7 @@ export interface CreateDoctorInput {
   bio?: string;
   permissionOverrides?:
     DoctorPermissionOverrideInput[];
+  status?: DoctorStatus;
 }
 
 export interface UpdateDoctorInput {

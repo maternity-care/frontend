@@ -199,10 +199,46 @@ function deriveAccountType(roleName?: string): AccountType {
   return "customer";
 }
 
+type StaffListUser = BackendUser & {
+  facilityId?: string | number | null;
+  personalEmail?: string | null;
+  employeeCode?: string | null;
+};
+
+function getStaffProfile(user: StaffListUser): BackendUser["staffProfile"] {
+  if (user.staffProfile) return user.staffProfile;
+
+  const facilityId = user.facilityId === null || user.facilityId === undefined
+    ? ""
+    : String(user.facilityId);
+  const roles = (user.roles ?? [])
+    .map((role) => role.name)
+    .filter((role): role is StaffPosition =>
+      role === "admin" || role === "doctor" || role === "nurse" || role === "staff",
+    );
+
+  if (!facilityId && !user.personalEmail && !user.employeeCode && roles.length === 0) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    staffId: user.id,
+    personalEmail: user.personalEmail || user.email,
+    employeeCode: user.employeeCode || "",
+    status: user.status,
+    facilityAssignments: facilityId
+      ? [{ facilityId, roles: roles.length ? roles : ["staff"] }]
+      : [],
+    doctor: null,
+  };
+}
+
 function normalizeUser(user: BackendUser): UserAccount {
   const firstRole = user.roles?.[0];
+  const staffProfile = getStaffProfile(user);
   const roleName =
-    user.staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
+    staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
   const accountType = deriveAccountType(roleName);
 
   return {
@@ -217,7 +253,7 @@ function normalizeUser(user: BackendUser): UserAccount {
     status: toUiStatus(user.status),
     createdAt: user.createdAt,
     lastLogin: undefined,
-    staffProfile: user.staffProfile,
+    staffProfile,
   };
 }
 

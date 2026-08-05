@@ -7,6 +7,7 @@ import type {
   BackendMedicalRecordFile,
   BackendAppointment,
   Appointment,
+  PendingMedicalRecordFile,
 } from "./management-medical-records.types";
 
 const MEDICAL_RECORDS_URL = "/management/medical-records";
@@ -96,4 +97,16 @@ export async function getAppointmentsByPregnancyProfileId(
   // Hỗ trợ cả trường hợp backend trả về array hoặc single object
   const list = Array.isArray(data) ? data : data ? [data] : [];
   return list.map(normalizeAppointment);
+}
+
+export async function getPendingMedicalRecordFiles(
+  appointmentId: string,
+): Promise<PendingMedicalRecordFile[]> {
+  const data = await unwrapApiData<PendingMedicalRecordFile[]>(
+    apiClient.get(`${MEDICAL_RECORDS_URL}/pending-files`, {
+      params: { appointmentId },
+    }),
+  );
+
+  return Array.isArray(data) ? data : [];
 }

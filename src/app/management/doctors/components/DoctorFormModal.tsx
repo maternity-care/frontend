@@ -30,7 +30,6 @@ import {
   X,
 } from "lucide-react";
 import { ApiClientError } from "@/lib/axios";
-import { getFacilities } from "@/management/features/facilities/facilities.api";
 import {
   getRoomTypeLookup,
 } from "@/management/features/rooms/rooms.api";
@@ -47,10 +46,10 @@ import type {
   DoctorStatus,
   UpdateDoctorInput,
 } from "@/management/features/doctors/doctors.types";
+import { getUsersPage } from "@/management/features/users/users.api";
+import type { User } from "@/management/features/users/users.types";
 
 const { Text, Title } = Typography;
-
-const DEFAULT_DOCTOR_ROLE_ID = "3";
 
 export const doctorStatusOptions = [
   { value: "active", label: "Hoạt động" },
@@ -171,11 +170,10 @@ export function DoctorFormModal({
   const { message: messageApi } = App.useApp();
 
   const [submitting, setSubmitting] = useState(false);
-  const [facilityOptions, setFacilityOptions] = useState<
-    Array<{ value: string; label: string }>
-  >([]);
-  const [facilitiesLoading, setFacilitiesLoading] =
-    useState(true);
+  const facilityOptions: Array<{ value: string; label: string }> = [];
+  const facilitiesLoading = false;
+  const [staffOptions, setStaffOptions] = useState<User[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
   const [roomTypes, setRoomTypes] =
     useState<RoomType[]>([]);
   const [roomTypesLoading, setRoomTypesLoading] =
@@ -222,10 +220,7 @@ export function DoctorFormModal({
   );
   const phone = Form.useWatch("phone", form);
   const address = Form.useWatch("address", form);
-  const facilityIds = Form.useWatch(
-    "facilityIds",
-    form,
-  );
+  const facilityIds: string[] = [];
   const staffId = Form.useWatch("staffId", form);
   const licenseNo = Form.useWatch("licenseNo", form);
   const title = Form.useWatch("title", form);
@@ -243,44 +238,72 @@ export function DoctorFormModal({
   );
   const status = Form.useWatch("status", form);
 
-  useEffect(() => {
-    let cancelled = false;
+  const selectedStaff = useMemo(
+    () =>
+      staffOptions.find(
+        (user) =>
+          String(user.staffProfile?.staffId ?? user.id) ===
+          String(staffId ?? ""),
+      ) ?? null,
+    [staffId, staffOptions],
+  );
 
-    void getFacilities()
-      .then((facilities) => {
+  const staffSelectOptions = useMemo(
+    () =>
+      staffOptions.map((user) => {
+        const profile = user.staffProfile;
+        const value = String(profile?.staffId ?? user.id);
+        const employeeCode = profile?.employeeCode;
+        const personalEmail =
+          profile?.personalEmail ?? user.email;
+
+        return {
+          value,
+          label: `${employeeCode ? `${employeeCode} - ` : ""}${user.name} (${personalEmail})`,
+        };
+      }),
+    [staffOptions],
+  );
+
+  useEffect(() => {
+    if (!open || editingDoctor) return;
+
+    let cancelled = false;
+    setStaffLoading(true);
+
+    void getUsersPage({
+      status: "active",
+      limit: 50,
+    })
+      .then((data) => {
         if (cancelled) return;
 
-        setFacilityOptions(
-          facilities
-            .filter(
-              (facility) =>
-                facility.status === "active",
-            )
-            .map((facility) => ({
-              value: facility.id,
-              label: `${facility.name} (${facility.code})`,
-            })),
+        setStaffOptions(
+          data.users.filter(
+            (user) => !user.staffProfile?.doctor,
+          ),
         );
       })
-      .catch((facilityError) => {
+      .catch((staffError) => {
         if (cancelled) return;
 
+        setStaffOptions([]);
         void messageApi.error(
-          facilityError instanceof Error
-            ? facilityError.message
-            : "Không tải được danh sách cơ sở.",
+          staffError instanceof Error
+            ? staffError.message
+            : "Không tải được danh sách tài khoản staff.",
         );
       })
       .finally(() => {
         if (!cancelled) {
-          setFacilitiesLoading(false);
+          setStaffLoading(false);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [messageApi]);
+  }, [editingDoctor, messageApi, open]);
 
   useEffect(() => {
     let cancelled = false;
@@ -333,7 +356,7 @@ export function DoctorFormModal({
           yearsOfExperience:
             editingDoctor.yearsOfExperience,
           workingRoomTypeId:
-            editingDoctor.workingRoomTypeId,
+            editingDoctor.workingRoomTypeId ?? undefined,
           bio: editingDoctor.bio,
           status: editingDoctor.status,
         });
@@ -433,22 +456,8 @@ export function DoctorFormModal({
         return;
       }
 
-      const selectedFacilityIds =
-        values.facilityIds ?? [];
-
       const payload: CreateDoctorInput = {
-        name: values.name?.trim() ?? "",
-        personalEmail:
-          values.personalEmail?.trim() ?? "",
-        phone: values.phone?.trim() ?? "",
-        roleIds: [DEFAULT_DOCTOR_ROLE_ID],
-        facilityAssignments:
-          selectedFacilityIds.map(
-            (facilityId) => ({
-              facilityId,
-              roles: ["doctor"],
-            }),
-          ),
+        staffId: values.staffId?.trim() ?? "",
         licenseNo: values.licenseNo.trim(),
         title: values.title.trim(),
         specialty: values.specialty.trim(),
@@ -457,7 +466,7 @@ export function DoctorFormModal({
         workingRoomTypeId:
           values.workingRoomTypeId.trim(),
         bio: values.bio?.trim() || undefined,
-        permissionOverrides: [],
+        status: "active",
       };
 
       const response =
@@ -562,6 +571,78 @@ export function DoctorFormModal({
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-3">
             {!isEditing ? (
+              <Card
+                size="small"
+                className="border-slate-200"
+                styles={{
+                  header: {
+                    padding: "8px 12px",
+                    minHeight: 46,
+                  },
+                  body: {
+                    padding: "10px 12px 0",
+                  },
+                }}
+                title={
+                  <Space size={10}>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+                      <UserRound className="h-4 w-4" />
+                    </span>
+
+                    <span>
+                      <p className="mb-0 text-base font-semibold text-slate-950">
+                        Tài khoản staff
+                      </p>
+                      <p className="mb-0 text-xs font-normal text-slate-500">
+                        Chọn tài khoản nhân viên để gắn hồ sơ bác sĩ.
+                      </p>
+                    </span>
+                  </Space>
+                }
+              >
+                <Form.Item
+                  name="staffId"
+                  label="Tài khoản staff"
+                  rules={[
+                    {
+                      required: true,
+                      message:
+                        "Vui lòng chọn tài khoản staff.",
+                    },
+                  ]}
+                >
+                  <Select
+                    showSearch
+                    options={staffSelectOptions}
+                    optionFilterProp="label"
+                    placeholder="Chọn tài khoản staff"
+                    loading={staffLoading}
+                    notFoundContent="Chưa có tài khoản staff phù hợp"
+                    onChange={(value) => {
+                      const user =
+                        staffOptions.find(
+                          (item) =>
+                            String(
+                              item.staffProfile?.staffId ??
+                                item.id,
+                            ) === String(value),
+                        ) ?? null;
+
+                      form.setFieldsValue({
+                        name: user?.name ?? "",
+                        personalEmail:
+                          user?.staffProfile?.personalEmail ??
+                          user?.email ??
+                          "",
+                        phone: user?.phone ?? "",
+                      });
+                    }}
+                  />
+                </Form.Item>
+              </Card>
+            ) : null}
+
+            {false ? (
               <Card
                 size="small"
                 className="border-slate-200"
@@ -779,7 +860,7 @@ export function DoctorFormModal({
               </Card>
             ) : null}
 
-            {!isEditing ? (
+            {false ? (
               <Card
                 size="small"
                 className="border-slate-200"
@@ -1053,6 +1134,8 @@ export function DoctorFormModal({
                         "Chưa cập nhật"
                       }`
                     : personalEmail ||
+                      selectedStaff?.staffProfile?.personalEmail ||
+                      selectedStaff?.email ||
                       "Chưa có email"}
                 </p>
               </div>

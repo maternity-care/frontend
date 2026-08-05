@@ -37,6 +37,19 @@ export interface MedicalRecordFile {
   updatedAt?: string | null;
 }
 
+export interface PendingMedicalRecordFile {
+  id: string;
+  appointmentId: string;
+  pregnancyProfileId?: string | null;
+  doctorId?: string | null;
+  fileType: MedicalRecordFileType;
+  fileName: string;
+  fileUrl: string;
+  mimeType: string;
+  sourcePath?: string | null;
+  createdAt?: string | null;
+}
+
 export interface MedicalRecord {
   id: string;
   appointmentId: string | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dayjs from "dayjs";
 import {
   Button,
@@ -17,18 +17,22 @@ import {
 } from "antd";
 import type { UploadFile, UploadProps } from "antd";
 import { Upload as UploadIcon } from "lucide-react";
+import { io, type Socket } from "socket.io-client";
 
 import { createManagementPresignedUpload } from "@/management/features/uploads/uploads.api";
+import { API_BASE_URL } from "@/lib/constants";
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   CreateMedicalRecordFileInput,
   CreateMedicalRecordInput,
   Appointment,
+  PendingMedicalRecordFile,
 } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.types";
 import {
   createManagementMedicalRecord,
   getAppointmentsByPregnancyProfileId,
+  getPendingMedicalRecordFiles,
 } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
 
 const { TextArea } = Input;
@@ -37,6 +41,7 @@ const { Text } = Typography;
 interface Props {
   open: boolean;
   profile: ManagementPregnancyProfile | null;
+  initialAppointmentId?: string | null;
   loading?: boolean;
   onCancel: () => void;
   onSuccess: () => void;
@@ -54,6 +59,7 @@ interface FormValues {
 export function CreateMedicalRecordModal({
   open,
   profile,
+  initialAppointmentId,
   onCancel,
   onSuccess,
 }: Props) {
@@ -66,6 +72,35 @@ export function CreateMedicalRecordModal({
   const [loadingAppointments, setLoadingAppointments] = useState(false);
 
   const { doctorId, user } = useCurrentUser();
+  const selectedAppointmentId = Form.useWatch("appointmentId", form);
+
+  const appendPendingFiles = useCallback((pendingFiles: PendingMedicalRecordFile[]) => {
+    if (!pendingFiles.length) return;
+
+    setFileList((currentFiles) => {
+      const existingUrls = new Set(
+        currentFiles
+          .map((file) => file.response?.publicUrl || file.url)
+          .filter(Boolean),
+      );
+
+      const helperFiles = pendingFiles
+        .filter((file) => file.fileUrl && !existingUrls.has(file.fileUrl))
+        .map<UploadFile>((file) => ({
+          uid: `helper-${file.id}`,
+          name: file.fileName,
+          status: "done",
+          url: file.fileUrl,
+          type: file.mimeType,
+          response: {
+            publicUrl: file.fileUrl,
+            helperPendingId: file.id,
+          },
+        }));
+
+      return helperFiles.length ? [...currentFiles, ...helperFiles] : currentFiles;
+    });
+  }, []);
 
   // Tự điền doctorId
   useEffect(() => {
@@ -75,43 +110,94 @@ export function CreateMedicalRecordModal({
     }
   }, [open, doctorId, form]);
 
-  // Load appointments theo pregnancyProfileId
   useEffect(() => {
-    if (!open || !profile?.id) {
-      setAppointments([]);
-      return;
-    }
+    if (!open || !initialAppointmentId) return;
+    form.setFieldsValue({ appointmentId: String(initialAppointmentId) });
+  }, [form, initialAppointmentId, open]);
+
+  useEffect(() => {
+    const appointmentId = String(selectedAppointmentId || "").trim();
+    if (!open || !appointmentId) return;
 
     let cancelled = false;
-
-    const loadAppointments = async () => {
-      setLoadingAppointments(true);
-      try {
-        const data = await getAppointmentsByPregnancyProfileId(profile.id);
+    void getPendingMedicalRecordFiles(appointmentId)
+      .then((files) => {
+        if (!cancelled) appendPendingFiles(files);
+      })
+      .catch(() => {
         if (!cancelled) {
-          setAppointments(Array.isArray(data) ? data : []);
+          message.warning("Không tải được file helper đang chờ của lịch hẹn.");
         }
-      } catch (err) {
-        if (!cancelled) {
-          console.error(err);
-          message.error(
-            err instanceof Error
-              ? err.message
-              : "Không tải được danh sách lịch hẹn",
-          );
-          setAppointments([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingAppointments(false);
-        }
-      }
-    };
-
-    void loadAppointments();
+      });
 
     return () => {
       cancelled = true;
+    };
+  }, [appendPendingFiles, open, selectedAppointmentId]);
+
+  useEffect(() => {
+    const appointmentId = String(selectedAppointmentId || "").trim();
+    if (!open || !appointmentId) return;
+
+    const socket: Socket = io(`${API_BASE_URL}/realtime`, {
+      transports: ["websocket", "polling"],
+    });
+
+    socket.on("connect", () => {
+      socket.emit("appointment:join", { appointmentId });
+    });
+
+    socket.on("medical-record:file.pending", (file: PendingMedicalRecordFile) => {
+      if (String(file.appointmentId) !== appointmentId) return;
+      appendPendingFiles([file]);
+      message.success(`Helper đã thêm file: ${file.fileName}`);
+    });
+
+    return () => {
+      socket.emit("appointment:leave", { appointmentId });
+      socket.disconnect();
+    };
+  }, [appendPendingFiles, open, selectedAppointmentId]);
+
+  // Load appointments theo pregnancyProfileId
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!open || !profile?.id) {
+        setAppointments([]);
+        return;
+      }
+
+      const loadAppointments = async () => {
+        setLoadingAppointments(true);
+        try {
+          const data = await getAppointmentsByPregnancyProfileId(profile.id);
+          if (!cancelled) {
+            setAppointments(Array.isArray(data) ? data : []);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.error(err);
+            message.error(
+              err instanceof Error
+                ? err.message
+                : "Không tải được danh sách lịch hẹn",
+            );
+            setAppointments([]);
+          }
+        } finally {
+          if (!cancelled) {
+            setLoadingAppointments(false);
+          }
+        }
+      };
+
+      void loadAppointments();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [open, profile?.id]);
 
