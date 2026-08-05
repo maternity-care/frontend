@@ -269,6 +269,34 @@ export interface ForumPostListResult {
   totalPages: number;
 }
 
+export interface CreateForumPostInput {
+  topicId: string;
+  title: string;
+  content: string;
+  coverImageUrl?: string;
+  status: ForumPostStatus;
+  commentable: boolean;
+  isPinned: boolean;
+  isFeatured: boolean;
+  moderationReason?: string;
+}
+
+export interface UpdateForumPostInput {
+  topicId?: string;
+  title?: string;
+  content?: string;
+  coverImageUrl?: string;
+  status?: ForumPostStatus;
+  commentable?: boolean;
+  isPinned?: boolean;
+  isFeatured?: boolean;
+  moderationReason?: string;
+}
+
+export interface DeleteForumPostInput {
+  reason: string;
+}
+
 export interface ModerateForumPostInput {
   action: ForumPostModerationAction;
   reason: string;
@@ -276,6 +304,16 @@ export interface ModerateForumPostInput {
 
 export interface ModerateForumCommentInput {
   action: ForumCommentModerationAction;
+  reason: string;
+}
+
+export interface UpdateForumCommentInput {
+  content?: string;
+  parentId?: string;
+  messageType?: string;
+}
+
+export interface DeleteForumCommentInput {
   reason: string;
 }
 

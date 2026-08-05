@@ -1,23 +1,46 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Card, Col, Row, Segmented, Statistic } from "antd";
+import {
+  useCallback,
+  useMemo,
+  useState,
+} from "react";
+import type { ReactNode } from "react";
+import {
+  Card,
+  Col,
+  Row,
+  Segmented,
+  Statistic,
+} from "antd";
 import {
   CircleAlert,
+  FilePenLine,
   FileText,
   Flag,
   MessagesSquare,
   Tags,
 } from "lucide-react";
 
+import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import type { ForumTopic } from "@/management/features/forums/forums.types";
+import { ForumPostAdminTab } from "./components/ForumPostAdminTab";
 import { ForumPostsTab } from "./components/ForumPostsTab";
 import { ForumReportsTab } from "./components/ForumReportsTab";
 import { ForumTopicsTab } from "./components/ForumTopicsTab";
 
-type ForumView = "posts" | "reports" | "topics";
+type ForumView =
+  | "posts"
+  | "post-admin"
+  | "reports"
+  | "topics";
+
+type ForumNavigationOption = {
+  value: ForumView;
+  label: ReactNode;
+};
 
 type PostSummary = {
   total: number;
@@ -30,34 +53,124 @@ type ReportSummary = {
 };
 
 export default function ForumManagementPage() {
-  const [view, setView] = useState<ForumView>("posts");
-  const [topics, setTopics] = useState<ForumTopic[]>([]);
-  const [postSummary, setPostSummary] = useState<PostSummary>({
-    total: 0,
-    pending: 0,
-  });
-  const [reportSummary, setReportSummary] = useState<ReportSummary>({
+  const roles = useAuthStore(
+    (state) => state.roles,
+  );
+  const isForumAdmin =
+    roles.includes("admin") ||
+    roles.includes("super_admin");
+  const isSuperAdmin =
+    roles.includes("super_admin");
+
+  const [view, setView] =
+    useState<ForumView>("posts");
+  const [topics, setTopics] = useState<
+    ForumTopic[]
+  >([]);
+  const [postSummary, setPostSummary] =
+    useState<PostSummary>({
+      total: 0,
+      pending: 0,
+    });
+  const [
+    reportSummary,
+    setReportSummary,
+  ] = useState<ReportSummary>({
     total: 0,
     needAction: 0,
   });
 
-  const handleTopicsChange = useCallback((nextTopics: ForumTopic[]) => {
-    setTopics(nextTopics);
-  }, []);
+  const activeView =
+    !isForumAdmin &&
+    view === "post-admin"
+      ? "posts"
+      : view;
 
-  const handlePostSummaryChange = useCallback((summary: PostSummary) => {
-    setPostSummary(summary);
-  }, []);
+  const navigationOptions =
+    useMemo<ForumNavigationOption[]>(
+      () => [
+        {
+          value: "posts",
+          label: (
+            <span className="flex items-center gap-2">
+              <MessagesSquare className="h-4 w-4" />
+              Bài viết
+            </span>
+          ),
+        },
+        ...(isForumAdmin
+          ? [
+              {
+                value:
+                  "post-admin" as const,
+                label: (
+                  <span className="flex items-center gap-2">
+                    <FilePenLine className="h-4 w-4" />
+                    Quản trị bài viết
+                  </span>
+                ),
+              },
+            ]
+          : []),
+        {
+          value: "reports",
+          label: (
+            <span className="flex items-center gap-2">
+              <Flag className="h-4 w-4" />
+              Báo cáo
+            </span>
+          ),
+        },
+        {
+          value: "topics",
+          label: (
+            <span className="flex items-center gap-2">
+              <Tags className="h-4 w-4" />
+              Chủ đề
+            </span>
+          ),
+        },
+      ],
+      [isForumAdmin],
+    );
 
-  const handleReportSummaryChange = useCallback((summary: ReportSummary) => {
-    setReportSummary(summary);
-  }, []);
+  const handleTopicsChange =
+    useCallback(
+      (nextTopics: ForumTopic[]) => {
+        setTopics(nextTopics);
+      },
+      [],
+    );
+
+  const handlePostSummaryChange =
+    useCallback(
+      (summary: PostSummary) => {
+        setPostSummary(summary);
+      },
+      [],
+    );
+
+  const handleReportSummaryChange =
+    useCallback(
+      (summary: ReportSummary) => {
+        setReportSummary(summary);
+      },
+      [],
+    );
+
+  const navigation = (
+    <Segmented<ForumView>
+      value={activeView}
+      options={navigationOptions}
+      onChange={setView}
+    />
+  );
 
   return (
     <AdminLayout>
       <PageHeader
         title="Quản lý diễn đàn"
-        description="Quản lý chủ đề, kiểm duyệt bài viết, bình luận trong bài và xử lý báo cáo nội dung."
+        description="Kiểm duyệt bài viết, quản trị nội dung, quản lý chủ đề và xử lý báo cáo."
       />
 
       <div className="mt-6 flex flex-col gap-5">
@@ -67,7 +180,9 @@ export default function ForumManagementPage() {
               <Statistic
                 title="Tổng bài viết"
                 value={postSummary.total}
-                prefix={<FileText className="mr-2 h-5 w-5 text-blue-600" />}
+                prefix={
+                  <FileText className="mr-2 h-5 w-5 text-blue-600" />
+                }
               />
             </Card>
           </Col>
@@ -77,7 +192,9 @@ export default function ForumManagementPage() {
               <Statistic
                 title="Chờ duyệt trên trang"
                 value={postSummary.pending}
-                prefix={<CircleAlert className="mr-2 h-5 w-5 text-amber-600" />}
+                prefix={
+                  <CircleAlert className="mr-2 h-5 w-5 text-amber-600" />
+                }
               />
             </Card>
           </Col>
@@ -86,8 +203,12 @@ export default function ForumManagementPage() {
             <Card className="border-red-100 bg-red-50/60">
               <Statistic
                 title="Báo cáo cần xử lý"
-                value={reportSummary.needAction}
-                prefix={<Flag className="mr-2 h-5 w-5 text-red-600" />}
+                value={
+                  reportSummary.needAction
+                }
+                prefix={
+                  <Flag className="mr-2 h-5 w-5 text-red-600" />
+                }
               />
             </Card>
           </Col>
@@ -97,98 +218,80 @@ export default function ForumManagementPage() {
               <Statistic
                 title="Tổng chủ đề"
                 value={topics.length}
-                prefix={<Tags className="mr-2 h-5 w-5 text-purple-600" />}
+                prefix={
+                  <Tags className="mr-2 h-5 w-5 text-purple-600" />
+                }
               />
             </Card>
           </Col>
         </Row>
 
-        {view !== "posts" ? (
+        {activeView !== "posts" ? (
           <Card className="border-slate-200 bg-white">
-            <Segmented<ForumView>
-              value={view}
-              options={[
-                {
-                  value: "posts",
-                  label: (
-                    <span className="flex items-center gap-2">
-                      <MessagesSquare className="h-4 w-4" />
-                      Bài viết
-                    </span>
-                  ),
-                },
-                {
-                  value: "reports",
-                  label: (
-                    <span className="flex items-center gap-2">
-                      <Flag className="h-4 w-4" />
-                      Báo cáo
-                    </span>
-                  ),
-                },
-                {
-                  value: "topics",
-                  label: (
-                    <span className="flex items-center gap-2">
-                      <Tags className="h-4 w-4" />
-                      Chủ đề
-                    </span>
-                  ),
-                },
-              ]}
-              onChange={setView}
-            />
+            {navigation}
           </Card>
         ) : null}
 
-        <div className={view === "posts" ? "block" : "hidden"}>
+        <div
+          className={
+            activeView === "posts"
+              ? "block"
+              : "hidden"
+          }
+        >
           <ForumPostsTab
             topics={topics}
-            navigation={
-              <Segmented<ForumView>
-                value={view}
-                options={[
-                  {
-                    value: "posts",
-                    label: (
-                      <span className="flex items-center gap-2">
-                        <MessagesSquare className="h-4 w-4" />
-                        Bài viết
-                      </span>
-                    ),
-                  },
-                  {
-                    value: "reports",
-                    label: (
-                      <span className="flex items-center gap-2">
-                        <Flag className="h-4 w-4" />
-                        Báo cáo
-                      </span>
-                    ),
-                  },
-                  {
-                    value: "topics",
-                    label: (
-                      <span className="flex items-center gap-2">
-                        <Tags className="h-4 w-4" />
-                        Chủ đề
-                      </span>
-                    ),
-                  },
-                ]}
-                onChange={setView}
-              />
+            navigation={navigation}
+            onSummaryChange={
+              handlePostSummaryChange
             }
-            onSummaryChange={handlePostSummaryChange}
           />
         </div>
 
-        <div className={view === "reports" ? "block" : "hidden"}>
-          <ForumReportsTab onSummaryChange={handleReportSummaryChange} />
+        {isForumAdmin ? (
+          <div
+            className={
+              activeView ===
+              "post-admin"
+                ? "block"
+                : "hidden"
+            }
+          >
+            <ForumPostAdminTab
+              topics={topics}
+              canHardDelete={
+                isSuperAdmin
+              }
+            />
+          </div>
+        ) : null}
+
+        <div
+          className={
+            activeView === "reports"
+              ? "block"
+              : "hidden"
+          }
+        >
+          <ForumReportsTab
+            onSummaryChange={
+              handleReportSummaryChange
+            }
+          />
         </div>
 
-        <div className={view === "topics" ? "block" : "hidden"}>
-          <ForumTopicsTab onTopicsChange={handleTopicsChange} />
+        <div
+          className={
+            activeView === "topics"
+              ? "block"
+              : "hidden"
+          }
+        >
+          <ForumTopicsTab
+            onTopicsChange={
+              handleTopicsChange
+            }
+          />
         </div>
       </div>
     </AdminLayout>
