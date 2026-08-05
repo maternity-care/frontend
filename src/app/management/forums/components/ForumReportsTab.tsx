@@ -221,6 +221,20 @@ export function ForumReportsTab({
 
   const columns: ColumnsType<ForumReport> = [
     {
+      title: "STT",
+      width: 64,
+      align: "center",
+      render: (
+        _value,
+        _record,
+        index,
+      ) =>
+        (page - 1) *
+          pageSize +
+        index +
+        1,
+    },
+    {
       title: "Mã báo cáo",
       dataIndex: "id",
       width: 150,
