@@ -110,45 +110,82 @@ export default function ForumManagementPage() {
           </Col>
         </Row>
 
-        <Card className="border-slate-200 bg-white">
-          <Segmented<ForumView>
-            value={view}
-            options={[
-              {
-                value: "posts",
-                label: (
-                  <span className="flex items-center gap-2">
-                    <MessagesSquare className="h-4 w-4" />
-                    Bài viết
-                  </span>
-                ),
-              },
-              {
-                value: "reports",
-                label: (
-                  <span className="flex items-center gap-2">
-                    <Flag className="h-4 w-4" />
-                    Báo cáo
-                  </span>
-                ),
-              },
-              {
-                value: "topics",
-                label: (
-                  <span className="flex items-center gap-2">
-                    <Tags className="h-4 w-4" />
-                    Chủ đề
-                  </span>
-                ),
-              },
-            ]}
-            onChange={setView}
-          />
-        </Card>
+        {view !== "posts" ? (
+          <Card className="border-slate-200 bg-white">
+            <Segmented<ForumView>
+              value={view}
+              options={[
+                {
+                  value: "posts",
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <MessagesSquare className="h-4 w-4" />
+                      Bài viết
+                    </span>
+                  ),
+                },
+                {
+                  value: "reports",
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <Flag className="h-4 w-4" />
+                      Báo cáo
+                    </span>
+                  ),
+                },
+                {
+                  value: "topics",
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <Tags className="h-4 w-4" />
+                      Chủ đề
+                    </span>
+                  ),
+                },
+              ]}
+              onChange={setView}
+            />
+          </Card>
+        ) : null}
 
         <div className={view === "posts" ? "block" : "hidden"}>
           <ForumPostsTab
             topics={topics}
+            navigation={
+              <Segmented<ForumView>
+                value={view}
+                options={[
+                  {
+                    value: "posts",
+                    label: (
+                      <span className="flex items-center gap-2">
+                        <MessagesSquare className="h-4 w-4" />
+                        Bài viết
+                      </span>
+                    ),
+                  },
+                  {
+                    value: "reports",
+                    label: (
+                      <span className="flex items-center gap-2">
+                        <Flag className="h-4 w-4" />
+                        Báo cáo
+                      </span>
+                    ),
+                  },
+                  {
+                    value: "topics",
+                    label: (
+                      <span className="flex items-center gap-2">
+                        <Tags className="h-4 w-4" />
+                        Chủ đề
+                      </span>
+                    ),
+                  },
+                ]}
+                onChange={setView}
+              />
+            }
             onSummaryChange={handlePostSummaryChange}
           />
         </div>
