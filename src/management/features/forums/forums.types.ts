@@ -84,6 +84,7 @@ export interface UpdateForumTopicInput {
 export interface BackendForumComment {
   id?: unknown;
   postId?: unknown;
+  author?: unknown;
   authorId?: unknown;
   authorName?: unknown;
   authorEmail?: unknown;
@@ -110,15 +111,31 @@ export interface ForumComment {
   updatedAt: string;
 }
 
+export interface BackendForumPostTopic {
+  id?: unknown;
+  authorId?: unknown;
+  title?: unknown;
+  slug?: unknown;
+  category?: unknown;
+  description?: unknown;
+  status?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
 export interface BackendForumPost {
   id?: unknown;
   topicId?: unknown;
+  forumTopicId?: unknown;
   topicTitle?: unknown;
+  forumTopic?: BackendForumPostTopic | null;
   title?: unknown;
   excerpt?: unknown;
   description?: unknown;
   content?: unknown;
+  coverImageUrl?: unknown;
   category?: unknown;
+  author?: unknown;
   authorId?: unknown;
   authorName?: unknown;
   authorEmail?: unknown;
@@ -131,12 +148,14 @@ export interface BackendForumPost {
   featured?: unknown;
   isLocked?: unknown;
   locked?: unknown;
+  commentable?: unknown;
   viewCount?: unknown;
   views?: unknown;
   commentCount?: unknown;
   commentsCount?: unknown;
   reportCount?: unknown;
   reportsCount?: unknown;
+  interactionCount?: unknown;
   comments?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
@@ -150,6 +169,7 @@ export interface ForumPost {
   title: string;
   excerpt: string;
   content: string;
+  coverImageUrl: string;
   category: ForumCategory;
   authorId: string;
   authorName: string;
@@ -159,9 +179,11 @@ export interface ForumPost {
   isPinned: boolean;
   isFeatured: boolean;
   isLocked: boolean;
+  commentable: boolean;
   viewCount: number;
   commentCount: number;
   reportCount: number;
+  interactionCount: number;
   comments: ForumComment[];
   createdAt: string;
   updatedAt: string;
