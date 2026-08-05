@@ -139,23 +139,19 @@ export function UserTable({
             />
           </Tooltip>
 
-          <Tooltip
-            title={
-              user.status === "locked"
-                ? "Tài khoản đã bị khóa"
-                : "Khóa tài khoản"
-            }
-          >
-            <Button
-              danger={user.status !== "locked"}
-              disabled={user.status === "locked"}
-              icon={<Lock className="h-4 w-4" />}
-              onClick={(e) => {
-                e.stopPropagation();
-                onLock(user);
-              }}
-            />
-          </Tooltip>
+          {/* Chỉ hiện Khóa khi đang active */}
+          {user.status === "active" && (
+            <Tooltip title="Khóa tài khoản">
+              <Button
+                danger
+                icon={<Lock className="h-4 w-4" />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLock(user);
+                }}
+              />
+            </Tooltip>
+          )}
         </Space>
       ),
     },
