@@ -8,12 +8,10 @@ import {
   Button,
   Card,
   Empty,
-  Form,
   Input,
   Modal,
   Select,
   Space,
-  Switch,
   Table,
   Tag,
   Tooltip,
@@ -26,7 +24,6 @@ import {
   EyeOff,
   Lock,
   Pin,
-  Plus,
   Search,
   Star,
   X,
@@ -34,14 +31,12 @@ import {
 } from "lucide-react";
 
 import {
-  createForumPost,
   getForumPost,
   getForumPosts,
   moderateForumComment,
   moderateForumPost,
 } from "@/management/features/forums/forums.api";
 import type {
-  CreateForumPostInput,
   ForumAuthorRole,
   ForumCategory,
   ForumComment,
@@ -96,15 +91,6 @@ const POST_STATUS_OPTIONS: Array<{
   { value: "hidden", label: "Đã ẩn" },
   { value: "rejected", label: "Đã từ chối" },
   { value: "deleted", label: "Đã xóa" },
-];
-
-const CREATE_POST_STATUS_OPTIONS: Array<{
-  value: ForumPostStatus;
-  label: string;
-}> = [
-  { value: "pending", label: "Chờ duyệt" },
-  { value: "published", label: "Đã xuất bản" },
-  { value: "hidden", label: "Đã ẩn" },
 ];
 
 const AUTHOR_ROLE_OPTIONS: Array<{
@@ -201,247 +187,6 @@ function stripHtml(value: string) {
     .replace(/&nbsp;/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function CreatePostModal({
-  open,
-  topics,
-  submitting,
-  onClose,
-  onSubmit,
-}: {
-  open: boolean;
-  topics: ForumTopic[];
-  submitting: boolean;
-  onClose: () => void;
-  onSubmit: (
-    input: CreateForumPostInput,
-  ) => Promise<void>;
-}) {
-  const [form] =
-    Form.useForm<CreateForumPostInput>();
-
-  const activeTopics = topics.filter(
-    (topic) =>
-      topic.status === "active",
-  );
-
-  return (
-    <Modal
-      open={open}
-      centered
-      forceRender
-      width={760}
-      title="Tạo bài viết"
-      okText="Tạo bài viết"
-      cancelText="Hủy"
-      confirmLoading={submitting}
-      okButtonProps={{
-        disabled:
-          activeTopics.length === 0,
-      }}
-      onCancel={onClose}
-      onOk={() => form.submit()}
-      afterClose={() =>
-        form.resetFields()
-      }
-      mask={{ closable: !submitting }}
-      styles={{
-        body: {
-          overflow: "hidden",
-          paddingTop: 8,
-        },
-        footer: {
-          marginTop: 24,
-        },
-      }}
-    >
-      <div className="mt-2 max-h-[calc(80vh-5rem)] overflow-y-auto pr-2">
-        {activeTopics.length === 0 ? (
-          <Alert
-            type="warning"
-            showIcon
-            className="!mb-4"
-            title="Chưa có chủ đề hoạt động"
-            description="Hãy tạo hoặc kích hoạt ít nhất một chủ đề trước khi tạo bài viết."
-          />
-        ) : null}
-
-        <Form<CreateForumPostInput>
-          form={form}
-          layout="vertical"
-          initialValues={{
-            status: "pending",
-            commentable: true,
-            isPinned: false,
-            isFeatured: false,
-          }}
-          onFinish={(values) =>
-            void onSubmit(values)
-          }
-        >
-          <Form.Item
-            name="topicId"
-            label="Chủ đề"
-            rules={[
-              {
-                required: true,
-                message:
-                  "Vui lòng chọn chủ đề.",
-              },
-            ]}
-          >
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="Chọn chủ đề"
-              options={activeTopics.map(
-                (topic) => ({
-                  value: topic.id,
-                  label: `${topic.title} · ${categoryLabel(
-                    topic.category,
-                  )}`,
-                }),
-              )}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="title"
-            label="Tiêu đề"
-            rules={[
-              {
-                required: true,
-                whitespace: true,
-                message:
-                  "Vui lòng nhập tiêu đề.",
-              },
-              {
-                min: 5,
-                message:
-                  "Tiêu đề cần ít nhất 5 ký tự.",
-              },
-              {
-                max: 250,
-                message:
-                  "Tiêu đề không vượt quá 250 ký tự.",
-              },
-            ]}
-          >
-            <Input
-              maxLength={250}
-              showCount
-              placeholder="Nhập tiêu đề bài viết"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="content"
-            label="Nội dung"
-            rules={[
-              {
-                required: true,
-                whitespace: true,
-                message:
-                  "Vui lòng nhập nội dung.",
-              },
-              {
-                min: 10,
-                message:
-                  "Nội dung cần ít nhất 10 ký tự.",
-              },
-            ]}
-          >
-            <TextArea
-              rows={8}
-              placeholder="Nhập nội dung bài viết. Có thể sử dụng HTML theo định dạng backend hỗ trợ."
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="coverImageUrl"
-            label="Đường dẫn ảnh bìa"
-            rules={[
-              {
-                type: "url",
-                message:
-                  "Đường dẫn ảnh bìa không hợp lệ.",
-              },
-            ]}
-          >
-            <Input placeholder="https://cdn.example.com/forum-cover.jpg" />
-          </Form.Item>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Form.Item
-              name="status"
-              label="Trạng thái"
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Vui lòng chọn trạng thái.",
-                },
-              ]}
-            >
-              <Select
-                options={
-                  CREATE_POST_STATUS_OPTIONS
-                }
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="commentable"
-              label="Cho phép bình luận"
-              valuePropName="checked"
-            >
-              <Switch
-                checkedChildren="Cho phép"
-                unCheckedChildren="Đã khóa"
-              />
-            </Form.Item>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Form.Item
-              name="isPinned"
-              label="Ghim bài viết"
-              valuePropName="checked"
-            >
-              <Switch
-                checkedChildren="Có"
-                unCheckedChildren="Không"
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="isFeatured"
-              label="Đánh dấu nổi bật"
-              valuePropName="checked"
-            >
-              <Switch
-                checkedChildren="Có"
-                unCheckedChildren="Không"
-              />
-            </Form.Item>
-          </div>
-
-          <Form.Item
-            name="moderationReason"
-            label="Ghi chú kiểm duyệt"
-          >
-            <TextArea
-              rows={3}
-              maxLength={500}
-              showCount
-              placeholder="Ví dụ: Bài viết được tạo từ màn quản lý."
-            />
-          </Form.Item>
-        </Form>
-      </div>
-    </Modal>
-  );
 }
 
 function ModerationModal({
@@ -1202,9 +947,6 @@ export function ForumPostsTab({
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createModalOpen, setCreateModalOpen] =
-    useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [keyword, setKeyword] = useState("");
@@ -1290,32 +1032,6 @@ export function ForumPostsTab({
     setStatusFilter(undefined);
     setAuthorRoleFilter(undefined);
     setPage(1);
-  }
-
-  async function handleCreatePost(
-    input: CreateForumPostInput,
-  ) {
-    setCreating(true);
-
-    try {
-      await createForumPost(input);
-      message.success(
-        "Tạo bài viết thành công.",
-      );
-      setCreateModalOpen(false);
-
-      if (page !== 1) {
-        setPage(1);
-      } else {
-        await loadPosts();
-      }
-    } catch (createError) {
-      message.error(
-        getErrorMessage(createError),
-      );
-    } finally {
-      setCreating(false);
-    }
   }
 
   async function openPostDetail(post: ForumPost) {
@@ -1617,19 +1333,6 @@ export function ForumPostsTab({
           className="overflow-hidden border-slate-200 bg-white"
           styles={{ body: { padding: 0 } }}
           title="Danh sách bài viết"
-          extra={
-            <Button
-              type="primary"
-              icon={
-                <Plus className="h-4 w-4" />
-              }
-              onClick={() =>
-                setCreateModalOpen(true)
-              }
-            >
-              Tạo bài viết
-            </Button>
-          }
         >
           <Table
             rowKey="id"
@@ -1668,18 +1371,6 @@ export function ForumPostsTab({
           />
         </Card>
       </div>
-
-      <CreatePostModal
-        open={createModalOpen}
-        topics={topics}
-        submitting={creating}
-        onClose={() => {
-          if (!creating) {
-            setCreateModalOpen(false);
-          }
-        }}
-        onSubmit={handleCreatePost}
-      />
 
       <PostDetailModal
         post={selectedPost}
