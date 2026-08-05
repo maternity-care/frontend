@@ -95,7 +95,26 @@ export interface UpdateRoomInput {
   name?: string;
   roomTypeId?: string;
   floor?: string;
-  status?: RoomStatus;
+}
+
+export interface SuspendResourceInput {
+  inactiveUntil?: string | null;
+  reason?: string;
+}
+
+export interface RoomSuspendImpact {
+  affectedShifts: number;
+  affectedAppointments: number;
+  cancelledShifts?: number;
+}
+
+export interface RoomSuspendResult {
+  room: ClinicRoom;
+  impact: RoomSuspendImpact;
+}
+
+export interface RoomReactivateResult {
+  room: ClinicRoom;
 }
 
 export interface BackendRoomType {

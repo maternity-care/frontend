@@ -313,7 +313,6 @@ export function FacilityUpdateModal({
         ownerId: values.ownerId,
         hotline: values.hotline,
         email: values.email ?? "",
-        status: values.status,
         address: values.address,
         city: values.city,
         ward: values.ward,
@@ -472,12 +471,12 @@ export function FacilityUpdateModal({
   
                   <Col xs={24} md={12}>
                     <Form.Item
-                      name="status"
                       label={FACILITY_MESSAGES.STATUS}
-                      rules={[{ required: true, message: "Vui lòng chọn trạng thái." }]}
                     >
                       <Select
                         size="large"
+                        disabled
+                        value={status}
                         options={[
                           { value: "active", label: FACILITY_MESSAGES.ACTIVE },
                           { value: "suspended", label: FACILITY_MESSAGES.SUSPENDED },
