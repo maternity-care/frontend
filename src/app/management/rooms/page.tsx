@@ -16,6 +16,7 @@ import {
   Card,
   Empty,
   Input,
+  Modal,
   Select,
   Space,
   Statistic,
@@ -27,7 +28,9 @@ import {
 import {
   Boxes,
   Eye,
+  PauseCircle,
   Pencil,
+  PlayCircle,
   Plus,
   Search,
   Shapes,
@@ -44,6 +47,8 @@ import {
 import {
   getRooms,
   getRoomTypeLookup,
+  reactivateRoom,
+  suspendRoom,
 } from "@/management/features/rooms/rooms.api";
 import type {
   ClinicRoom,
@@ -66,6 +71,12 @@ import type {
 } from "./components/room-form.shared";
 
 const { Text } = Typography;
+const { TextArea } = Input;
+
+type RoomStatusAction =
+  | { mode: "suspend"; room: ClinicRoom }
+  | { mode: "reactivate"; room: ClinicRoom }
+  | null;
 
 function getErrorMessage(error: unknown) {
   if (
@@ -166,6 +177,7 @@ function isEmptyRoomResult(
 }
 
 function ClinicRoomManagementContent() {
+  const [modal, modalContextHolder] = Modal.useModal();
   const searchParams = useSearchParams();
   const sessionFacilityId = useAuthStore(
     (state) => state.activeFacilityId,
@@ -235,6 +247,18 @@ function ClinicRoomManagementContent() {
     useState(false);
   const [roomTypesOpen, setRoomTypesOpen] =
     useState(false);
+  const [statusAction, setStatusAction] =
+    useState<RoomStatusAction>(null);
+  const [statusReason, setStatusReason] =
+    useState("");
+  const [
+    statusInactiveUntil,
+    setStatusInactiveUntil,
+  ] = useState("");
+  const [
+    statusActionLoading,
+    setStatusActionLoading,
+  ] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -418,6 +442,101 @@ function ClinicRoomManagementContent() {
     );
   }
 
+  function openStatusAction(
+    action: RoomStatusAction,
+  ) {
+    setStatusAction(action);
+    setStatusReason("");
+    setStatusInactiveUntil("");
+  }
+
+  function closeStatusAction() {
+    if (statusActionLoading) return;
+
+    setStatusAction(null);
+    setStatusReason("");
+    setStatusInactiveUntil("");
+  }
+
+  function toIsoDateTime(value: string) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? null
+      : date.toISOString();
+  }
+
+  function updateRoomInState(
+    updatedRoom: ClinicRoom,
+  ) {
+    setRooms((current) =>
+      current.map((room) =>
+        room.id === updatedRoom.id
+          ? updatedRoom
+          : room,
+      ),
+    );
+    setEditingRoom((current) =>
+      current?.id === updatedRoom.id
+        ? updatedRoom
+        : current,
+    );
+    setDetailInitialRoom((current) =>
+      current?.id === updatedRoom.id
+        ? updatedRoom
+        : current,
+    );
+  }
+
+  async function handleConfirmStatusAction() {
+    if (!statusAction) return;
+
+    setStatusActionLoading(true);
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (statusAction.mode === "suspend") {
+        const response = await suspendRoom(statusAction.room.id, {
+          inactiveUntil: toIsoDateTime(statusInactiveUntil),
+          reason: statusReason,
+        });
+        updateRoomInState(response.data.room);
+
+        modal.success({
+          title: "Đã tạm ngưng phòng",
+          content: `Ca trực bị hủy: ${response.data.impact.cancelledShifts ?? 0}. Lịch hẹn bị ảnh hưởng: ${response.data.impact.affectedAppointments ?? 0}.`,
+          centered: true,
+        });
+      } else {
+        const response = await reactivateRoom(statusAction.room.id);
+        updateRoomInState(response.data.room);
+
+        modal.success({
+          title: "Đã mở lại phòng",
+          content: "Phòng đã được chuyển về trạng thái hoạt động.",
+          centered: true,
+        });
+      }
+
+      setStatusAction(null);
+      setStatusReason("");
+      setStatusInactiveUntil("");
+      refreshRooms();
+    } catch (statusError) {
+      const message = getErrorMessage(statusError);
+      setError(message);
+      modal.error({
+        title: "Không thể cập nhật trạng thái phòng",
+        content: message,
+        centered: true,
+      });
+    } finally {
+      setStatusActionLoading(false);
+      setLoading(false);
+    }
+  }
+
   function resetFilters() {
     setSearchInput("");
     setDebouncedSearch("");
@@ -563,7 +682,7 @@ function ClinicRoomManagementContent() {
     },
     {
       title: "Thao tác",
-      width: 160,
+      width: 210,
       align: "center",
       fixed: "right",
       render: (_value, room) => (
@@ -588,6 +707,34 @@ function ClinicRoomManagementContent() {
               onClick={(event) => {
                 event.stopPropagation();
                 setEditingRoom(room);
+              }}
+            />
+          </Tooltip>
+
+          <Tooltip
+            title={
+              room.status === "active"
+                ? "Tạm ngưng phòng"
+                : "Mở lại phòng"
+            }
+          >
+            <Button
+              icon={
+                room.status === "active" ? (
+                  <PauseCircle className="h-4 w-4" />
+                ) : (
+                  <PlayCircle className="h-4 w-4" />
+                )
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                openStatusAction({
+                  mode:
+                    room.status === "active"
+                      ? "suspend"
+                      : "reactivate",
+                  room,
+                });
               }}
             />
           </Tooltip>
@@ -617,10 +764,74 @@ function ClinicRoomManagementContent() {
       roles={["super_admin", "admin"]}
       permissions={["user.view"]}
     >
+      {modalContextHolder}
       <PageHeader
         title="Quản lý phòng"
         description="Quản lý phòng, loại phòng và dữ liệu phòng theo từng cơ sở."
       />
+
+      <Modal
+        open={Boolean(statusAction)}
+        title={
+          statusAction?.mode === "suspend"
+            ? `Tạm ngưng phòng ${statusAction.room.roomName}`
+            : `Mở lại phòng ${statusAction?.room.roomName ?? ""}`
+        }
+        okText={
+          statusAction?.mode === "suspend"
+            ? "Tạm ngưng"
+            : "Mở lại"
+        }
+        cancelText="Hủy"
+        confirmLoading={statusActionLoading}
+        onCancel={closeStatusAction}
+        onOk={handleConfirmStatusAction}
+        centered
+      >
+        {statusAction?.mode === "suspend" ? (
+          <Space
+            direction="vertical"
+            className="w-full"
+            size={12}
+          >
+            <div>
+              <Text strong>Lý do</Text>
+              <TextArea
+                className="mt-2"
+                rows={3}
+                value={statusReason}
+                placeholder="Ví dụ: Bảo trì phòng"
+                onChange={(event) =>
+                  setStatusReason(event.target.value)
+                }
+              />
+            </div>
+            <div>
+              <Text strong>Tạm ngưng đến</Text>
+              <Input
+                className="mt-2"
+                type="datetime-local"
+                value={statusInactiveUntil}
+                onChange={(event) =>
+                  setStatusInactiveUntil(
+                    event.target.value,
+                  )
+                }
+              />
+              <Text
+                type="secondary"
+                className="mt-1 block text-xs"
+              >
+                Bỏ trống nếu tạm ngưng vô thời hạn. Hệ thống sẽ hủy ca trực tương lai trong khoảng tạm ngưng và chỉ ghi nhận lịch hẹn bị ảnh hưởng.
+              </Text>
+            </div>
+          </Space>
+        ) : (
+          <Text>
+            Phòng sẽ được chuyển về trạng thái hoạt động. Các ca trực đã bị hủy trước đó sẽ không tự khôi phục.
+          </Text>
+        )}
+      </Modal>
 
       <div className="mt-6 flex flex-col gap-5">
         {error ? (

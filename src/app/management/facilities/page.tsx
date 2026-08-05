@@ -14,7 +14,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { Building2, Eye, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Building2, Eye, PauseCircle, Pencil, PlayCircle, Plus, Trash2, X } from "lucide-react";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
@@ -26,6 +26,8 @@ import {
   deleteFacilities,
   deleteFacility,
   getFacilitiesPage,
+  reactivateFacility,
+  suspendFacility,
 } from "@/management/features/facilities/facilities.api";
 import type {
   Facility,
@@ -55,6 +57,11 @@ type DeleteConfirmState =
       ids: string[];
       count: number;
     };
+
+type FacilityStatusAction =
+  | { mode: "suspend"; facility: Facility }
+  | { mode: "reactivate"; facility: Facility }
+  | null;
 
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) {
@@ -108,6 +115,10 @@ export default function FacilityManagementPage() {
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteReasonTouched, setDeleteReasonTouched] = useState(false);
   const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
+  const [statusAction, setStatusAction] = useState<FacilityStatusAction>(null);
+  const [statusReason, setStatusReason] = useState("");
+  const [statusInactiveUntil, setStatusInactiveUntil] = useState("");
+  const [statusActionLoading, setStatusActionLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
@@ -225,6 +236,77 @@ export default function FacilityManagementPage() {
     setDetailFacility((current) =>
       current?.id === updatedFacility.id ? updatedFacility : current,
     );
+  }
+
+  function openStatusAction(action: FacilityStatusAction) {
+    setStatusAction(action);
+    setStatusReason("");
+    setStatusInactiveUntil("");
+  }
+
+  function closeStatusAction() {
+    if (statusActionLoading) return;
+    setStatusAction(null);
+    setStatusReason("");
+    setStatusInactiveUntil("");
+  }
+
+  function toIsoDateTime(value: string) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  async function handleConfirmStatusAction() {
+    if (!statusAction) return;
+
+    setStatusActionLoading(true);
+    setTableLoading(true);
+    setError(null);
+
+    try {
+      if (statusAction.mode === "suspend") {
+        const response = await suspendFacility(statusAction.facility.id, {
+          inactiveUntil: toIsoDateTime(statusInactiveUntil),
+          reason: statusReason,
+        });
+        handleFacilityUpdated(response.data.facility);
+
+        modal.success({
+          title: "Đã tạm ngưng cơ sở",
+          content: `Phòng bị tạm ngưng: ${response.data.impact.suspendedRooms ?? 0}. Ca trực bị hủy: ${response.data.impact.cancelledShifts ?? 0}. Lịch hẹn bị ảnh hưởng: ${response.data.impact.affectedAppointments ?? 0}.`,
+          okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+          centered: true,
+        });
+      } else {
+        const response = await reactivateFacility(statusAction.facility.id);
+        handleFacilityUpdated(response.data.facility);
+
+        modal.success({
+          title: "Đã mở lại cơ sở",
+          content: `Phòng được mở lại theo cơ sở: ${response.data.impact?.reactivatedRooms ?? 0}.`,
+          okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+          centered: true,
+        });
+      }
+
+      setStatusAction(null);
+      setStatusReason("");
+      setStatusInactiveUntil("");
+      await reloadFacilities(currentPage, pageSize);
+    } catch (err) {
+      const message = getErrorMessage(err);
+      setError(message);
+      modal.error({
+        title: "Không thể cập nhật trạng thái cơ sở",
+        content: message,
+        okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+        centered: true,
+      });
+    } finally {
+      setStatusActionLoading(false);
+      setTableLoading(false);
+    }
   }
 
   function confirmDeleteFacility(record: Facility) {
@@ -447,7 +529,7 @@ export default function FacilityManagementPage() {
     {
       title: FACILITY_MESSAGES.ACTIONS,
       key: "actions",
-      width: 160,
+      width: 210,
       fixed: "right",
       align: "center",
       render: (_value, record) => (
@@ -466,6 +548,23 @@ export default function FacilityManagementPage() {
             onClick={(event) => {
               event.stopPropagation();
               setUpdateFacilityTarget(record);
+            }}
+          />
+          <Button
+            title={record.status === "active" ? "Tạm ngưng cơ sở" : "Mở lại cơ sở"}
+            icon={
+              record.status === "active" ? (
+                <PauseCircle className="h-4 w-4" />
+              ) : (
+                <PlayCircle className="h-4 w-4" />
+              )
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              openStatusAction({
+                mode: record.status === "active" ? "suspend" : "reactivate",
+                facility: record,
+              });
             }}
           />
           {isSuperAdmin ? (
@@ -494,6 +593,52 @@ export default function FacilityManagementPage() {
         title={FACILITY_MESSAGES.PAGE_TITLE}
         description={FACILITY_MESSAGES.PAGE_DESCRIPTION}
       />
+
+      <Modal
+        open={Boolean(statusAction)}
+        title={
+          statusAction?.mode === "suspend"
+            ? `Tạm ngưng cơ sở ${statusAction.facility.name}`
+            : `Mở lại cơ sở ${statusAction?.facility.name ?? ""}`
+        }
+        okText={statusAction?.mode === "suspend" ? "Tạm ngưng" : "Mở lại"}
+        cancelText="Hủy"
+        confirmLoading={statusActionLoading}
+        onCancel={closeStatusAction}
+        onOk={handleConfirmStatusAction}
+        centered
+      >
+        {statusAction?.mode === "suspend" ? (
+          <Space direction="vertical" className="w-full" size={12}>
+            <div>
+              <Text strong>Lý do</Text>
+              <TextArea
+                className="mt-2"
+                rows={3}
+                value={statusReason}
+                placeholder="Ví dụ: Bảo trì cơ sở"
+                onChange={(event) => setStatusReason(event.target.value)}
+              />
+            </div>
+            <div>
+              <Text strong>Tạm ngưng đến</Text>
+              <Input
+                className="mt-2"
+                type="datetime-local"
+                value={statusInactiveUntil}
+                onChange={(event) => setStatusInactiveUntil(event.target.value)}
+              />
+              <Text type="secondary" className="mt-1 block text-xs">
+                Bỏ trống nếu tạm ngưng vô thời hạn. Hệ thống sẽ hủy ca trực tương lai trong khoảng tạm ngưng và chỉ ghi nhận lịch hẹn bị ảnh hưởng.
+              </Text>
+            </div>
+          </Space>
+        ) : (
+          <Text>
+            Cơ sở sẽ được mở lại. Chỉ những phòng bị tạm ngưng theo cơ sở sẽ được mở lại cùng cơ sở.
+          </Text>
+        )}
+      </Modal>
 
       <div className="mt-6 flex flex-col gap-5">
         {error ? (

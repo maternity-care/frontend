@@ -623,6 +623,7 @@ export function RoomFormModalBase({
                     ]}
                   >
                     <Select
+                      disabled={mode === "edit"}
                       options={[
                         {
                           value: "active",
