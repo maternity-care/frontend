@@ -223,6 +223,11 @@ function ModerationModal({
       onCancel={onClose}
       onOk={() => void onConfirm(reason.trim())}
       mask={{ closable: !submitting }}
+      styles={{
+        footer: {
+          marginTop: 32,
+        },
+      }}
     >
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <Text type="secondary" className="block text-xs">
@@ -233,7 +238,7 @@ function ModerationModal({
         </Text>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 pb-2">
         <label className="mb-2 block text-sm font-semibold text-slate-800">
           Lý do kiểm duyệt <span className="text-red-500">*</span>
         </label>
