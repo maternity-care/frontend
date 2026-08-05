@@ -142,6 +142,16 @@ function formatDateTime(value?: string) {
   });
 }
 
+function getPostCreatedTime(post: ForumPost) {
+  const createdTime = new Date(
+    post.createdAt,
+  ).getTime();
+
+  return Number.isNaN(createdTime)
+    ? 0
+    : createdTime;
+}
+
 function categoryLabel(category: ForumCategory) {
   return (
     CATEGORY_OPTIONS.find((item) => item.value === category)?.label ?? category
@@ -223,6 +233,11 @@ function ModerationModal({
       onCancel={onClose}
       onOk={() => void onConfirm(reason.trim())}
       mask={{ closable: !submitting }}
+      styles={{
+        footer: {
+          marginTop: 32,
+        },
+      }}
     >
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <Text type="secondary" className="block text-xs">
@@ -233,7 +248,7 @@ function ModerationModal({
         </Text>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 pb-2">
         <label className="mb-2 block text-sm font-semibold text-slate-800">
           Lý do kiểm duyệt <span className="text-red-500">*</span>
         </label>
@@ -268,6 +283,10 @@ function CommentItem({
     action: ForumCommentModerationAction,
   ) => void;
 }) {
+  const [
+    showModerationReason,
+    setShowModerationReason,
+  ] = useState(false);
   const canModerate =
     comment.status !== "deleted";
 
@@ -370,15 +389,41 @@ function CommentItem({
       </Paragraph>
 
       {comment.moderationReason ? (
-        <Alert
-          type="warning"
-          showIcon
-          className="mt-3"
-          title="Lý do kiểm duyệt"
-          description={
-            comment.moderationReason
-          }
-        />
+        <div className="mt-3">
+          <Button
+            type="text"
+            size="small"
+            className="!h-auto !px-0 !text-amber-700"
+            icon={
+              showModerationReason ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )
+            }
+            onClick={() =>
+              setShowModerationReason(
+                (current) => !current,
+              )
+            }
+          >
+            {showModerationReason
+              ? "Ẩn lý do kiểm duyệt"
+              : "Xem lý do kiểm duyệt"}
+          </Button>
+
+          {showModerationReason ? (
+            <Alert
+              type="warning"
+              showIcon
+              className="mt-2 !rounded-xl !border-amber-200 !bg-amber-50"
+              title="Lý do kiểm duyệt"
+              description={
+                comment.moderationReason
+              }
+            />
+          ) : null}
+        </div>
       ) : null}
 
       {comment.replies.length > 0 ? (
@@ -420,6 +465,52 @@ function PostDetailModal({
     action: ForumCommentModerationAction,
   ) => void;
 }) {
+  const [
+    expandedModerationPostId,
+    setExpandedModerationPostId,
+  ] = useState<string | null>(null);
+  const [
+    expandedCommentsPostId,
+    setExpandedCommentsPostId,
+  ] = useState<string | null>(null);
+
+  const showAllModerationLogs =
+    Boolean(
+      post &&
+        expandedModerationPostId ===
+          post.id,
+    );
+  const showAllComments =
+    Boolean(
+      post &&
+        expandedCommentsPostId ===
+          post.id,
+    );
+
+  const moderationLogs = post
+    ? [...post.moderationLogs].sort(
+        (left, right) =>
+          new Date(
+            right.createdAt,
+          ).getTime() -
+          new Date(
+            left.createdAt,
+          ).getTime(),
+      )
+    : [];
+
+  const visibleModerationLogs =
+    showAllModerationLogs
+      ? moderationLogs
+      : moderationLogs.slice(0, 5);
+  const visibleComments = post
+    ? (
+        showAllComments
+          ? post.comments
+          : post.comments.slice(0, 5)
+      )
+    : [];
+
   return (
     <Modal
       open={Boolean(post)}
@@ -431,13 +522,13 @@ function PostDetailModal({
       onCancel={onClose}
       styles={{
         body: {
-          maxHeight: "82vh",
-          overflowY: "auto",
+          overflow: "hidden",
+          paddingTop: 8,
         },
       }}
     >
       {post ? (
-        <div>
+        <div className="mt-6 max-h-[calc(82vh-3rem)] overflow-y-auto pr-2">
           <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 lg:flex-row">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -575,30 +666,43 @@ function PostDetailModal({
             </Space>
           </div>
 
-          {post.medicalDisclaimer ? (
-            <Alert
-              type="warning"
-              showIcon
-              className="mt-4"
-              title={
-                post.medicalDisclaimer
-              }
-            />
+          {post.medicalDisclaimer ||
+          post.moderationReason ? (
+            <div className="mt-5 flex flex-col gap-4">
+              {post.medicalDisclaimer ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  className="!m-0 !rounded-xl !border-amber-200 !bg-amber-50"
+                  title="Lưu ý về nội dung y tế"
+                  description={
+                    post.medicalDisclaimer
+                  }
+                />
+              ) : null}
+
+              {post.moderationReason ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  className="!m-0 !rounded-xl !border-cyan-200 !bg-cyan-50"
+                  title="Thông tin kiểm duyệt"
+                  description={
+                    <div className="space-y-1">
+                      <Text className="block !text-slate-700">
+                        Lý do xử lý gần nhất:
+                      </Text>
+                      <Text strong>
+                        {post.moderationReason}
+                      </Text>
+                    </div>
+                  }
+                />
+              ) : null}
+            </div>
           ) : null}
 
-          {post.moderationReason ? (
-            <Alert
-              type="info"
-              showIcon
-              className="mt-4"
-              title="Lý do kiểm duyệt gần nhất"
-              description={
-                post.moderationReason
-              }
-            />
-          ) : null}
-
-          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
             <div className="rounded-xl border border-slate-200 p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <Tag color="blue">
@@ -638,52 +742,82 @@ function PostDetailModal({
             </div>
 
             <div className="space-y-3">
-              {[
-                [
-                  "Lượt xem",
-                  post.viewCount,
-                ],
-                [
-                  "Bình luận",
-                  post.commentCount,
-                ],
-                [
-                  "Báo cáo",
-                  post.reportCount,
-                ],
-              ].map(([label, value]) => (
-                <Card
-                  size="small"
-                  key={String(label)}
-                >
-                  <div className="text-sm text-slate-500">
-                    {label}
-                  </div>
-                  <div className="mt-1 text-2xl font-bold">
-                    {value}
-                  </div>
-                </Card>
-              ))}
+              <Card
+                size="small"
+                className="h-fit"
+              >
+                <div className="text-sm text-slate-500">
+                  Bình luận
+                </div>
+                <div className="mt-1 text-2xl font-bold">
+                  {post.commentCount}
+                </div>
+              </Card>
+
+              <Card
+                size="small"
+                className="h-fit"
+              >
+                <div className="text-sm text-slate-500">
+                  Báo cáo
+                </div>
+                <div className="mt-1 text-2xl font-bold">
+                  {post.reportCount}
+                </div>
+              </Card>
             </div>
           </div>
 
           <div className="mt-5">
-            <div className="mb-3 flex items-center justify-between">
-              <Title
-                level={5}
-                className="!mb-0"
-              >
-                Bình luận trong bài
-              </Title>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <Title
+                  level={5}
+                  className="!mb-0"
+                >
+                  Bình luận trong bài
+                </Title>
 
-              <Text type="secondary">
-                {post.commentCount} bình luận
-              </Text>
+                {!showAllComments &&
+                post.comments.length > 5 ? (
+                  <Text
+                    type="secondary"
+                    className="mt-1 block text-xs"
+                  >
+                    Đang hiển thị 5 bình luận gần nhất.
+                  </Text>
+                ) : null}
+              </div>
+
+              <Space wrap>
+                <Text type="secondary">
+                  {post.commentCount} bình luận
+                </Text>
+
+                {post.comments.length > 5 ? (
+                  <Button
+                    type="link"
+                    className="!h-auto !p-0"
+                    onClick={() =>
+                      setExpandedCommentsPostId(
+                        (current) =>
+                          current === post.id
+                            ? null
+                            : post.id,
+                      )
+                    }
+                  >
+                    {showAllComments
+                      ? "Thu gọn"
+                      : `Xem toàn bộ bình luận (${post.comments.length})`}
+                  </Button>
+                ) : null}
+              </Space>
             </div>
 
             {post.comments.length > 0 ? (
               <div className="space-y-3">
-                {post.comments.map(
+                {visibleComments.map(
                   (comment) => (
                     <CommentItem
                       key={comment.id}
@@ -700,15 +834,38 @@ function PostDetailModal({
             )}
           </div>
 
-          {post.moderationLogs.length >
-          0 ? (
+          {moderationLogs.length > 0 ? (
             <div className="mt-5">
-              <Title level={5}>
-                Lịch sử kiểm duyệt
-              </Title>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <Title
+                  level={5}
+                  className="!mb-0"
+                >
+                  Lịch sử kiểm duyệt
+                </Title>
+
+                {moderationLogs.length > 5 ? (
+                  <Button
+                    type="link"
+                    className="!h-auto !p-0"
+                    onClick={() =>
+                      setExpandedModerationPostId(
+                        (current) =>
+                          current === post.id
+                            ? null
+                            : post.id,
+                      )
+                    }
+                  >
+                    {showAllModerationLogs
+                      ? "Thu gọn"
+                      : `Xem toàn bộ lịch sử (${moderationLogs.length})`}
+                  </Button>
+                ) : null}
+              </div>
 
               <div className="space-y-2">
-                {post.moderationLogs.map(
+                {visibleModerationLogs.map(
                   (log) => (
                     <div
                       key={log.id}
@@ -752,6 +909,16 @@ function PostDetailModal({
                   ),
                 )}
               </div>
+
+              {!showAllModerationLogs &&
+              moderationLogs.length > 5 ? (
+                <Text
+                  type="secondary"
+                  className="mt-2 block text-xs"
+                >
+                  Đang hiển thị 5 hoạt động kiểm duyệt gần nhất.
+                </Text>
+              ) : null}
             </div>
           ) : null}
 
@@ -818,13 +985,24 @@ export function ForumPostsTab({
         status: statusFilter,
       });
 
-      setPosts(result.items);
+      const newestPosts = [
+        ...result.items,
+      ].sort(
+        (left, right) =>
+          getPostCreatedTime(right) -
+          getPostCreatedTime(left),
+      );
+
+      setPosts(newestPosts);
       setTotal(result.total);
       setPage(result.page);
       setPageSize(result.limit);
       onSummaryChange({
         total: result.total,
-        pending: result.items.filter((post) => post.status === "pending").length,
+        pending: newestPosts.filter(
+          (post) =>
+            post.status === "pending",
+        ).length,
       });
     } catch (loadError) {
       setError(getErrorMessage(loadError));

@@ -8,12 +8,18 @@ import {
   Card,
   Input,
   Modal,
-  Select,
+  Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import {
+  EyeOff,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 
 import {
   getForumReports,
@@ -36,6 +42,7 @@ type ForumReportsTabProps = {
 
 type ReportResolveRequest = {
   report: ForumReport;
+  action: ForumReportResolveAction;
 };
 
 const REPORT_ACTION_OPTIONS: Array<{
@@ -86,14 +93,12 @@ function ReportResolveModal({
     note: string,
   ) => Promise<void>;
 }) {
-  const [action, setAction] = useState<ForumReportResolveAction>("hide");
   const [note, setNote] = useState("");
 
   useEffect(() => {
     if (!request) return;
 
     const timer = window.setTimeout(() => {
-      setAction("hide");
       setNote("");
     }, 0);
 
@@ -113,7 +118,12 @@ function ReportResolveModal({
       confirmLoading={submitting}
       okButtonProps={{ disabled: !note.trim() }}
       onCancel={onClose}
-      onOk={() => void onConfirm(action, note.trim())}
+      onOk={() =>
+        void onConfirm(
+          request.action,
+          note.trim(),
+        )
+      }
       mask={{ closable: !submitting }}
     >
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -129,13 +139,20 @@ function ReportResolveModal({
       </div>
 
       <div className="mt-4">
-        <label className="mb-2 block text-sm font-semibold">Hành động</label>
-        <Select
-          className="w-full"
-          value={action}
-          options={REPORT_ACTION_OPTIONS}
-          onChange={setAction}
-        />
+        <Tag
+          color={
+            request.action === "dismiss"
+              ? "default"
+              : "red"
+          }
+          className="!mr-0"
+        >
+          {REPORT_ACTION_OPTIONS.find(
+            (item) =>
+              item.value ===
+              request.action,
+          )?.label ?? request.action}
+        </Tag>
       </div>
 
       <div className="mt-4">
@@ -221,18 +238,36 @@ export function ForumReportsTab({
 
   const columns: ColumnsType<ForumReport> = [
     {
+      title: "STT",
+      width: "5%",
+      align: "center",
+      render: (
+        _value,
+        _record,
+        index,
+      ) =>
+        (page - 1) *
+          pageSize +
+        index +
+        1,
+    },
+    {
       title: "Mã báo cáo",
       dataIndex: "id",
-      width: 150,
+      width: "9%",
       render: (value: string) => (
-        <Text strong className="font-mono">
+        <Text
+          strong
+          ellipsis
+          className="block font-mono"
+        >
           {value}
         </Text>
       ),
     },
     {
       title: "Đối tượng",
-      width: 180,
+      width: "12%",
       render: (_value, report) => (
         <div>
           <Tag
@@ -258,7 +293,7 @@ export function ForumReportsTab({
     },
     {
       title: "Lý do",
-      width: 330,
+      width: "24%",
       render: (_value, report) => (
         <div>
           <Tag color="red">{report.reason || "Không rõ lý do"}</Tag>
@@ -270,11 +305,21 @@ export function ForumReportsTab({
     },
     {
       title: "Người báo cáo",
-      width: 210,
+      width: "17%",
       render: (_value, report) => (
         <div>
-          <Text strong>{report.reporterName}</Text>
-          <Text type="secondary" className="block text-xs">
+          <Text
+            strong
+            ellipsis
+            className="block"
+          >
+            {report.reporterName}
+          </Text>
+          <Text
+            type="secondary"
+            ellipsis
+            className="block text-xs"
+          >
             {report.reporterEmail}
           </Text>
         </div>
@@ -283,7 +328,7 @@ export function ForumReportsTab({
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: 140,
+      width: "10%",
       align: "center",
       render: (value: string) => (
         <Tag color={isResolvedStatus(value) ? "green" : "red"}>
@@ -294,23 +339,68 @@ export function ForumReportsTab({
     {
       title: "Ngày gửi",
       dataIndex: "createdAt",
-      width: 170,
+      width: "11%",
       render: (value: string) => formatDateTime(value),
     },
     {
-      title: "Thao tác",
-      width: 120,
-      fixed: "right",
+      title: "Hành động",
+      width: "12%",
       align: "center",
-      render: (_value, report) => (
-        <Button
-          type="primary"
-          disabled={isResolvedStatus(report.status)}
-          onClick={() => setResolveRequest({ report })}
-        >
-          Xử lý
-        </Button>
-      ),
+      render: (_value, report) => {
+        const disabled = isResolvedStatus(
+          report.status,
+        );
+
+        return (
+          <Space size={6}>
+            <Tooltip title="Ẩn nội dung">
+              <Button
+                disabled={disabled}
+                icon={
+                  <EyeOff className="h-4 w-4" />
+                }
+                onClick={() =>
+                  setResolveRequest({
+                    report,
+                    action: "hide",
+                  })
+                }
+              />
+            </Tooltip>
+
+            <Tooltip title="Xóa nội dung">
+              <Button
+                danger
+                disabled={disabled}
+                icon={
+                  <Trash2 className="h-4 w-4" />
+                }
+                onClick={() =>
+                  setResolveRequest({
+                    report,
+                    action: "delete",
+                  })
+                }
+              />
+            </Tooltip>
+
+            <Tooltip title="Bỏ qua báo cáo">
+              <Button
+                disabled={disabled}
+                icon={
+                  <XCircle className="h-4 w-4" />
+                }
+                onClick={() =>
+                  setResolveRequest({
+                    report,
+                    action: "dismiss",
+                  })
+                }
+              />
+            </Tooltip>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -339,7 +429,6 @@ export function ForumReportsTab({
             loading={loading}
             columns={columns}
             dataSource={reports}
-            scroll={{ x: 1300 }}
             pagination={{
               current: page,
               pageSize,
