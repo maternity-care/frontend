@@ -52,7 +52,7 @@ import { getDoctors } from "@/management/features/doctors/doctors.api";
 import { getFacilitiesPage } from "@/management/features/facilities/facilities.api";
 import { getManagementPregnancyProfiles } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.api";
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
-import { getUsersPage } from "@/management/features/users/users.api";
+import { getStaffsPage } from "@/management/features/staffs/staffs.api";
 
 const { Text, Title } = Typography;
 
@@ -504,7 +504,7 @@ export default function ManagementDashboardPage() {
           })
         : Promise.resolve({ total: 0 }),
       canViewStaffStats
-        ? getUsersPage({
+        ? getStaffsPage({
             page: 1,
             limit: 1,
             facilityId,

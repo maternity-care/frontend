@@ -1,4 +1,4 @@
-// src/management/features/users/users.types.ts
+// src/management/features/staffs/staffs.types.ts
 
 export type UserPermissionEffect = "allow" | "deny";
 export type AccountStatus = "active" | "inactive" | "locked";
@@ -22,19 +22,19 @@ export interface Role {
   deletedAt?: string | null;
 }
 
-export interface UserPermissionOverride {
+export interface StaffPermissionOverride {
   permission: Permission;
   effect: UserPermissionEffect;
 }
 
-export interface User {
+export interface Staff {
   id: string;
   name: string;
   email: string;
   phone?: string | null;
   status: AccountStatus;
   roles: Role[];
-  permissionOverrides?: UserPermissionOverride[];
+  permissionOverrides?: StaffPermissionOverride[];
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
@@ -78,7 +78,7 @@ export interface CreateStaffProfileInput {
   bio?: string;
 }
 
-export interface GetUsersParams {
+export interface GetStaffsParams {
   search?: string;
   name?: string;
   email?: string;
@@ -91,8 +91,8 @@ export interface GetUsersParams {
   sort?: string;
 }
 
-export interface UsersListData {
-  users: User[];
+export interface StaffsListData {
+  users: Staff[];
   total: number;
 }
 
@@ -101,7 +101,7 @@ export interface UserPermissionOverrideInput {
   effect: UserPermissionEffect;
 }
 
-export interface CreateUserInput {
+export interface CreateStaffInput {
   name: string;
   personalEmail: string;
   phone: string;
@@ -114,7 +114,7 @@ export interface CreateUserInput {
   bio?: string;
 }
 
-export interface UpdateUserInput {
+export interface UpdateStaffInput {
   name?: string;
   email?: string;
   password?: string;

@@ -1,4 +1,4 @@
-// src/app/management/staffs/components/UserAccountFormModal.tsx
+// src/app/management/staffs/components/StaffAccountFormModal.tsx
 
 "use client";
 
@@ -33,13 +33,13 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { createUser, getPermissions, updateUser } from "@/management/features/users/users.api";
-import type { User as BackendUser } from "@/management/features/users/users.types";
+import { createStaff, getPermissions, updateStaff } from "@/management/features/staffs/staffs.api";
+import type { Staff as BackendStaff } from "@/management/features/staffs/staffs.types";
 import type {
   Permission,
   StaffPosition,
   UserPermissionOverrideInput,
-} from "@/management/features/users/users.types";
+} from "@/management/features/staffs/staffs.types";
 import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { ApiClientError } from "@/lib/axios";
 
@@ -49,23 +49,24 @@ export type UserRole = "pregnant" | "staff" | "doctor" | "nurse" | "owner" | "ad
 export type UserStatus = "active" | "locked";
 export type AccountType = "customer" | "internal" | "system";
 
-export interface UserAccount {
+export interface StaffAccount {
   id: string;
   fullName: string;
   email: string;
   phone: string;
   role: UserRole;
   roleLabel: string;
+  roles?: BackendStaff["roles"];
   accountType: AccountType;
   accountTypeLabel: string;
   status: UserStatus;
   createdAt: string;
   lastLogin?: string;
-  staffProfile?: BackendUser["staffProfile"];
-  permissionOverrides?: BackendUser["permissionOverrides"];
+  staffProfile?: BackendStaff["staffProfile"];
+  permissionOverrides?: BackendStaff["permissionOverrides"];
 }
 
-export interface UserFormValues {
+export interface StaffFormValues {
   fullName: string;
   email: string;
   phone: string;
@@ -103,14 +104,14 @@ export const accountTypeOptions = [
 
 type ApiResponseData<T> = T | { data: T };
 
-type UserAccountFormModalProps = {
+type StaffAccountFormModalProps = {
   open: boolean;
-  editingUser: UserAccount | null;
+  editingStaff: StaffAccount | null;
   onClose: () => void;
-  onSaved?: (user: UserAccount, mode: "create" | "update") => void;
+  onSaved?: (staff: StaffAccount, mode: "create" | "update") => void;
 };
 
-const initialValues: Partial<UserFormValues> = {
+const initialValues: Partial<StaffFormValues> = {
   fullName: "",
   email: "",
   phone: "",
@@ -235,13 +236,13 @@ function deriveAccountType(roleName?: string): AccountType {
   return "customer";
 }
 
-type StaffListUser = BackendUser & {
+type StaffListUser = BackendStaff & {
   facilityId?: string | number | null;
   personalEmail?: string | null;
   employeeCode?: string | null;
 };
 
-function getStaffProfile(user: StaffListUser): BackendUser["staffProfile"] {
+function getStaffProfile(user: StaffListUser): BackendStaff["staffProfile"] {
   if (user.staffProfile) return user.staffProfile;
 
   const facilityId = user.facilityId === null || user.facilityId === undefined
@@ -270,7 +271,7 @@ function getStaffProfile(user: StaffListUser): BackendUser["staffProfile"] {
   };
 }
 
-function normalizeUser(user: BackendUser): UserAccount {
+function normalizeStaff(user: BackendStaff): StaffAccount {
   const firstRole = user.roles?.[0];
   const staffProfile = getStaffProfile(user);
   const roleName = staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
@@ -283,6 +284,7 @@ function normalizeUser(user: BackendUser): UserAccount {
     phone: user.phone || "",
     role: toUiRole(roleName),
     roleLabel: formatBackendRoleLabel(roleName),
+    roles: user.roles ?? [],
     accountType,
     accountTypeLabel: getAccountTypeLabel(accountType),
     status: toUiStatus(user.status),
@@ -318,13 +320,13 @@ function PreviewLine({
   );
 }
 
-export function UserAccountFormModal({
+export function StaffAccountFormModal({
   open,
-  editingUser,
+  editingStaff,
   onClose,
   onSaved,
-}: UserAccountFormModalProps) {
-  const [form] = Form.useForm<UserFormValues>();
+}: StaffAccountFormModalProps) {
+  const [form] = Form.useForm<StaffFormValues>();
   const { message: messageApi } = App.useApp();
   const [submitting, setSubmitting] = useState(false);
   const [facilityOptions, setFacilityOptions] = useState<
@@ -353,6 +355,22 @@ export function UserAccountFormModal({
     () => watchedDenyPermissionIds ?? [],
     [watchedDenyPermissionIds],
   );
+  const facilitySelectOptions = useMemo(() => {
+    const options = [...facilityOptions];
+    const existingOptionIds = new Set(options.map((option) => option.value));
+
+    (facilityAssignments ?? []).forEach((assignment) => {
+      const facilityId = assignment?.facilityId;
+      if (!facilityId || existingOptionIds.has(facilityId)) return;
+
+      options.push({
+        value: facilityId,
+        label: `Cơ sở #${facilityId}`,
+      });
+    });
+
+    return options;
+  }, [facilityAssignments, facilityOptions]);
 
   const permissionModuleGroups = useMemo(() => {
     const groups = new Map<string, Permission[]>();
@@ -444,6 +462,37 @@ export function UserAccountFormModal({
     [allowPermissionIds, permissionModuleGroups],
   );
 
+  const rolePermissionModuleGroups = useMemo(() => {
+    const selectedRoles = new Set(
+      (facilityAssignments ?? []).flatMap((assignment) => assignment?.roles ?? []),
+    );
+    const rolePermissions = (editingStaff?.roles ?? [])
+      .filter((staffRole) => selectedRoles.has(staffRole.name as StaffPosition))
+      .flatMap((staffRole) => staffRole.permissions ?? []);
+    const uniquePermissions = Array.from(
+      new Map(rolePermissions.map((permission) => [permission.id, permission])).values(),
+    );
+    const groups = new Map<string, Permission[]>();
+
+    uniquePermissions.forEach((permission) => {
+      const moduleName = permission.name.split(".")[0] || "other";
+      const modulePermissions = groups.get(moduleName) ?? [];
+      modulePermissions.push(permission);
+      groups.set(moduleName, modulePermissions);
+    });
+
+    return Array.from(groups.entries())
+      .map(([name, items]) => ({
+        name,
+        label: name
+          .split("_")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" "),
+        permissions: items.sort((left, right) => left.name.localeCompare(right.name)),
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [editingStaff?.roles, facilityAssignments]);
+
   function selectPermissionModule(
     effect: "allow" | "deny",
     permissionIds: string[],
@@ -468,7 +517,7 @@ export function UserAccountFormModal({
   }
 
   function buildPermissionOverrides(
-    values: UserFormValues,
+    values: StaffFormValues,
   ): UserPermissionOverrideInput[] {
     const allowIds = new Set(values.allowPermissionIds ?? []);
     const denyIds = new Set(values.denyPermissionIds ?? []);
@@ -494,7 +543,6 @@ export function UserAccountFormModal({
       .then((facilities) => {
         setFacilityOptions(
           facilities
-            .filter((facility) => facility.status === "active")
             .map((facility) => ({
               value: facility.id,
               label: `${facility.name} (${facility.code})`,
@@ -524,21 +572,26 @@ export function UserAccountFormModal({
       });
 
     const timer = window.setTimeout(() => {
-      if (editingUser) {
+      if (editingStaff) {
         form.setFieldsValue({
-          fullName: editingUser.fullName,
-          email: editingUser.email,
-          phone: editingUser.phone,
+          fullName: editingStaff.fullName,
+          email: editingStaff.email,
+          phone: editingStaff.phone,
           password: "",
-          role: editingUser.role,
-          accountType: editingUser.accountType,
-          status: editingUser.status,
+          role: editingStaff.role,
+          accountType: editingStaff.accountType,
+          status: editingStaff.status,
           facilityAssignments:
-            editingUser.staffProfile?.facilityAssignments ?? initialValues.facilityAssignments,
-          allowPermissionIds: (editingUser.permissionOverrides ?? [])
+            editingStaff.staffProfile?.facilityAssignments ?? initialValues.facilityAssignments,
+          licenseNo: editingStaff.staffProfile?.doctor?.licenseNo,
+          title: editingStaff.staffProfile?.doctor?.title,
+          specialty: editingStaff.staffProfile?.doctor?.specialty,
+          yearsOfExperience: editingStaff.staffProfile?.doctor?.yearsOfExperience,
+          bio: editingStaff.staffProfile?.doctor?.bio,
+          allowPermissionIds: (editingStaff.permissionOverrides ?? [])
             .filter((override) => override.effect === "allow")
             .map((override) => override.permission.id),
-          denyPermissionIds: (editingUser.permissionOverrides ?? [])
+          denyPermissionIds: (editingStaff.permissionOverrides ?? [])
             .filter((override) => override.effect === "deny")
             .map((override) => override.permission.id),
         });
@@ -553,17 +606,17 @@ export function UserAccountFormModal({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [open, editingUser, form, messageApi]);
+  }, [open, editingStaff, form, messageApi]);
 
-  const modalTitle = editingUser ? "Cập nhật tài khoản" : "Thêm tài khoản";
+  const modalTitle = editingStaff ? "Cập nhật tài khoản" : "Thêm tài khoản";
 
-  const modalDescription = editingUser
-    ? "Chỉnh sửa thông tin người dùng, vai trò, loại tài khoản và trạng thái."
-    : "Tạo tài khoản mới cho người dùng trong hệ thống.";
+  const modalDescription = editingStaff
+    ? "Chỉnh sửa thông tin nhân viên, vai trò, loại tài khoản và trạng thái."
+    : "Tạo tài khoản mới cho nhân viên trong hệ thống.";
 
   const previewName = useMemo(() => {
-    return fullName || editingUser?.fullName || "Tài khoản mới";
-  }, [fullName, editingUser]);
+    return fullName || editingStaff?.fullName || "Nhân viên mới";
+  }, [fullName, editingStaff]);
 
   function handleCancel() {
     if (submitting) return;
@@ -572,14 +625,14 @@ export function UserAccountFormModal({
     onClose();
   }
 
-  async function handleFinish(values: UserFormValues) {
+  async function handleFinish(values: StaffFormValues) {
     setSubmitting(true);
 
     try {
       const password = values.password?.trim();
 
-      if (editingUser) {
-        const response = await updateUser(editingUser.id, {
+      if (editingStaff) {
+        const response = await updateStaff(editingStaff.id, {
           name: values.fullName.trim(),
           email: values.email.trim(),
           password: password || undefined,
@@ -593,10 +646,10 @@ export function UserAccountFormModal({
           bio: values.bio,
         });
 
-        const backendUser = getResponseData<BackendUser>(response);
-        const updatedUser = normalizeUser(backendUser);
+        const backendStaff = getResponseData<BackendStaff>(response);
+        const updatedStaff = normalizeStaff(backendStaff);
 
-        onSaved?.(updatedUser, "update");
+        onSaved?.(updatedStaff, "update");
 
         void messageApi.success(
           response.message ?? "Cập nhật tài khoản thành công.",
@@ -608,7 +661,7 @@ export function UserAccountFormModal({
         return;
       }
 
-      const response = await createUser({
+      const response = await createStaff({
         name: values.fullName.trim(),
         personalEmail: values.email.trim(),
         phone: values.phone.trim(),
@@ -621,19 +674,19 @@ export function UserAccountFormModal({
         bio: values.bio,
       });
 
-      let backendUser = getResponseData<BackendUser>(response);
+      let backendStaff = getResponseData<BackendStaff>(response);
 
       if (values.status === "locked") {
-        const updateResponse = await updateUser(backendUser.id, {
+        const updateResponse = await updateStaff(backendStaff.id, {
           status: "locked",
         });
 
-        backendUser = getResponseData<BackendUser>(updateResponse);
+        backendStaff = getResponseData<BackendStaff>(updateResponse);
       }
 
-      const createdUser = normalizeUser(backendUser);
+      const createdStaff = normalizeStaff(backendStaff);
 
-      onSaved?.(createdUser, "create");
+      onSaved?.(createdStaff, "create");
 
       void messageApi.success(
         response.message ?? "Thêm tài khoản thành công.",
@@ -645,7 +698,7 @@ export function UserAccountFormModal({
       if (err instanceof ApiClientError && err.validationErrors.length > 0) {
         const fieldNames = Object.keys(
           form.getFieldsValue(true),
-        ) as Array<keyof UserFormValues>;
+        ) as Array<keyof StaffFormValues>;
         const fieldErrors = fieldNames
           .map((name) => ({
             name,
@@ -692,7 +745,7 @@ export function UserAccountFormModal({
       </div>
 
       <Form
-        key={editingUser?.id ?? "create-user"}
+        key={editingStaff?.id ?? "create-staff"}
         form={form}
         layout="vertical"
         initialValues={initialValues}
@@ -748,7 +801,7 @@ export function UserAccountFormModal({
                 <Col xs={24} md={8}>
                   <Form.Item
                     name="email"
-                    label={editingUser ? "Email" : "Email cá nhân"}
+                    label={editingStaff ? "Email" : "Email cá nhân"}
                     rules={[
                       { required: true, message: "Vui lòng nhập email" },
                       { type: "email", message: "Email không hợp lệ" },
@@ -785,7 +838,7 @@ export function UserAccountFormModal({
                   </Form.Item>
                 </Col>
 
-                {editingUser ? <Col xs={24} md={12}>
+                {editingStaff ? <Col xs={24} md={12}>
                   <Form.Item
                     name="password"
                     label="Mật khẩu mới"
@@ -846,11 +899,11 @@ export function UserAccountFormModal({
                             label="Cơ sở làm việc"
                             rules={[{ required: true, message: "Vui lòng chọn cơ sở" }]}
                           >
-                            <Select
-                              placeholder="Chọn cơ sở"
-                              options={facilityOptions}
-                              optionFilterProp="label"
-                            />
+	                            <Select
+	                              placeholder="Chọn cơ sở"
+	                              options={facilitySelectOptions}
+	                              optionFilterProp="label"
+	                            />
                           </Form.Item>
                         </Col>
                         <Col xs={20} md={11}>
@@ -963,6 +1016,34 @@ export function UserAccountFormModal({
                 </Space>
               }
             >
+              <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50 px-3 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase text-sky-700">
+                  Quyền theo chức vụ
+                </p>
+                {rolePermissionModuleGroups.length > 0 ? (
+                  <div className="space-y-3">
+                    {rolePermissionModuleGroups.map((group) => (
+                      <div key={group.name}>
+                        <div className="mb-1.5 text-xs font-semibold text-slate-600">
+                          {group.label}
+                        </div>
+                        <Space size={[6, 6]} wrap>
+                          {group.permissions.map((permission) => (
+                            <Tag key={permission.id} color="blue">
+                              {permission.name}
+                            </Tag>
+                          ))}
+                        </Space>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Text className="text-sm text-slate-500">
+                    Chưa có quyền mặc định theo chức vụ hoặc chưa chọn chức vụ.
+                  </Text>
+                )}
+              </div>
+
               <Tabs
                 items={[
                   {
@@ -1115,13 +1196,13 @@ export function UserAccountFormModal({
           </Button>
 
           <Button type="primary" htmlType="submit" loading={submitting}>
-            {editingUser ? (
+            {editingStaff ? (
               <Pencil className="mr-1 h-4 w-4" />
             ) : (
               <Save className="mr-1 h-4 w-4" />
             )}
 
-            {editingUser ? "Cập nhật tài khoản" : "Thêm tài khoản"}
+            {editingStaff ? "Cập nhật tài khoản" : "Thêm tài khoản"}
           </Button>
         </div>
       </Form>

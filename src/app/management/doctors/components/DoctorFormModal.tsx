@@ -46,8 +46,8 @@ import type {
   DoctorStatus,
   UpdateDoctorInput,
 } from "@/management/features/doctors/doctors.types";
-import { getUsersPage } from "@/management/features/users/users.api";
-import type { User } from "@/management/features/users/users.types";
+import { getStaffsPage } from "@/management/features/staffs/staffs.api";
+import type { Staff } from "@/management/features/staffs/staffs.types";
 
 const { Text, Title } = Typography;
 
@@ -172,7 +172,7 @@ export function DoctorFormModal({
   const [submitting, setSubmitting] = useState(false);
   const facilityOptions: Array<{ value: string; label: string }> = [];
   const facilitiesLoading = false;
-  const [staffOptions, setStaffOptions] = useState<User[]>([]);
+  const [staffOptions, setStaffOptions] = useState<Staff[]>([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [roomTypes, setRoomTypes] =
     useState<RoomType[]>([]);
@@ -271,7 +271,7 @@ export function DoctorFormModal({
     let cancelled = false;
     setStaffLoading(true);
 
-    void getUsersPage({
+    void getStaffsPage({
       status: "active",
       limit: 50,
     })
