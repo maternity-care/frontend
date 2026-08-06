@@ -703,10 +703,6 @@ export function DoctorShiftBulkGenerateModal({
     Boolean(
       previewResult &&
       previewResult.recognized &&
-      previewResult.canConfirm !== false &&
-      previewResult.skipped === 0 &&
-      previewResult.conflicted === 0 &&
-      !previewResult.allOrNothingRejected &&
       previewResult.valid > 0,
     );
 
@@ -1208,7 +1204,7 @@ export function DoctorShiftBulkGenerateModal({
       fromDate: values.fromDate,
       toDate,
       slotAssignments,
-      saveOnlyValid: false,
+      saveOnlyValid: true,
     };
   }
 
@@ -1300,17 +1296,13 @@ export function DoctorShiftBulkGenerateModal({
           response,
         );
 
-      const rejected =
-        result.recognized &&
-        (
-          result.skipped > 0 ||
-          result.conflicted > 0 ||
-          result.allOrNothingRejected ||
-          result.canConfirm === false ||
-          result.createdCount === 0
-        );
+      const createdCount =
+        result.createdCount;
 
-      if (rejected) {
+      if (
+        result.recognized &&
+        createdCount === 0
+      ) {
         const issues =
           applyGenerationIssues(
             result,
@@ -1320,9 +1312,7 @@ export function DoctorShiftBulkGenerateModal({
         setPreviewResult(result);
 
         const summaryMessage =
-          `Không thể lưu lịch trực. ` +
-          `${result.skipped} lịch bị bỏ qua, ` +
-          `${result.conflicted} lịch bị trùng.`;
+          "Không có ca trực hợp lệ nào được tạo.";
 
         setError(summaryMessage);
         setGenerationIssues(issues);
@@ -1343,7 +1333,12 @@ export function DoctorShiftBulkGenerateModal({
           response,
           result.recognized &&
           result.createdCount > 0
-            ? `Tạo thành công ${result.createdCount} lịch trực.`
+            ? (
+                result.skipped > 0 ||
+                result.conflicted > 0
+                  ? `Đã tạo ${result.createdCount} ca trực hợp lệ. Các ca bị trùng hoặc bị bỏ qua không được tạo.`
+                  : `Tạo thành công ${result.createdCount} ca trực.`
+              )
             : "Tạo lịch trực 1 tuần thành công.",
         ),
       );
