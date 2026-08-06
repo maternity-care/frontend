@@ -53,6 +53,8 @@ const { TextArea } = Input;
 type ForumPostsTabProps = {
   topics: ForumTopic[];
   navigation: ReactNode;
+  focusPostId?: string;
+  realtimeVersion?: number;
   onSummaryChange: (summary: {
     total: number;
     pending: number;
@@ -939,6 +941,8 @@ function PostDetailModal({
 export function ForumPostsTab({
   topics,
   navigation,
+  focusPostId,
+  realtimeVersion = 0,
   onSummaryChange,
 }: ForumPostsTabProps) {
   const { message } = App.useApp();
@@ -1023,7 +1027,31 @@ export function ForumPostsTab({
   useEffect(() => {
     const timer = window.setTimeout(() => void loadPosts(), 300);
     return () => window.clearTimeout(timer);
-  }, [loadPosts]);
+  }, [loadPosts, realtimeVersion]);
+
+  useEffect(() => {
+    if (!focusPostId) return;
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setDetailLoading(true);
+      void getForumPost(focusPostId)
+        .then((detail) => {
+          if (active) setSelectedPost(detail);
+        })
+        .catch((loadError) => {
+          if (active) message.error(getErrorMessage(loadError));
+        })
+        .finally(() => {
+          if (active) setDetailLoading(false);
+        });
+    }, 0);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [focusPostId, message]);
 
   function resetFilters() {
     setKeyword("");

@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Bell,
   Building2,
   ChevronDown,
   LogOut,
@@ -10,10 +9,11 @@ import {
   Settings,
   UserRound,
 } from "lucide-react";
-import { Dropdown, Tooltip, type MenuProps } from "antd";
+import { Dropdown, type MenuProps } from "antd";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { Button } from "@/management/components/ui/Button";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 const sectionLabels: Record<string, string> = {
   dashboard: "Tổng quan",
@@ -26,6 +26,7 @@ const sectionLabels: Record<string, string> = {
   jobs: "Công việc",
   uploads: "Tệp tải lên",
   profile: "Hồ sơ cá nhân",
+  "appointment-disruptions": "Lịch hẹn bị ảnh hưởng",
 };
 
 function getInitials(name?: string) {
@@ -139,15 +140,7 @@ export function Header() {
             </label>
           ) : null}
 
-          <Tooltip title="Thông báo">
-            <button
-              type="button"
-              aria-label="Thông báo"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-            >
-              <Bell className="h-[18px] w-[18px]" />
-            </button>
-          </Tooltip>
+          <NotificationCenter />
 
           <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
 
