@@ -323,6 +323,26 @@ export function RoomFormModalBase({
   ) {
     setError(null);
 
+    const facilityAllowed =
+      facilities.some(
+        (facility) =>
+          String(
+            facility.id,
+          ) ===
+          String(
+            values.facilityId,
+          ),
+      );
+
+    if (!facilityAllowed) {
+      const message =
+        "Bạn không có quyền quản lý phòng của cơ sở này.";
+
+      setError(message);
+      messageApi.error(message);
+      return;
+    }
+
     if (
       mode === "edit" &&
       editingRoom &&
@@ -519,7 +539,10 @@ export function RoomFormModalBase({
                     <Select
                       showSearch
                       optionFilterProp="label"
-                      disabled={mode === "edit"}
+                      disabled={
+                        mode === "edit" ||
+                        facilities.length === 1
+                      }
                       placeholder="Chọn cơ sở"
                       options={facilities.map(
                         (facility) => ({
@@ -623,7 +646,6 @@ export function RoomFormModalBase({
                     ]}
                   >
                     <Select
-                      disabled={mode === "edit"}
                       options={[
                         {
                           value: "active",

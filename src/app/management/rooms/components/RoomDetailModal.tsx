@@ -34,6 +34,8 @@ type RoomDetailModalProps = {
   open: boolean;
   roomId: string | null;
   initialRoom?: ClinicRoom | null;
+  canManage: boolean;
+  allowedFacilityId?: string;
   onClose: () => void;
   onEdit: (
     room: ClinicRoom,
@@ -65,6 +67,8 @@ export function RoomDetailModal({
   open,
   roomId,
   initialRoom = null,
+  canManage,
+  allowedFacilityId,
   onClose,
   onEdit,
   onDelete,
@@ -91,9 +95,23 @@ export function RoomDetailModal({
 
       void getRoomById(roomId)
         .then((data) => {
-          if (!cancelled) {
-            setRoom(data);
+          if (cancelled) return;
+
+          if (
+            allowedFacilityId &&
+            String(
+              data.facilityId,
+            ) !==
+              allowedFacilityId
+          ) {
+            setRoom(null);
+            setError(
+              "Bạn không có quyền xem phòng của cơ sở này.",
+            );
+            return;
           }
+
+          setRoom(data);
         })
         .catch((loadError) => {
           if (!cancelled) {
@@ -116,6 +134,7 @@ export function RoomDetailModal({
       window.clearTimeout(timer);
     };
   }, [
+    allowedFacilityId,
     initialRoom,
     open,
     roomId,
@@ -176,30 +195,32 @@ export function RoomDetailModal({
               </div>
             </div>
 
-            <Space size={8} wrap>
-              <Button
-                icon={
-                  <Pencil className="h-4 w-4" />
-                }
-                onClick={() =>
-                  onEdit(room)
-                }
-              >
-                Cập nhật
-              </Button>
+            {canManage ? (
+              <Space size={8} wrap>
+                <Button
+                  icon={
+                    <Pencil className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    onEdit(room)
+                  }
+                >
+                  Cập nhật
+                </Button>
 
-              <Button
-                danger
-                icon={
-                  <Trash2 className="h-4 w-4" />
-                }
-                onClick={() =>
-                  onDelete(room)
-                }
-              >
-                Xóa
-              </Button>
-            </Space>
+                <Button
+                  danger
+                  icon={
+                    <Trash2 className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    onDelete(room)
+                  }
+                >
+                  Xóa
+                </Button>
+              </Space>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
