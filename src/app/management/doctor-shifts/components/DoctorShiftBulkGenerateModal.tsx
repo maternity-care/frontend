@@ -62,6 +62,9 @@ const WORKING_DAY_OPTIONS: Array<{
   { label: "Chủ nhật", value: "SUN" },
 ];
 
+const WEEKLY_DRAFT_STORAGE_PREFIX =
+  "management-doctor-shifts-weekly-draft:v1";
+
 type BulkAssignmentFormValue = {
   staffId: string;
   roomId: string;
@@ -81,8 +84,13 @@ type BulkSlotGroupFormValue = {
 type BulkGenerateFormValues = {
   facilityId: string;
   fromDate: string;
-  toDate: string;
   slotGroups: BulkSlotGroupFormValue[];
+};
+
+type BulkGenerateDraft = {
+  version: 1;
+  savedAt: string;
+  values: BulkGenerateFormValues;
 };
 
 type BulkGenerationIssueFieldPath =
@@ -113,17 +121,82 @@ type DoctorShiftBulkGenerateModalProps = {
   }) => Promise<void> | void;
 };
 
-function getCurrentDateKey() {
-  const currentDate = new Date();
-  const year = currentDate.getFullYear();
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
   const month = String(
-    currentDate.getMonth() + 1,
+    date.getMonth() + 1,
   ).padStart(2, "0");
   const day = String(
-    currentDate.getDate(),
+    date.getDate(),
   ).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function getNextWeekMondayDateKey() {
+  const currentDate = new Date();
+  const currentDay =
+    currentDate.getDay();
+  const daysUntilNextMonday =
+    currentDay === 0
+      ? 1
+      : 8 - currentDay;
+
+  currentDate.setDate(
+    currentDate.getDate() +
+      daysUntilNextMonday,
+  );
+
+  return toDateKey(currentDate);
+}
+
+function isNextWeekMondayDateKey(
+  value: string,
+) {
+  return (
+    Boolean(value) &&
+    value ===
+      getNextWeekMondayDateKey()
+  );
+}
+
+function formatLockedWeekDate(
+  value?: string,
+) {
+  if (!value) {
+    return "";
+  }
+
+  const [year, month, day] =
+    value.split("-");
+
+  if (
+    !year ||
+    !month ||
+    !day
+  ) {
+    return value;
+  }
+
+  return `${day}-${month}-${year}`;
+}
+
+type LockedWeekDateInputProps = {
+  value?: string;
+};
+
+function LockedWeekDateInput({
+  value,
+}: LockedWeekDateInputProps) {
+  return (
+    <Input
+      value={formatLockedWeekDate(
+        value,
+      )}
+      readOnly
+      disabled
+    />
+  );
 }
 
 function addDaysToDateKey(
@@ -154,6 +227,150 @@ function isRecord(
     typeof value === "object" &&
     !Array.isArray(value)
   );
+}
+
+function getWeeklyDraftStorageKey(
+  facilityId: string,
+) {
+  return `${WEEKLY_DRAFT_STORAGE_PREFIX}:${facilityId}`;
+}
+
+function readWeeklyDraft(
+  facilityId: string,
+  expectedFromDate: string,
+): BulkGenerateFormValues | null {
+  if (
+    typeof window === "undefined" ||
+    !facilityId
+  ) {
+    return null;
+  }
+
+  const storageKey =
+    getWeeklyDraftStorageKey(
+      facilityId,
+    );
+
+  try {
+    const rawValue =
+      window.localStorage.getItem(
+        storageKey,
+      );
+
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsed: unknown =
+      JSON.parse(rawValue);
+
+    if (
+      !isRecord(parsed) ||
+      parsed.version !== 1 ||
+      !isRecord(parsed.values)
+    ) {
+      window.localStorage.removeItem(
+        storageKey,
+      );
+      return null;
+    }
+
+    const values =
+      parsed.values;
+
+    if (
+      values.facilityId !==
+        facilityId ||
+      values.fromDate !==
+        expectedFromDate ||
+      !Array.isArray(
+        values.slotGroups,
+      )
+    ) {
+      window.localStorage.removeItem(
+        storageKey,
+      );
+      return null;
+    }
+
+    return values as unknown as
+      BulkGenerateFormValues;
+  } catch {
+    window.localStorage.removeItem(
+      storageKey,
+    );
+    return null;
+  }
+}
+
+function saveWeeklyDraft(
+  values: BulkGenerateFormValues,
+) {
+  if (
+    typeof window === "undefined" ||
+    !values.facilityId ||
+    !values.fromDate
+  ) {
+    return;
+  }
+
+  const draft: BulkGenerateDraft = {
+    version: 1,
+    savedAt:
+      new Date().toISOString(),
+    values,
+  };
+
+  window.localStorage.setItem(
+    getWeeklyDraftStorageKey(
+      values.facilityId,
+    ),
+    JSON.stringify(draft),
+  );
+}
+
+function clearWeeklyDraft(
+  facilityId: string,
+) {
+  if (
+    typeof window === "undefined" ||
+    !facilityId
+  ) {
+    return;
+  }
+
+  window.localStorage.removeItem(
+    getWeeklyDraftStorageKey(
+      facilityId,
+    ),
+  );
+}
+
+function mergeDraftSlotGroups(
+  slots: ShiftSlotLookupItem[],
+  draft:
+    | BulkGenerateFormValues
+    | null,
+): BulkSlotGroupFormValue[] {
+  const draftBySlotId =
+    new Map(
+      (draft?.slotGroups ?? [])
+        .filter(
+          (group) =>
+            Boolean(group?.slotId),
+        )
+        .map((group) => [
+          group.slotId,
+          group,
+        ]),
+    );
+
+  return slots.map((slot) => ({
+    slotId: slot.id,
+    assignments:
+      draftBySlotId.get(slot.id)
+        ?.assignments ?? [],
+  }));
 }
 
 
@@ -463,9 +680,14 @@ export function DoctorShiftBulkGenerateModal({
   const issueFieldPathsRef = useRef<
     BulkGenerationIssueFieldPath[]
   >([]);
+  const pendingDraftRef = useRef<
+    BulkGenerateFormValues | null
+  >(null);
 
   const watchedFacilityId =
     Form.useWatch("facilityId", form) ?? "";
+  const watchedFromDate =
+    Form.useWatch("fromDate", form) ?? "";
   const watchedSlotGroups =
     Form.useWatch("slotGroups", form) ?? [];
 
@@ -528,13 +750,30 @@ export function DoctorShiftBulkGenerateModal({
   useEffect(() => {
     if (!open) return;
 
-    const today = getCurrentDateKey();
+    const nextWeekMonday =
+      getNextWeekMondayDateKey();
+    const defaultFacilityId =
+      facilities.length === 1
+        ? facilities[0]?.id
+        : undefined;
+    const restoredDraft =
+      defaultFacilityId
+        ? readWeeklyDraft(
+            defaultFacilityId,
+            nextWeekMonday,
+          )
+        : null;
 
     const timer = window.setTimeout(() => {
+      pendingDraftRef.current =
+        restoredDraft;
+
       form.resetFields();
       form.setFieldsValue({
-        fromDate: today,
-        toDate: addDaysToDateKey(today, 30),
+        facilityId:
+          defaultFacilityId,
+        fromDate:
+          nextWeekMonday,
         slotGroups: [],
       });
       setShiftSlots([]);
@@ -550,7 +789,11 @@ export function DoctorShiftBulkGenerateModal({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [form, open]);
+  }, [
+    facilities,
+    form,
+    open,
+  ]);
 
   useEffect(() => {
     if (!open || !watchedFacilityId) {
@@ -575,17 +818,28 @@ export function DoctorShiftBulkGenerateModal({
         if (cancelled) return;
 
         setShiftSlots(slots);
+
+        const restoredDraft =
+          pendingDraftRef.current;
+        const slotGroups =
+          mergeDraftSlotGroups(
+            slots,
+            restoredDraft,
+          );
+
         form.setFieldsValue({
-          slotGroups: slots.map((slot) => ({
-            slotId: slot.id,
-            assignments: [],
-          })),
+          slotGroups,
         });
+
+        pendingDraftRef.current =
+          null;
       })
       .catch((loadError) => {
         if (cancelled) return;
 
         setShiftSlots([]);
+        pendingDraftRef.current =
+          null;
         form.setFieldsValue({
           slotGroups: [],
         });
@@ -881,11 +1135,21 @@ export function DoctorShiftBulkGenerateModal({
   function buildPayload(
     values: BulkGenerateFormValues,
   ): BulkGenerateDoctorShiftsInput {
-    if (values.toDate < values.fromDate) {
+    if (
+      !isNextWeekMondayDateKey(
+        values.fromDate,
+      )
+    ) {
       throw new Error(
-        "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.",
+        "Chỉ được xếp lịch cho tuần kế tiếp.",
       );
     }
+
+    const toDate =
+      addDaysToDateKey(
+        values.fromDate,
+        6,
+      );
 
     const slotAssignments =
       (values.slotGroups ?? [])
@@ -942,7 +1206,7 @@ export function DoctorShiftBulkGenerateModal({
     return {
       facilityId: values.facilityId.trim(),
       fromDate: values.fromDate,
-      toDate: values.toDate,
+      toDate,
       slotAssignments,
       saveOnlyValid: false,
     };
@@ -1080,10 +1344,15 @@ export function DoctorShiftBulkGenerateModal({
           result.recognized &&
           result.createdCount > 0
             ? `Tạo thành công ${result.createdCount} lịch trực.`
-            : "Tạo lịch trực nhiều ngày thành công.",
+            : "Tạo lịch trực 1 tuần thành công.",
         ),
       );
 
+      clearWeeklyDraft(
+        previewPayload.facilityId,
+      );
+      pendingDraftRef.current =
+        null;
       setPreviewModalOpen(false);
       setPreviewPayload(null);
       setPreviewValues(null);
@@ -1110,9 +1379,16 @@ export function DoctorShiftBulkGenerateModal({
       return;
     }
 
+    const currentValues =
+      form.getFieldsValue(
+        true,
+      );
+
+    saveWeeklyDraft(
+      currentValues,
+    );
+
     clearGenerationIssueErrors();
-    form.resetFields();
-    setShiftSlots([]);
     setError(null);
     setGenerationIssues([]);
     setPreviewModalOpen(false);
@@ -1169,11 +1445,18 @@ export function DoctorShiftBulkGenerateModal({
               level={4}
               className="!mb-1 !text-slate-950"
             >
-              Tạo lịch trực nhiều ngày
+              Tạo lịch trực 1 tuần
             </Title>
 
             <Text type="secondary">
-              Chọn khoảng ngày và phân công bác sĩ theo từng khung ca, phòng và ngày làm việc trong tuần.
+              Phân công bác sĩ theo từng khung ca, phòng và ngày làm việc. Hệ thống chỉ tạo lịch cho tuần kế tiếp, từ Thứ 2 đến Chủ nhật.
+            </Text>
+
+            <Text
+              type="secondary"
+              className="mt-1 block text-xs"
+            >
+              Bản nháp được tự động lưu và sẽ được khôi phục khi mở lại.
             </Text>
           </div>
         </div>
@@ -1206,6 +1489,7 @@ export function DoctorShiftBulkGenerateModal({
         requiredMark="optional"
         onValuesChange={(
           changedValues,
+          allValues,
         ) => {
           if (
             generationIssues.length >
@@ -1238,6 +1522,10 @@ export function DoctorShiftBulkGenerateModal({
               slotGroups: [],
             });
           }
+
+          saveWeeklyDraft(
+            allValues,
+          );
         }}
       >
         <Row gutter={[16, 0]}>
@@ -1256,6 +1544,9 @@ export function DoctorShiftBulkGenerateModal({
               <Select
                 showSearch
                 optionFilterProp="label"
+                disabled={
+                  facilities.length === 1
+                }
                 placeholder="Chọn cơ sở khám"
                 options={facilities.map(
                   (facility) => ({
@@ -1267,63 +1558,50 @@ export function DoctorShiftBulkGenerateModal({
             </Form.Item>
           </Col>
 
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} lg={12}>
             <Form.Item
               name="fromDate"
-              label="Từ ngày"
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Chọn ngày bắt đầu.",
-                },
-              ]}
-            >
-              <Input type="date" />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} sm={12} lg={6}>
-            <Form.Item
-              name="toDate"
-              label="Đến ngày"
-              dependencies={[
-                "fromDate",
-              ]}
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Chọn ngày kết thúc.",
-                },
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    const fromDate =
-                      getFieldValue(
-                        "fromDate",
-                      ) as string;
-
-                    if (
-                      !value ||
-                      !fromDate ||
-                      value >= fromDate
-                    ) {
-                      return Promise.resolve();
-                    }
-
-                    return Promise.reject(
-                      new Error(
-                        "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.",
+              label="Tuần được xếp lịch"
+              extra={
+                watchedFromDate
+                  ? `Từ Thứ 2 ${formatIssueDate(
+                      watchedFromDate,
+                    )} đến Chủ nhật ${formatIssueDate(
+                      addDaysToDateKey(
+                        watchedFromDate,
+                        6,
                       ),
-                    );
+                    )}.`
+                  : "Hệ thống tự xác định tuần kế tiếp."
+              }
+              rules={[
+                {
+                  required: true,
+                  message:
+                    "Không xác định được tuần kế tiếp.",
+                },
+                {
+                  validator: async (
+                    _rule,
+                    value?: string,
+                  ) => {
+                    if (
+                      value &&
+                      !isNextWeekMondayDateKey(
+                        value,
+                      )
+                    ) {
+                      throw new Error(
+                        "Chỉ được xếp lịch cho tuần kế tiếp.",
+                      );
+                    }
                   },
-                }),
+                },
               ]}
             >
-              <Input type="date" />
+              <LockedWeekDateInput />
             </Form.Item>
           </Col>
-
         </Row>
 
         <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
@@ -1760,7 +2038,7 @@ export function DoctorShiftBulkGenerateModal({
             void handlePreview()
           }
         >
-          Xem trước lịch trực
+          Xem trước lịch tuần
         </Button>
       </div>
       </Modal>
