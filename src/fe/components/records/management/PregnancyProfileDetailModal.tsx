@@ -14,7 +14,6 @@ import {
   Tag,
   Typography,
 } from "antd";
-
 import {
   ExternalLink,
   FileText,
@@ -38,23 +37,20 @@ interface Props {
   profile: ManagementPregnancyProfile | null;
   onClose: () => void;
   onEdit: (profile: ManagementPregnancyProfile) => void;
+  onEditMedicalRecord?: (recordId: string) => void;
 }
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
-
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-
   return new Intl.DateTimeFormat("vi-VN").format(date);
 }
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
-
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-
   return new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "short",
     timeStyle: "short",
@@ -63,7 +59,6 @@ function formatDateTime(value?: string | null): string {
 
 function formatFileSize(value?: number | null): string {
   if (!value || value <= 0) return "";
-
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
@@ -103,16 +98,11 @@ function isHttpUrl(value: string): boolean {
 }
 
 function getFileNameFromString(record: string, index: number): string {
-  if (!isHttpUrl(record)) {
-    return record || `Tài liệu ${index + 1}`;
-  }
-
+  if (!isHttpUrl(record)) return record || `Tài liệu ${index + 1}`;
   try {
     const url = new URL(record);
     const lastSegment = url.pathname.split("/").filter(Boolean).at(-1);
-    return lastSegment
-      ? decodeURIComponent(lastSegment)
-      : `Tài liệu ${index + 1}`;
+    return lastSegment ? decodeURIComponent(lastSegment) : `Tài liệu ${index + 1}`;
   } catch {
     return `Tài liệu ${index + 1}`;
   }
@@ -140,8 +130,7 @@ function isPdfRecord(
   );
 }
 
-/* ===== Document Card (file dạng string hoặc PdfRecord cũ) ===== */
-
+/* ===== Document Card ===== */
 interface DocumentCardProps {
   record: string | PregnancyProfilePdfRecord;
   index: number;
@@ -173,51 +162,6 @@ function DocumentCard({ record, index }: DocumentCardProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        gap: 16,
-        padding: 14,
-        border: "1px solid #f0f0f0",
-        borderRadius: 8,
-      }}
-    >
-      <Space align="start">
-        <FileText size={22} />
-        <div>
-          <Text strong>{name}</Text>
-          <br />
-          <Text type="secondary">{details}</Text>
-        </div>
-      </Space>
-
-      {canOpen && (
-        <Button
-          type="link"
-          icon={<ExternalLink size={15} />}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Mở tài liệu
-        </Button>
-      )}
-    </div>
-  );
-}
-
-/* ===== File thuộc lần khám (files[] trong consultation) ===== */
-
-interface MedicalRecordFileCardProps {
-  file: PregnancyProfileMedicalRecordFile;
-}
-
-function MedicalRecordFileCard({ file }: MedicalRecordFileCardProps) {
-  const canOpen = isHttpUrl(file.fileUrl);
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
         gap: 12,
         padding: "10px 12px",
         border: "1px solid #f0f0f0",
@@ -227,8 +171,56 @@ function MedicalRecordFileCard({ file }: MedicalRecordFileCardProps) {
     >
       <Space align="start" size={10}>
         <FileText size={18} />
-        <div>
-          <Text strong style={{ fontSize: 13 }}>
+        <div style={{ minWidth: 0 }}>
+          <Text strong style={{ fontSize: 13 }} ellipsis>
+            {name}
+          </Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {details}
+          </Text>
+        </div>
+      </Space>
+      {canOpen && (
+        <Button
+          type="link"
+          size="small"
+          icon={<ExternalLink size={14} />}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Mở
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/* ===== File thuộc lần khám ===== */
+interface MedicalRecordFileCardProps {
+  file: PregnancyProfileMedicalRecordFile;
+}
+
+function MedicalRecordFileCard({ file }: MedicalRecordFileCardProps) {
+  const canOpen = isHttpUrl(file.fileUrl);
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "8px 10px",
+        border: "1px solid #f0f0f0",
+        borderRadius: 6,
+        background: "#fafafa",
+      }}
+    >
+      <Space align="start" size={8}>
+        <FileText size={16} />
+        <div style={{ minWidth: 0 }}>
+          <Text strong style={{ fontSize: 13 }} ellipsis>
             {file.fileName}
           </Text>
           <br />
@@ -243,12 +235,11 @@ function MedicalRecordFileCard({ file }: MedicalRecordFileCardProps) {
           </Text>
         </div>
       </Space>
-
       {canOpen && (
         <Button
           type="link"
           size="small"
-          icon={<ExternalLink size={14} />}
+          icon={<ExternalLink size={13} />}
           href={file.fileUrl}
           target="_blank"
           rel="noopener noreferrer"
@@ -261,12 +252,12 @@ function MedicalRecordFileCard({ file }: MedicalRecordFileCardProps) {
 }
 
 /* ===== Consultation Card ===== */
-
 interface ConsultationCardProps {
   consultation: PregnancyConsultationRecord;
+  onEdit?: (id: string) => void;
 }
 
-function ConsultationCard({ consultation }: ConsultationCardProps) {
+function ConsultationCard({ consultation, onEdit }: ConsultationCardProps) {
   return (
     <div
       style={{
@@ -275,43 +266,47 @@ function ConsultationCard({ consultation }: ConsultationCardProps) {
         borderRadius: 8,
       }}
     >
-      <Space align="center" style={{ marginBottom: 12 }}>
-        <Stethoscope size={20} />
-        <Text strong>
-          Kết quả khám{" "}
-          {consultation.createdAt
-            ? `– ${formatDateTime(consultation.createdAt)}`
-            : ""}
-        </Text>
-      </Space>
+      <Flex justify="space-between" align="center" style={{ marginBottom: 12 }}>
+        <Space align="center">
+          <Stethoscope size={20} />
+          <Text strong>
+            Kết quả khám{" "}
+            {consultation.createdAt
+              ? `– ${formatDateTime(consultation.createdAt)}`
+              : ""}
+          </Text>
+        </Space>
+        {onEdit && consultation.id && (
+          <Button
+            type="link"
+            size="small"
+            icon={<Pencil size={14} />}
+            onClick={() => onEdit(consultation.id)}
+          >
+            Sửa
+          </Button>
+        )}
+      </Flex>
 
       <Descriptions
         size="small"
-        column={{
-          xs: 1,
-          md: 2,
-        }}
+        column={{ xs: 1, md: 2 }}
       >
         <Descriptions.Item label="Chẩn đoán">
           {consultation.diagnosis || "—"}
         </Descriptions.Item>
-
         <Descriptions.Item label="Kết luận">
           {consultation.conclusion || "—"}
         </Descriptions.Item>
-
         <Descriptions.Item label="Khuyến nghị">
           {consultation.recommendation || "—"}
         </Descriptions.Item>
-
         <Descriptions.Item label="Ngày tái khám đề xuất">
           {formatDateTime(consultation.nextAppointmentSuggestedAt)}
         </Descriptions.Item>
-
         <Descriptions.Item label="Mã lịch hẹn">
           {consultation.appointmentId || "—"}
         </Descriptions.Item>
-
         <Descriptions.Item label="Mã bác sĩ">
           {consultation.doctorId || "—"}
         </Descriptions.Item>
@@ -322,11 +317,19 @@ function ConsultationCard({ consultation }: ConsultationCardProps) {
           <Text strong style={{ display: "block", marginBottom: 8 }}>
             Tài liệu đính kèm ({consultation.files.length})
           </Text>
-          <Flex vertical gap={8}>
+          <div
+            style={{
+              maxHeight: 220,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
             {consultation.files.map((file) => (
-              <MedicalRecordFileCard key={file.id} file={file} />
+              <MedicalRecordFileCard key={file.id || file.fileUrl} file={file} />
             ))}
-          </Flex>
+          </div>
         </div>
       )}
     </div>
@@ -334,53 +337,40 @@ function ConsultationCard({ consultation }: ConsultationCardProps) {
 }
 
 /* ===== Main Modal ===== */
-
 export function PregnancyProfileDetailModal({
   open,
   profile,
   onClose,
   onEdit,
+  onEditMedicalRecord,
 }: Props) {
-  if (!profile) {
-    return null;
-  }
+  if (!profile) return null;
 
   const user = profile.user;
 
-  // 1. Top-level string / PdfRecord (legacy)
   const fileRecords = profile.medicalRecords.filter(
     (record): record is string | PregnancyProfilePdfRecord =>
       typeof record === "string" || isPdfRecord(record),
   );
 
-  // 2. All consultations (dedicated + embedded)
   const embeddedConsultations =
     profile.medicalRecords.filter(isConsultationRecord);
 
   const consultationMap = new Map<string, PregnancyConsultationRecord>();
-
-  [...profile.consultations, ...embeddedConsultations].forEach(
-    (consultation) => {
-      const key =
-        consultation.id ||
-        `${consultation.appointmentId}-${consultation.createdAt}`;
-      consultationMap.set(key, consultation);
-    },
-  );
-
+  [...profile.consultations, ...embeddedConsultations].forEach((c) => {
+    const key = c.id || `${c.appointmentId}-${c.createdAt}`;
+    consultationMap.set(key, c);
+  });
   const consultations = Array.from(consultationMap.values());
 
-  // 3. Collect ALL files from every consultation (this is what you need)
   const allFilesFromConsultations: PregnancyProfileMedicalRecordFile[] = [];
   const seenFileIds = new Set<string>();
-
-  consultations.forEach((consultation) => {
-    (consultation.files ?? []).forEach((file) => {
+  consultations.forEach((c) => {
+    (c.files ?? []).forEach((file) => {
       if (file.id && !seenFileIds.has(file.id)) {
         seenFileIds.add(file.id);
         allFilesFromConsultations.push(file);
       } else if (!file.id) {
-        // fallback if id is missing
         allFilesFromConsultations.push(file);
       }
     });
@@ -440,27 +430,18 @@ export function PregnancyProfileDetailModal({
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={12}>
-            <Descriptions
-              title="Thông tin thai phụ"
-              bordered
-              size="small"
-              column={1}
-            >
+            <Descriptions title="Thông tin thai phụ" bordered size="small" column={1}>
               <Descriptions.Item label="Mã bệnh nhân">
                 {profile.patientId || "—"}
               </Descriptions.Item>
-              <Descriptions.Item label="CCCD">
-                {user?.cccd || "—"}
-              </Descriptions.Item>
+              <Descriptions.Item label="CCCD">{user?.cccd || "—"}</Descriptions.Item>
               <Descriptions.Item label="Ngày sinh">
                 {formatDate(user?.dateOfBirth)}
               </Descriptions.Item>
               <Descriptions.Item label="Số điện thoại">
                 {user?.phone || "—"}
               </Descriptions.Item>
-              <Descriptions.Item label="Email">
-                {user?.email || "—"}
-              </Descriptions.Item>
+              <Descriptions.Item label="Email">{user?.email || "—"}</Descriptions.Item>
               <Descriptions.Item label="Địa chỉ">
                 {[user?.address, user?.ward, user?.district, user?.province]
                   .filter(Boolean)
@@ -476,12 +457,7 @@ export function PregnancyProfileDetailModal({
           </Col>
 
           <Col xs={24} lg={12}>
-            <Descriptions
-              title="Thông tin thai kỳ"
-              bordered
-              size="small"
-              column={1}
-            >
+            <Descriptions title="Thông tin thai kỳ" bordered size="small" column={1}>
               <Descriptions.Item label="Ngày đầu kỳ kinh cuối">
                 {formatDate(profile.lastMenstrualPeriod)}
               </Descriptions.Item>
@@ -511,24 +487,12 @@ export function PregnancyProfileDetailModal({
           title="Tiền sử sản khoa"
           bordered
           size="small"
-          column={{
-            xs: 1,
-            sm: 2,
-            md: 5,
-          }}
+          column={{ xs: 1, sm: 2, md: 5 }}
         >
-          <Descriptions.Item label="Số lần mang thai">
-            {profile.gravida}
-          </Descriptions.Item>
-          <Descriptions.Item label="Sinh đủ tháng">
-            {profile.paraFullTerm}
-          </Descriptions.Item>
-          <Descriptions.Item label="Sinh non">
-            {profile.paraPremature}
-          </Descriptions.Item>
-          <Descriptions.Item label="Sảy/phá thai">
-            {profile.paraAbortion}
-          </Descriptions.Item>
+          <Descriptions.Item label="Số lần mang thai">{profile.gravida}</Descriptions.Item>
+          <Descriptions.Item label="Sinh đủ tháng">{profile.paraFullTerm}</Descriptions.Item>
+          <Descriptions.Item label="Sinh non">{profile.paraPremature}</Descriptions.Item>
+          <Descriptions.Item label="Sảy/phá thai">{profile.paraAbortion}</Descriptions.Item>
           <Descriptions.Item label="Con đang sống">
             {profile.paraLivingChildren}
           </Descriptions.Item>
@@ -552,37 +516,34 @@ export function PregnancyProfileDetailModal({
 
         <Divider style={{ margin: 0 }} />
 
-        {/* ===== TÀI LIỆU Y TẾ – giờ đã lấy hết files từ consultations ===== */}
+        {/* ===== TÀI LIỆU Y TẾ – đã giới hạn chiều cao ===== */}
         <div>
-          <Title level={5}>
-            Tài liệu y tế ({totalMedicalDocuments})
-          </Title>
+          <Title level={5}>Tài liệu y tế ({totalMedicalDocuments})</Title>
 
           {totalMedicalDocuments === 0 ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="Chưa có tài liệu"
-            />
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có tài liệu" />
           ) : (
-            <Flex vertical gap={12}>
-              {/* Legacy top-level documents */}
+            <div
+              style={{
+                maxHeight: 280,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                paddingRight: 4,
+              }}
+            >
               {fileRecords.map((record, index) => (
                 <DocumentCard
-                  key={
-                    typeof record === "string"
-                      ? `${record}-${index}`
-                      : record.id
-                  }
+                  key={typeof record === "string" ? `${record}-${index}` : record.id}
                   record={record}
                   index={index}
                 />
               ))}
-
-              {/* All files coming from medicalRecords[].files[] */}
               {allFilesFromConsultations.map((file) => (
                 <MedicalRecordFileCard key={file.id || file.fileUrl} file={file} />
               ))}
-            </Flex>
+            </div>
           )}
         </div>
 
@@ -601,6 +562,7 @@ export function PregnancyProfileDetailModal({
                 <ConsultationCard
                   key={consultation.id || `consultation-${index}`}
                   consultation={consultation}
+                  onEdit={onEditMedicalRecord}
                 />
               ))}
             </Flex>

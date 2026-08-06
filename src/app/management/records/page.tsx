@@ -31,6 +31,7 @@ import {
   TableFilterValues,
 } from "@/management/components/ui/TableFilter";
 import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
+import { UpdateMedicalRecordModal } from "@/fe/components/records/management/UpdateMedicalRecordModal";
 
 const { Title, Text } = Typography;
 
@@ -139,6 +140,10 @@ export default function ManagementPregnancyProfilesPage() {
   const [filters, setFilters] = useState<GetManagementPregnancyProfilesParams>(
     {},
   );
+
+  const [editingMedicalRecordId, setEditingMedicalRecordId] = useState<
+    string | null
+  >(null);
 
   const [creatingMedicalRecordFor, setCreatingMedicalRecordFor] =
     useState<ManagementPregnancyProfile | null>(null);
@@ -395,6 +400,7 @@ export default function ManagementPregnancyProfilesPage() {
           setDetailProfile(null);
           setEditingProfile(profile);
         }}
+        onEditMedicalRecord={(id) => setEditingMedicalRecordId(id)}
       />
 
       <CreatePregnancyProfileModal
@@ -427,6 +433,16 @@ export default function ManagementPregnancyProfilesPage() {
         onSuccess={() => {
           setCreatingMedicalRecordFor(null);
           void loadProfiles(); // reload danh sách để thấy medicalRecords mới
+        }}
+      />
+
+      <UpdateMedicalRecordModal
+        open={editingMedicalRecordId !== null}
+        medicalRecordId={editingMedicalRecordId}
+        onCancel={() => setEditingMedicalRecordId(null)}
+        onSuccess={() => {
+          setEditingMedicalRecordId(null);
+          void loadProfiles();
         }}
       />
     </AdminLayout>

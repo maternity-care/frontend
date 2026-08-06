@@ -25,6 +25,17 @@ export interface CreateMedicalRecordInput {
   files?: CreateMedicalRecordFileInput[];
 }
 
+export interface UpdateMedicalRecordInput {
+  appointmentId?: string;
+  pregnancyProfileId?: string;
+  doctorId?: string;
+  diagnosis?: string;
+  conclusion?: string | null;
+  recommendation?: string | null;
+  nextAppointmentSuggestedAt?: string | null;
+  files?: CreateMedicalRecordFileInput[];
+}
+
 export interface MedicalRecordFile {
   id: string;
   medicalRecordId: string;
@@ -64,7 +75,7 @@ export interface MedicalRecord {
   updatedAt: string | null;
 }
 
-/* ===== Backend raw types (để normalize) ===== */
+/* ===== Backend raw types ===== */
 
 export interface BackendMedicalRecordFile {
   id?: string | number;
@@ -92,8 +103,6 @@ export interface BackendMedicalRecord {
   updatedAt?: string | null;
 }
 
-/* ===== Appointment types ===== */
-
 export type AppointmentStatus =
   | "pending"
   | "confirmed"
@@ -106,7 +115,7 @@ export interface Appointment {
   id: string;
   pregnancyProfileId: string | null;
   doctorId: string | null;
-  appointmentAt: string | null;          
+  appointmentAt: string | null;
   status: AppointmentStatus | null;
   note?: string | null;
   createdAt: string | null;
