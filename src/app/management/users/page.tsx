@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { App, Input, Modal } from "antd";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
@@ -42,6 +42,7 @@ export default function UserManagementPage() {
   const [formModalOpen, setFormModalOpen] = useState(false);
 
   const [lockReason, setLockReason] = useState("");
+  const lockReasonRef = useRef("");
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -145,6 +146,7 @@ export default function UserManagementPage() {
     if (user.status !== "active") return;
 
     setLockReason("");
+    lockReasonRef.current = "";
     modal.confirm({
       centered: true,
       title: "Khóa tài khoản?",
@@ -163,7 +165,10 @@ export default function UserManagementPage() {
               placeholder="Nhập lý do khóa tài khoản..."
               maxLength={300}
               showCount
-              onChange={(e) => setLockReason(e.target.value)}
+              onChange={(e) => {
+                lockReasonRef.current = e.target.value;
+                setLockReason(e.target.value);
+              }}
             />
           </div>
         </div>
@@ -172,7 +177,7 @@ export default function UserManagementPage() {
       okButtonProps: { danger: true },
       cancelText: "Hủy",
       onOk: async () => {
-        const reason = lockReason.trim();
+        const reason = lockReasonRef.current.trim();
         if (!reason) {
           messageApi.error("Vui lòng nhập lý do khóa tài khoản.");
           return Promise.reject();
