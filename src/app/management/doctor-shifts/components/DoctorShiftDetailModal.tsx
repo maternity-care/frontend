@@ -43,6 +43,7 @@ type DoctorShiftDetailModalProps = {
   facilities: FacilityOption[];
   rooms: RoomOption[];
   doctors: DoctorOption[];
+  canManage: boolean;
   onClose: () => void;
   onEdit: (shift: DoctorShiftItem) => void;
   onDelete: (shift: DoctorShiftItem) => void;
@@ -59,6 +60,7 @@ export function DoctorShiftDetailModal({
   facilities,
   rooms,
   doctors,
+  canManage,
   onClose,
   onEdit,
   onDelete,
@@ -143,26 +145,32 @@ export function DoctorShiftDetailModal({
               </div>
             </div>
 
-            <Space size={8} wrap>
-              <Button
-                icon={
-                  <Pencil className="h-4 w-4" />
-                }
-                onClick={() => onEdit(shift)}
-              >
-                Cập nhật
-              </Button>
+            {canManage ? (
+              <Space size={8} wrap>
+                <Button
+                  icon={
+                    <Pencil className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    onEdit(shift)
+                  }
+                >
+                  Cập nhật
+                </Button>
 
-              <Button
-                danger
-                icon={
-                  <Trash2 className="h-4 w-4" />
-                }
-                onClick={() => onDelete(shift)}
-              >
-                Xóa
-              </Button>
-            </Space>
+                <Button
+                  danger
+                  icon={
+                    <Trash2 className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    onDelete(shift)
+                  }
+                >
+                  Xóa
+                </Button>
+              </Space>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -256,14 +264,15 @@ export function DoctorShiftDetailModal({
                 </div>
               </div>
 
-              <Select
-                showSearch
-                optionFilterProp="label"
-                className="w-full"
-                value={shift.doctorId}
-                loading={loading}
-                placeholder="Chọn bác sĩ phụ trách"
-                options={doctors
+              {canManage ? (
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  className="w-full"
+                  value={shift.doctorId}
+                  loading={loading}
+                  placeholder="Chọn bác sĩ phụ trách"
+                  options={doctors
                   .filter(
                     (doctor) =>
                       doctor.status === "active",
@@ -304,10 +313,20 @@ export function DoctorShiftDetailModal({
                       }`,
                     };
                   })}
-                onChange={(value) =>
-                  void onAssignDoctor(value)
-                }
-              />
+                  onChange={(value) =>
+                    void onAssignDoctor(
+                      value,
+                    )
+                  }
+                />
+              ) : (
+                <Text
+                  type="secondary"
+                  className="block text-sm"
+                >
+                  Bạn đang ở chế độ chỉ xem.
+                </Text>
+              )}
             </div>
 
             <div className="rounded-xl border border-slate-200 p-4">
