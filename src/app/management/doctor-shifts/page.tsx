@@ -66,6 +66,55 @@ const { Text, Title } = Typography;
 
 type ViewMode = "day" | "week" | "month";
 
+type AuthRoleValue =
+  | string
+  | {
+      name?: string | null;
+    }
+  | null
+  | undefined;
+
+type AuthFacilityAssignment = {
+  facilityId?: string | number | null;
+  roles?: AuthRoleValue[] | null;
+};
+
+type ShiftAccessAuthUser = {
+  facilityId?: string | number | null;
+  roles?: AuthRoleValue[] | null;
+  staffProfile?: {
+    facilityAssignments?:
+      | AuthFacilityAssignment[]
+      | null;
+  } | null;
+};
+
+function readAuthRoleName(
+  role: AuthRoleValue,
+) {
+  return typeof role === "string"
+    ? role
+    : role?.name;
+}
+
+function normalizeAuthRoles(
+  values: AuthRoleValue[],
+) {
+  return new Set(
+    values
+      .map(readAuthRoleName)
+      .filter(
+        (
+          role,
+        ): role is string =>
+          Boolean(role),
+      )
+      .map((role) =>
+        role.trim().toLowerCase(),
+      ),
+  );
+}
+
 type WeeklyScheduleRow = {
   key: string;
   slotId: string;
@@ -288,87 +337,141 @@ export default function DoctorShiftPage() {
         state.activeFacilityId,
     );
 
-  const activeFacility = useMemo(
-    () =>
-      user?.facilities?.find(
-        (facility) =>
-          String(facility.id) ===
-          String(
-            activeFacilityId ?? "",
-          ),
-      ) ?? null,
-    [
-      activeFacilityId,
-      user?.facilities,
-    ],
-  );
+  const authUser =
+    user as unknown as
+      | ShiftAccessAuthUser
+      | null;
 
-  const canManageShifts = useMemo(() => {
-    if (
-      !activeFacilityId ||
-      !activeFacility
-    ) {
-      return false;
+  const shiftAccess = useMemo(() => {
+    const assignments =
+      authUser?.staffProfile
+        ?.facilityAssignments ?? [];
+
+    const globalRoles =
+      normalizeAuthRoles([
+        ...roles,
+        ...(authUser?.roles ?? []),
+      ]);
+
+    const isSuperAdmin =
+      globalRoles.has(
+        "super_admin",
+      );
+
+    if (isSuperAdmin) {
+      return {
+        canViewAllFacilities: true,
+        canManage: false,
+        facilityId: "",
+      };
     }
 
-    const facilityRoles =
-      activeFacility.roles?.length
-        ? activeFacility.roles
-        : activeFacility.role
-          ? [activeFacility.role]
-          : [];
+    const assignedFacilityIds =
+      new Set(
+        assignments
+          .map((assignment) =>
+            String(
+              assignment.facilityId ??
+                "",
+            ).trim(),
+          )
+          .filter(Boolean),
+      );
 
-    const readRoleName = (
-      role:
-        | string
-        | {
-            name?: string;
-          }
-        | null
-        | undefined,
-    ) =>
-      typeof role === "string"
-        ? role
-        : role?.name;
+    const directFacilityId =
+      String(
+        authUser?.facilityId ??
+          "",
+      ).trim();
 
-    const effectiveRoles = new Set(
-      [
-        ...roles,
-        ...(user?.roles?.map(
-          readRoleName,
-        ) ?? []),
-        ...facilityRoles.map(
-          readRoleName,
-        ),
-      ]
-        .filter(
-          (
-            role,
-          ): role is string =>
-            Boolean(role),
+    const requestedFacilityId =
+      String(
+        activeFacilityId ??
+          "",
+      ).trim();
+
+    const requestedFacilityAllowed =
+      Boolean(
+        requestedFacilityId,
+      ) &&
+      (
+        requestedFacilityId ===
+          directFacilityId ||
+        assignedFacilityIds.has(
+          requestedFacilityId,
         )
-        .map((role) =>
-          role.toLowerCase(),
-        ),
-    );
+      );
 
-    return (
-      effectiveRoles.has("admin") &&
-      !effectiveRoles.has(
-        "super_admin",
-      )
-    );
+    const resolvedFacilityId =
+      requestedFacilityAllowed
+        ? requestedFacilityId
+        : directFacilityId ||
+          Array.from(
+            assignedFacilityIds,
+          )[0] ||
+          "";
+
+    const matchedAssignment =
+      assignments.find(
+        (assignment) =>
+          String(
+            assignment.facilityId ??
+              "",
+          ).trim() ===
+          resolvedFacilityId,
+      );
+
+    const facilityRoles =
+      normalizeAuthRoles(
+        matchedAssignment?.roles ??
+          [],
+      );
+
+    const belongsToFacility =
+      Boolean(
+        resolvedFacilityId,
+      ) &&
+      (
+        resolvedFacilityId ===
+          directFacilityId ||
+        Boolean(
+          matchedAssignment,
+        )
+      );
+
+    const hasAdminRole =
+      facilityRoles.has("admin") ||
+      (
+        globalRoles.has("admin") &&
+        resolvedFacilityId ===
+          directFacilityId
+      );
+
+    return {
+      canViewAllFacilities: false,
+      canManage:
+        belongsToFacility &&
+        hasAdminRole,
+      facilityId:
+        belongsToFacility
+          ? resolvedFacilityId
+          : "",
+    };
   }, [
-    activeFacility,
     activeFacilityId,
+    authUser,
     roles,
-    user?.roles,
   ]);
 
+  const canViewAllFacilities =
+    shiftAccess.canViewAllFacilities;
+  const scopedFacilityId =
+    shiftAccess.facilityId;
+  const canManageShifts =
+    shiftAccess.canManage;
   const managedFacilityId =
-    canManageShifts &&
-    activeFacility
-      ? String(activeFacility.id)
+    canManageShifts
+      ? scopedFacilityId
       : "";
 
   const [shifts, setShifts] = useState<
@@ -381,6 +484,79 @@ export default function DoctorShiftPage() {
   const [doctors, setDoctors] = useState<
     DoctorOption[]
   >([]);
+
+  const visibleFacilities = useMemo(
+    () =>
+      canViewAllFacilities
+        ? facilities
+        : facilities.filter(
+            (facility) =>
+              String(facility.id) ===
+              scopedFacilityId,
+          ),
+    [
+      canViewAllFacilities,
+      facilities,
+      scopedFacilityId,
+    ],
+  );
+
+  const visibleRooms = useMemo(
+    () =>
+      canViewAllFacilities
+        ? rooms
+        : rooms.filter(
+            (room) =>
+              String(
+                room.facilityId,
+              ) ===
+              scopedFacilityId,
+          ),
+    [
+      canViewAllFacilities,
+      rooms,
+      scopedFacilityId,
+    ],
+  );
+
+  const visibleDoctors = useMemo(
+    () =>
+      canViewAllFacilities
+        ? doctors
+        : doctors.filter(
+            (doctor) =>
+              doctor.facilityIds.some(
+                (facilityId) =>
+                  String(
+                    facilityId,
+                  ) ===
+                  scopedFacilityId,
+              ),
+          ),
+    [
+      canViewAllFacilities,
+      doctors,
+      scopedFacilityId,
+    ],
+  );
+
+  const visibleShifts = useMemo(
+    () =>
+      canViewAllFacilities
+        ? shifts
+        : shifts.filter(
+            (shift) =>
+              String(
+                shift.facilityId,
+              ) ===
+              scopedFacilityId,
+          ),
+    [
+      canViewAllFacilities,
+      scopedFacilityId,
+      shifts,
+    ],
+  );
 
   const managedFacilities = useMemo(
     () =>
@@ -475,13 +651,20 @@ export default function DoctorShiftPage() {
       );
       setEditingShift(null);
       setDeletingShift(null);
+      setDetailShift(null);
       setDeleteReason("");
+      setFacilityFilter(undefined);
+      setRoomFilter(undefined);
+      setDoctorFilter(undefined);
     }, 0);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [managedFacilityId]);
+  }, [
+    canViewAllFacilities,
+    scopedFacilityId,
+  ]);
 
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] =
@@ -495,21 +678,60 @@ export default function DoctorShiftPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void Promise.all([
-      getAllDoctorShifts(),
+    if (
+      !canViewAllFacilities &&
+      !scopedFacilityId
+    ) {
+      const timer =
+        window.setTimeout(() => {
+          setShifts([]);
+          setFacilities([]);
+          setRooms([]);
+          setDoctors([]);
+          setLoading(false);
+        }, 0);
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }
+
+    void Promise.resolve()
+      .then(() => {
+        if (!cancelled) {
+          setLoading(true);
+        }
+
+        return Promise.all([
+          getAllDoctorShifts(
+        canViewAllFacilities
+          ? {}
+          : {
+              facilityId:
+                scopedFacilityId,
+            },
+      ),
       getFacilities(),
       getRooms({
         status: "active",
         page: 1,
         limit: 40,
+        ...(!canViewAllFacilities
+          ? {
+              facilityId:
+                scopedFacilityId,
+            }
+          : {}),
       }),
-      getDoctors({
-        page: 1,
-        limit: 40,
-        status: "active",
-        sortYearsOfExperience: "desc",
-      }),
-    ])
+          getDoctors({
+            page: 1,
+            limit: 40,
+            status: "active",
+            sortYearsOfExperience: "desc",
+          }),
+        ]);
+      })
       .then(
         ([
           shiftData,
@@ -559,7 +781,15 @@ export default function DoctorShiftPage() {
             facilityData
               .filter(
                 (facility) =>
-                  facility.status === "active",
+                  facility.status ===
+                    "active" &&
+                  (
+                    canViewAllFacilities ||
+                    String(
+                      facility.id,
+                    ) ===
+                      scopedFacilityId
+                  ),
               )
               .map((facility) => ({
                 id: facility.id,
@@ -573,7 +803,15 @@ export default function DoctorShiftPage() {
             roomResult.items
               .filter(
                 (room: ClinicRoom) =>
-                  room.status === "active",
+                  room.status ===
+                    "active" &&
+                  (
+                    canViewAllFacilities ||
+                    String(
+                      room.facilityId,
+                    ) ===
+                      scopedFacilityId
+                  ),
               )
               .map(
                 (room: ClinicRoom) => ({
@@ -587,7 +825,27 @@ export default function DoctorShiftPage() {
           );
 
           setDoctors(
-            doctorData.items.map((doctor) => {
+            doctorData.items
+              .filter((doctor) =>
+                canViewAllFacilities ||
+                (
+                  doctor.facilityIds.length >
+                    0
+                    ? doctor.facilityIds.some(
+                        (facilityId) =>
+                          String(
+                            facilityId,
+                          ) ===
+                          scopedFacilityId,
+                      )
+                    : String(
+                        doctor.facilityId ??
+                          "",
+                      ) ===
+                      scopedFacilityId
+                ),
+              )
+              .map((doctor) => {
               const shiftDoctor =
                 doctorInfoById.get(
                   doctor.id,
@@ -641,7 +899,10 @@ export default function DoctorShiftPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    canViewAllFacilities,
+    scopedFacilityId,
+  ]);
 
   const doctorById = useMemo(
     () =>
@@ -678,7 +939,7 @@ export default function DoctorShiftPage() {
       .trim()
       .toLowerCase();
 
-    return shifts.filter((shift) => {
+    return visibleShifts.filter((shift) => {
       const matchesKeyword =
         !normalizedKeyword ||
         [
@@ -703,8 +964,12 @@ export default function DoctorShiftPage() {
 
       return (
         matchesKeyword &&
-        (!facilityFilter ||
-          shift.facilityId === facilityFilter) &&
+        (
+          !canViewAllFacilities ||
+          !facilityFilter ||
+          shift.facilityId ===
+            facilityFilter
+        ) &&
         (!roomFilter ||
           shift.roomId === roomFilter) &&
         (!doctorFilter ||
@@ -714,12 +979,13 @@ export default function DoctorShiftPage() {
       );
     });
   }, [
+    canViewAllFacilities,
     doctorFilter,
     facilityFilter,
     keyword,
     roomFilter,
-    shifts,
     statusFilter,
+    visibleShifts,
   ]);
 
   const scopedShifts = useMemo(() => {
@@ -1679,25 +1945,6 @@ export default function DoctorShiftPage() {
           />
         ) : null}
 
-        {!canManageShifts ? (
-          <Alert
-            type="info"
-            showIcon
-            title="Chế độ chỉ xem"
-            description="Tài khoản hiện tại có thể xem lịch và chi tiết ca trực nhưng không thể thêm, chỉnh sửa, phân công lại hoặc xóa."
-          />
-        ) : (
-          <Alert
-            type="info"
-            showIcon
-            title="Quản lý theo cơ sở"
-            description={`Bạn chỉ có thể thêm, chỉnh sửa, đổi bác sĩ và xóa ca trực thuộc ${
-              activeFacility?.name ||
-              "cơ sở đang hoạt động"
-            }.`}
-          />
-        )}
-
         <Card className="border-slate-200 bg-white">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
@@ -1826,7 +2073,13 @@ export default function DoctorShiftPage() {
               </div>
             </div>
 
-            <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            <div
+              className={`grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-4 ${
+                canViewAllFacilities
+                  ? "xl:grid-cols-7"
+                  : "xl:grid-cols-6"
+              }`}
+            >
               <div className="flex min-w-0 flex-col gap-1">
                 <Text className="text-xs font-medium text-slate-500">
                   {viewMode === "week"
@@ -1853,7 +2106,7 @@ export default function DoctorShiftPage() {
                 prefix={
                   <Search className="h-4 w-4 text-slate-400" />
                 }
-                placeholder="Tìm bác sĩ, cơ sở, phòng, slot..."
+                placeholder="Tìm bác sĩ, phòng, slot, cơ sở,"
                 onChange={(event) =>
                   setKeyword(
                     event.target.value,
@@ -1861,29 +2114,32 @@ export default function DoctorShiftPage() {
                 }
               />
 
-              <Select
-                allowClear
-                value={facilityFilter}
-                placeholder="Tất cả cơ sở"
-                options={facilities.map(
-                  (facility) => ({
-                    value: facility.id,
-                    label: facility.name,
-                  }),
-                )}
-                onChange={(value) => {
-                  setFacilityFilter(value);
-                  setRoomFilter(undefined);
-                }}
-              />
+              {canViewAllFacilities ? (
+                <Select
+                  allowClear
+                  value={facilityFilter}
+                  placeholder="Tất cả cơ sở"
+                  options={visibleFacilities.map(
+                    (facility) => ({
+                      value: facility.id,
+                      label: facility.name,
+                    }),
+                  )}
+                  onChange={(value) => {
+                    setFacilityFilter(value);
+                    setRoomFilter(undefined);
+                  }}
+                />
+              ) : null}
 
               <Select
                 allowClear
                 value={roomFilter}
                 placeholder="Tất cả phòng"
-                options={rooms
+                options={visibleRooms
                   .filter(
                     (room) =>
+                      !canViewAllFacilities ||
                       !facilityFilter ||
                       room.facilityId ===
                         facilityFilter,
@@ -1901,7 +2157,7 @@ export default function DoctorShiftPage() {
                 optionFilterProp="label"
                 value={doctorFilter}
                 placeholder="Tất cả bác sĩ"
-                options={doctors.map(
+                options={visibleDoctors.map(
                   (doctor) => ({
                     value: doctor.id,
                     label: `${doctor.title} ${doctor.name}`,
@@ -2453,9 +2709,9 @@ export default function DoctorShiftPage() {
         shift={detailShift}
         loading={detailLoading}
         shifts={shifts}
-        facilities={facilities}
-        rooms={rooms}
-        doctors={doctors}
+        facilities={visibleFacilities}
+        rooms={visibleRooms}
+        doctors={visibleDoctors}
         canManage={
           detailShift
             ? canManageShift(
