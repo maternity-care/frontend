@@ -180,17 +180,50 @@ export function ShiftSlotFormModalBase({
       }
 
       form.resetFields();
+      form.setFieldsValue({
+        facilityId:
+          facilities.length === 1
+            ? facilities[0]?.id
+            : undefined,
+        status: "active",
+      });
     }, 0);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [editingSlot, form, mode, open]);
+  }, [
+    editingSlot,
+    facilities,
+    form,
+    mode,
+    open,
+  ]);
 
   async function handleFinish(
     values: ShiftSlotFormValues,
   ) {
     setError(null);
+
+    const facilityAllowed =
+      facilities.some(
+        (facility) =>
+          String(
+            facility.id,
+          ) ===
+          String(
+            values.facilityId,
+          ),
+      );
+
+    if (!facilityAllowed) {
+      const message =
+        "Bạn không có quyền quản lý khung ca của cơ sở này.";
+
+      setError(message);
+      messageApi.error(message);
+      return;
+    }
 
     if (
       mode === "edit" &&
@@ -370,6 +403,9 @@ export function ShiftSlotFormModalBase({
               <Select
                 showSearch
                 optionFilterProp="label"
+                disabled={
+                  facilities.length === 1
+                }
                 placeholder="Chọn cơ sở"
                 suffixIcon={
                   <Building2 className="h-4 w-4" />

@@ -26,6 +26,7 @@ type ShiftSlotDetailModalProps = {
   open: boolean;
   slot: ShiftSlot | null;
   loading?: boolean;
+  canManage: boolean;
   onClose: () => void;
   onEdit: (slot: ShiftSlot) => void;
   onDelete: (slot: ShiftSlot) => void;
@@ -63,6 +64,7 @@ export function ShiftSlotDetailModal({
   open,
   slot,
   loading = false,
+  canManage,
   onClose,
   onEdit,
   onDelete,
@@ -109,26 +111,32 @@ export function ShiftSlotDetailModal({
               </div>
             </div>
 
-            <Space size={8} wrap>
-              <Button
-                icon={
-                  <Pencil className="h-4 w-4" />
-                }
-                onClick={() => onEdit(slot)}
-              >
-                Cập nhật
-              </Button>
+            {canManage ? (
+              <Space size={8} wrap>
+                <Button
+                  icon={
+                    <Pencil className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    onEdit(slot)
+                  }
+                >
+                  Cập nhật
+                </Button>
 
-              <Button
-                danger
-                icon={
-                  <Trash2 className="h-4 w-4" />
-                }
-                onClick={() => onDelete(slot)}
-              >
-                Xóa
-              </Button>
-            </Space>
+                <Button
+                  danger
+                  icon={
+                    <Trash2 className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    onDelete(slot)
+                  }
+                >
+                  Xóa
+                </Button>
+              </Space>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">

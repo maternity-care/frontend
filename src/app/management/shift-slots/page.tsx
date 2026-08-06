@@ -15,7 +15,6 @@ import {
   Input,
   Select,
   Space,
-  Statistic,
   Table,
   Tag,
   Tooltip,
@@ -25,7 +24,6 @@ import type {
   ColumnsType,
 } from "antd/es/table";
 import {
-  Clock3,
   Eye,
   Moon,
   Pencil,
@@ -34,9 +32,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
-import { getFacilities } from "@/management/features/facilities/facilities.api";
+import {
+  getFacility,
+  getFacilities,
+} from "@/management/features/facilities/facilities.api";
 import {
   deleteShiftSlot,
   getShiftSlot,
@@ -58,6 +60,55 @@ import type {
 
 const { Text } = Typography;
 
+type AuthRoleValue =
+  | string
+  | {
+      name?: string | null;
+    }
+  | null
+  | undefined;
+
+type AuthFacilityAssignment = {
+  facilityId?: string | number | null;
+  roles?: AuthRoleValue[] | null;
+};
+
+type ShiftSlotAccessUser = {
+  facilityId?: string | number | null;
+  roles?: AuthRoleValue[] | null;
+  staffProfile?: {
+    facilityAssignments?:
+      | AuthFacilityAssignment[]
+      | null;
+  } | null;
+};
+
+function readRoleName(
+  role: AuthRoleValue,
+) {
+  return typeof role === "string"
+    ? role
+    : role?.name;
+}
+
+function normalizeRoles(
+  values: AuthRoleValue[],
+) {
+  return new Set(
+    values
+      .map(readRoleName)
+      .filter(
+        (
+          role,
+        ): role is string =>
+          Boolean(role),
+      )
+      .map((role) =>
+        role.trim().toLowerCase(),
+      ),
+  );
+}
+
 function renderStatus(
   status: ShiftSlotStatus,
 ) {
@@ -74,6 +125,157 @@ export default function ShiftSlotsPage() {
     message: messageApi,
     modal: modalApi,
   } = App.useApp();
+  const roles = useAuthStore(
+    (state) => state.roles,
+  );
+  const user = useAuthStore(
+    (state) => state.user,
+  );
+  const activeFacilityId =
+    useAuthStore(
+      (state) =>
+        state.activeFacilityId,
+    );
+
+  const authUser =
+    user as unknown as
+      | ShiftSlotAccessUser
+      | null;
+
+  const slotAccess = useMemo(() => {
+    const globalRoles =
+      normalizeRoles([
+        ...roles,
+        ...(authUser?.roles ?? []),
+      ]);
+
+    if (
+      globalRoles.has(
+        "super_admin",
+      )
+    ) {
+      return {
+        canViewAllFacilities: true,
+        canManage: false,
+        facilityId: "",
+      };
+    }
+
+    const assignments =
+      authUser?.staffProfile
+        ?.facilityAssignments ?? [];
+
+    const assignedFacilityIds =
+      new Set(
+        assignments
+          .map((assignment) =>
+            String(
+              assignment.facilityId ??
+                "",
+            ).trim(),
+          )
+          .filter(Boolean),
+      );
+
+    const directFacilityId =
+      String(
+        authUser?.facilityId ??
+          "",
+      ).trim();
+    const requestedFacilityId =
+      String(
+        activeFacilityId ??
+          "",
+      ).trim();
+
+    const requestedFacilityAllowed =
+      Boolean(
+        requestedFacilityId,
+      ) &&
+      (
+        requestedFacilityId ===
+          directFacilityId ||
+        assignedFacilityIds.has(
+          requestedFacilityId,
+        )
+      );
+
+    const firstAdminAssignment =
+      assignments.find(
+        (assignment) =>
+          normalizeRoles(
+            assignment.roles ?? [],
+          ).has("admin"),
+      );
+
+    const resolvedFacilityId =
+      requestedFacilityAllowed
+        ? requestedFacilityId
+        : directFacilityId ||
+          String(
+            firstAdminAssignment
+              ?.facilityId ??
+              "",
+          ).trim();
+
+    const matchedAssignment =
+      assignments.find(
+        (assignment) =>
+          String(
+            assignment.facilityId ??
+              "",
+          ).trim() ===
+          resolvedFacilityId,
+      );
+
+    const facilityRoles =
+      normalizeRoles(
+        matchedAssignment?.roles ??
+          [],
+      );
+
+    const belongsToFacility =
+      Boolean(
+        resolvedFacilityId,
+      ) &&
+      (
+        resolvedFacilityId ===
+          directFacilityId ||
+        Boolean(
+          matchedAssignment,
+        )
+      );
+
+    const hasAdminRole =
+      facilityRoles.has("admin") ||
+      (
+        globalRoles.has("admin") &&
+        resolvedFacilityId ===
+          directFacilityId
+      );
+
+    return {
+      canViewAllFacilities: false,
+      canManage:
+        belongsToFacility &&
+        hasAdminRole,
+      facilityId:
+        belongsToFacility
+          ? resolvedFacilityId
+          : "",
+    };
+  }, [
+    activeFacilityId,
+    authUser,
+    roles,
+  ]);
+
+  const canViewAllFacilities =
+    slotAccess.canViewAllFacilities;
+  const canManageSlots =
+    slotAccess.canManage;
+  const scopedFacilityId =
+    slotAccess.facilityId;
 
   const [slots, setSlots] = useState<
     ShiftSlot[]
@@ -82,6 +284,37 @@ export default function ShiftSlotsPage() {
     useState(0);
   const [facilities, setFacilities] =
     useState<FacilityOption[]>([]);
+
+  const managedFacilities = useMemo(
+    () =>
+      canManageSlots
+        ? facilities.filter(
+            (facility) =>
+              String(
+                facility.id,
+              ) ===
+              scopedFacilityId,
+          )
+        : [],
+    [
+      canManageSlots,
+      facilities,
+      scopedFacilityId,
+    ],
+  );
+
+  function canManageSlot(
+    slot: ShiftSlot,
+  ) {
+    return Boolean(
+      canManageSlots &&
+      scopedFacilityId &&
+      String(
+        slot.facilityId,
+      ) ===
+        scopedFacilityId,
+    );
+  }
 
   const [searchInput, setSearchInput] =
     useState("");
@@ -94,7 +327,7 @@ export default function ShiftSlotsPage() {
   const [currentPage, setCurrentPage] =
     useState(1);
   const [pageSize, setPageSize] =
-    useState(20);
+    useState(5);
   const [reloadKey, setReloadKey] =
     useState(0);
 
@@ -128,7 +361,31 @@ export default function ShiftSlotsPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void getFacilities()
+    if (
+      !canViewAllFacilities &&
+      !scopedFacilityId
+    ) {
+      const timer =
+        window.setTimeout(() => {
+          setFacilities([]);
+        }, 0);
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }
+
+    const facilityRequest =
+      canViewAllFacilities
+        ? getFacilities()
+        : getFacility(
+            scopedFacilityId,
+          ).then((facility) => [
+            facility,
+          ]);
+
+    void facilityRequest
       .then((data) => {
         if (cancelled) return;
 
@@ -154,10 +411,32 @@ export default function ShiftSlotsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    canViewAllFacilities,
+    scopedFacilityId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
+
+    if (
+      !canViewAllFacilities &&
+      !scopedFacilityId
+    ) {
+      const emptyTimer =
+        window.setTimeout(() => {
+          setSlots([]);
+          setTotalSlots(0);
+          setLoading(false);
+        }, 0);
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(
+          emptyTimer,
+        );
+      };
+    }
 
     const timer = window.setTimeout(() => {
       void (async () => {
@@ -167,7 +446,10 @@ export default function ShiftSlotsPage() {
           const result = await getShiftSlots({
             search:
               debouncedSearch || undefined,
-            facilityId: facilityFilter,
+            facilityId:
+              canViewAllFacilities
+                ? facilityFilter
+                : scopedFacilityId,
             status: statusFilter,
             page: currentPage,
             limit: pageSize,
@@ -199,29 +481,15 @@ export default function ShiftSlotsPage() {
       window.clearTimeout(timer);
     };
   }, [
+    canViewAllFacilities,
     currentPage,
     debouncedSearch,
     facilityFilter,
     pageSize,
     reloadKey,
+    scopedFacilityId,
     statusFilter,
   ]);
-
-  const stats = useMemo(
-    () => ({
-      total: totalSlots,
-      activeOnPage: slots.filter(
-        (slot) => slot.status === "active",
-      ).length,
-      inactiveOnPage: slots.filter(
-        (slot) => slot.status === "inactive",
-      ).length,
-      overnightOnPage: slots.filter(
-        (slot) => slot.isOvernight,
-      ).length,
-    }),
-    [slots, totalSlots],
-  );
 
   const facilityById = useMemo(
     () =>
@@ -235,6 +503,16 @@ export default function ShiftSlotsPage() {
   );
 
   async function openDetail(slot: ShiftSlot) {
+    if (
+      !canViewAllFacilities &&
+      String(
+        slot.facilityId,
+      ) !==
+        scopedFacilityId
+    ) {
+      return;
+    }
+
     setDetailSlot(slot);
     setDetailLoading(true);
 
@@ -242,6 +520,18 @@ export default function ShiftSlotsPage() {
       const detail = await getShiftSlot(
         slot.id,
       );
+
+      if (
+        !canViewAllFacilities &&
+        String(
+          detail.facilityId,
+        ) !==
+          scopedFacilityId
+      ) {
+        throw new Error(
+          "Bạn không có quyền xem khung ca của cơ sở này.",
+        );
+      }
 
       setDetailSlot(detail);
     } catch (detailError) {
@@ -277,6 +567,10 @@ export default function ShiftSlotsPage() {
   }
 
   function confirmDelete(slot: ShiftSlot) {
+    if (!canManageSlot(slot)) {
+      return;
+    }
+
     modalApi.confirm({
       centered: true,
       title: "Xóa khung ca?",
@@ -357,7 +651,10 @@ export default function ShiftSlotsPage() {
   function resetFilters() {
     setSearchInput("");
     setDebouncedSearch("");
-    setFacilityFilter(undefined);
+    if (canViewAllFacilities) {
+      setFacilityFilter(undefined);
+    }
+
     setStatusFilter(undefined);
     setCurrentPage(1);
   }
@@ -468,49 +765,64 @@ export default function ShiftSlotsPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 150,
+      width: canManageSlots
+        ? 150
+        : 80,
       align: "center",
       fixed: "right",
-      render: (_value, slot) => (
-        <Space size={6}>
-          <Tooltip title="Xem chi tiết">
-            <Button
-              icon={
-                <Eye className="h-4 w-4" />
-              }
-              onClick={(event) => {
-                event.stopPropagation();
-                void openDetail(slot);
-              }}
-            />
-          </Tooltip>
+      render: (_value, slot) => {
+        const canManageCurrentSlot =
+          canManageSlot(slot);
 
-          <Tooltip title="Cập nhật">
-            <Button
-              icon={
-                <Pencil className="h-4 w-4" />
-              }
-              onClick={(event) => {
-                event.stopPropagation();
-                setEditingSlot(slot);
-              }}
-            />
-          </Tooltip>
+        return (
+          <Space size={6}>
+            <Tooltip title="Xem chi tiết">
+              <Button
+                icon={
+                  <Eye className="h-4 w-4" />
+                }
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void openDetail(slot);
+                }}
+              />
+            </Tooltip>
 
-          <Tooltip title="Xóa">
-            <Button
-              danger
-              icon={
-                <Trash2 className="h-4 w-4" />
-              }
-              onClick={(event) => {
-                event.stopPropagation();
-                confirmDelete(slot);
-              }}
-            />
-          </Tooltip>
-        </Space>
-      ),
+            {canManageCurrentSlot ? (
+              <>
+                <Tooltip title="Cập nhật">
+                  <Button
+                    icon={
+                      <Pencil className="h-4 w-4" />
+                    }
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setEditingSlot(
+                        slot,
+                      );
+                    }}
+                  />
+                </Tooltip>
+
+                <Tooltip title="Xóa">
+                  <Button
+                    danger
+                    icon={
+                      <Trash2 className="h-4 w-4" />
+                    }
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      confirmDelete(
+                        slot,
+                      );
+                    }}
+                  />
+                </Tooltip>
+              </>
+            ) : null}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -532,51 +844,15 @@ export default function ShiftSlotsPage() {
           />
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-slate-200 bg-white">
-            <Statistic
-              title="Tổng khung ca"
-              value={stats.total}
-              prefix={
-                <Clock3 className="h-5 w-5" />
-              }
-            />
-          </Card>
-
-          <Card className="border-emerald-100 bg-emerald-50/60">
-            <Statistic
-              title="Hoạt động trên trang"
-              value={
-                stats.activeOnPage
-              }
-            />
-          </Card>
-
-          <Card className="border-red-100 bg-red-50/60">
-            <Statistic
-              title="Ngừng hoạt động trên trang"
-              value={
-                stats.inactiveOnPage
-              }
-            />
-          </Card>
-
-          <Card className="border-violet-100 bg-violet-50/60">
-            <Statistic
-              title="Qua đêm trên trang"
-              value={
-                stats.overnightOnPage
-              }
-              prefix={
-                <Moon className="h-5 w-5" />
-              }
-            />
-          </Card>
-        </div>
-
         <Card className="border-slate-200 bg-white">
           <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
-            <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+              className={`grid flex-1 gap-3 sm:grid-cols-2 ${
+                canViewAllFacilities
+                  ? "lg:grid-cols-3"
+                  : "lg:grid-cols-2"
+              }`}
+            >
               <Input
                 allowClear
                 value={searchInput}
@@ -591,23 +867,27 @@ export default function ShiftSlotsPage() {
                 }
               />
 
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                value={facilityFilter}
-                placeholder="Tất cả cơ sở"
-                options={facilities.map(
-                  (facility) => ({
-                    value: facility.id,
-                    label: facility.name,
-                  }),
-                )}
-                onChange={(value) => {
-                  setFacilityFilter(value);
-                  setCurrentPage(1);
-                }}
-              />
+              {canViewAllFacilities ? (
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  value={facilityFilter}
+                  placeholder="Tất cả cơ sở"
+                  options={facilities.map(
+                    (facility) => ({
+                      value: facility.id,
+                      label: facility.name,
+                    }),
+                  )}
+                  onChange={(value) => {
+                    setFacilityFilter(
+                      value,
+                    );
+                    setCurrentPage(1);
+                  }}
+                />
+              ) : null}
 
               <Select
                 allowClear
@@ -640,17 +920,21 @@ export default function ShiftSlotsPage() {
                 Xóa bộ lọc
               </Button>
 
-              <Button
-                type="primary"
-                icon={
-                  <Plus className="h-4 w-4" />
-                }
-                onClick={() =>
-                  setCreateModalOpen(true)
-                }
-              >
-                Thêm khung ca
-              </Button>
+              {canManageSlots ? (
+                <Button
+                  type="primary"
+                  icon={
+                    <Plus className="h-4 w-4" />
+                  }
+                  onClick={() =>
+                    setCreateModalOpen(
+                      true,
+                    )
+                  }
+                >
+                  Thêm khung ca
+                </Button>
+              ) : null}
             </div>
           </div>
         </Card>
@@ -693,6 +977,7 @@ export default function ShiftSlotsPage() {
               total: totalSlots,
               showSizeChanger: true,
               pageSizeOptions: [
+                5,
                 10,
                 20,
                 30,
@@ -727,16 +1012,18 @@ export default function ShiftSlotsPage() {
                   }
                   description="Không có khung ca phù hợp."
                 >
-                  <Button
-                    type="primary"
-                    onClick={() =>
-                      setCreateModalOpen(
-                        true,
-                      )
-                    }
-                  >
-                    Thêm khung ca
-                  </Button>
+                  {canManageSlots ? (
+                    <Button
+                      type="primary"
+                      onClick={() =>
+                        setCreateModalOpen(
+                          true,
+                        )
+                      }
+                    >
+                      Thêm khung ca
+                    </Button>
+                  ) : null}
                 </Empty>
               ),
             }}
@@ -762,37 +1049,68 @@ export default function ShiftSlotsPage() {
         </Card>
       </div>
 
-      <ShiftSlotCreateModal
-        open={createModalOpen}
-        facilities={facilities}
-        onClose={() =>
-          setCreateModalOpen(false)
-        }
-        onCreated={handleCreated}
-      />
+      {canManageSlots ? (
+        <>
+          <ShiftSlotCreateModal
+            open={createModalOpen}
+            facilities={
+              managedFacilities
+            }
+            onClose={() =>
+              setCreateModalOpen(
+                false,
+              )
+            }
+            onCreated={
+              handleCreated
+            }
+          />
 
-      <ShiftSlotEditModal
-        open={Boolean(editingSlot)}
-        slot={editingSlot}
-        facilities={facilities}
-        onClose={() =>
-          setEditingSlot(null)
-        }
-        onUpdated={handleUpdated}
-      />
+          <ShiftSlotEditModal
+            open={Boolean(
+              editingSlot,
+            )}
+            slot={editingSlot}
+            facilities={
+              managedFacilities
+            }
+            onClose={() =>
+              setEditingSlot(null)
+            }
+            onUpdated={
+              handleUpdated
+            }
+          />
+        </>
+      ) : null}
 
       <ShiftSlotDetailModal
         open={Boolean(detailSlot)}
         slot={detailSlot}
         loading={detailLoading}
+        canManage={
+          detailSlot
+            ? canManageSlot(
+                detailSlot,
+              )
+            : false
+        }
         onClose={() =>
           setDetailSlot(null)
         }
         onEdit={(slot) => {
+          if (!canManageSlot(slot)) {
+            return;
+          }
+
           setDetailSlot(null);
           setEditingSlot(slot);
         }}
         onDelete={(slot) => {
+          if (!canManageSlot(slot)) {
+            return;
+          }
+
           setDetailSlot(null);
           confirmDelete(slot);
         }}
