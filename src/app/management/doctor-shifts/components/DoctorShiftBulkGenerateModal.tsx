@@ -62,6 +62,9 @@ const WORKING_DAY_OPTIONS: Array<{
   { label: "Chủ nhật", value: "SUN" },
 ];
 
+const WEEKLY_DRAFT_STORAGE_PREFIX =
+  "management-doctor-shifts-weekly-draft:v1";
+
 type BulkAssignmentFormValue = {
   staffId: string;
   roomId: string;
@@ -82,6 +85,12 @@ type BulkGenerateFormValues = {
   facilityId: string;
   fromDate: string;
   slotGroups: BulkSlotGroupFormValue[];
+};
+
+type BulkGenerateDraft = {
+  version: 1;
+  savedAt: string;
+  values: BulkGenerateFormValues;
 };
 
 type BulkGenerationIssueFieldPath =
@@ -218,6 +227,150 @@ function isRecord(
     typeof value === "object" &&
     !Array.isArray(value)
   );
+}
+
+function getWeeklyDraftStorageKey(
+  facilityId: string,
+) {
+  return `${WEEKLY_DRAFT_STORAGE_PREFIX}:${facilityId}`;
+}
+
+function readWeeklyDraft(
+  facilityId: string,
+  expectedFromDate: string,
+): BulkGenerateFormValues | null {
+  if (
+    typeof window === "undefined" ||
+    !facilityId
+  ) {
+    return null;
+  }
+
+  const storageKey =
+    getWeeklyDraftStorageKey(
+      facilityId,
+    );
+
+  try {
+    const rawValue =
+      window.localStorage.getItem(
+        storageKey,
+      );
+
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsed: unknown =
+      JSON.parse(rawValue);
+
+    if (
+      !isRecord(parsed) ||
+      parsed.version !== 1 ||
+      !isRecord(parsed.values)
+    ) {
+      window.localStorage.removeItem(
+        storageKey,
+      );
+      return null;
+    }
+
+    const values =
+      parsed.values;
+
+    if (
+      values.facilityId !==
+        facilityId ||
+      values.fromDate !==
+        expectedFromDate ||
+      !Array.isArray(
+        values.slotGroups,
+      )
+    ) {
+      window.localStorage.removeItem(
+        storageKey,
+      );
+      return null;
+    }
+
+    return values as unknown as
+      BulkGenerateFormValues;
+  } catch {
+    window.localStorage.removeItem(
+      storageKey,
+    );
+    return null;
+  }
+}
+
+function saveWeeklyDraft(
+  values: BulkGenerateFormValues,
+) {
+  if (
+    typeof window === "undefined" ||
+    !values.facilityId ||
+    !values.fromDate
+  ) {
+    return;
+  }
+
+  const draft: BulkGenerateDraft = {
+    version: 1,
+    savedAt:
+      new Date().toISOString(),
+    values,
+  };
+
+  window.localStorage.setItem(
+    getWeeklyDraftStorageKey(
+      values.facilityId,
+    ),
+    JSON.stringify(draft),
+  );
+}
+
+function clearWeeklyDraft(
+  facilityId: string,
+) {
+  if (
+    typeof window === "undefined" ||
+    !facilityId
+  ) {
+    return;
+  }
+
+  window.localStorage.removeItem(
+    getWeeklyDraftStorageKey(
+      facilityId,
+    ),
+  );
+}
+
+function mergeDraftSlotGroups(
+  slots: ShiftSlotLookupItem[],
+  draft:
+    | BulkGenerateFormValues
+    | null,
+): BulkSlotGroupFormValue[] {
+  const draftBySlotId =
+    new Map(
+      (draft?.slotGroups ?? [])
+        .filter(
+          (group) =>
+            Boolean(group?.slotId),
+        )
+        .map((group) => [
+          group.slotId,
+          group,
+        ]),
+    );
+
+  return slots.map((slot) => ({
+    slotId: slot.id,
+    assignments:
+      draftBySlotId.get(slot.id)
+        ?.assignments ?? [],
+  }));
 }
 
 
@@ -527,6 +680,9 @@ export function DoctorShiftBulkGenerateModal({
   const issueFieldPathsRef = useRef<
     BulkGenerationIssueFieldPath[]
   >([]);
+  const pendingDraftRef = useRef<
+    BulkGenerateFormValues | null
+  >(null);
 
   const watchedFacilityId =
     Form.useWatch("facilityId", form) ?? "";
@@ -596,14 +752,26 @@ export function DoctorShiftBulkGenerateModal({
 
     const nextWeekMonday =
       getNextWeekMondayDateKey();
+    const defaultFacilityId =
+      facilities.length === 1
+        ? facilities[0]?.id
+        : undefined;
+    const restoredDraft =
+      defaultFacilityId
+        ? readWeeklyDraft(
+            defaultFacilityId,
+            nextWeekMonday,
+          )
+        : null;
 
     const timer = window.setTimeout(() => {
+      pendingDraftRef.current =
+        restoredDraft;
+
       form.resetFields();
       form.setFieldsValue({
         facilityId:
-          facilities.length === 1
-            ? facilities[0]?.id
-            : undefined,
+          defaultFacilityId,
         fromDate:
           nextWeekMonday,
         slotGroups: [],
@@ -650,17 +818,28 @@ export function DoctorShiftBulkGenerateModal({
         if (cancelled) return;
 
         setShiftSlots(slots);
+
+        const restoredDraft =
+          pendingDraftRef.current;
+        const slotGroups =
+          mergeDraftSlotGroups(
+            slots,
+            restoredDraft,
+          );
+
         form.setFieldsValue({
-          slotGroups: slots.map((slot) => ({
-            slotId: slot.id,
-            assignments: [],
-          })),
+          slotGroups,
         });
+
+        pendingDraftRef.current =
+          null;
       })
       .catch((loadError) => {
         if (cancelled) return;
 
         setShiftSlots([]);
+        pendingDraftRef.current =
+          null;
         form.setFieldsValue({
           slotGroups: [],
         });
@@ -1169,6 +1348,11 @@ export function DoctorShiftBulkGenerateModal({
         ),
       );
 
+      clearWeeklyDraft(
+        previewPayload.facilityId,
+      );
+      pendingDraftRef.current =
+        null;
       setPreviewModalOpen(false);
       setPreviewPayload(null);
       setPreviewValues(null);
@@ -1195,9 +1379,16 @@ export function DoctorShiftBulkGenerateModal({
       return;
     }
 
+    const currentValues =
+      form.getFieldsValue(
+        true,
+      );
+
+    saveWeeklyDraft(
+      currentValues,
+    );
+
     clearGenerationIssueErrors();
-    form.resetFields();
-    setShiftSlots([]);
     setError(null);
     setGenerationIssues([]);
     setPreviewModalOpen(false);
@@ -1260,6 +1451,13 @@ export function DoctorShiftBulkGenerateModal({
             <Text type="secondary">
               Phân công bác sĩ theo từng khung ca, phòng và ngày làm việc. Hệ thống chỉ tạo lịch cho tuần kế tiếp, từ Thứ 2 đến Chủ nhật.
             </Text>
+
+            <Text
+              type="secondary"
+              className="mt-1 block text-xs"
+            >
+              Bản nháp được tự động lưu và sẽ được khôi phục khi mở lại.
+            </Text>
           </div>
         </div>
       </div>
@@ -1291,6 +1489,7 @@ export function DoctorShiftBulkGenerateModal({
         requiredMark="optional"
         onValuesChange={(
           changedValues,
+          allValues,
         ) => {
           if (
             generationIssues.length >
@@ -1323,6 +1522,10 @@ export function DoctorShiftBulkGenerateModal({
               slotGroups: [],
             });
           }
+
+          saveWeeklyDraft(
+            allValues,
+          );
         }}
       >
         <Row gutter={[16, 0]}>
