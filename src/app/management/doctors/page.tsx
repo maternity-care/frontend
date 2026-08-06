@@ -14,7 +14,6 @@ import {
   Modal,
   Select,
   Space,
-  Statistic,
   Table,
   Tag,
   Tooltip,
@@ -41,6 +40,9 @@ import {
 } from "lucide-react";
 
 import {
+  useAuthStore,
+} from "@/features/auth/auth.store";
+import {
   AdminLayout,
 } from "@/management/components/layouts/AdminLayout";
 import {
@@ -52,6 +54,7 @@ import {
   getDoctors,
 } from "@/management/features/doctors/doctors.api";
 import {
+  getFacility,
   getFacilities,
 } from "@/management/features/facilities/facilities.api";
 import {
@@ -74,13 +77,64 @@ const {
   Title,
 } = Typography;
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 5;
 
 type CombinedSearchField =
   | "name"
   | "phone"
-  | "facilityId"
   | "employeeCode";
+
+type AuthRoleValue =
+  | string
+  | {
+      name?: string | null;
+    }
+  | null
+  | undefined;
+
+type AuthFacilityAssignment = {
+  facilityId?: string | number | null;
+  roles?: AuthRoleValue[] | null;
+};
+
+type DoctorAccessUser = {
+  facilityId?: string | number | null;
+  homeFacilityId?: string | number | null;
+  roles?: AuthRoleValue[] | null;
+  staffProfile?: {
+    facilityId?: string | number | null;
+    homeFacilityId?: string | number | null;
+    facilityAssignments?:
+      | AuthFacilityAssignment[]
+      | null;
+  } | null;
+};
+
+function readRoleName(
+  role: AuthRoleValue,
+) {
+  return typeof role === "string"
+    ? role
+    : role?.name;
+}
+
+function normalizeRoles(
+  values: AuthRoleValue[],
+) {
+  return new Set(
+    values
+      .map(readRoleName)
+      .filter(
+        (
+          role,
+        ): role is string =>
+          Boolean(role),
+      )
+      .map((role) =>
+        role.trim().toLowerCase(),
+      ),
+  );
+}
 
 type DoctorFilters = {
   keyword?: string;
@@ -274,9 +328,8 @@ function mergeDoctorDetail(
 }
 
 /**
- * Tự nhận diện trường tìm kiếm từ một thanh search:
+ * Tự nhận diện trường tìm kiếm:
  * - Số điện thoại Việt Nam -> phone
- * - UUID hoặc chuỗi chỉ gồm số -> facilityId
  * - Mã dạng DR-001, BS001... -> employeeCode
  * - Còn lại -> name
  */
@@ -295,15 +348,6 @@ function inferSearchField(
   }
 
   if (
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      value,
-    ) ||
-    /^\d+$/.test(value)
-  ) {
-    return "facilityId";
-  }
-
-  if (
     /^[a-z]{1,12}[-_]?\d+$/i.test(
       value,
     )
@@ -318,6 +362,7 @@ function toApiParams(
   filters: DoctorFilters,
   page: number,
   limit: number,
+  facilityId?: string,
 ): GetDoctorsParams {
   const keyword =
     filters.keyword?.trim();
@@ -337,6 +382,9 @@ function toApiParams(
             keyword,
         }
       : {}),
+    facilityId:
+      facilityId?.trim() ||
+      undefined,
     specialty:
       filters.specialty?.trim() ||
       undefined,
@@ -355,6 +403,160 @@ export default function DoctorManagementPage() {
     modal,
     modalContextHolder,
   ] = Modal.useModal();
+  const roles = useAuthStore(
+    (state) => state.roles,
+  );
+  const user = useAuthStore(
+    (state) => state.user,
+  );
+  const activeFacilityId =
+    useAuthStore(
+      (state) =>
+        state.activeFacilityId,
+    );
+
+  const authUser =
+    user as unknown as
+      | DoctorAccessUser
+      | null;
+
+  const doctorAccess = useMemo(() => {
+    const globalRoles =
+      normalizeRoles([
+        ...(roles ?? []),
+        ...(authUser?.roles ?? []),
+      ]);
+
+    if (
+      globalRoles.has(
+        "super_admin",
+      )
+    ) {
+      return {
+        canViewAllFacilities: true,
+        canManage: false,
+        facilityId: "",
+      };
+    }
+
+    const assignments =
+      authUser?.staffProfile
+        ?.facilityAssignments ?? [];
+
+    const firstAdminAssignment =
+      assignments.find(
+        (assignment) =>
+          normalizeRoles(
+            assignment.roles ?? [],
+          ).has("admin"),
+      );
+
+    const resolvedFacilityId =
+      String(
+        activeFacilityId ??
+          authUser?.staffProfile
+            ?.facilityId ??
+          authUser?.staffProfile
+            ?.homeFacilityId ??
+          authUser?.facilityId ??
+          authUser?.homeFacilityId ??
+          firstAdminAssignment
+            ?.facilityId ??
+          "",
+      ).trim();
+
+    const matchedAssignment =
+      assignments.find(
+        (assignment) =>
+          String(
+            assignment.facilityId ??
+              "",
+          ).trim() ===
+          resolvedFacilityId,
+      );
+
+    const facilityRoles =
+      normalizeRoles(
+        matchedAssignment?.roles ??
+          [],
+      );
+
+    const hasAdminRole =
+      globalRoles.has("admin") ||
+      facilityRoles.has("admin");
+
+    return {
+      canViewAllFacilities: false,
+      canManage:
+        Boolean(
+          resolvedFacilityId,
+        ) &&
+        hasAdminRole,
+      facilityId:
+        hasAdminRole
+          ? resolvedFacilityId
+          : "",
+    };
+  }, [
+    activeFacilityId,
+    authUser,
+    roles,
+  ]);
+
+  const canViewAllFacilities =
+    doctorAccess.canViewAllFacilities;
+  const canManageDoctors =
+    doctorAccess.canManage;
+  const scopedFacilityId =
+    doctorAccess.facilityId;
+
+  function doctorBelongsToFacility(
+    doctor: Doctor,
+    facilityId: string,
+  ) {
+    if (!facilityId) return false;
+
+    if (
+      doctor.facilityIds.length >
+      0
+    ) {
+      return doctor.facilityIds.some(
+        (item) =>
+          String(item) ===
+          facilityId,
+      );
+    }
+
+    return (
+      String(
+        doctor.facilityId ?? "",
+      ) === facilityId
+    );
+  }
+
+  function canViewDoctor(
+    doctor: Doctor,
+  ) {
+    return (
+      canViewAllFacilities ||
+      doctorBelongsToFacility(
+        doctor,
+        scopedFacilityId,
+      )
+    );
+  }
+
+  function canManageDoctor(
+    doctor: Doctor,
+  ) {
+    return (
+      canManageDoctors &&
+      doctorBelongsToFacility(
+        doctor,
+        scopedFacilityId,
+      )
+    );
+  }
 
   const [doctors, setDoctors] =
     useState<Doctor[]>([]);
@@ -477,10 +679,33 @@ export default function DoctorManagementPage() {
   useEffect(() => {
     let cancelled = false;
 
+    if (
+      !canViewAllFacilities &&
+      !scopedFacilityId
+    ) {
+      const timer =
+        window.setTimeout(() => {
+          setDoctors([]);
+          setTotal(0);
+          setLoading(false);
+        }, 0);
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }
+
     async function loadInitialData() {
+      setLoading(true);
+
       try {
         const result =
           await getDoctors({
+            facilityId:
+              canViewAllFacilities
+                ? undefined
+                : scopedFacilityId,
             page: 1,
             limit:
               DEFAULT_PAGE_SIZE,
@@ -490,10 +715,27 @@ export default function DoctorManagementPage() {
 
         if (cancelled) return;
 
+        const visibleDoctors =
+          canViewAllFacilities
+            ? result.items
+            : result.items.filter(
+                (doctor) =>
+                  doctorBelongsToFacility(
+                    doctor,
+                    scopedFacilityId,
+                  ),
+              );
+
         setDoctors(
-          result.items,
+          visibleDoctors,
         );
-        setTotal(result.total);
+        setTotal(
+          canViewAllFacilities ||
+          visibleDoctors.length ===
+            result.items.length
+            ? result.total
+            : visibleDoctors.length,
+        );
         setError(null);
       } catch (loadError) {
         if (!cancelled) {
@@ -515,20 +757,41 @@ export default function DoctorManagementPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    canViewAllFacilities,
+    scopedFacilityId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
 
+    if (
+      !canViewAllFacilities &&
+      !scopedFacilityId
+    ) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     async function loadDisplayLookups() {
+      const facilityRequest =
+        canViewAllFacilities
+          ? getFacilities({
+              page: 1,
+              limit: 100,
+            })
+          : getFacility(
+              scopedFacilityId,
+            ).then((facility) => [
+              facility,
+            ]);
+
       const [
         facilityResult,
         roomTypeResult,
       ] = await Promise.allSettled([
-        getFacilities({
-          page: 1,
-          limit: 100,
-        }),
+        facilityRequest,
         getRoomTypeLookup({
           status: "active",
           limit: 50,
@@ -575,7 +838,10 @@ export default function DoctorManagementPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    canViewAllFacilities,
+    scopedFacilityId,
+  ]);
 
   const detailFacilityName =
     useMemo(() => {
@@ -645,20 +911,6 @@ export default function DoctorManagementPage() {
       roomTypeNameById,
     ]);
 
-  const stats = useMemo(() => {
-    const active = doctors.filter(
-      (doctor) =>
-        doctor.status ===
-        "active",
-    ).length;
-
-    return {
-      active,
-      inactive:
-        doctors.length - active,
-    };
-  }, [doctors]);
-
   function buildFilters(
     overrides: Partial<DoctorFilters> = {},
   ): DoctorFilters {
@@ -692,11 +944,31 @@ export default function DoctorManagementPage() {
             filters,
             page,
             limit,
+            canViewAllFacilities
+              ? undefined
+              : scopedFacilityId,
           ),
         );
 
-      setDoctors(result.items);
-      setTotal(result.total);
+      const visibleDoctors =
+        canViewAllFacilities
+          ? result.items
+          : result.items.filter(
+              (doctor) =>
+                doctorBelongsToFacility(
+                  doctor,
+                  scopedFacilityId,
+                ),
+            );
+
+      setDoctors(visibleDoctors);
+      setTotal(
+        canViewAllFacilities ||
+        visibleDoctors.length ===
+          result.items.length
+          ? result.total
+          : visibleDoctors.length,
+      );
       setCurrentPage(
         result.page,
       );
@@ -760,6 +1032,10 @@ export default function DoctorManagementPage() {
   async function openDetail(
     doctor: Doctor,
   ) {
+    if (!canViewDoctor(doctor)) {
+      return;
+    }
+
     setDetailDoctor(doctor);
     setDetailLoading(true);
 
@@ -768,12 +1044,24 @@ export default function DoctorManagementPage() {
         await getDoctor(
           doctor.id,
         );
-
-      setDetailDoctor(
+      const mergedDoctor =
         mergeDoctorDetail(
           doctor,
           detail,
-        ),
+        );
+
+      if (
+        !canViewDoctor(
+          mergedDoctor,
+        )
+      ) {
+        throw new Error(
+          "Bạn không có quyền xem bác sĩ của cơ sở này.",
+        );
+      }
+
+      setDetailDoctor(
+        mergedDoctor,
       );
     } catch (detailError) {
       setError(
@@ -787,6 +1075,10 @@ export default function DoctorManagementPage() {
   }
 
   function openCreate() {
+    if (!canManageDoctors) {
+      return;
+    }
+
     setEditingDoctor(null);
     setFormModalOpen(true);
   }
@@ -794,6 +1086,10 @@ export default function DoctorManagementPage() {
   function openEdit(
     doctor: Doctor,
   ) {
+    if (!canManageDoctor(doctor)) {
+      return;
+    }
+
     setEditingDoctor(doctor);
     setFormModalOpen(true);
   }
@@ -837,7 +1133,12 @@ export default function DoctorManagementPage() {
   }
 
   async function confirmDelete() {
-    if (!deletingDoctor) {
+    if (
+      !deletingDoctor ||
+      !canManageDoctor(
+        deletingDoctor,
+      )
+    ) {
       return;
     }
 
@@ -1048,57 +1349,72 @@ export default function DoctorManagementPage() {
       {
         title: "Thao tác",
         key: "actions",
-        width: 132,
+        width: canManageDoctors
+          ? 132
+          : 64,
         align: "center",
         render: (
           _value,
           doctor,
-        ) => (
-          <Space size={4}>
-            <Tooltip title="Xem chi tiết">
-              <Button
-                icon={
-                  <Eye className="h-4 w-4" />
-                }
-                onClick={(event) => {
-                  event.stopPropagation();
+        ) => {
+          const canManageCurrentDoctor =
+            canManageDoctor(
+              doctor,
+            );
 
-                  void openDetail(
-                    doctor,
-                  );
-                }}
-              />
-            </Tooltip>
+          return (
+            <Space size={4}>
+              <Tooltip title="Xem chi tiết">
+                <Button
+                  icon={
+                    <Eye className="h-4 w-4" />
+                  }
+                  onClick={(event) => {
+                    event.stopPropagation();
 
-            <Tooltip title="Cập nhật">
-              <Button
-                icon={
-                  <Pencil className="h-4 w-4" />
-                }
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEdit(doctor);
-                }}
-              />
-            </Tooltip>
+                    void openDetail(
+                      doctor,
+                    );
+                  }}
+                />
+              </Tooltip>
 
-            <Tooltip title="Xóa bác sĩ">
-              <Button
-                danger
-                icon={
-                  <Trash2 className="h-4 w-4" />
-                }
-                onClick={(event) => {
-                  event.stopPropagation();
+              {canManageCurrentDoctor ? (
+                <>
+                  <Tooltip title="Cập nhật">
+                    <Button
+                      icon={
+                        <Pencil className="h-4 w-4" />
+                      }
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEdit(
+                          doctor,
+                        );
+                      }}
+                    />
+                  </Tooltip>
 
-                  setDeletingDoctor(
-                    doctor,
-                  );
-                }}
-              />
-            </Tooltip>
-          </Space>
-        ),
+                  <Tooltip title="Xóa bác sĩ">
+                    <Button
+                      danger
+                      icon={
+                        <Trash2 className="h-4 w-4" />
+                      }
+                      onClick={(event) => {
+                        event.stopPropagation();
+
+                        setDeletingDoctor(
+                          doctor,
+                        );
+                      }}
+                    />
+                  </Tooltip>
+                </>
+              ) : null}
+            </Space>
+          );
+        },
       },
     ];
 
@@ -1132,30 +1448,7 @@ export default function DoctorManagementPage() {
           />
         ) : null}
 
-        <div className="order-1 grid gap-4 md:grid-cols-3">
-          <Card className="border-slate-200 bg-white">
-            <Statistic
-              title="Tổng bác sĩ"
-              value={total}
-            />
-          </Card>
-
-          <Card className="border-emerald-100 bg-emerald-50/60">
-            <Statistic
-              title="Hoạt động trên trang"
-              value={stats.active}
-            />
-          </Card>
-
-          <Card className="border-slate-200 bg-slate-50/70">
-            <Statistic
-              title="Ngừng hoạt động trên trang"
-              value={stats.inactive}
-            />
-          </Card>
-        </div>
-
-        <Card className="order-2 border-slate-200 bg-white">
+        <Card className="order-1 border-slate-200 bg-white">
           <div
             className="flex flex-wrap items-center gap-3"
             style={{
@@ -1169,8 +1462,8 @@ export default function DoctorManagementPage() {
               prefix={
                 <Search className="h-4 w-4 text-slate-400" />
               }
-              placeholder="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
-              title="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
+              placeholder="Tìm theo họ tên, số điện thoại hoặc mã nhân viên"
+              title="Tìm theo họ tên, số điện thoại hoặc mã nhân viên"
               style={{
                 width: 300,
                 minWidth: 300,
@@ -1315,7 +1608,7 @@ export default function DoctorManagementPage() {
         </Card>
 
         <Card
-          className="order-3 overflow-hidden border-slate-200 bg-white"
+          className="order-2 overflow-hidden border-slate-200 bg-white"
           styles={{
             body: {
               padding: 0,
@@ -1329,17 +1622,19 @@ export default function DoctorManagementPage() {
             </div>
           }
           extra={
-            <Button
-              type="primary"
-              icon={
-                <Plus className="h-4 w-4" />
-              }
-              onClick={
-                openCreate
-              }
-            >
-              Thêm bác sĩ
-            </Button>
+            canManageDoctors ? (
+              <Button
+                type="primary"
+                icon={
+                  <Plus className="h-4 w-4" />
+                }
+                onClick={
+                  openCreate
+                }
+              >
+                Thêm bác sĩ
+              </Button>
+            ) : null
           }
         >
           <Table<Doctor>
@@ -1377,6 +1672,7 @@ export default function DoctorManagementPage() {
               total,
               showSizeChanger: true,
               pageSizeOptions: [
+                5,
                 10,
                 20,
                 50,
@@ -1395,18 +1691,23 @@ export default function DoctorManagementPage() {
         </Card>
       </div>
 
-      <DoctorFormModal
-        open={formModalOpen}
-        editingDoctor={
-          editingDoctor
-        }
-        onClose={
-          closeFormModal
-        }
-        onSaved={
-          handleDoctorSaved
-        }
-      />
+      {canManageDoctors ? (
+        <DoctorFormModal
+          open={formModalOpen}
+          editingDoctor={
+            editingDoctor
+          }
+          allowedFacilityId={
+            scopedFacilityId
+          }
+          onClose={
+            closeFormModal
+          }
+          onSaved={
+            handleDoctorSaved
+          }
+        />
+      ) : null}
 
       <Modal
         open={Boolean(
@@ -1418,7 +1719,10 @@ export default function DoctorManagementPage() {
         closable={false}
         footer={
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-2">
-            {detailDoctor ? (
+            {detailDoctor &&
+            canManageDoctor(
+              detailDoctor,
+            ) ? (
               <Button
                 icon={
                   <Pencil className="h-4 w-4" />
@@ -1718,9 +2022,12 @@ export default function DoctorManagementPage() {
       </Modal>
 
       <Modal
-        open={Boolean(
-          deletingDoctor,
-        )}
+        open={
+          canManageDoctors &&
+          Boolean(
+            deletingDoctor,
+          )
+        }
         centered
         width={456}
         title={null}
