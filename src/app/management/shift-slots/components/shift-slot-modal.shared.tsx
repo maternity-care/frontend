@@ -9,6 +9,7 @@ import {
   Input,
   Modal,
   Row,
+  Segmented,
   Select,
   Typography,
 } from "antd";
@@ -19,6 +20,7 @@ import {
 import type {
   CreateShiftSlotInput,
   ShiftSlot,
+  ShiftSlotStatus,
 } from "@/management/features/shift-slots/shift-slots.types";
 
 const { Text, Title } = Typography;
@@ -35,6 +37,7 @@ export type ShiftSlotFormValues = {
   name: string;
   startTime: string;
   endTime: string;
+  status: ShiftSlotStatus;
 };
 
 type ShiftSlotFormModalBaseProps = {
@@ -124,7 +127,7 @@ function hasSlotChanges(
     values.startTime !== editingSlot.startTime ||
     values.endTime !== editingSlot.endTime ||
     isOvernight !== editingSlot.isOvernight ||
-    editingSlot.status !== "active"
+    values.status !== editingSlot.status
   );
 }
 
@@ -152,6 +155,8 @@ export function ShiftSlotFormModalBase({
     Form.useWatch("startTime", form) ?? "";
   const watchedEndTime =
     Form.useWatch("endTime", form) ?? "";
+  const watchedStatus =
+    Form.useWatch("status", form) ?? "active";
   const isOvernight = isOvernightTime(
     watchedStartTime,
     watchedEndTime,
@@ -169,6 +174,7 @@ export function ShiftSlotFormModalBase({
           name: editingSlot.name,
           startTime: editingSlot.startTime,
           endTime: editingSlot.endTime,
+          status: editingSlot.status,
         });
         return;
       }
@@ -251,7 +257,7 @@ export function ShiftSlotFormModalBase({
             values.startTime,
             values.endTime,
           ),
-          status: "active",
+          status: values.status ?? "active",
         });
 
       messageApi.success(successMessage);
@@ -431,6 +437,46 @@ export function ShiftSlotFormModalBase({
               <Input type="time" />
             </Form.Item>
           </Col>
+
+          {mode === "edit" ? (
+            <Col xs={24}>
+              <Form.Item
+                name="status"
+                label="Trạng thái khung ca"
+                rules={[
+                  {
+                    required: true,
+                    message:
+                      "Vui lòng chọn trạng thái khung ca.",
+                  },
+                ]}
+              >
+                <Segmented
+                  block
+                  options={[
+                    {
+                      value: "active",
+                      label: "Hoạt động",
+                    },
+                    {
+                      value: "inactive",
+                      label: "Tạm ngưng",
+                    },
+                  ]}
+                />
+              </Form.Item>
+
+              {watchedStatus === "inactive" ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  className="mb-6"
+                  title="Khung ca sẽ không còn dùng để tạo lịch trực mới"
+                  description="Các ca trực đã được tạo từ khung ca này vẫn được giữ nguyên."
+                />
+              ) : null}
+            </Col>
+          ) : null}
 
           <Col xs={24}>
             <div className="mb-6">

@@ -231,13 +231,63 @@ export interface UpdateFacilityOperatingHoursInput {
   schedules: FacilityScheduleInput[];
 }
 
+export type OperatingHoursSlotStrategy =
+  | "strict"
+  | "deactivate_invalid_slots";
+
+export interface ApplyFacilityOperatingHoursInput
+  extends UpdateFacilityOperatingHoursInput {
+  slotStrategy?: OperatingHoursSlotStrategy;
+}
+
 export interface FacilityOperatingHoursResult {
   operatingHours: BackendOperatingHour[];
   operatingHourGroups: BackendOperatingHourGroup[];
 }
 
-export type FacilityOperatingHoursPreview =
-  Record<string, unknown>;
+export interface FacilityOperatingHoursImpactedShift {
+  id: string;
+  shiftDate: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  doctorName?: string | null;
+  roomName?: string | null;
+  slotName?: string | null;
+  reason?: string;
+}
+
+export interface FacilityOperatingHoursImpactedShiftSlot {
+  id: string;
+  name: string;
+  code: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  reason?: string;
+}
+
+export interface FacilityOperatingHoursImpactSummary {
+  impactedShiftCount: number;
+  impactedShiftSlotCount: number;
+  deactivatedShiftSlotCount?: number;
+}
+
+export interface FacilityOperatingHoursPreview
+  extends FacilityOperatingHoursResult {
+  canUpdate: boolean;
+  summary: FacilityOperatingHoursImpactSummary;
+  impactedShifts: FacilityOperatingHoursImpactedShift[];
+  impactedShiftSlots: FacilityOperatingHoursImpactedShiftSlot[];
+}
+
+export interface FacilityOperatingHoursApplyResult
+  extends FacilityOperatingHoursResult {
+  slotStrategy: OperatingHoursSlotStrategy;
+  summary: FacilityOperatingHoursImpactSummary;
+  impactedShifts: FacilityOperatingHoursImpactedShift[];
+  impactedShiftSlots: FacilityOperatingHoursImpactedShiftSlot[];
+}
 
 export type FacilityRoomTypeStatus =
   | "active"
