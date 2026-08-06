@@ -533,6 +533,10 @@ export function DoctorShiftBulkGenerateModal({
     const timer = window.setTimeout(() => {
       form.resetFields();
       form.setFieldsValue({
+        facilityId:
+          facilities.length === 1
+            ? facilities[0]?.id
+            : undefined,
         fromDate: today,
         toDate: addDaysToDateKey(today, 30),
         slotGroups: [],
@@ -550,7 +554,11 @@ export function DoctorShiftBulkGenerateModal({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [form, open]);
+  }, [
+    facilities,
+    form,
+    open,
+  ]);
 
   useEffect(() => {
     if (!open || !watchedFacilityId) {
@@ -1256,6 +1264,9 @@ export function DoctorShiftBulkGenerateModal({
               <Select
                 showSearch
                 optionFilterProp="label"
+                disabled={
+                  facilities.length === 1
+                }
                 placeholder="Chọn cơ sở khám"
                 options={facilities.map(
                   (facility) => ({
