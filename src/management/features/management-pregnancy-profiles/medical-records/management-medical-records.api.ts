@@ -2,6 +2,7 @@ import { apiClient, unwrapApiData } from "@/lib/axios";
 import type {
   BackendMedicalRecord,
   CreateMedicalRecordInput,
+  UpdateMedicalRecordInput,
   MedicalRecord,
   MedicalRecordFile,
   BackendMedicalRecordFile,
@@ -26,9 +27,7 @@ function toNullableString(
   return result || null;
 }
 
-function normalizeFile(
-  file: BackendMedicalRecordFile,
-): MedicalRecordFile {
+function normalizeFile(file: BackendMedicalRecordFile): MedicalRecordFile {
   return {
     id: toStringValue(file.id),
     medicalRecordId: toStringValue(file.medicalRecordId),
@@ -42,9 +41,7 @@ function normalizeFile(
   };
 }
 
-function normalizeAppointment(
-  item: BackendAppointment,
-): Appointment {
+function normalizeAppointment(item: BackendAppointment): Appointment {
   return {
     id: toStringValue(item.id),
     pregnancyProfileId: toNullableString(item.pregnancyProfileId),
@@ -75,14 +72,52 @@ export function normalizeMedicalRecord(
   };
 }
 
+/** GET /management/medical-records/{id} */
+export async function getManagementMedicalRecordById(
+  id: string,
+): Promise<MedicalRecord> {
+  const data = await unwrapApiData<BackendMedicalRecord>(
+    apiClient.get(`${MEDICAL_RECORDS_URL}/${id}`),
+  );
+  return normalizeMedicalRecord(data);
+}
+
+/** POST /management/medical-records */
 export async function createManagementMedicalRecord(
   input: CreateMedicalRecordInput,
 ): Promise<MedicalRecord> {
   const data = await unwrapApiData<BackendMedicalRecord>(
     apiClient.post(MEDICAL_RECORDS_URL, input),
   );
-
   return normalizeMedicalRecord(data);
+}
+
+/** PATCH /management/medical-records/{id} */
+export async function updateManagementMedicalRecord(
+  id: string,
+  input: UpdateMedicalRecordInput,
+): Promise<MedicalRecord> {
+  const data = await unwrapApiData<BackendMedicalRecord>(
+    apiClient.patch(`${MEDICAL_RECORDS_URL}/${id}`, input),
+  );
+  return normalizeMedicalRecord(data);
+}
+
+/** DELETE /management/medical-records/{id} */
+export async function deleteManagementMedicalRecord(id: string): Promise<void> {
+  await apiClient.delete(`${MEDICAL_RECORDS_URL}/${id}`);
+}
+
+/** GET /management/medical-records/pending-files */
+export async function getPendingMedicalRecordFiles(
+  appointmentId: string,
+): Promise<PendingMedicalRecordFile[]> {
+  const data = await unwrapApiData<PendingMedicalRecordFile[]>(
+    apiClient.get(`${MEDICAL_RECORDS_URL}/pending-files`, {
+      params: { appointmentId },
+    }),
+  );
+  return Array.isArray(data) ? data : [];
 }
 
 export async function getAppointmentsByPregnancyProfileId(
@@ -93,20 +128,6 @@ export async function getAppointmentsByPregnancyProfileId(
       `${APPOINTMENTS_BY_PREGNANCY_PROFILE_URL}/${pregnancyProfileId}`,
     ),
   );
-
-  // Hỗ trợ cả trường hợp backend trả về array hoặc single object
   const list = Array.isArray(data) ? data : data ? [data] : [];
   return list.map(normalizeAppointment);
-}
-
-export async function getPendingMedicalRecordFiles(
-  appointmentId: string,
-): Promise<PendingMedicalRecordFile[]> {
-  const data = await unwrapApiData<PendingMedicalRecordFile[]>(
-    apiClient.get(`${MEDICAL_RECORDS_URL}/pending-files`, {
-      params: { appointmentId },
-    }),
-  );
-
-  return Array.isArray(data) ? data : [];
 }
