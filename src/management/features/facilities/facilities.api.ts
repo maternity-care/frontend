@@ -7,10 +7,12 @@ import type {
   BackendFacilityAdminOptionsResponse,
   BackendOperatingHour,
   BackendOperatingHourGroup,
+  ApplyFacilityOperatingHoursInput,
   CreateFacilityInput,
   Facility,
   FacilityAdminOption,
   FacilityAdminOptionsResult,
+  FacilityOperatingHoursApplyResult,
   FacilityListResult,
   FacilityLookupItem,
   FacilityOperatingHoursPreview,
@@ -399,6 +401,13 @@ type BackendOperatingHoursResponse =
       operatingHourGroups?: BackendOperatingHourGroup[];
     };
 
+type BackendOperatingHoursApplyResponse = BackendOperatingHoursResponse & {
+  slotStrategy?: FacilityOperatingHoursApplyResult["slotStrategy"];
+  summary?: FacilityOperatingHoursApplyResult["summary"];
+  impactedShifts?: FacilityOperatingHoursApplyResult["impactedShifts"];
+  impactedShiftSlots?: FacilityOperatingHoursApplyResult["impactedShiftSlots"];
+};
+
 function normalizeOperatingHoursPayload(
   data: BackendOperatingHoursResponse,
 ): FacilityOperatingHoursResult {
@@ -690,6 +699,31 @@ export async function updateFacilityOperatingHours(
   );
 
   return normalizeOperatingHoursPayload(data);
+}
+
+export async function applyFacilityOperatingHours(
+  id: string,
+  input: ApplyFacilityOperatingHoursInput,
+): Promise<FacilityOperatingHoursApplyResult> {
+  const data = await unwrapApiData<BackendOperatingHoursApplyResponse>(
+    apiClient.patch(`/management/facilities/${id}/operating-hours/apply`, {
+      schedules: normalizeSchedules(input.schedules),
+      slotStrategy: input.slotStrategy,
+    }),
+  );
+  const operatingHoursPayload = normalizeOperatingHoursPayload(data);
+
+  return {
+    ...operatingHoursPayload,
+    slotStrategy: data.slotStrategy ?? input.slotStrategy ?? "strict",
+    summary: data.summary ?? {
+      impactedShiftCount: 0,
+      impactedShiftSlotCount: 0,
+      deactivatedShiftSlotCount: 0,
+    },
+    impactedShifts: data.impactedShifts ?? [],
+    impactedShiftSlots: data.impactedShiftSlots ?? [],
+  };
 }
 
 export function previewFacilityOperatingHours(
