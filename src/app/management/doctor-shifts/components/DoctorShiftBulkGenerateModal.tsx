@@ -112,17 +112,82 @@ type DoctorShiftBulkGenerateModalProps = {
   }) => Promise<void> | void;
 };
 
-function getCurrentDateKey() {
-  const currentDate = new Date();
-  const year = currentDate.getFullYear();
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
   const month = String(
-    currentDate.getMonth() + 1,
+    date.getMonth() + 1,
   ).padStart(2, "0");
   const day = String(
-    currentDate.getDate(),
+    date.getDate(),
   ).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function getNextWeekMondayDateKey() {
+  const currentDate = new Date();
+  const currentDay =
+    currentDate.getDay();
+  const daysUntilNextMonday =
+    currentDay === 0
+      ? 1
+      : 8 - currentDay;
+
+  currentDate.setDate(
+    currentDate.getDate() +
+      daysUntilNextMonday,
+  );
+
+  return toDateKey(currentDate);
+}
+
+function isNextWeekMondayDateKey(
+  value: string,
+) {
+  return (
+    Boolean(value) &&
+    value ===
+      getNextWeekMondayDateKey()
+  );
+}
+
+function formatLockedWeekDate(
+  value?: string,
+) {
+  if (!value) {
+    return "";
+  }
+
+  const [year, month, day] =
+    value.split("-");
+
+  if (
+    !year ||
+    !month ||
+    !day
+  ) {
+    return value;
+  }
+
+  return `${day}-${month}-${year}`;
+}
+
+type LockedWeekDateInputProps = {
+  value?: string;
+};
+
+function LockedWeekDateInput({
+  value,
+}: LockedWeekDateInputProps) {
+  return (
+    <Input
+      value={formatLockedWeekDate(
+        value,
+      )}
+      readOnly
+      disabled
+    />
+  );
 }
 
 function addDaysToDateKey(
@@ -529,7 +594,8 @@ export function DoctorShiftBulkGenerateModal({
   useEffect(() => {
     if (!open) return;
 
-    const today = getCurrentDateKey();
+    const nextWeekMonday =
+      getNextWeekMondayDateKey();
 
     const timer = window.setTimeout(() => {
       form.resetFields();
@@ -538,7 +604,8 @@ export function DoctorShiftBulkGenerateModal({
           facilities.length === 1
             ? facilities[0]?.id
             : undefined,
-        fromDate: today,
+        fromDate:
+          nextWeekMonday,
         slotGroups: [],
       });
       setShiftSlots([]);
@@ -889,6 +956,16 @@ export function DoctorShiftBulkGenerateModal({
   function buildPayload(
     values: BulkGenerateFormValues,
   ): BulkGenerateDoctorShiftsInput {
+    if (
+      !isNextWeekMondayDateKey(
+        values.fromDate,
+      )
+    ) {
+      throw new Error(
+        "Chỉ được xếp lịch cho tuần kế tiếp.",
+      );
+    }
+
     const toDate =
       addDaysToDateKey(
         values.fromDate,
@@ -1181,7 +1258,7 @@ export function DoctorShiftBulkGenerateModal({
             </Title>
 
             <Text type="secondary">
-              Chọn ngày bắt đầu và phân công bác sĩ theo từng khung ca, phòng và ngày làm việc. Hệ thống tự tạo lịch trong đúng 7 ngày.
+              Phân công bác sĩ theo từng khung ca, phòng và ngày làm việc. Hệ thống chỉ tạo lịch cho tuần kế tiếp, từ Thứ 2 đến Chủ nhật.
             </Text>
           </div>
         </div>
@@ -1281,28 +1358,45 @@ export function DoctorShiftBulkGenerateModal({
           <Col xs={24} lg={12}>
             <Form.Item
               name="fromDate"
-              label="Ngày bắt đầu"
+              label="Tuần được xếp lịch"
               extra={
                 watchedFromDate
-                  ? `Lịch sẽ được tạo từ ${formatIssueDate(
+                  ? `Từ Thứ 2 ${formatIssueDate(
                       watchedFromDate,
-                    )} đến ${formatIssueDate(
+                    )} đến Chủ nhật ${formatIssueDate(
                       addDaysToDateKey(
                         watchedFromDate,
                         6,
                       ),
-                    )}, tổng cộng 7 ngày.`
-                  : "Hệ thống sẽ tự tính ngày kết thúc để tạo đúng 7 ngày."
+                    )}.`
+                  : "Hệ thống tự xác định tuần kế tiếp."
               }
               rules={[
                 {
                   required: true,
                   message:
-                    "Chọn ngày bắt đầu tuần.",
+                    "Không xác định được tuần kế tiếp.",
+                },
+                {
+                  validator: async (
+                    _rule,
+                    value?: string,
+                  ) => {
+                    if (
+                      value &&
+                      !isNextWeekMondayDateKey(
+                        value,
+                      )
+                    ) {
+                      throw new Error(
+                        "Chỉ được xếp lịch cho tuần kế tiếp.",
+                      );
+                    }
+                  },
                 },
               ]}
             >
-              <Input type="date" />
+              <LockedWeekDateInput />
             </Form.Item>
           </Col>
         </Row>
