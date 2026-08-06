@@ -16,8 +16,8 @@ import {
   Select,
 } from "antd";
 
-import { getUsers } from "@/management/features/users/users.api";
-import type { User } from "@/management/features/users/users.types";
+import { getUsers } from "@/management/features/management-users/management-user.api";
+import type { User } from "@/management/features/management-users/management-user.types";
 import type { CreateManagementPregnancyProfileInput } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 
 const { TextArea } = Input;
@@ -76,7 +76,7 @@ export function CreatePregnancyProfileModal({
         page: 1,
         limit: 20,
       });
-      setPatients(result);
+      setPatients(result.users ?? []);
     } catch {
       setPatients([]);
     } finally {
