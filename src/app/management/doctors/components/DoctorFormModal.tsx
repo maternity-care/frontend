@@ -75,6 +75,7 @@ type DoctorFormValues = {
 type DoctorFormModalProps = {
   open: boolean;
   editingDoctor: Doctor | null;
+  allowedFacilityId: string;
   onClose: () => void;
   onSaved?: (
     doctor: Doctor,
@@ -134,6 +135,76 @@ function getErrorMessage(error: unknown) {
   return "Đã có lỗi xảy ra. Vui lòng thử lại.";
 }
 
+function readStaffFacilityIds(
+  user: Staff,
+) {
+  const profile =
+    user.staffProfile as
+      | {
+          facilityId?: unknown;
+          homeFacilityId?: unknown;
+          facilityAssignments?: Array<{
+            facilityId?: unknown;
+          }> | null;
+        }
+      | null
+      | undefined;
+  const directFacilityId =
+    (
+      user as unknown as {
+        facilityId?: unknown;
+      }
+    ).facilityId;
+
+  return Array.from(
+    new Set(
+      [
+        profile?.facilityId,
+        profile?.homeFacilityId,
+        directFacilityId,
+        ...(
+          profile
+            ?.facilityAssignments ??
+          []
+        ).map(
+          (assignment) =>
+            assignment.facilityId,
+        ),
+      ]
+        .map((value) =>
+          String(
+            value ?? "",
+          ).trim(),
+        )
+        .filter(Boolean),
+    ),
+  );
+}
+
+function doctorBelongsToFacility(
+  doctor: Doctor,
+  facilityId: string,
+) {
+  if (!facilityId) return false;
+
+  if (
+    doctor.facilityIds.length >
+    0
+  ) {
+    return doctor.facilityIds.some(
+      (item) =>
+        String(item) ===
+        facilityId,
+    );
+  }
+
+  return (
+    String(
+      doctor.facilityId ?? "",
+    ) === facilityId
+  );
+}
+
 function PreviewLine({
   icon,
   label,
@@ -163,6 +234,7 @@ function PreviewLine({
 export function DoctorFormModal({
   open,
   editingDoctor,
+  allowedFacilityId,
   onClose,
   onSaved,
 }: DoctorFormModalProps) {
@@ -280,7 +352,14 @@ export function DoctorFormModal({
 
         setStaffOptions(
           data.users.filter(
-            (user) => !user.staffProfile?.doctor,
+            (user) =>
+              !user.staffProfile
+                ?.doctor &&
+              readStaffFacilityIds(
+                user,
+              ).includes(
+                allowedFacilityId,
+              ),
           ),
         );
       })
@@ -303,7 +382,12 @@ export function DoctorFormModal({
     return () => {
       cancelled = true;
     };
-  }, [editingDoctor, messageApi, open]);
+  }, [
+    allowedFacilityId,
+    editingDoctor,
+    messageApi,
+    open,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -417,6 +501,56 @@ export function DoctorFormModal({
   async function handleFinish(
     values: DoctorFormValues,
   ) {
+    if (!allowedFacilityId) {
+      void messageApi.error(
+        "Không xác định được cơ sở quản lý.",
+      );
+      return;
+    }
+
+    if (
+      editingDoctor &&
+      !doctorBelongsToFacility(
+        editingDoctor,
+        allowedFacilityId,
+      )
+    ) {
+      void messageApi.error(
+        "Bạn không có quyền cập nhật bác sĩ của cơ sở này.",
+      );
+      return;
+    }
+
+    if (!editingDoctor) {
+      const selected =
+        staffOptions.find(
+          (user) =>
+            String(
+              user.staffProfile
+                ?.staffId ??
+                user.id,
+            ) ===
+            String(
+              values.staffId ??
+                "",
+            ),
+        );
+
+      if (
+        !selected ||
+        !readStaffFacilityIds(
+          selected,
+        ).includes(
+          allowedFacilityId,
+        )
+      ) {
+        void messageApi.error(
+          "Tài khoản staff không thuộc cơ sở của bạn.",
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
