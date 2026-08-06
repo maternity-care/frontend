@@ -403,15 +403,50 @@ function ClinicRoomManagementContent() {
     statusFilter,
   ]);
 
+  const tableRooms = useMemo(() => {
+    if (
+      rooms.length <= pageSize
+    ) {
+      return rooms;
+    }
+
+    const backendReturnedFullList =
+      totalRooms > 0 &&
+      rooms.length >= totalRooms;
+
+    if (
+      backendReturnedFullList
+    ) {
+      const offset =
+        (currentPage - 1) *
+        pageSize;
+
+      return rooms.slice(
+        offset,
+        offset + pageSize,
+      );
+    }
+
+    return rooms.slice(
+      0,
+      pageSize,
+    );
+  }, [
+    currentPage,
+    pageSize,
+    rooms,
+    totalRooms,
+  ]);
+
   const roomById = useMemo(
     () =>
       new Map(
-        rooms.map((room) => [
+        tableRooms.map((room) => [
           room.id,
           room,
         ]),
       ),
-    [rooms],
+    [tableRooms],
   );
 
   function refreshRooms() {
@@ -550,7 +585,7 @@ function ClinicRoomManagementContent() {
         : current,
     );
     if (
-      rooms.length <=
+      tableRooms.length <=
         deletedIds.length &&
       currentPage > 1
     ) {
@@ -984,7 +1019,7 @@ function ClinicRoomManagementContent() {
             tableLayout="fixed"
             loading={loading}
             columns={columns}
-            dataSource={rooms}
+            dataSource={tableRooms}
             onRow={(room) => ({
               className:
                 "cursor-pointer",
