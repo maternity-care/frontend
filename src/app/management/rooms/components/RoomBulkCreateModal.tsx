@@ -757,11 +757,11 @@ export function RoomBulkCreateModal({
               level={4}
               className="!mb-1 !text-slate-950"
             >
-              Tạo nhiều phòng
+              Thêm phòng
             </Title>
 
             <Text type="secondary">
-              Nhập danh sách phòng và bấm Tạo phòng để lưu trực tiếp.
+              Nhập phòng và bấm Tạo phòng để lưu trực tiếp.
             </Text>
           </div>
         </div>
