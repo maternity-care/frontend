@@ -98,11 +98,11 @@ export function DoctorShiftBulkPreviewModal({
               level={4}
               className="!mb-1 !text-slate-950"
             >
-              Xem trước lịch trực nhiều ngày
+              Xem trước lịch trực 1 tuần
             </Title>
 
             <Text type="secondary">
-              Kiểm tra toàn bộ lịch dự kiến trước khi xác nhận lưu vào hệ thống.
+              Kiểm tra lịch trực dự kiến trong 7 ngày trước khi xác nhận lưu vào hệ thống.
             </Text>
           </div>
         </div>
@@ -202,7 +202,7 @@ export function DoctorShiftBulkPreviewModal({
               <CheckCircle2 className="h-5 w-5" />
             }
             title="Toàn bộ lịch dự kiến đều hợp lệ"
-            description="Bạn có thể xác nhận để lưu toàn bộ lịch trực vào hệ thống."
+            description="Bạn có thể xác nhận để lưu lịch trực của tuần này vào hệ thống."
           />
         )}
       </div>
