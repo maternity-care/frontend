@@ -2,9 +2,11 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
 } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   Card,
@@ -26,6 +28,7 @@ import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import type { ForumTopic } from "@/management/features/forums/forums.types";
+import { useForumRealtime } from "@/features/forum/useForumRealtime";
 import { ForumPostAdminTab } from "./components/ForumPostAdminTab";
 import { ForumPostsTab } from "./components/ForumPostsTab";
 import { ForumReportsTab } from "./components/ForumReportsTab";
@@ -53,6 +56,7 @@ type ReportSummary = {
 };
 
 export default function ForumManagementPage() {
+  const searchParams = useSearchParams();
   const roles = useAuthStore(
     (state) => state.roles,
   );
@@ -64,6 +68,7 @@ export default function ForumManagementPage() {
 
   const [view, setView] =
     useState<ForumView>("posts");
+  const [realtimeVersion, setRealtimeVersion] = useState(0);
   const [topics, setTopics] = useState<
     ForumTopic[]
   >([]);
@@ -85,6 +90,24 @@ export default function ForumManagementPage() {
     view === "post-admin"
       ? "posts"
       : view;
+
+  useEffect(() => {
+    const requestedView = searchParams.get("view");
+    if (
+      requestedView === "posts" ||
+      requestedView === "post-admin" ||
+      requestedView === "reports" ||
+      requestedView === "topics"
+    ) {
+      const timer = window.setTimeout(() => setView(requestedView), 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [searchParams]);
+
+  useForumRealtime({
+    management: true,
+    onEvent: () => setRealtimeVersion((current) => current + 1),
+  });
 
   const navigationOptions =
     useMemo<ForumNavigationOption[]>(
@@ -242,6 +265,8 @@ export default function ForumManagementPage() {
           <ForumPostsTab
             topics={topics}
             navigation={navigation}
+            focusPostId={searchParams.get("postId") ?? undefined}
+            realtimeVersion={realtimeVersion}
             onSummaryChange={
               handlePostSummaryChange
             }
@@ -259,6 +284,7 @@ export default function ForumManagementPage() {
           >
             <ForumPostAdminTab
               topics={topics}
+              realtimeVersion={realtimeVersion}
               canHardDelete={
                 isSuperAdmin
               }
@@ -274,6 +300,7 @@ export default function ForumManagementPage() {
           }
         >
           <ForumReportsTab
+            realtimeVersion={realtimeVersion}
             onSummaryChange={
               handleReportSummaryChange
             }

@@ -1,6 +1,4 @@
-import { UserProfile } from "../profile/profile.types";
-
-export type PregnancyScheduleStatus = "upcoming" | "done" | "missed";
+export type PregnancyScheduleStatus = "upcoming" | "done" | "missed" | "action_required" | "cancelled";
 
 export type PregnancyScheduleType =
   | "checkup"

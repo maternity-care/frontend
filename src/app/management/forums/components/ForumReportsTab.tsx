@@ -34,6 +34,7 @@ const { Paragraph, Text } = Typography;
 const { TextArea } = Input;
 
 type ForumReportsTabProps = {
+  realtimeVersion?: number;
   onSummaryChange: (summary: {
     total: number;
     needAction: number;
@@ -172,6 +173,7 @@ function ReportResolveModal({
 }
 
 export function ForumReportsTab({
+  realtimeVersion = 0,
   onSummaryChange,
 }: ForumReportsTabProps) {
   const { message } = App.useApp();
@@ -213,7 +215,7 @@ export function ForumReportsTab({
   useEffect(() => {
     const timer = window.setTimeout(() => void loadReports(), 0);
     return () => window.clearTimeout(timer);
-  }, [loadReports]);
+  }, [loadReports, realtimeVersion]);
 
   async function handleResolveReport(
     action: ForumReportResolveAction,
