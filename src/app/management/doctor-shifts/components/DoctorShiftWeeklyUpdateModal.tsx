@@ -3,14 +3,15 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
+  Alert,
   App,
   Button,
   Checkbox,
   Col,
-  Empty,
   Form,
   Input,
   InputNumber,
@@ -21,17 +22,31 @@ import {
   Typography,
 } from "antd";
 import {
-  CalendarClock,
+  Calendar,
+  Clock,
+  Copy,
   Plus,
   Save,
   Trash2,
   X,
 } from "lucide-react";
+import {
+  getGroupedDoctorShifts,
+} from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type {
   DoctorShiftItem,
   DoctorShiftStatus,
   DoctorShiftWorkingDay,
 } from "@/management/features/doctor-shifts/doctor-shifts.types";
+import {
+  getShiftSlotLookup,
+} from "@/management/features/shift-slots/shift-slots.api";
+import type {
+  ShiftSlotLookupItem,
+} from "@/management/features/shift-slots/shift-slots.types";
+import {
+  getErrorMessage,
+} from "./doctor-shift-modal.shared";
 import type {
   DoctorOption,
   FacilityOption,
@@ -41,78 +56,36 @@ import type {
 const { Text, Title } = Typography;
 
 const CURRENT_WEEK_UPDATE_DRAFT_PREFIX =
-  "management-doctor-shifts-current-week-update-draft:v1";
+  "management-doctor-shifts-current-week-update-draft:v3";
 
 const WORKING_DAY_OPTIONS: Array<{
   label: string;
   value: DoctorShiftWorkingDay;
 }> = [
-  {
-    label: "Thứ 2",
-    value: "MON",
-  },
-  {
-    label: "Thứ 3",
-    value: "TUE",
-  },
-  {
-    label: "Thứ 4",
-    value: "WED",
-  },
-  {
-    label: "Thứ 5",
-    value: "THU",
-  },
-  {
-    label: "Thứ 6",
-    value: "FRI",
-  },
-  {
-    label: "Thứ 7",
-    value: "SAT",
-  },
-  {
-    label: "Chủ nhật",
-    value: "SUN",
-  },
+  { label: "Thứ 2", value: "MON" },
+  { label: "Thứ 3", value: "TUE" },
+  { label: "Thứ 4", value: "WED" },
+  { label: "Thứ 5", value: "THU" },
+  { label: "Thứ 6", value: "FRI" },
+  { label: "Thứ 7", value: "SAT" },
+  { label: "Chủ nhật", value: "SUN" },
 ];
 
-const STATUS_OPTIONS: Array<{
-  label: string;
-  value: DoctorShiftStatus;
-}> = [
-  {
-    label: "Còn trống",
-    value: "available",
-  },
-  {
-    label: "Đã đầy",
-    value: "full",
-  },
-  {
-    label: "Đã hủy",
-    value: "cancelled",
-  },
-  {
-    label: "Nghỉ",
-    value: "off",
-  },
-];
+type WeeklyUpdateStatus = Extract<
+  DoctorShiftStatus,
+  "available" | "off"
+>;
 
 type WeeklyUpdateAssignment = {
-  doctorId: string;
+  staffId: string;
   roomId: string;
   workingDays: DoctorShiftWorkingDay[];
   maxAppointments: number;
-  status: DoctorShiftStatus;
+  status: WeeklyUpdateStatus;
 };
 
 type WeeklyUpdateSlotGroup = {
   slotId: string;
-  slotName: string;
-  slotCode: string;
-  startTime: string;
-  endTime: string;
   assignments: WeeklyUpdateAssignment[];
 };
 
@@ -123,7 +96,7 @@ type WeeklyUpdateFormValues = {
 };
 
 type WeeklyUpdateDraft = {
-  version: 1;
+  version: 3;
   savedAt: string;
   values: WeeklyUpdateFormValues;
 };
@@ -137,31 +110,12 @@ type DoctorShiftWeeklyUpdateModalProps = {
   onClose: () => void;
 };
 
-type LockedValueInputProps = {
+type LockedWeekDateInputProps = {
   value?: string;
 };
 
-function LockedValueInput({
-  value,
-}: LockedValueInputProps) {
-  return (
-    <Input
-      value={value ?? ""}
-      readOnly
-      disabled
-    />
-  );
-}
-
-function parseDateKey(value: string) {
-  return new Date(
-    `${value}T00:00:00`,
-  );
-}
-
 function toDateKey(date: Date) {
-  const year =
-    date.getFullYear();
+  const year = date.getFullYear();
   const month = String(
     date.getMonth() + 1,
   ).padStart(2, "0");
@@ -173,12 +127,12 @@ function toDateKey(date: Date) {
 }
 
 function addDaysToDateKey(
-  value: string,
+  dateKey: string,
   amount: number,
 ) {
-  const date =
-    parseDateKey(value);
-
+  const date = new Date(
+    `${dateKey}T00:00:00`,
+  );
   date.setDate(
     date.getDate() + amount,
   );
@@ -186,24 +140,47 @@ function addDaysToDateKey(
   return toDateKey(date);
 }
 
-function getCurrentWeekMondayDateKey() {
-  const date = new Date();
+function getCurrentWeekDateRange() {
+  const currentDate = new Date();
   const currentDay =
-    date.getDay();
-  const distanceFromMonday =
+    currentDate.getDay();
+  const daysFromMonday =
     currentDay === 0
       ? 6
       : currentDay - 1;
 
-  date.setDate(
-    date.getDate() -
-      distanceFromMonday,
+  currentDate.setDate(
+    currentDate.getDate() -
+      daysFromMonday,
   );
 
-  return toDateKey(date);
+  const dateFrom =
+    toDateKey(currentDate);
+
+  return {
+    dateFrom,
+    dateTo:
+      addDaysToDateKey(
+        dateFrom,
+        6,
+      ),
+  };
 }
 
-function formatDateKey(
+function formatIssueDate(
+  value: string,
+) {
+  const [year, month, day] =
+    value.split("-");
+
+  if (!year || !month || !day) {
+    return value || "Không rõ ngày";
+  }
+
+  return `${day}/${month}/${year}`;
+}
+
+function formatLockedWeekDate(
   value?: string,
 ) {
   if (!value) {
@@ -213,70 +190,44 @@ function formatDateKey(
   const [year, month, day] =
     value.split("-");
 
-  if (
-    !year ||
-    !month ||
-    !day
-  ) {
+  if (!year || !month || !day) {
     return value;
   }
 
   return `${day}-${month}-${year}`;
 }
 
-function getWorkingDay(
-  value: string,
-): DoctorShiftWorkingDay {
-  const day =
-    parseDateKey(value).getDay();
-
-  const map: Record<
-    number,
-    DoctorShiftWorkingDay
-  > = {
-    0: "SUN",
-    1: "MON",
-    2: "TUE",
-    3: "WED",
-    4: "THU",
-    5: "FRI",
-    6: "SAT",
-  };
-
-  return map[day] ?? "MON";
-}
-
-function getStatusLabel(
-  status: DoctorShiftStatus,
-) {
+function LockedWeekDateInput({
+  value,
+}: LockedWeekDateInputProps) {
   return (
-    STATUS_OPTIONS.find(
-      (item) =>
-        item.value === status,
-    )?.label ?? status
+    <Input
+      value={
+        value
+          ? `${formatLockedWeekDate(
+              value,
+            )} - ${formatLockedWeekDate(
+              addDaysToDateKey(
+                value,
+                6,
+              ),
+            )}`
+          : ""
+      }
+      readOnly
+      disabled
+    />
   );
 }
 
-function getStatusColor(
-  status: DoctorShiftStatus,
-) {
-  if (
-    status === "available"
-  ) {
-    return "green";
-  }
-
-  if (status === "full") {
-    return "blue";
-  }
-
-  if (
-    status === "cancelled"
-  ) {
-    return "red";
-  }
-
-  return "default";
+function isRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  );
 }
 
 function getDraftStorageKey(
@@ -291,49 +242,66 @@ function readDraft(
   fromDate: string,
 ): WeeklyUpdateFormValues | null {
   if (
-    typeof window ===
-      "undefined" ||
+    typeof window === "undefined" ||
     !facilityId ||
     !fromDate
   ) {
     return null;
   }
 
+  const storageKey =
+    getDraftStorageKey(
+      facilityId,
+      fromDate,
+    );
+
   try {
     const rawValue =
       window.localStorage.getItem(
-        getDraftStorageKey(
-          facilityId,
-          fromDate,
-        ),
+        storageKey,
       );
 
     if (!rawValue) {
       return null;
     }
 
-    const parsed =
-      JSON.parse(
-        rawValue,
-      ) as WeeklyUpdateDraft;
+    const parsed: unknown =
+      JSON.parse(rawValue);
 
     if (
-      parsed.version !== 1 ||
-      parsed.values
-        .facilityId !==
-        facilityId ||
-      parsed.values.fromDate !==
-        fromDate ||
-      !Array.isArray(
-        parsed.values
-          .slotGroups,
-      )
+      !isRecord(parsed) ||
+      parsed.version !== 3 ||
+      !isRecord(parsed.values)
     ) {
+      window.localStorage.removeItem(
+        storageKey,
+      );
       return null;
     }
 
-    return parsed.values;
+    const values = parsed.values;
+
+    if (
+      values.facilityId !==
+        facilityId ||
+      values.fromDate !==
+        fromDate ||
+      !Array.isArray(
+        values.slotGroups,
+      )
+    ) {
+      window.localStorage.removeItem(
+        storageKey,
+      );
+      return null;
+    }
+
+    return values as unknown as
+      WeeklyUpdateFormValues;
   } catch {
+    window.localStorage.removeItem(
+      storageKey,
+    );
     return null;
   }
 }
@@ -342,8 +310,7 @@ function saveDraft(
   values: WeeklyUpdateFormValues,
 ) {
   if (
-    typeof window ===
-      "undefined" ||
+    typeof window === "undefined" ||
     !values.facilityId ||
     !values.fromDate
   ) {
@@ -351,7 +318,7 @@ function saveDraft(
   }
 
   const draft: WeeklyUpdateDraft = {
-    version: 1,
+    version: 3,
     savedAt:
       new Date().toISOString(),
     values,
@@ -366,78 +333,38 @@ function saveDraft(
   );
 }
 
-function buildCurrentWeekGroups(
+function getWorkingDay(
+  dateKey: string,
+): DoctorShiftWorkingDay {
+  const day = new Date(
+    `${dateKey}T00:00:00`,
+  ).getDay();
+
+  const dayMap: Record<
+    number,
+    DoctorShiftWorkingDay
+  > = {
+    0: "SUN",
+    1: "MON",
+    2: "TUE",
+    3: "WED",
+    4: "THU",
+    5: "FRI",
+    6: "SAT",
+  };
+
+  return dayMap[day] ?? "MON";
+}
+
+function buildGroupsFromShifts(
+  slots: ShiftSlotLookupItem[],
   shifts: DoctorShiftItem[],
+  doctors: DoctorOption[],
   facilityId: string,
-  fromDate: string,
+  dateFrom: string,
+  dateTo: string,
 ): WeeklyUpdateSlotGroup[] {
-  const toDate =
-    addDaysToDateKey(
-      fromDate,
-      6,
-    );
-
-  const facilityShifts =
-    shifts.filter(
-      (shift) =>
-        String(
-          shift.facilityId,
-        ) ===
-        facilityId,
-    );
-
-  const slotDefinitions =
-    new Map<
-      string,
-      Omit<
-        WeeklyUpdateSlotGroup,
-        "assignments"
-      >
-    >();
-
-  for (
-    const shift of facilityShifts
-  ) {
-    if (!shift.slotId) {
-      continue;
-    }
-
-    if (
-      !slotDefinitions.has(
-        shift.slotId,
-      )
-    ) {
-      slotDefinitions.set(
-        shift.slotId,
-        {
-          slotId:
-            shift.slotId,
-          slotName:
-            shift.slotName ||
-            shift.slotCode ||
-            "Khung ca",
-          slotCode:
-            shift.slotCode ||
-            "",
-          startTime:
-            shift.startTime,
-          endTime:
-            shift.endTime,
-        },
-      );
-    }
-  }
-
-  const currentWeekShifts =
-    facilityShifts.filter(
-      (shift) =>
-        shift.shiftDate >=
-          fromDate &&
-        shift.shiftDate <=
-          toDate,
-    );
-
-  const assignmentsBySlot =
+  const assignmentMaps =
     new Map<
       string,
       Map<
@@ -446,98 +373,159 @@ function buildCurrentWeekGroups(
       >
     >();
 
+  const currentWeekShifts =
+    shifts.filter(
+      (shift) =>
+        String(
+          shift.facilityId,
+        ) ===
+          String(facilityId) &&
+        shift.shiftDate >=
+          dateFrom &&
+        shift.shiftDate <=
+          dateTo &&
+        shift.status !==
+          "cancelled",
+    );
+
   for (
     const shift of
       currentWeekShifts
   ) {
-    if (!shift.slotId) {
+    const slotId = String(
+      shift.slotId ?? "",
+    );
+
+    if (!slotId) {
       continue;
     }
 
-    const assignmentKey = [
-      shift.doctorId,
-      shift.roomId,
-      shift.maxAppointments,
-      shift.status,
-    ].join("|");
+    const doctor = doctors.find(
+      (item) =>
+        item.id ===
+          shift.doctorId ||
+        item.staffId ===
+          shift.staffId,
+    );
+    const staffId = String(
+      shift.staffId ??
+        doctor?.staffId ??
+        "",
+    );
+    const roomId = String(
+      shift.roomId ?? "",
+    );
 
-    const slotAssignments =
-      assignmentsBySlot.get(
-        shift.slotId,
+    if (!staffId || !roomId) {
+      continue;
+    }
+
+    const status: WeeklyUpdateStatus =
+      shift.status === "off"
+        ? "off"
+        : "available";
+    const maxAppointments =
+      Math.max(
+        1,
+        Number(
+          shift.maxAppointments,
+        ) || 8,
+      );
+    const assignmentKey = [
+      staffId,
+      roomId,
+      status,
+      maxAppointments,
+    ].join(":");
+    const assignments =
+      assignmentMaps.get(
+        slotId,
       ) ??
       new Map<
         string,
         WeeklyUpdateAssignment
       >();
-
-    const currentAssignment =
-      slotAssignments.get(
+    const existing =
+      assignments.get(
         assignmentKey,
       );
-
     const workingDay =
       getWorkingDay(
         shift.shiftDate,
       );
 
-    if (
-      currentAssignment
-    ) {
-      if (
-        !currentAssignment
-          .workingDays.includes(
-            workingDay,
-          )
-      ) {
-        currentAssignment
-          .workingDays.push(
-            workingDay,
-          );
-      }
-    } else {
-      slotAssignments.set(
-        assignmentKey,
-        {
-          doctorId:
-            shift.doctorId,
-          roomId:
-            shift.roomId,
-          workingDays: [
-            workingDay,
-          ],
-          maxAppointments:
-            shift.maxAppointments,
-          status:
-            shift.status,
-        },
-      );
-    }
-
-    assignmentsBySlot.set(
-      shift.slotId,
-      slotAssignments,
+    assignments.set(
+      assignmentKey,
+      {
+        staffId,
+        roomId,
+        status,
+        maxAppointments,
+        workingDays:
+          Array.from(
+            new Set([
+              ...(existing
+                ?.workingDays ?? []),
+              workingDay,
+            ]),
+          ),
+      },
+    );
+    assignmentMaps.set(
+      slotId,
+      assignments,
     );
   }
 
-  return Array.from(
-    slotDefinitions.values(),
-  )
-    .sort((left, right) =>
-      left.startTime.localeCompare(
-        right.startTime,
+  return slots.map((slot) => ({
+    slotId: slot.id,
+    assignments:
+      Array.from(
+        assignmentMaps.get(
+          slot.id,
+        )?.values() ?? [],
       ),
-    )
-    .map((slot) => ({
-      ...slot,
-      assignments:
-        Array.from(
-          assignmentsBySlot
-            .get(
-              slot.slotId,
-            )
-            ?.values() ?? [],
-        ),
-    }));
+  }));
+}
+
+function mergeDraftGroups(
+  slots: ShiftSlotLookupItem[],
+  fallbackGroups:
+    WeeklyUpdateSlotGroup[],
+  draft:
+    | WeeklyUpdateFormValues
+    | null,
+) {
+  const draftBySlotId =
+    new Map(
+      (draft?.slotGroups ?? [])
+        .filter((group) =>
+          Boolean(group?.slotId),
+        )
+        .map((group) => [
+          group.slotId,
+          group,
+        ]),
+    );
+  const fallbackBySlotId =
+    new Map(
+      fallbackGroups.map(
+        (group) => [
+          group.slotId,
+          group,
+        ],
+      ),
+    );
+
+  return slots.map((slot) => ({
+    slotId: slot.id,
+    assignments:
+      draftBySlotId.get(slot.id)
+        ?.assignments ??
+      fallbackBySlotId.get(slot.id)
+        ?.assignments ??
+      [],
+  }));
 }
 
 export function DoctorShiftWeeklyUpdateModal({
@@ -553,142 +541,486 @@ export function DoctorShiftWeeklyUpdateModal({
   } = App.useApp();
   const [form] =
     Form.useForm<WeeklyUpdateFormValues>();
-  const [
-    savingDraft,
-    setSavingDraft,
-  ] = useState(false);
-
-  const facilityId =
-    facilities[0]?.id ?? "";
-  const fromDate =
-    getCurrentWeekMondayDateKey();
-  const toDate =
-    addDaysToDateKey(
-      fromDate,
-      6,
-    );
+  const [shiftSlots, setShiftSlots] =
+    useState<ShiftSlotLookupItem[]>([]);
+  const [slotsLoading, setSlotsLoading] =
+    useState(false);
+  const [importWeekLoading, setImportWeekLoading] =
+    useState(false);
+  const [savingDraft, setSavingDraft] =
+    useState(false);
+  const [error, setError] =
+    useState<string | null>(null);
+  const pendingDraftRef =
+    useRef<
+      WeeklyUpdateFormValues | null
+    >(null);
 
   const watchedFacilityId =
     Form.useWatch(
       "facilityId",
       form,
-    ) ?? facilityId;
+    ) ?? "";
+  const watchedFromDate =
+    Form.useWatch(
+      "fromDate",
+      form,
+    ) ?? "";
+  const watchedSlotGroups =
+    Form.useWatch(
+      "slotGroups",
+      form,
+    ) ?? [];
 
-  const roomOptions =
-    useMemo(
-      () =>
-        rooms
-          .filter(
-            (room) =>
-              String(
-                room.facilityId,
-              ) ===
-              String(
-                watchedFacilityId,
-              ),
-          )
-          .map((room) => ({
-            value: room.id,
-            label: `${room.name}${
-              room.floor
-                ? ` · ${room.floor}`
-                : ""
-            }`,
-          })),
-      [
-        rooms,
-        watchedFacilityId,
-      ],
-    );
+  const slotById = useMemo(
+    () =>
+      new Map(
+        shiftSlots.map(
+          (slot) => [
+            slot.id,
+            slot,
+          ],
+        ),
+      ),
+    [shiftSlots],
+  );
 
-  const doctorOptions =
-    useMemo(
-      () =>
-        doctors
-          .filter(
-            (doctor) =>
-              doctor.status ===
-                "active" &&
-              doctor.facilityIds.some(
-                (
-                  doctorFacilityId,
-                ) =>
-                  String(
-                    doctorFacilityId,
-                  ) ===
-                  String(
-                    watchedFacilityId,
-                  ),
-              ),
-          )
-          .map((doctor) => ({
-            value:
-              doctor.id,
-            label: `${doctor.title} ${doctor.name} · ${doctor.specialty}`,
-          })),
-      [
-        doctors,
-        watchedFacilityId,
-      ],
-    );
+  const roomOptions = useMemo(
+    () =>
+      rooms
+        .filter(
+          (room) =>
+            String(
+              room.facilityId,
+            ) ===
+            String(
+              watchedFacilityId,
+            ),
+        )
+        .map((room) => ({
+          value: room.id,
+          label: `${room.name}${
+            room.floor
+              ? ` · ${room.floor}`
+              : ""
+          }`,
+        })),
+    [rooms, watchedFacilityId],
+  );
+
+  const doctorOptions = useMemo(
+    () =>
+      doctors
+        .filter(
+          (doctor) =>
+            doctor.status ===
+              "active" &&
+            doctor.staffId &&
+            doctor.roleId &&
+            doctor.facilityIds.includes(
+              watchedFacilityId,
+            ),
+        )
+        .map((doctor) => ({
+          value:
+            doctor.staffId,
+          label: `${doctor.title} ${doctor.name} · ${doctor.specialty}`,
+        })),
+    [doctors, watchedFacilityId],
+  );
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
+    const { dateFrom } =
+      getCurrentWeekDateRange();
+    const defaultFacilityId =
+      facilities.length === 1
+        ? facilities[0]?.id
+        : undefined;
     const restoredDraft =
-      readDraft(
-        facilityId,
-        fromDate,
-      );
-
-    const slotGroups =
-      restoredDraft
-        ?.slotGroups ??
-      buildCurrentWeekGroups(
-        shifts,
-        facilityId,
-        fromDate,
-      );
+      defaultFacilityId
+        ? readDraft(
+            defaultFacilityId,
+            dateFrom,
+          )
+        : null;
 
     const timer =
-      window.setTimeout(
-        () => {
-          form.resetFields();
-          form.setFieldsValue({
-            facilityId,
-            fromDate,
-            slotGroups,
-          });
-        },
-        0,
-      );
+      window.setTimeout(() => {
+        pendingDraftRef.current =
+          restoredDraft;
+        form.resetFields();
+        form.setFieldsValue({
+          facilityId:
+            defaultFacilityId,
+          fromDate: dateFrom,
+          slotGroups: [],
+        });
+        setShiftSlots([]);
+        setError(null);
+      }, 0);
 
     return () => {
-      window.clearTimeout(
-        timer,
-      );
+      window.clearTimeout(timer);
     };
   }, [
-    facilityId,
+    facilities,
     form,
-    fromDate,
     open,
-    shifts,
   ]);
 
-  function handleClose() {
-    const values =
-      form.getFieldsValue(
-        true,
-      );
+  useEffect(() => {
+    if (
+      !open ||
+      !watchedFacilityId ||
+      !watchedFromDate
+    ) {
+      return;
+    }
 
-    saveDraft(values);
+    let cancelled = false;
+
+    void Promise.resolve()
+      .then(() => {
+        if (!cancelled) {
+          setSlotsLoading(true);
+        }
+
+        return getShiftSlotLookup({
+          facilityId:
+            watchedFacilityId,
+          status: "active",
+          limit: 40,
+        });
+      })
+      .then((slots) => {
+        if (cancelled) {
+          return;
+        }
+
+        const dateTo =
+          addDaysToDateKey(
+            watchedFromDate,
+            6,
+          );
+        const currentGroups =
+          buildGroupsFromShifts(
+            slots,
+            shifts,
+            doctors,
+            watchedFacilityId,
+            watchedFromDate,
+            dateTo,
+          );
+        const slotGroups =
+          mergeDraftGroups(
+            slots,
+            currentGroups,
+            pendingDraftRef.current,
+          );
+
+        setShiftSlots(slots);
+        form.setFieldsValue({
+          slotGroups,
+        });
+        pendingDraftRef.current =
+          null;
+      })
+      .catch((loadError) => {
+        if (cancelled) {
+          return;
+        }
+
+        setShiftSlots([]);
+        pendingDraftRef.current =
+          null;
+        form.setFieldsValue({
+          slotGroups: [],
+        });
+        setError(
+          getErrorMessage(
+            loadError,
+          ),
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSlotsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    doctors,
+    form,
+    open,
+    shifts,
+    watchedFacilityId,
+    watchedFromDate,
+  ]);
+
+  async function handleImportCurrentWeek() {
+    setError(null);
+
+    if (!watchedFacilityId) {
+      const warning =
+        "Không xác định được cơ sở hiện tại.";
+      setError(warning);
+      messageApi.warning(warning);
+      return;
+    }
+
+    const {
+      dateFrom,
+      dateTo,
+    } = getCurrentWeekDateRange();
+
+    setImportWeekLoading(true);
+
+    try {
+      const schedule =
+        await getGroupedDoctorShifts({
+          facilityId:
+            watchedFacilityId,
+          dateFrom,
+          dateTo,
+        });
+      const activeSlotIds =
+        new Set(
+          shiftSlots.map(
+            (slot) => slot.id,
+          ),
+        );
+      const availableRoomIds =
+        new Set(
+          rooms
+            .filter(
+              (room) =>
+                room.facilityId ===
+                watchedFacilityId,
+            )
+            .map(
+              (room) => room.id,
+            ),
+        );
+      const assignmentMaps =
+        new Map<
+          string,
+          Map<
+            string,
+            WeeklyUpdateAssignment
+          >
+        >();
+      let skippedGroups = 0;
+
+      for (
+        const group of
+          schedule.groups ?? []
+      ) {
+        const sourceShift =
+          group.shifts?.[0];
+
+        if (
+          !sourceShift ||
+          sourceShift.status ===
+            "cancelled"
+        ) {
+          skippedGroups += 1;
+          continue;
+        }
+
+        const slotId = String(
+          sourceShift.slotId ?? "",
+        );
+        const staffId = String(
+          sourceShift.staffId ?? "",
+        );
+        const roleId = String(
+          sourceShift.roleId ?? "",
+        );
+        const roomId = String(
+          sourceShift.roomId ?? "",
+        );
+        const doctor = doctors.find(
+          (item) =>
+            item.staffId ===
+              staffId &&
+            String(item.roleId) ===
+              roleId &&
+            item.status ===
+              "active" &&
+            item.facilityIds.includes(
+              watchedFacilityId,
+            ),
+        );
+        const workingDays =
+          (group.workingDays ?? [])
+            .filter((day) =>
+              WORKING_DAY_OPTIONS.some(
+                (option) =>
+                  option.value === day,
+              ),
+            );
+
+        if (
+          !slotId ||
+          !activeSlotIds.has(
+            slotId,
+          ) ||
+          !doctor ||
+          !roomId ||
+          !availableRoomIds.has(
+            roomId,
+          ) ||
+          workingDays.length === 0
+        ) {
+          skippedGroups += 1;
+          continue;
+        }
+
+        const status:
+          WeeklyUpdateStatus =
+          sourceShift.status ===
+            "off"
+            ? "off"
+            : "available";
+        const maxAppointments =
+          Math.max(
+            1,
+            Number(
+              sourceShift.maxAppointments,
+            ) || 8,
+          );
+        const assignmentKey = [
+          staffId,
+          roomId,
+          status,
+          maxAppointments,
+        ].join(":");
+        const assignments =
+          assignmentMaps.get(
+            slotId,
+          ) ??
+          new Map<
+            string,
+            WeeklyUpdateAssignment
+          >();
+        const existing =
+          assignments.get(
+            assignmentKey,
+          );
+
+        assignments.set(
+          assignmentKey,
+          {
+            staffId,
+            roomId,
+            status,
+            maxAppointments,
+            workingDays:
+              Array.from(
+                new Set([
+                  ...(existing
+                    ?.workingDays ?? []),
+                  ...workingDays,
+                ]),
+              ),
+          },
+        );
+        assignmentMaps.set(
+          slotId,
+          assignments,
+        );
+      }
+
+      const slotGroups =
+        shiftSlots.map((slot) => ({
+          slotId: slot.id,
+          assignments:
+            Array.from(
+              assignmentMaps.get(
+                slot.id,
+              )?.values() ?? [],
+            ),
+        }));
+      const importedAssignments =
+        slotGroups.reduce(
+          (total, group) =>
+            total +
+            group.assignments.length,
+          0,
+        );
+
+      if (importedAssignments === 0) {
+        const warning =
+          `Không có lịch phù hợp trong tuần ${formatIssueDate(
+            dateFrom,
+          )} - ${formatIssueDate(
+            dateTo,
+          )}.`;
+        setError(warning);
+        messageApi.warning(warning);
+        return;
+      }
+
+      const nextValues:
+        WeeklyUpdateFormValues = {
+        facilityId:
+          watchedFacilityId,
+        fromDate: dateFrom,
+        slotGroups,
+      };
+
+      form.setFieldsValue(
+        nextValues,
+      );
+      saveDraft(nextValues);
+
+      const skippedMessage =
+        skippedGroups > 0
+          ? ` Bỏ qua ${skippedGroups} nhóm không còn hợp lệ.`
+          : "";
+
+      messageApi.success(
+        `Đã lấy ${importedAssignments} phân công của tuần hiện tại.${skippedMessage}`,
+      );
+    } catch (importError) {
+      const importMessage =
+        getErrorMessage(
+          importError,
+        );
+      setError(importMessage);
+      messageApi.error(
+        importMessage,
+      );
+    } finally {
+      setImportWeekLoading(false);
+    }
+  }
+
+  function handleCancel() {
+    if (
+      slotsLoading ||
+      importWeekLoading ||
+      savingDraft
+    ) {
+      return;
+    }
+
+    const currentValues =
+      form.getFieldsValue(true);
+    saveDraft(currentValues);
+    setError(null);
     onClose();
   }
 
   async function handleSaveDraft() {
+    setError(null);
     setSavingDraft(true);
 
     try {
@@ -696,11 +1028,26 @@ export function DoctorShiftWeeklyUpdateModal({
         await form.validateFields();
 
       saveDraft(values);
-
       messageApi.success(
-        "Đã lưu bản nháp cập nhật lịch tuần. Chưa gọi API.",
+        "Đã lưu bản nháp cập nhật lịch tuần. Chưa gọi API cập nhật.",
       );
       onClose();
+    } catch (saveError) {
+      if (
+        !(
+          isRecord(saveError) &&
+          "errorFields" in saveError
+        )
+      ) {
+        const saveMessage =
+          getErrorMessage(
+            saveError,
+          );
+        setError(saveMessage);
+        messageApi.error(
+          saveMessage,
+        );
+      }
     } finally {
       setSavingDraft(false);
     }
@@ -714,16 +1061,18 @@ export function DoctorShiftWeeklyUpdateModal({
       title={null}
       footer={null}
       closable={false}
-      onCancel={
-        handleClose
-      }
+      onCancel={handleCancel}
+      mask={{
+        closable:
+          !slotsLoading &&
+          !importWeekLoading &&
+          !savingDraft,
+      }}
       destroyOnHidden
       styles={{
         body: {
-          maxHeight:
-            "82vh",
-          overflow:
-            "hidden",
+          maxHeight: "82vh",
+          overflow: "hidden",
         },
       }}
     >
@@ -731,49 +1080,39 @@ export function DoctorShiftWeeklyUpdateModal({
         <button
           type="button"
           aria-label="Đóng"
-          onClick={
-            handleClose
+          disabled={
+            slotsLoading ||
+            importWeekLoading ||
+            savingDraft
           }
-          className="absolute right-0 top-0 z-10 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          onClick={handleCancel}
+          className="absolute right-0 top-0 z-10 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <X className="h-5 w-5" />
         </button>
 
         <div className="flex items-start gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
-            <CalendarClock className="h-5 w-5" />
+            <Calendar className="h-5 w-5" />
           </span>
 
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Title
-                level={4}
-                className="!mb-1 !text-slate-950"
-              >
-                Cập nhật lịch tuần hiện tại
-              </Title>
-
-              <Tag color="orange">
-                Chưa kết nối API
-              </Tag>
-            </div>
+            <Title
+              level={4}
+              className="!mb-1 !text-slate-950"
+            >
+              Cập nhật lịch trực 1 tuần
+            </Title>
 
             <Text type="secondary">
-              Điều chỉnh phân công từ Thứ 2{" "}
-              {formatDateKey(
-                fromDate,
-              )}{" "}
-              đến Chủ nhật{" "}
-              {formatDateKey(
-                toDate,
-              )}.
+              Điều chỉnh bác sĩ theo từng khung ca, phòng và ngày làm việc của tuần hiện tại, từ Thứ 2 đến Chủ nhật.
             </Text>
 
             <Text
               type="secondary"
               className="mt-1 block text-xs"
             >
-              Dữ liệu thay đổi được tự động lưu nháp trên trình duyệt.
+              Bản nháp được tự động lưu và sẽ được khôi phục khi mở lại.
             </Text>
           </div>
         </div>
@@ -784,48 +1123,75 @@ export function DoctorShiftWeeklyUpdateModal({
         style={{
           maxHeight:
             "calc(82vh - 180px)",
-          overflowY:
-            "auto",
+          overflowY: "auto",
           scrollbarGutter:
             "stable",
         }}
       >
+        {error ? (
+          <Alert
+            type="error"
+            title={error}
+            showIcon
+            closable
+            className="mb-4"
+            onClose={() =>
+              setError(null)
+            }
+          />
+        ) : null}
+
         <Form<WeeklyUpdateFormValues>
           form={form}
           layout="vertical"
           requiredMark="optional"
           onValuesChange={(
-            _changedValues,
+            changedValues,
             allValues,
           ) => {
-            saveDraft(
-              allValues,
-            );
+            setError(null);
+
+            if (
+              "facilityId" in
+              changedValues
+            ) {
+              const facilityId =
+                changedValues.facilityId as string;
+
+              setShiftSlots([]);
+              setSlotsLoading(
+                Boolean(facilityId),
+              );
+              form.setFieldsValue({
+                slotGroups: [],
+              });
+            }
+
+            saveDraft(allValues);
           }}
         >
           <Row gutter={[16, 0]}>
-            <Col
-              xs={24}
-              lg={12}
-            >
+            <Col xs={24} lg={12}>
               <Form.Item
                 name="facilityId"
                 label="Cơ sở"
                 rules={[
                   {
-                    required:
-                      true,
+                    required: true,
                     message:
-                      "Không xác định được cơ sở.",
+                      "Vui lòng chọn cơ sở.",
                   },
                 ]}
               >
                 <Select
-                  disabled
+                  showSearch
+                  optionFilterProp="label"
+                  disabled={
+                    facilities.length === 1
+                  }
+                  placeholder="Chọn cơ sở khám"
                   options={facilities.map(
-                    (
-                      facility,
-                    ) => ({
+                    (facility) => ({
                       value:
                         facility.id,
                       label: `${facility.name} (${facility.code})`,
@@ -835,91 +1201,148 @@ export function DoctorShiftWeeklyUpdateModal({
               </Form.Item>
             </Col>
 
-            <Col
-              xs={24}
-              lg={12}
-            >
+            <Col xs={24} lg={12}>
               <Form.Item
                 name="fromDate"
-                label="Tuần hiện tại"
+                label="Tuần được cập nhật"
+                extra={
+                  watchedFromDate
+                    ? `Từ Thứ 2 ${formatIssueDate(
+                        watchedFromDate,
+                      )} đến Chủ nhật ${formatIssueDate(
+                        addDaysToDateKey(
+                          watchedFromDate,
+                          6,
+                        ),
+                      )}.`
+                    : "Hệ thống tự xác định tuần hiện tại."
+                }
+                rules={[
+                  {
+                    required: true,
+                    message:
+                      "Không xác định được tuần hiện tại.",
+                  },
+                ]}
               >
-                <LockedValueInput
-                  value={`${formatDateKey(
-                    fromDate,
-                  )} - ${formatDateKey(
-                    toDate,
-                  )}`}
-                />
+                <LockedWeekDateInput />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.List name="slotGroups">
-            {(slotFields) => (
-              <div className="flex flex-col gap-4">
-                {slotFields.length ===
-                0 ? (
-                  <Empty
-                    image={
-                      Empty.PRESENTED_IMAGE_SIMPLE
-                    }
-                    description="Chưa có khung ca để cập nhật trong cơ sở này."
-                  />
-                ) : (
-                  slotFields.map(
+          <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+            <div>
+              <Text
+                strong
+                className="block text-slate-950"
+              >
+                Phân công theo khung ca
+              </Text>
+
+              <Text
+                type="secondary"
+                className="text-sm"
+              >
+                Mỗi bác sĩ chọn phòng, các ngày làm việc trong tuần và số lịch tối đa.
+              </Text>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                icon={
+                  <Copy className="h-4 w-4" />
+                }
+                loading={
+                  importWeekLoading
+                }
+                disabled={
+                  !watchedFacilityId ||
+                  slotsLoading ||
+                  savingDraft
+                }
+                onClick={() =>
+                  void handleImportCurrentWeek()
+                }
+              >
+                Lấy lịch tuần này
+              </Button>
+
+              {watchedFacilityId &&
+              !slotsLoading ? (
+                <Tag color="blue">
+                  {shiftSlots.length} khung ca
+                </Tag>
+              ) : null}
+            </div>
+          </div>
+
+          {!watchedFacilityId ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
+              <Clock className="mx-auto h-7 w-7 text-slate-400" />
+
+              <Text className="mt-3 block font-medium text-slate-700">
+                Vui lòng chọn cơ sở
+              </Text>
+
+              <Text
+                type="secondary"
+                className="mt-1 block text-sm"
+              >
+                Các khung ca hoạt động của cơ sở sẽ hiển thị tại đây.
+              </Text>
+            </div>
+          ) : slotsLoading ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-10 text-center">
+              <Text type="secondary">
+                Đang tải danh sách khung ca...
+              </Text>
+            </div>
+          ) : shiftSlots.length === 0 ? (
+            <Alert
+              type="warning"
+              showIcon
+              title="Cơ sở chưa có khung ca hoạt động"
+            />
+          ) : (
+            <Form.List name="slotGroups">
+              {(groupFields) => (
+                <div className="grid gap-4">
+                  {groupFields.map(
                     (
-                      slotField,
-                      slotIndex,
+                      groupField,
+                      groupIndex,
                     ) => {
-                      const slotGroup =
-                        form.getFieldValue([
-                          "slotGroups",
-                          slotIndex,
-                        ]) as
-                          | WeeklyUpdateSlotGroup
-                          | undefined;
+                      const group =
+                        watchedSlotGroups[
+                          groupIndex
+                        ];
+                      const slot =
+                        slotById.get(
+                          group?.slotId ??
+                            shiftSlots[
+                              groupIndex
+                            ]?.id ??
+                            "",
+                        );
+
+                      if (!slot) {
+                        return null;
+                      }
+
+                      const assignmentCount =
+                        group?.assignments
+                          ?.length ?? 0;
 
                       return (
                         <div
                           key={
-                            slotField.key
+                            groupField.key
                           }
-                          className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                          className="overflow-hidden rounded-xl border border-slate-200 bg-white"
                         >
-                          <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <Text strong>
-                                {slotGroup?.slotName ||
-                                  "Khung ca"}
-                              </Text>
-
-                              <div className="mt-1 flex flex-wrap items-center gap-2">
-                                {slotGroup?.slotCode ? (
-                                  <Tag>
-                                    {
-                                      slotGroup.slotCode
-                                    }
-                                  </Tag>
-                                ) : null}
-
-                                <Tag color="blue">
-                                  {slotGroup?.startTime ||
-                                    "--:--"}{" "}
-                                  -{" "}
-                                  {slotGroup?.endTime ||
-                                    "--:--"}
-                                </Tag>
-                              </div>
-                            </div>
-
-                            <Text type="secondary">
-                              Chỉnh phân công theo ngày trong tuần
-                            </Text>
-                          </div>
-
                           <Form.Item
                             name={[
-                              slotField.name,
+                              groupField.name,
                               "slotId",
                             ]}
                             hidden
@@ -927,61 +1350,68 @@ export function DoctorShiftWeeklyUpdateModal({
                             <Input />
                           </Form.Item>
 
-                          <Form.Item
-                            name={[
-                              slotField.name,
-                              "slotName",
-                            ]}
-                            hidden
-                          >
-                            <Input />
-                          </Form.Item>
+                          <div className="flex flex-col justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center">
+                            <div className="flex items-center gap-3">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                                <Clock className="h-5 w-5" />
+                              </span>
 
-                          <Form.Item
-                            name={[
-                              slotField.name,
-                              "slotCode",
-                            ]}
-                            hidden
-                          >
-                            <Input />
-                          </Form.Item>
+                              <div>
+                                <Text
+                                  strong
+                                  className="block text-slate-950"
+                                >
+                                  {slot.name}
+                                </Text>
 
-                          <Form.Item
-                            name={[
-                              slotField.name,
-                              "startTime",
-                            ]}
-                            hidden
-                          >
-                            <Input />
-                          </Form.Item>
+                                <Text
+                                  type="secondary"
+                                  className="text-sm"
+                                >
+                                  {slot.code} ·{" "}
+                                  {slot.startTime} -{" "}
+                                  {slot.endTime}
+                                </Text>
+                              </div>
+                            </div>
 
-                          <Form.Item
-                            name={[
-                              slotField.name,
-                              "endTime",
-                            ]}
-                            hidden
-                          >
-                            <Input />
-                          </Form.Item>
+                            <Tag
+                              color={
+                                assignmentCount > 0
+                                  ? "green"
+                                  : "default"
+                              }
+                            >
+                              {assignmentCount > 0
+                                ? `${assignmentCount} phân công`
+                                : "Chưa phân công"}
+                            </Tag>
+                          </div>
 
                           <div className="p-4">
                             <Form.List
                               name={[
-                                slotField.name,
+                                groupField.name,
                                 "assignments",
                               ]}
                             >
                               {(
                                 assignmentFields,
-                                {
-                                  add,
-                                  remove,
-                                },
+                                { add, remove },
                               ) => (
-                                <div className="flex flex-col gap-4">
+                                <div className="flex flex-col gap-3">
+                                  {assignmentFields.length ===
+                                  0 ? (
+                                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center">
+                                      <Text
+                                        type="secondary"
+                                        className="text-sm"
+                                      >
+                                        Chưa có bác sĩ trong khung ca này.
+                                      </Text>
+                                    </div>
+                                  ) : null}
+
                                   {assignmentFields.map(
                                     (
                                       assignmentField,
@@ -991,50 +1421,22 @@ export function DoctorShiftWeeklyUpdateModal({
                                         key={
                                           assignmentField.key
                                         }
-                                        className="rounded-xl border border-slate-200 p-4"
+                                        className="rounded-lg border border-slate-200 bg-slate-50/70 p-3"
                                       >
-                                        <div className="mb-3 flex items-center justify-between gap-3">
-                                          <div className="flex items-center gap-2">
-                                            <Text strong>
-                                              Phân công{" "}
-                                              {assignmentIndex +
-                                                1}
-                                            </Text>
-
-                                            <Form.Item
-                                              noStyle
-                                              shouldUpdate
-                                            >
-                                              {() => {
-                                                const status =
-                                                  form.getFieldValue([
-                                                    "slotGroups",
-                                                    slotIndex,
-                                                    "assignments",
-                                                    assignmentIndex,
-                                                    "status",
-                                                  ]) as
-                                                    | DoctorShiftStatus
-                                                    | undefined;
-
-                                                return status ? (
-                                                  <Tag
-                                                    color={getStatusColor(
-                                                      status,
-                                                    )}
-                                                  >
-                                                    {getStatusLabel(
-                                                      status,
-                                                    )}
-                                                  </Tag>
-                                                ) : null;
-                                              }}
-                                            </Form.Item>
-                                          </div>
+                                        <div className="mb-2 flex items-center justify-between">
+                                          <Text
+                                            strong
+                                            className="text-sm text-slate-700"
+                                          >
+                                            Phân công{" "}
+                                            {assignmentIndex +
+                                              1}
+                                          </Text>
 
                                           <Button
                                             danger
                                             type="text"
+                                            size="small"
                                             icon={
                                               <Trash2 className="h-4 w-4" />
                                             }
@@ -1050,22 +1452,18 @@ export function DoctorShiftWeeklyUpdateModal({
 
                                         <Row
                                           gutter={[
-                                            16,
+                                            12,
                                             0,
                                           ]}
                                         >
                                           <Col
-                                            xs={
-                                              24
-                                            }
-                                            lg={
-                                              12
-                                            }
+                                            xs={24}
+                                            lg={9}
                                           >
                                             <Form.Item
                                               name={[
                                                 assignmentField.name,
-                                                "doctorId",
+                                                "staffId",
                                               ]}
                                               label="Bác sĩ"
                                               rules={[
@@ -1084,17 +1482,15 @@ export function DoctorShiftWeeklyUpdateModal({
                                                 options={
                                                   doctorOptions
                                                 }
+                                                notFoundContent="Cơ sở chưa có bác sĩ phù hợp"
                                               />
                                             </Form.Item>
                                           </Col>
 
                                           <Col
-                                            xs={
-                                              24
-                                            }
-                                            lg={
-                                              12
-                                            }
+                                            xs={24}
+                                            md={12}
+                                            lg={6}
                                           >
                                             <Form.Item
                                               name={[
@@ -1123,40 +1519,9 @@ export function DoctorShiftWeeklyUpdateModal({
                                           </Col>
 
                                           <Col
-                                            xs={
-                                              24
-                                            }
-                                          >
-                                            <Form.Item
-                                              name={[
-                                                assignmentField.name,
-                                                "workingDays",
-                                              ]}
-                                              label="Ngày trực"
-                                              rules={[
-                                                {
-                                                  required:
-                                                    true,
-                                                  message:
-                                                    "Chọn ít nhất một ngày trực.",
-                                                },
-                                              ]}
-                                            >
-                                              <Checkbox.Group
-                                                options={
-                                                  WORKING_DAY_OPTIONS
-                                                }
-                                              />
-                                            </Form.Item>
-                                          </Col>
-
-                                          <Col
-                                            xs={
-                                              24
-                                            }
-                                            md={
-                                              12
-                                            }
+                                            xs={24}
+                                            md={6}
+                                            lg={4}
                                           >
                                             <Form.Item
                                               name={[
@@ -1169,32 +1534,21 @@ export function DoctorShiftWeeklyUpdateModal({
                                                   required:
                                                     true,
                                                   message:
-                                                    "Nhập số lịch tối đa.",
+                                                    "Nhập số lịch.",
                                                 },
                                               ]}
                                             >
                                               <InputNumber
-                                                min={
-                                                  1
-                                                }
-                                                max={
-                                                  100
-                                                }
-                                                precision={
-                                                  0
-                                                }
+                                                min={1}
                                                 className="w-full"
                                               />
                                             </Form.Item>
                                           </Col>
 
                                           <Col
-                                            xs={
-                                              24
-                                            }
-                                            md={
-                                              12
-                                            }
+                                            xs={24}
+                                            md={6}
+                                            lg={5}
                                           >
                                             <Form.Item
                                               name={[
@@ -1212,9 +1566,45 @@ export function DoctorShiftWeeklyUpdateModal({
                                               ]}
                                             >
                                               <Select
+                                                options={[
+                                                  {
+                                                    value:
+                                                      "available",
+                                                    label:
+                                                      "Còn trống",
+                                                  },
+                                                  {
+                                                    value:
+                                                      "off",
+                                                    label:
+                                                      "Nghỉ",
+                                                  },
+                                                ]}
+                                              />
+                                            </Form.Item>
+                                          </Col>
+
+                                          <Col xs={24}>
+                                            <Form.Item
+                                              name={[
+                                                assignmentField.name,
+                                                "workingDays",
+                                              ]}
+                                              label="Ngày làm việc trong tuần"
+                                              rules={[
+                                                {
+                                                  required:
+                                                    true,
+                                                  message:
+                                                    "Chọn ít nhất một ngày làm việc.",
+                                                },
+                                              ]}
+                                            >
+                                              <Checkbox.Group
                                                 options={
-                                                  STATUS_OPTIONS
+                                                  WORKING_DAY_OPTIONS
                                                 }
+                                                className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7"
                                               />
                                             </Form.Item>
                                           </Col>
@@ -1224,24 +1614,22 @@ export function DoctorShiftWeeklyUpdateModal({
                                   )}
 
                                   <Button
+                                    type="dashed"
                                     block
                                     icon={
                                       <Plus className="h-4 w-4" />
                                     }
                                     onClick={() =>
                                       add({
-                                        doctorId:
-                                          "",
-                                        roomId:
-                                          "",
-                                        workingDays:
-                                          [
-                                            "MON",
-                                            "TUE",
-                                            "WED",
-                                            "THU",
-                                            "FRI",
-                                          ],
+                                        staffId: "",
+                                        roomId: "",
+                                        workingDays: [
+                                          "MON",
+                                          "TUE",
+                                          "WED",
+                                          "THU",
+                                          "FRI",
+                                        ],
                                         maxAppointments:
                                           8,
                                         status:
@@ -1250,8 +1638,7 @@ export function DoctorShiftWeeklyUpdateModal({
                                     }
                                   >
                                     Thêm bác sĩ vào{" "}
-                                    {slotGroup?.slotName ||
-                                      "khung ca"}
+                                    {slot.name}
                                   </Button>
                                 </div>
                               )}
@@ -1260,30 +1647,32 @@ export function DoctorShiftWeeklyUpdateModal({
                         </div>
                       );
                     },
-                  )
-                )}
-              </div>
-            )}
-          </Form.List>
+                  )}
+                </div>
+              )}
+            </Form.List>
+          )}
         </Form>
       </div>
 
       <div className="mt-4 flex flex-col-reverse justify-end gap-2 border-t border-slate-200 pt-4 sm:flex-row">
         <Button
           disabled={
+            slotsLoading ||
+            importWeekLoading ||
             savingDraft
           }
-          onClick={
-            handleClose
-          }
+          onClick={handleCancel}
         >
-          Đóng
+          Hủy
         </Button>
 
         <Button
           type="primary"
-          loading={
-            savingDraft
+          loading={savingDraft}
+          disabled={
+            slotsLoading ||
+            importWeekLoading
           }
           icon={
             <Save className="h-4 w-4" />
