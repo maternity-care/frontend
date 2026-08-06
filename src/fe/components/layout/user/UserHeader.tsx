@@ -4,6 +4,7 @@ import type { MenuProps } from "antd";
 import { Avatar, Button, Dropdown, Layout, Typography, message } from "antd";
 import {
   CalendarDays,
+  CalendarX2,
   ChevronDown,
   HeartPulse,
   LogOut,
@@ -16,6 +17,7 @@ import { logout as logoutApi } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
 import useAuth from "@/hooks/useAuth";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 const { Header } = Layout;
 const { Text } = Typography;
@@ -90,6 +92,11 @@ export function UserHeader() {
       return;
     }
 
+    if (key === "appointment-disruptions") {
+      router.push("/appointment-disruptions");
+      return;
+    }
+
     if (key === "logout") {
       await handleLogout();
     }
@@ -105,6 +112,11 @@ export function UserHeader() {
       key: "schedule",
       icon: <CalendarDays className="h-4 w-4" />,
       label: RESPONSE_MESSAGES.NAVIGATION.SCHEDULE,
+    },
+    {
+      key: "appointment-disruptions",
+      icon: <CalendarX2 className="h-4 w-4" />,
+      label: "Lịch khám cần xử lý",
     },
     {
       key: "record_keeping",
@@ -137,6 +149,8 @@ export function UserHeader() {
           </div>
         </Link>
 
+        <div className="flex items-center gap-2">
+          <NotificationCenter />
         <Dropdown
           menu={{
             items: menuItems,
@@ -165,6 +179,7 @@ export function UserHeader() {
             <ChevronDown className="h-4 w-4 text-slate-500" />
           </Button>
         </Dropdown>
+        </div>
       </Header>
     </>
   );

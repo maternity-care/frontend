@@ -51,6 +51,7 @@ import {
   getForumPost,
   getForumPosts,
 } from "@/features/forum/forum.api";
+import { useForumRealtime } from "@/features/forum/useForumRealtime";
 import type {
   ForumAuthor,
   ForumComment,
@@ -323,6 +324,11 @@ export default function ForumPostDetailPage() {
     },
     [params.postId],
   );
+
+  useForumRealtime({
+    postId: params.postId,
+    onEvent: () => void loadPost(),
+  });
 
   useEffect(() => {
     const timer =

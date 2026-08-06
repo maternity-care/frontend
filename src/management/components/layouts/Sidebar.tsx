@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarCheck,
+  CalendarX2,
   ChevronLeft,
   ChevronRight,
   DoorOpen,
@@ -67,6 +68,7 @@ const navItems = [
   { href: "/management/forums", label: "Quản lý diễn đàn", icon: MessageSquare, roles: ["super_admin", "admin"] },
   { href: "/management/doctor-shifts", label: "Ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
   { href: "/management/appointments", label: "Lịch đặt khám", icon: CalendarCheck, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
+  { href: "/management/appointment-disruptions", label: "Lịch bị ảnh hưởng", icon: CalendarX2, roles: ["super_admin", "admin"] },
   { href: "/management/shift-slots", label: "Khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
 ];
 

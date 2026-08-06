@@ -70,6 +70,7 @@ const { TextArea } = Input;
 type ForumPostAdminTabProps = {
   topics: ForumTopic[];
   canHardDelete: boolean;
+  realtimeVersion?: number;
 };
 
 type PostEditorMode =
@@ -1172,6 +1173,7 @@ function PostEditorModal({
 export function ForumPostAdminTab({
   topics,
   canHardDelete,
+  realtimeVersion = 0,
 }: ForumPostAdminTabProps) {
   const { message } =
     App.useApp();
@@ -1278,7 +1280,7 @@ export function ForumPostAdminTab({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [loadPosts]);
+  }, [loadPosts, realtimeVersion]);
 
   const topicOptions =
     useMemo(

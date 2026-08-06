@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Card, Empty, Popconfirm, Space, Tag, Typography } from "antd";
-import { CalendarPlus, Clock, Hospital, Stethoscope, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarPlus, Clock, Hospital, Stethoscope, Trash2 } from "lucide-react";
 import dayjs from "dayjs";
 
 import type {
@@ -17,12 +17,16 @@ const statusText: Record<PregnancyScheduleStatus, string> = {
   upcoming: "Sắp tới",
   done: "Đã hoàn thành",
   missed: "Đã lỡ",
+  action_required: "Cần xử lý",
+  cancelled: "Đã hủy",
 };
 
 const statusColor: Record<PregnancyScheduleStatus, string> = {
   upcoming: "processing",
   done: "success",
   missed: "error",
+  action_required: "warning",
+  cancelled: "default",
 };
 
 const typeText: Record<PregnancyScheduleType, string> = {
@@ -90,6 +94,16 @@ export function ScheduleList({
               </div>
 
               <Space className="mt-3" wrap>
+                {item.status === "action_required" ? (
+                  <Button
+                    type="primary"
+                    size="small"
+                    href="/appointment-disruptions"
+                    icon={<AlertTriangle className="h-3.5 w-3.5" />}
+                  >
+                    Xử lý lịch
+                  </Button>
+                ) : null}
                 <Button
                   size="small"
                   icon={<CalendarPlus className="h-3.5 w-3.5" />}

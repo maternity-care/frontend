@@ -23,7 +23,6 @@ import {
   Pagination,
   Segmented,
   Select,
-  Space,
   Tag,
   Typography,
 } from "antd";
@@ -53,6 +52,7 @@ import {
   getForumPosts,
   getForumTopics,
 } from "@/features/forum/forum.api";
+import { useForumRealtime } from "@/features/forum/useForumRealtime";
 import type {
   ForumCategory,
   ForumCategoryCode,
@@ -350,6 +350,8 @@ export default function ForumPage() {
       search,
       topicId,
     ]);
+
+  useForumRealtime({ onEvent: () => void loadPosts() });
 
   useEffect(() => {
     const timer =
