@@ -327,7 +327,7 @@ export default function ShiftSlotsPage() {
   const [currentPage, setCurrentPage] =
     useState(1);
   const [pageSize, setPageSize] =
-    useState(20);
+    useState(5);
   const [reloadKey, setReloadKey] =
     useState(0);
 
@@ -977,6 +977,7 @@ export default function ShiftSlotsPage() {
               total: totalSlots,
               showSizeChanger: true,
               pageSizeOptions: [
+                5,
                 10,
                 20,
                 30,
