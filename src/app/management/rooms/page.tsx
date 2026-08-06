@@ -19,7 +19,6 @@ import {
   Modal,
   Select,
   Space,
-  Statistic,
   Table,
   Tag,
   Tooltip,
@@ -215,10 +214,7 @@ function ClinicRoomManagementContent() {
   const [currentPage, setCurrentPage] =
     useState(1);
   const [pageSize, setPageSize] =
-    useState(20);
-  const [selectedRoomIds, setSelectedRoomIds] =
-    useState<string[]>([]);
-
+    useState(5);
   const [loading, setLoading] =
     useState(true);
   const [error, setError] = useState<
@@ -367,7 +363,6 @@ function ClinicRoomManagementContent() {
 
           setRooms(result.items);
           setTotalRooms(result.total);
-          setSelectedRoomIds([]);
           setError(null);
         })
         .catch((loadError) => {
@@ -375,8 +370,6 @@ function ClinicRoomManagementContent() {
 
           setRooms([]);
           setTotalRooms(0);
-          setSelectedRoomIds([]);
-
           if (
             isEmptyRoomResult(loadError)
           ) {
@@ -409,21 +402,6 @@ function ClinicRoomManagementContent() {
     roomTypeIdFilter,
     statusFilter,
   ]);
-
-  const stats = useMemo(
-    () => ({
-      total: totalRooms,
-      activeOnPage: rooms.filter(
-        (room) =>
-          room.status === "active",
-      ).length,
-      inactiveOnPage: rooms.filter(
-        (room) =>
-          room.status === "inactive",
-      ).length,
-    }),
-    [rooms, totalRooms],
-  );
 
   const roomById = useMemo(
     () =>
@@ -571,8 +549,6 @@ function ClinicRoomManagementContent() {
         ? null
         : current,
     );
-    setSelectedRoomIds([]);
-
     if (
       rooms.length <=
         deletedIds.length &&
@@ -605,7 +581,7 @@ function ClinicRoomManagementContent() {
     {
       title: "Tên phòng",
       dataIndex: "roomName",
-      width: 230,
+      ellipsis: true,
       render: (
         roomName: string,
         room,
@@ -631,7 +607,8 @@ function ClinicRoomManagementContent() {
     {
       title: "Loại phòng",
       dataIndex: "roomTypeName",
-      width: 190,
+      width: 160,
+      ellipsis: true,
       render: (
         roomTypeName: string,
       ) => (
@@ -643,7 +620,7 @@ function ClinicRoomManagementContent() {
     },
     {
       title: "Cơ sở",
-      width: 250,
+      ellipsis: true,
       render: (_value, room) => (
         <div className="min-w-0">
           <Text
@@ -667,7 +644,7 @@ function ClinicRoomManagementContent() {
     {
       title: "Tầng",
       dataIndex: "floor",
-      width: 120,
+      width: 90,
       align: "center",
       render: (floor: string) =>
         floor || "Chưa cập nhật",
@@ -675,16 +652,15 @@ function ClinicRoomManagementContent() {
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: 150,
+      width: 130,
       align: "center",
       render: (status: RoomStatus) =>
         renderStatus(status),
     },
     {
       title: "Thao tác",
-      width: 210,
+      width: 185,
       align: "center",
-      fixed: "right",
       render: (_value, room) => (
         <Space size={6}>
           <Tooltip title="Xem chi tiết">
@@ -844,33 +820,6 @@ function ClinicRoomManagementContent() {
           />
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-slate-200 bg-white">
-            <Statistic
-              title="Tổng số phòng"
-              value={stats.total}
-            />
-          </Card>
-
-          <Card className="border-emerald-100 bg-emerald-50/60">
-            <Statistic
-              title="Hoạt động trên trang"
-              value={
-                stats.activeOnPage
-              }
-            />
-          </Card>
-
-          <Card className="border-slate-200 bg-slate-50/70">
-            <Statistic
-              title="Ngừng hoạt động trên trang"
-              value={
-                stats.inactiveOnPage
-              }
-            />
-          </Card>
-        </div>
-
         <Card className="border-slate-200 bg-white">
           <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <Input
@@ -1015,30 +964,6 @@ function ClinicRoomManagementContent() {
               </Button>
 
               <Button
-                danger
-                disabled={
-                  selectedRoomIds.length ===
-                  0
-                }
-                icon={
-                  <Trash2 className="h-4 w-4" />
-                }
-                onClick={() =>
-                  setDeleteTarget({
-                    mode: "selected",
-                    ids: selectedRoomIds,
-                    count:
-                      selectedRoomIds.length,
-                  })
-                }
-              >
-                Xóa đã chọn
-                {selectedRoomIds.length > 0
-                  ? ` (${selectedRoomIds.length})`
-                  : ""}
-              </Button>
-
-              <Button
                 type="primary"
                 icon={
                   <Plus className="h-4 w-4" />
@@ -1053,26 +978,13 @@ function ClinicRoomManagementContent() {
           }
         >
           <Table
-            className="management-table"
+            className="management-table [&_.ant-table-cell]:px-3"
             rowKey="id"
             size="middle"
             tableLayout="fixed"
             loading={loading}
             columns={columns}
             dataSource={rooms}
-            scroll={{
-              x: 1165,
-            }}
-            rowSelection={{
-              selectedRowKeys:
-                selectedRoomIds,
-              onChange: (
-                selectedKeys,
-              ) =>
-                setSelectedRoomIds(
-                  selectedKeys.map(String),
-                ),
-            }}
             onRow={(room) => ({
               className:
                 "cursor-pointer",
@@ -1084,13 +996,7 @@ function ClinicRoomManagementContent() {
                   target.closest(
                     "button",
                   ) ||
-                  target.closest("a") ||
-                  target.closest(
-                    ".ant-checkbox",
-                  ) ||
-                  target.closest(
-                    ".ant-checkbox-wrapper",
-                  )
+                  target.closest("a")
                 ) {
                   return;
                 }
@@ -1104,6 +1010,7 @@ function ClinicRoomManagementContent() {
               total: totalRooms,
               showSizeChanger: true,
               pageSizeOptions: [
+                5,
                 10,
                 20,
                 50,
