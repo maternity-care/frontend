@@ -49,6 +49,7 @@ import type {
 } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import { DoctorShiftCreateModal } from "./components/DoctorShiftCreateModal";
 import { DoctorShiftBulkGenerateModal } from "./components/DoctorShiftBulkGenerateModal";
+import { DoctorShiftWeeklyUpdateModal } from "./components/DoctorShiftWeeklyUpdateModal";
 import { DoctorShiftEditModal } from "./components/DoctorShiftEditModal";
 import { DoctorShiftDetailModal } from "./components/DoctorShiftDetailModal";
 import {
@@ -636,6 +637,10 @@ export default function DoctorShiftPage() {
     bulkGenerateModalOpen,
     setBulkGenerateModalOpen,
   ] = useState(false);
+  const [
+    weeklyUpdateModalOpen,
+    setWeeklyUpdateModalOpen,
+  ] = useState(false);
   const [editingShift, setEditingShift] =
     useState<DoctorShiftItem | null>(null);
   const [deletingShift, setDeletingShift] =
@@ -647,6 +652,9 @@ export default function DoctorShiftPage() {
     const timer = window.setTimeout(() => {
       setCreateModalOpen(false);
       setBulkGenerateModalOpen(
+        false,
+      );
+      setWeeklyUpdateModalOpen(
         false,
       );
       setEditingShift(null);
@@ -2030,6 +2038,27 @@ export default function DoctorShiftPage() {
                   <>
                     <Button
                       icon={
+                        <Pencil className="h-4 w-4" />
+                      }
+                      disabled={
+                        managedFacilities.length ===
+                          0 ||
+                        managedRooms.length ===
+                          0 ||
+                        managedDoctors.length ===
+                          0
+                      }
+                      onClick={() =>
+                        setWeeklyUpdateModalOpen(
+                          true,
+                        )
+                      }
+                    >
+                      Cập nhật lịch tuần
+                    </Button>
+
+                    <Button
+                      icon={
                         <CalendarRange className="h-4 w-4" />
                       }
                       disabled={
@@ -2682,6 +2711,21 @@ export default function DoctorShiftPage() {
             }
             onGenerated={
               handleBulkGenerated
+            }
+          />
+
+          <DoctorShiftWeeklyUpdateModal
+            open={
+              weeklyUpdateModalOpen
+            }
+            shifts={shifts}
+            facilities={managedFacilities}
+            rooms={managedRooms}
+            doctors={managedDoctors}
+            onClose={() =>
+              setWeeklyUpdateModalOpen(
+                false,
+              )
             }
           />
 
