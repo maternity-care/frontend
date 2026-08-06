@@ -81,7 +81,6 @@ type BulkSlotGroupFormValue = {
 type BulkGenerateFormValues = {
   facilityId: string;
   fromDate: string;
-  toDate: string;
   slotGroups: BulkSlotGroupFormValue[];
 };
 
@@ -466,6 +465,8 @@ export function DoctorShiftBulkGenerateModal({
 
   const watchedFacilityId =
     Form.useWatch("facilityId", form) ?? "";
+  const watchedFromDate =
+    Form.useWatch("fromDate", form) ?? "";
   const watchedSlotGroups =
     Form.useWatch("slotGroups", form) ?? [];
 
@@ -538,7 +539,6 @@ export function DoctorShiftBulkGenerateModal({
             ? facilities[0]?.id
             : undefined,
         fromDate: today,
-        toDate: addDaysToDateKey(today, 30),
         slotGroups: [],
       });
       setShiftSlots([]);
@@ -889,11 +889,11 @@ export function DoctorShiftBulkGenerateModal({
   function buildPayload(
     values: BulkGenerateFormValues,
   ): BulkGenerateDoctorShiftsInput {
-    if (values.toDate < values.fromDate) {
-      throw new Error(
-        "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.",
+    const toDate =
+      addDaysToDateKey(
+        values.fromDate,
+        6,
       );
-    }
 
     const slotAssignments =
       (values.slotGroups ?? [])
@@ -950,7 +950,7 @@ export function DoctorShiftBulkGenerateModal({
     return {
       facilityId: values.facilityId.trim(),
       fromDate: values.fromDate,
-      toDate: values.toDate,
+      toDate,
       slotAssignments,
       saveOnlyValid: false,
     };
@@ -1088,7 +1088,7 @@ export function DoctorShiftBulkGenerateModal({
           result.recognized &&
           result.createdCount > 0
             ? `Tạo thành công ${result.createdCount} lịch trực.`
-            : "Tạo lịch trực nhiều ngày thành công.",
+            : "Tạo lịch trực 1 tuần thành công.",
         ),
       );
 
@@ -1177,11 +1177,11 @@ export function DoctorShiftBulkGenerateModal({
               level={4}
               className="!mb-1 !text-slate-950"
             >
-              Tạo lịch trực nhiều ngày
+              Tạo lịch trực 1 tuần
             </Title>
 
             <Text type="secondary">
-              Chọn khoảng ngày và phân công bác sĩ theo từng khung ca, phòng và ngày làm việc trong tuần.
+              Chọn ngày bắt đầu và phân công bác sĩ theo từng khung ca, phòng và ngày làm việc. Hệ thống tự tạo lịch trong đúng 7 ngày.
             </Text>
           </div>
         </div>
@@ -1278,63 +1278,33 @@ export function DoctorShiftBulkGenerateModal({
             </Form.Item>
           </Col>
 
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} lg={12}>
             <Form.Item
               name="fromDate"
-              label="Từ ngày"
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Chọn ngày bắt đầu.",
-                },
-              ]}
-            >
-              <Input type="date" />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} sm={12} lg={6}>
-            <Form.Item
-              name="toDate"
-              label="Đến ngày"
-              dependencies={[
-                "fromDate",
-              ]}
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Chọn ngày kết thúc.",
-                },
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    const fromDate =
-                      getFieldValue(
-                        "fromDate",
-                      ) as string;
-
-                    if (
-                      !value ||
-                      !fromDate ||
-                      value >= fromDate
-                    ) {
-                      return Promise.resolve();
-                    }
-
-                    return Promise.reject(
-                      new Error(
-                        "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.",
+              label="Ngày bắt đầu"
+              extra={
+                watchedFromDate
+                  ? `Lịch sẽ được tạo từ ${formatIssueDate(
+                      watchedFromDate,
+                    )} đến ${formatIssueDate(
+                      addDaysToDateKey(
+                        watchedFromDate,
+                        6,
                       ),
-                    );
-                  },
-                }),
+                    )}, tổng cộng 7 ngày.`
+                  : "Hệ thống sẽ tự tính ngày kết thúc để tạo đúng 7 ngày."
+              }
+              rules={[
+                {
+                  required: true,
+                  message:
+                    "Chọn ngày bắt đầu tuần.",
+                },
               ]}
             >
               <Input type="date" />
             </Form.Item>
           </Col>
-
         </Row>
 
         <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
@@ -1771,7 +1741,7 @@ export function DoctorShiftBulkGenerateModal({
             void handlePreview()
           }
         >
-          Xem trước lịch trực
+          Xem trước lịch tuần
         </Button>
       </div>
       </Modal>
