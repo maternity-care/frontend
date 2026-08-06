@@ -2046,7 +2046,7 @@ export default function DoctorShiftPage() {
                         )
                       }
                     >
-                      Tạo nhiều ngày
+                      Tạo lịch tuần
                     </Button>
 
                     <Button
@@ -2106,7 +2106,7 @@ export default function DoctorShiftPage() {
                 prefix={
                   <Search className="h-4 w-4 text-slate-400" />
                 }
-                placeholder="Tìm bác sĩ, phòng, slot, cơ sở,"
+                placeholder="Tìm bác sĩ, cơ sở, phòng, slot..."
                 onChange={(event) =>
                   setKeyword(
                     event.target.value,
