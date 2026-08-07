@@ -84,9 +84,15 @@ type ShiftAccessAuthUser = {
   facilityId?: string | number | null;
   roles?: AuthRoleValue[] | null;
   staffProfile?: {
+    id?: string | number | null;
+    staffId?: string | number | null;
+    facilityId?: string | number | null;
     facilityAssignments?:
       | AuthFacilityAssignment[]
       | null;
+    doctor?: {
+      id?: string | number | null;
+    } | null;
   } | null;
 };
 
@@ -363,7 +369,10 @@ export default function DoctorShiftPage() {
       return {
         canViewAllFacilities: true,
         canManage: false,
+        isDoctorViewer: false,
         facilityId: "",
+        doctorId: "",
+        staffId: "",
       };
     }
 
@@ -382,6 +391,8 @@ export default function DoctorShiftPage() {
     const directFacilityId =
       String(
         authUser?.facilityId ??
+          authUser?.staffProfile
+            ?.facilityId ??
           "",
       ).trim();
 
@@ -444,18 +455,50 @@ export default function DoctorShiftPage() {
       facilityRoles.has("admin") ||
       (
         globalRoles.has("admin") &&
-        resolvedFacilityId ===
-          directFacilityId
+        belongsToFacility
       );
+    const hasDoctorRole =
+      facilityRoles.has("doctor") ||
+      globalRoles.has("doctor");
+
+    const doctorId =
+      String(
+        authUser?.staffProfile
+          ?.doctor?.id ??
+          "",
+      ).trim();
+    const staffId =
+      String(
+        authUser?.staffProfile
+          ?.staffId ??
+          authUser?.staffProfile
+            ?.id ??
+          "",
+      ).trim();
+
+    const canManage =
+      belongsToFacility &&
+      hasAdminRole;
+    const isDoctorViewer =
+      belongsToFacility &&
+      hasDoctorRole &&
+      !canManage;
 
     return {
       canViewAllFacilities: false,
-      canManage:
-        belongsToFacility &&
-        hasAdminRole,
+      canManage,
+      isDoctorViewer,
       facilityId:
         belongsToFacility
           ? resolvedFacilityId
+          : "",
+      doctorId:
+        isDoctorViewer
+          ? doctorId
+          : "",
+      staffId:
+        isDoctorViewer
+          ? staffId
           : "",
     };
   }, [
@@ -470,10 +513,37 @@ export default function DoctorShiftPage() {
     shiftAccess.facilityId;
   const canManageShifts =
     shiftAccess.canManage;
+  const isDoctorViewer =
+    shiftAccess.isDoctorViewer;
+  const currentDoctorId =
+    shiftAccess.doctorId;
+  const currentStaffId =
+    shiftAccess.staffId;
   const managedFacilityId =
     canManageShifts
       ? scopedFacilityId
       : "";
+
+  function isOwnDoctorShift(
+    shift: DoctorShiftItem,
+  ) {
+    if (!isDoctorViewer) {
+      return true;
+    }
+
+    return Boolean(
+      (
+        currentDoctorId &&
+        String(shift.doctorId) ===
+          currentDoctorId
+      ) ||
+      (
+        currentStaffId &&
+        String(shift.staffId) ===
+          currentStaffId
+      ),
+    );
+  }
 
   const [shifts, setShifts] = useState<
     DoctorShiftItem[]
@@ -521,8 +591,26 @@ export default function DoctorShiftPage() {
   );
 
   const visibleDoctors = useMemo(
-    () =>
-      canViewAllFacilities
+    () => {
+      if (isDoctorViewer) {
+        return doctors.filter(
+          (doctor) =>
+            (
+              currentDoctorId &&
+              String(doctor.id) ===
+                currentDoctorId
+            ) ||
+            (
+              currentStaffId &&
+              String(
+                doctor.staffId,
+              ) ===
+                currentStaffId
+            ),
+        );
+      }
+
+      return canViewAllFacilities
         ? doctors
         : doctors.filter(
             (doctor) =>
@@ -533,17 +621,32 @@ export default function DoctorShiftPage() {
                   ) ===
                   scopedFacilityId,
               ),
-          ),
+          );
+    },
     [
       canViewAllFacilities,
+      currentDoctorId,
+      currentStaffId,
       doctors,
+      isDoctorViewer,
       scopedFacilityId,
     ],
   );
 
   const visibleShifts = useMemo(
-    () =>
-      canViewAllFacilities
+    () => {
+      if (isDoctorViewer) {
+        return shifts.filter(
+          (shift) =>
+            String(
+              shift.facilityId,
+            ) ===
+              scopedFacilityId &&
+            isOwnDoctorShift(shift),
+        );
+      }
+
+      return canViewAllFacilities
         ? shifts
         : shifts.filter(
             (shift) =>
@@ -551,9 +654,13 @@ export default function DoctorShiftPage() {
                 shift.facilityId,
               ) ===
               scopedFacilityId,
-          ),
+          );
+    },
     [
       canViewAllFacilities,
+      currentDoctorId,
+      currentStaffId,
+      isDoctorViewer,
       scopedFacilityId,
       shifts,
     ],
@@ -671,6 +778,9 @@ export default function DoctorShiftPage() {
     };
   }, [
     canViewAllFacilities,
+    currentDoctorId,
+    currentStaffId,
+    isDoctorViewer,
     scopedFacilityId,
   ]);
 
@@ -705,51 +815,156 @@ export default function DoctorShiftPage() {
       };
     }
 
+    if (
+      isDoctorViewer &&
+      !currentDoctorId &&
+      !currentStaffId
+    ) {
+      const timer =
+        window.setTimeout(() => {
+          setShifts([]);
+          setFacilities([]);
+          setRooms([]);
+          setDoctors([]);
+          setError(
+            "Không xác định được hồ sơ bác sĩ của tài khoản hiện tại.",
+          );
+          setLoading(false);
+        }, 0);
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }
+
     void Promise.resolve()
-      .then(() => {
+      .then(async () => {
         if (!cancelled) {
           setLoading(true);
         }
 
-        return Promise.all([
-          getAllDoctorShifts(
-        canViewAllFacilities
-          ? {}
-          : {
-              facilityId:
-                scopedFacilityId,
-            },
-      ),
-      getFacilities(),
-      getRooms({
-        status: "active",
-        page: 1,
-        limit: 40,
-        ...(!canViewAllFacilities
-          ? {
-              facilityId:
-                scopedFacilityId,
-            }
-          : {}),
-      }),
+        const shiftData =
+          await getAllDoctorShifts({
+            ...(
+              canViewAllFacilities
+                ? {}
+                : {
+                    facilityId:
+                      scopedFacilityId,
+                  }
+            ),
+            ...(
+              isDoctorViewer &&
+              currentDoctorId
+                ? {
+                    doctorId:
+                      currentDoctorId,
+                  }
+                : {}
+            ),
+          });
+
+        const safeShiftData =
+          isDoctorViewer
+            ? shiftData.filter(
+                (shift) =>
+                  String(
+                    shift.facilityId,
+                  ) ===
+                    scopedFacilityId &&
+                  (
+                    (
+                      currentDoctorId &&
+                      String(
+                        shift.doctorId,
+                      ) ===
+                        currentDoctorId
+                    ) ||
+                    (
+                      currentStaffId &&
+                      String(
+                        shift.staffId,
+                      ) ===
+                        currentStaffId
+                    )
+                  ),
+              )
+            : shiftData;
+
+        if (isDoctorViewer) {
+          return {
+            shiftData:
+              safeShiftData,
+            facilityData: [],
+            roomItems: [],
+            doctorItems: [],
+          };
+        }
+
+        const [
+          facilityData,
+          roomResult,
+          doctorData,
+        ] = await Promise.all([
+          getFacilities(),
+          getRooms({
+            status: "active",
+            page: 1,
+            limit: 40,
+            ...(
+              !canViewAllFacilities
+                ? {
+                    facilityId:
+                      scopedFacilityId,
+                  }
+                : {}
+            ),
+          }),
           getDoctors({
             page: 1,
             limit: 40,
             status: "active",
-            sortYearsOfExperience: "desc",
+            sortYearsOfExperience:
+              "desc",
+            ...(
+              !canViewAllFacilities
+                ? {
+                    facilityId:
+                      scopedFacilityId,
+                  }
+                : {}
+            ),
           }),
         ]);
+
+        return {
+          shiftData:
+            safeShiftData,
+          facilityData,
+          roomItems:
+            roomResult.items,
+          doctorItems:
+            doctorData.items,
+        };
       })
-      .then(
-        ([
+      .then((result) => {
+        if (
+          cancelled ||
+          !result
+        ) {
+          return;
+        }
+
+        const {
           shiftData,
           facilityData,
-          roomResult,
-          doctorData,
-        ]) => {
-          if (cancelled) return;
+          roomItems,
+          doctorItems,
+        } = result;
 
-          const doctorInfoById = new Map<
+        const doctorInfoById =
+          new Map<
             string,
             {
               name: string;
@@ -758,102 +973,221 @@ export default function DoctorShiftPage() {
             }
           >();
 
-          shiftData.forEach((shift) => {
-            if (
-              doctorInfoById.has(
-                shift.doctorId,
-              )
-            ) {
-              return;
-            }
-
-            doctorInfoById.set(
+        shiftData.forEach((shift) => {
+          if (
+            doctorInfoById.has(
               shift.doctorId,
-              {
-                name:
-                  shift.doctorName ||
-                  `Bác sĩ #${shift.doctorId}`,
-                title:
-                  shift.doctorTitle ||
-                  "Bác sĩ",
-                specialty:
-                  shift.doctorSpecialty ||
-                  "Chưa cập nhật",
-              },
-            );
-          });
+            )
+          ) {
+            return;
+          }
 
-          setShifts(shiftData);
+          doctorInfoById.set(
+            shift.doctorId,
+            {
+              name:
+                shift.doctorName ||
+                `Bác sĩ #${shift.doctorId}`,
+              title:
+                shift.doctorTitle ||
+                "Bác sĩ",
+              specialty:
+                shift.doctorSpecialty ||
+                "Chưa cập nhật",
+            },
+          );
+        });
+
+        setShifts(shiftData);
+
+        if (isDoctorViewer) {
+          const facilityMap =
+            new Map<
+              string,
+              FacilityOption
+            >();
+          const roomMap =
+            new Map<
+              string,
+              RoomOption
+            >();
+          const doctorMap =
+            new Map<
+              string,
+              DoctorOption
+            >();
+
+          shiftData.forEach(
+            (shift) => {
+              if (
+                shift.facilityId &&
+                !facilityMap.has(
+                  shift.facilityId,
+                )
+              ) {
+                facilityMap.set(
+                  shift.facilityId,
+                  {
+                    id:
+                      shift.facilityId,
+                    name:
+                      shift.facilityName ||
+                      `Cơ sở #${shift.facilityId}`,
+                    code:
+                      shift.facilityCode ||
+                      "",
+                    address: "",
+                  },
+                );
+              }
+
+              if (
+                shift.roomId &&
+                !roomMap.has(
+                  shift.roomId,
+                )
+              ) {
+                roomMap.set(
+                  shift.roomId,
+                  {
+                    id: shift.roomId,
+                    facilityId:
+                      shift.facilityId,
+                    name:
+                      shift.roomName ||
+                      `Phòng #${shift.roomId}`,
+                    floor: "",
+                  },
+                );
+              }
+
+              if (
+                shift.doctorId &&
+                !doctorMap.has(
+                  shift.doctorId,
+                )
+              ) {
+                doctorMap.set(
+                  shift.doctorId,
+                  {
+                    id:
+                      shift.doctorId,
+                    staffId:
+                      shift.staffId,
+                    roleId:
+                      shift.roleId,
+                    name:
+                      shift.doctorName ||
+                      shift.staffName ||
+                      `Bác sĩ #${shift.doctorId}`,
+                    title:
+                      shift.doctorTitle ||
+                      "Bác sĩ",
+                    specialty:
+                      shift.doctorSpecialty ||
+                      "Chưa cập nhật",
+                    status:
+                      "active",
+                    facilityIds: [
+                      shift.facilityId,
+                    ].filter(Boolean),
+                  },
+                );
+              }
+            },
+          );
 
           setFacilities(
-            facilityData
-              .filter(
-                (facility) =>
-                  facility.status ===
-                    "active" &&
-                  (
-                    canViewAllFacilities ||
-                    String(
-                      facility.id,
-                    ) ===
-                      scopedFacilityId
-                  ),
-              )
-              .map((facility) => ({
-                id: facility.id,
-                name: facility.name,
-                code: facility.code,
-                address: facility.address,
-              })),
+            Array.from(
+              facilityMap.values(),
+            ),
           );
-
           setRooms(
-            roomResult.items
-              .filter(
-                (room: ClinicRoom) =>
-                  room.status ===
-                    "active" &&
-                  (
-                    canViewAllFacilities ||
-                    String(
-                      room.facilityId,
-                    ) ===
-                      scopedFacilityId
-                  ),
-              )
-              .map(
-                (room: ClinicRoom) => ({
-                  id: room.id,
-                  facilityId:
-                    room.facilityId,
-                  name: room.roomName,
-                  floor: room.floor,
-                }),
-              ),
+            Array.from(
+              roomMap.values(),
+            ),
           );
-
           setDoctors(
-            doctorData.items
-              .filter((doctor) =>
-                canViewAllFacilities ||
+            Array.from(
+              doctorMap.values(),
+            ),
+          );
+          setError(null);
+          return;
+        }
+
+        setFacilities(
+          facilityData
+            .filter(
+              (facility) =>
+                facility.status ===
+                  "active" &&
                 (
-                  doctor.facilityIds.length >
-                    0
-                    ? doctor.facilityIds.some(
-                        (facilityId) =>
-                          String(
-                            facilityId,
-                          ) ===
-                          scopedFacilityId,
-                      )
-                    : String(
-                        doctor.facilityId ??
-                          "",
-                      ) ===
-                      scopedFacilityId
+                  canViewAllFacilities ||
+                  String(
+                    facility.id,
+                  ) ===
+                    scopedFacilityId
                 ),
-              )
-              .map((doctor) => {
+            )
+            .map((facility) => ({
+              id: facility.id,
+              name: facility.name,
+              code: facility.code,
+              address:
+                facility.address,
+            })),
+        );
+
+        setRooms(
+          roomItems
+            .filter(
+              (room: ClinicRoom) =>
+                room.status ===
+                  "active" &&
+                (
+                  canViewAllFacilities ||
+                  String(
+                    room.facilityId,
+                  ) ===
+                    scopedFacilityId
+                ),
+            )
+            .map(
+              (room: ClinicRoom) => ({
+                id: room.id,
+                facilityId:
+                  room.facilityId,
+                name:
+                  room.roomName,
+                floor:
+                  room.floor,
+              }),
+            ),
+        );
+
+        setDoctors(
+          doctorItems
+            .filter((doctor) =>
+              canViewAllFacilities ||
+              (
+                doctor.facilityIds.length >
+                  0
+                  ? doctor.facilityIds.some(
+                      (facilityId) =>
+                        String(
+                          facilityId,
+                        ) ===
+                        scopedFacilityId,
+                    )
+                  : String(
+                      doctor.facilityId ??
+                        "",
+                    ) ===
+                    scopedFacilityId
+              ),
+            )
+            .map((doctor) => {
               const shiftDoctor =
                 doctorInfoById.get(
                   doctor.id,
@@ -861,8 +1195,10 @@ export default function DoctorShiftPage() {
 
               return {
                 id: doctor.id,
-                staffId: doctor.staffId,
-                roleId: doctor.roleId,
+                staffId:
+                  doctor.staffId,
+                roleId:
+                  doctor.roleId,
                 name:
                   doctor.name ||
                   shiftDoctor?.name ||
@@ -876,26 +1212,34 @@ export default function DoctorShiftPage() {
                   shiftDoctor?.specialty ||
                   "Chưa cập nhật",
                 status:
-                  doctor.status === "active" &&
-                  doctor.staffStatus === "active"
+                  doctor.status ===
+                    "active" &&
+                  doctor.staffStatus ===
+                    "active"
                     ? "active"
                     : "inactive",
                 facilityIds:
-                  doctor.facilityIds.length > 0
+                  doctor.facilityIds
+                    .length > 0
                     ? doctor.facilityIds
                     : doctor.facilityId
-                      ? [doctor.facilityId]
+                      ? [
+                          doctor.facilityId,
+                        ]
                       : [],
               };
             }),
-          );
+        );
 
-          setError(null);
-        },
-      )
+        setError(null);
+      })
       .catch((loadError) => {
         if (!cancelled) {
-          setError(getErrorMessage(loadError));
+          setError(
+            getErrorMessage(
+              loadError,
+            ),
+          );
         }
       })
       .finally(() => {
@@ -909,6 +1253,9 @@ export default function DoctorShiftPage() {
     };
   }, [
     canViewAllFacilities,
+    currentDoctorId,
+    currentStaffId,
+    isDoctorViewer,
     scopedFacilityId,
   ]);
 
@@ -1277,7 +1624,10 @@ export default function DoctorShiftPage() {
 
     try {
       const nextShifts =
-        await getAllDoctorShifts();
+        await getAllDoctorShifts({
+          facilityId:
+            managedFacilityId,
+        });
 
       setShifts(nextShifts);
       setSelectedDate(fromDate);
@@ -1315,17 +1665,34 @@ export default function DoctorShiftPage() {
   async function openDetail(
     shift: DoctorShiftItem,
   ) {
+    if (
+      isDoctorViewer &&
+      !isOwnDoctorShift(shift)
+    ) {
+      return;
+    }
+
     setDetailShift(shift);
+
+    if (isDoctorViewer) {
+      return;
+    }
+
     setDetailLoading(true);
 
     try {
-      const detail = await getDoctorShift(
-        shift.id,
-      );
+      const detail =
+        await getDoctorShift(
+          shift.id,
+        );
 
       setDetailShift(detail);
     } catch (detailError) {
-      setError(getErrorMessage(detailError));
+      setError(
+        getErrorMessage(
+          detailError,
+        ),
+      );
     } finally {
       setDetailLoading(false);
     }
@@ -2104,9 +2471,11 @@ export default function DoctorShiftPage() {
 
             <div
               className={`grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-4 ${
-                canViewAllFacilities
-                  ? "xl:grid-cols-7"
-                  : "xl:grid-cols-6"
+                isDoctorViewer
+                  ? "xl:grid-cols-5"
+                  : canViewAllFacilities
+                    ? "xl:grid-cols-7"
+                    : "xl:grid-cols-6"
               }`}
             >
               <div className="flex min-w-0 flex-col gap-1">
@@ -2135,7 +2504,11 @@ export default function DoctorShiftPage() {
                 prefix={
                   <Search className="h-4 w-4 text-slate-400" />
                 }
-                placeholder="Tìm bác sĩ, cơ sở, phòng, slot..."
+                placeholder={
+                  isDoctorViewer
+                    ? "Tìm phòng, slot, ghi chú..."
+                    : "Tìm bác sĩ, cơ sở, phòng, slot..."
+                }
                 onChange={(event) =>
                   setKeyword(
                     event.target.value,
@@ -2180,20 +2553,25 @@ export default function DoctorShiftPage() {
                 onChange={setRoomFilter}
               />
 
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                value={doctorFilter}
-                placeholder="Tất cả bác sĩ"
-                options={visibleDoctors.map(
-                  (doctor) => ({
-                    value: doctor.id,
-                    label: `${doctor.title} ${doctor.name}`,
-                  }),
-                )}
-                onChange={setDoctorFilter}
-              />
+              {!isDoctorViewer ? (
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  value={doctorFilter}
+                  placeholder="Tất cả bác sĩ"
+                  options={visibleDoctors.map(
+                    (doctor) => ({
+                      value:
+                        doctor.id,
+                      label: `${doctor.title} ${doctor.name}`,
+                    }),
+                  )}
+                  onChange={
+                    setDoctorFilter
+                  }
+                />
+              ) : null}
 
               <Select
                 allowClear
