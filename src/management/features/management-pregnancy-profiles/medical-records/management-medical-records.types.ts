@@ -61,6 +61,14 @@ export interface PendingMedicalRecordFile {
   createdAt?: string | null;
 }
 
+export interface MedicalRecordDoctor {
+  id: string;
+  name: string | null;
+  email?: string | null;
+  phone?: string | null;
+  employeeCode?: string | null;
+}
+
 export interface MedicalRecord {
   id: string;
   appointmentId: string | null;
@@ -73,6 +81,7 @@ export interface MedicalRecord {
   files: MedicalRecordFile[];
   createdAt: string | null;
   updatedAt: string | null;
+  doctor?: MedicalRecordDoctor | null;
 }
 
 /* ===== Backend raw types ===== */

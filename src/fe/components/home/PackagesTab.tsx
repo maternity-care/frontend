@@ -120,7 +120,7 @@ export function PackagesTab() {
         <Alert
           type="warning"
           showIcon
-          message={error}
+          title={error}
           closable
           onClose={() => setError(null)}
         />

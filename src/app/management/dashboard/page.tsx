@@ -892,7 +892,7 @@ export default function ManagementDashboardPage() {
           <Alert
             type="warning"
             showIcon
-            message="Một số API không tải được"
+            title="Một số API không tải được"
             description={data.errors.join(" | ")}
           />
         ) : null}
