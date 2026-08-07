@@ -79,7 +79,7 @@ export default function PregnancyProfileDetail({
     return (
       <Alert
         type="error"
-        message="Lỗi"
+        title="Lỗi"
         description={error ?? "Không tìm thấy hồ sơ thai."}
         showIcon
       />

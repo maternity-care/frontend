@@ -552,7 +552,7 @@ export default function ManagementAppointmentsPage() {
               showIcon
               type="warning"
               className="mb-4"
-              message="User này chưa có hồ sơ thai kỳ"
+              title="Người dùng này chưa có hồ sơ thai kỳ"
               description="Cần tạo hồ sơ thai kỳ cho user trước, sau đó quay lại check-in và chọn hồ sơ."
               action={
                 <Button size="small" href="/management/records">
