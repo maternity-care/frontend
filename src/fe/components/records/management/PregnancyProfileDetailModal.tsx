@@ -536,9 +536,9 @@ export function PregnancyProfileDetailModal({
                             ? `– ${formatDateTime(consultation.createdAt)}`
                             : `#${index + 1}`}
                         </Text>
-                        {consultation.diagnosis && (
+                        {consultation.conclusion && (
                           <Text type="secondary" style={{ fontSize: 13 }}>
-                            • {consultation.diagnosis}
+                            • {consultation.conclusion}
                           </Text>
                         )}
                       </Space>
