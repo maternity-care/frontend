@@ -208,7 +208,7 @@ export function UpdateMedicalRecordModal({
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`Mã lịch hẹn: ${record.appointmentId || "—"} • Bác sĩ: ${record.doctorId || "—"}`}
+          title={`Mã lịch hẹn: ${record.appointmentId || "—"} • Bác sĩ: ${record.doctorId || "—"}`}
         />
       )}
 
@@ -288,10 +288,6 @@ export function UpdateMedicalRecordModal({
               ))
             )}
           </div>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            * Hiện tại chỉ hỗ trợ gỡ file khỏi bản ghi. Upload file mới sẽ bổ
-            sung sau.
-          </Text>
         </div>
       </Form>
     </Modal>

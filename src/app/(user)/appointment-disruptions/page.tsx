@@ -112,7 +112,7 @@ export default function AppointmentDisruptionsPage() {
       <Alert
         showIcon
         type="info"
-        message="Cơ sở sẽ xác nhận trước khi hoàn tiền"
+        title="Cơ sở sẽ xác nhận trước khi hoàn tiền"
         description="Yêu cầu hoàn tiền không đồng nghĩa tiền đã được chuyển ngay. Bạn sẽ nhận thông báo khi quản lý xử lý xong."
       />
 

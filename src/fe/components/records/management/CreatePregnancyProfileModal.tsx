@@ -150,7 +150,7 @@ export function CreatePregnancyProfileModal({
         type="info"
         showIcon
         style={{ marginBottom: 20 }}
-        message="Chọn thai phụ đã có tài khoản người dùng, sau đó nhập thông tin thai kỳ ban đầu."
+        title="Chọn thai phụ đã có tài khoản người dùng, sau đó nhập thông tin thai kỳ ban đầu."
       />
 
       <Form form={form} layout="vertical" disabled={loading}>
