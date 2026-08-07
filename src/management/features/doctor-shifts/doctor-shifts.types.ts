@@ -185,6 +185,30 @@ export interface GetWeeklyDoctorShiftsParams {
   weekStart?: string;
 }
 
+export interface GetGroupedDoctorShiftsParams {
+  facilityId: string;
+  doctorId?: string;
+  roomId?: string;
+  dateFrom: string;
+  dateTo: string;
+  status?: DoctorShiftStatus;
+}
+
+export interface BackendDoctorShiftGroup {
+  groupIndex: number;
+  workingDays: DoctorShiftWorkingDay[];
+  shifts: Array<BackendDoctorShift & { workingDay?: DoctorShiftWorkingDay }>;
+}
+
+export interface BackendGroupedDoctorShifts {
+  facilityId: string;
+  dateFrom: string;
+  dateTo: string;
+  totalShifts: number;
+  totalGroups: number;
+  groups: BackendDoctorShiftGroup[];
+}
+
 export interface DoctorShiftApiResponse<T> {
   success: boolean;
   message: string;

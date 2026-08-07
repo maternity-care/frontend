@@ -17,12 +17,15 @@ import {
 import { Building2, Clock3, Mail, MapPin, Phone, Save, UserRound, X } from "lucide-react";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import {
+  applyFacilityOperatingHours,
   getFacility,
+  previewFacilityOperatingHours,
   updateFacility,
-  updateFacilityOperatingHours,
 } from "@/management/features/facilities/facilities.api";
 import type {
   Facility,
+  FacilityOperatingHoursImpactedShiftSlot,
+  FacilityOperatingHoursPreview,
   FacilityScheduleInput,
   FacilityStatus,
 } from "@/management/features/facilities/facilities.types";
@@ -156,6 +159,29 @@ function getScheduleSummary(schedules?: FacilityScheduleInput[]) {
       return `${days}: ${time}`;
     })
     .join("; ");
+}
+
+function getOperatingHoursImpactCounts(
+  preview: FacilityOperatingHoursPreview,
+) {
+  return {
+    impactedShiftCount:
+      preview.summary?.impactedShiftCount ??
+      preview.impactedShifts?.length ??
+      0,
+    impactedShiftSlotCount:
+      preview.summary?.impactedShiftSlotCount ??
+      preview.impactedShiftSlots?.length ??
+      0,
+  };
+}
+
+function getShiftSlotImpactLabel(
+  slot: FacilityOperatingHoursImpactedShiftSlot,
+) {
+  const time = `${slot.startTime?.slice(0, 5)} - ${slot.endTime?.slice(0, 5)}`;
+
+  return `${slot.code || slot.id} - ${slot.name || "Khung ca"} (${time})`;
 }
 
 export function FacilityUpdateModal({
@@ -331,12 +357,71 @@ export function FacilityUpdateModal({
     setSubmitting(true);
 
     try {
+      const operatingHoursInput = { schedules: values.schedules };
+      const preview = await previewFacilityOperatingHours(
+        facility.id,
+        operatingHoursInput,
+      );
+      const {
+        impactedShiftCount,
+        impactedShiftSlotCount,
+      } = getOperatingHoursImpactCounts(preview);
+
+      if (impactedShiftCount > 0) {
+        modal.error({
+          title: "Không thể lưu giờ hoạt động",
+          content:
+            `Có ${impactedShiftCount} ca trực thật bị nằm ngoài giờ hoạt động mới. ` +
+            "Vui lòng xử lý ca trực trước khi đổi giờ của cơ sở.",
+          okText: RESPONSE_MESSAGES.COMMON.CLOSE,
+          centered: true,
+        });
+        return;
+      }
+
+      let shouldDeactivateInvalidSlots = false;
+      if (impactedShiftSlotCount > 0) {
+        const confirmed = await new Promise<boolean>((resolve) => {
+          modal.confirm({
+            title: "Khung ca sẽ bị tạm tắt",
+            content: (
+              <div className="space-y-3">
+                <p>
+                  Có {impactedShiftSlotCount} khung ca đang hoạt động không còn
+                  phù hợp với giờ mới. Nếu tiếp tục, hệ thống sẽ chuyển các
+                  khung ca này sang tạm tắt.
+                </p>
+                {preview.impactedShiftSlots?.length ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {preview.impactedShiftSlots.slice(0, 3).map((slot) => (
+                      <p key={slot.id}>{getShiftSlotImpactLabel(slot)}</p>
+                    ))}
+                    {preview.impactedShiftSlots.length > 3 ? (
+                      <p>
+                        +{preview.impactedShiftSlots.length - 3} khung ca khác
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ),
+            okText: "Tắt khung ca và lưu",
+            cancelText: RESPONSE_MESSAGES.COMMON.CANCEL,
+            centered: true,
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+
+        if (!confirmed) return;
+        shouldDeactivateInvalidSlots = true;
+      }
+
       await updateFacility(facility.id, {
         name: values.name,
         ownerId: values.ownerId,
         hotline: values.hotline,
         email: values.email ?? "",
-        status: values.status,
         address: values.address,
         city: values.city,
         ward: values.ward,
@@ -344,8 +429,11 @@ export function FacilityUpdateModal({
         longitude: values.longitude ?? "",
       });
 
-      await updateFacilityOperatingHours(facility.id, {
-        schedules: values.schedules,
+      await applyFacilityOperatingHours(facility.id, {
+        schedules: operatingHoursInput.schedules,
+        slotStrategy: shouldDeactivateInvalidSlots
+          ? "deactivate_invalid_slots"
+          : "strict",
       });
 
       const refreshedFacility = await getFacility(facility.id);
@@ -503,12 +591,12 @@ export function FacilityUpdateModal({
   
                   <Col xs={24} md={12}>
                     <Form.Item
-                      name="status"
                       label={FACILITY_MESSAGES.STATUS}
-                      rules={[{ required: true, message: "Vui lòng chọn trạng thái." }]}
                     >
                       <Select
                         size="large"
+                        disabled
+                        value={status}
                         options={[
                           { value: "active", label: FACILITY_MESSAGES.ACTIVE },
                           { value: "suspended", label: FACILITY_MESSAGES.SUSPENDED },

@@ -41,11 +41,12 @@ export function DoctorShiftBulkPreviewModal({
   onClose,
   onConfirm,
 }: DoctorShiftBulkPreviewModalProps) {
-  const hasIssues =
+  const hasInvalidItems =
     skipped > 0 ||
     conflicted > 0 ||
-    issues.length > 0 ||
-    !canConfirm;
+    issues.length > 0;
+  const hasValidItems =
+    valid > 0;
 
   return (
     <Modal
@@ -81,12 +82,12 @@ export function DoctorShiftBulkPreviewModal({
         <div className="flex items-start gap-3">
           <span
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-              hasIssues
-                ? "bg-red-600 text-white"
+              hasInvalidItems
+                ? "bg-amber-500 text-white"
                 : "bg-emerald-600 text-white"
             }`}
           >
-            {hasIssues ? (
+            {hasInvalidItems ? (
               <AlertTriangle className="h-5 w-5" />
             ) : (
               <Eye className="h-5 w-5" />
@@ -98,11 +99,11 @@ export function DoctorShiftBulkPreviewModal({
               level={4}
               className="!mb-1 !text-slate-950"
             >
-              Xem trước lịch trực nhiều ngày
+              Xem trước lịch trực 1 tuần
             </Title>
 
             <Text type="secondary">
-              Kiểm tra toàn bộ lịch dự kiến trước khi xác nhận lưu vào hệ thống.
+              Kiểm tra lịch trực dự kiến trong 7 ngày trước khi xác nhận lưu vào hệ thống.
             </Text>
           </div>
         </div>
@@ -157,13 +158,25 @@ export function DoctorShiftBulkPreviewModal({
           </div>
         </div>
 
-        {hasIssues ? (
+        {hasInvalidItems ? (
           <div className="mt-4">
             <Alert
-              type="error"
+              type={
+                hasValidItems
+                  ? "warning"
+                  : "error"
+              }
               showIcon
-              title="Chưa thể tạo lịch trực"
-              description="Các lịch bên dưới đang bị bỏ qua hoặc xung đột. Hãy quay lại sửa đúng phân công rồi xem trước lại."
+              title={
+                hasValidItems
+                  ? `Có thể tạo ${valid} ca trực hợp lệ`
+                  : "Không có ca trực hợp lệ để tạo"
+              }
+              description={
+                hasValidItems
+                  ? "Chỉ các ca hợp lệ được tạo. Ca bị trùng và ca bị bỏ qua sẽ không được lưu. Bạn vẫn có thể quay lại chỉnh sửa trước khi xác nhận."
+                  : "Tất cả ca dự kiến đều bị trùng hoặc bị bỏ qua. Hãy quay lại chỉnh sửa phân công."
+              }
             />
 
             <div className="mt-4 flex flex-col gap-3">
@@ -185,9 +198,9 @@ export function DoctorShiftBulkPreviewModal({
                   </div>
                 ))
               ) : (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <Text className="text-slate-800">
-                    Backend không cho phép xác nhận lịch. Vui lòng kiểm tra lại các phân công.
+                    Các ca không hợp lệ sẽ tự động bị bỏ qua khi tạo lịch.
                   </Text>
                 </div>
               )}
@@ -202,7 +215,7 @@ export function DoctorShiftBulkPreviewModal({
               <CheckCircle2 className="h-5 w-5" />
             }
             title="Toàn bộ lịch dự kiến đều hợp lệ"
-            description="Bạn có thể xác nhận để lưu toàn bộ lịch trực vào hệ thống."
+            description="Bạn có thể xác nhận để lưu lịch trực của tuần này vào hệ thống."
           />
         )}
       </div>
@@ -212,12 +225,10 @@ export function DoctorShiftBulkPreviewModal({
           disabled={confirmLoading}
           onClick={onClose}
         >
-          {hasIssues
-            ? "Quay lại chỉnh sửa"
-            : "Đóng"}
+          Quay lại chỉnh sửa
         </Button>
 
-        {canConfirm && !hasIssues ? (
+        {canConfirm && hasValidItems ? (
           <Button
             type="primary"
             loading={confirmLoading}
@@ -228,7 +239,9 @@ export function DoctorShiftBulkPreviewModal({
               void onConfirm()
             }
           >
-            Xác nhận tạo lịch
+            {hasInvalidItems
+              ? `Tạo ${valid} ca hợp lệ`
+              : "Xác nhận tạo lịch"}
           </Button>
         ) : null}
       </div>

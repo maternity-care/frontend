@@ -13,9 +13,13 @@ import type {
   GetRoomTypeLookupParams,
   GetRoomTypesParams,
   RoomListResult,
+  RoomReactivateResult,
   RoomStatus,
+  RoomSuspendImpact,
+  RoomSuspendResult,
   RoomType,
   RoomTypeListResult,
+  SuspendResourceInput,
   UpdateRoomInput,
   UpdateRoomTypeInput,
 } from "./rooms.types";
@@ -190,36 +194,101 @@ function normalizeRoomList(
   fallbackPage: number,
   fallbackLimit: number,
 ): RoomListResult {
+  const requestedPage = Math.max(
+    1,
+    Math.trunc(fallbackPage),
+  );
+  const requestedLimit = Math.max(
+    1,
+    Math.trunc(fallbackLimit),
+  );
+
   if (Array.isArray(data)) {
-    const items = data.map(normalizeRoom);
+    const allItems = data.map(normalizeRoom);
+    const total = allItems.length;
+    const offset =
+      (requestedPage - 1) *
+      requestedLimit;
+    const items = allItems.slice(
+      offset,
+      offset + requestedLimit,
+    );
 
     return {
       items,
-      total: items.length,
-      page: fallbackPage,
-      limit: fallbackLimit,
+      total,
+      page: requestedPage,
+      limit: requestedLimit,
       totalPages:
-        items.length > 0 ? 1 : 0,
+        total === 0
+          ? 0
+          : Math.ceil(
+              total /
+                requestedLimit,
+            ),
     };
   }
 
-  const items = Array.isArray(data?.items)
+  const normalizedItems = Array.isArray(
+    data?.items,
+  )
     ? data.items.map(normalizeRoom)
     : [];
+  const total = Math.max(
+    0,
+    Number(
+      data?.total ??
+        normalizedItems.length,
+    ) || 0,
+  );
+  const page = Math.max(
+    1,
+    Number(
+      data?.page ??
+        requestedPage,
+    ) || requestedPage,
+  );
+  const limit = Math.max(
+    1,
+    Number(
+      data?.limit ??
+        requestedLimit,
+    ) || requestedLimit,
+  );
+
+  const offset =
+    (page - 1) * limit;
+
+  const items =
+    normalizedItems.length > limit
+      ? normalizedItems.length >= total
+        ? normalizedItems.slice(
+            offset,
+            offset + limit,
+          )
+        : normalizedItems.slice(
+            0,
+            limit,
+          )
+      : normalizedItems;
 
   return {
     items,
-    total: Number(data?.total ?? items.length),
-    page: Number(
-      data?.page ?? fallbackPage,
-    ),
-    limit: Number(
-      data?.limit ?? fallbackLimit,
-    ),
-    totalPages: Number(
-      data?.totalPages ??
-        (items.length > 0 ? 1 : 0),
-    ),
+    total,
+    page,
+    limit,
+    totalPages:
+      total === 0
+        ? 0
+        : Math.max(
+            1,
+            Number(
+              data?.totalPages,
+            ) ||
+              Math.ceil(
+                total / limit,
+              ),
+          ),
   };
 }
 
@@ -319,7 +388,6 @@ function toUpdateRoomPayload(
     roomTypeId:
       input.roomTypeId?.trim(),
     floor: input.floor?.trim(),
-    status: input.status,
   });
 }
 
@@ -410,6 +478,55 @@ export async function updateRoom(
   return {
     ...result,
     data: normalizeRoom(result.data),
+  };
+}
+
+export async function suspendRoom(
+  id: string,
+  input: SuspendResourceInput,
+): Promise<ApiResponse<RoomSuspendResult>> {
+  const response = await apiClient.patch<
+    ApiEnvelope<{
+      room: BackendRoom;
+      impact: RoomSuspendImpact;
+    }>
+  >(`${ROOM_ENDPOINT}/${id}/suspend`, {
+    inactiveUntil: input.inactiveUntil || null,
+    reason: input.reason?.trim() || undefined,
+  });
+
+  const result = unwrapResponse<{
+    room: BackendRoom;
+    impact: RoomSuspendImpact;
+  }>(response.data, "Tạm ngưng phòng thành công");
+
+  return {
+    ...result,
+    data: {
+      ...result.data,
+      room: normalizeRoom(result.data.room),
+    },
+  };
+}
+
+export async function reactivateRoom(
+  id: string,
+): Promise<ApiResponse<RoomReactivateResult>> {
+  const response = await apiClient.patch<
+    ApiEnvelope<{
+      room: BackendRoom;
+    }>
+  >(`${ROOM_ENDPOINT}/${id}/reactivate`, {});
+
+  const result = unwrapResponse<{
+    room: BackendRoom;
+  }>(response.data, "Mở lại phòng thành công");
+
+  return {
+    ...result,
+    data: {
+      room: normalizeRoom(result.data.room),
+    },
   };
 }
 

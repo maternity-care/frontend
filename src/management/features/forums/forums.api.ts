@@ -6,12 +6,18 @@ import {
 import type {
   BackendForumComment,
   BackendForumPost,
+  BackendForumPostDetailData,
+  BackendForumModerationLog,
   BackendForumReport,
   BackendForumTopic,
+  CreateForumPostInput,
   CreateForumTopicInput,
+  DeleteForumCommentInput,
+  DeleteForumPostInput,
   ForumAuthorRole,
   ForumCategory,
   ForumComment,
+  ForumModerationLog,
   ForumPost,
   ForumPostListResult,
   ForumPostStatus,
@@ -25,6 +31,8 @@ import type {
   ModerateForumCommentInput,
   ModerateForumPostInput,
   ResolveForumReportInput,
+  UpdateForumCommentInput,
+  UpdateForumPostInput,
   UpdateForumTopicInput,
 } from "./forums.types";
 
@@ -228,6 +236,7 @@ function normalizeComment(
     ),
     authorName:
       normalizeText(item.authorName) ||
+      normalizeText(item.author) ||
       "Không rõ tác giả",
     authorEmail: normalizeText(
       item.authorEmail,
@@ -235,11 +244,32 @@ function normalizeComment(
     authorRole: normalizeAuthorRole(
       item.authorRole ?? item.role,
     ),
+    parentId: normalizeText(
+      item.parentId,
+    ),
+    messageType:
+      normalizeText(item.messageType) ||
+      "text",
     content: normalizeText(
       item.content,
     ),
+    isDoctorAnswer: normalizeBoolean(
+      item.isDoctorAnswer,
+    ),
     status: normalizePostStatus(
       item.status,
+    ),
+    moderatedBy: normalizeText(
+      item.moderatedBy,
+    ),
+    moderatedAt: normalizeText(
+      item.moderatedAt,
+    ),
+    moderationReason: normalizeText(
+      item.moderationReason,
+    ),
+    deletedAt: normalizeText(
+      item.deletedAt,
     ),
     reportCount: Math.max(
       0,
@@ -253,6 +283,7 @@ function normalizeComment(
     updatedAt: normalizeText(
       item.updatedAt,
     ),
+    replies: [],
   };
 }
 
@@ -264,7 +295,7 @@ function readCommentArray(
     return [];
   }
 
-  return value
+  const comments = value
     .filter(isRecord)
     .map((item) =>
       normalizeComment(
@@ -272,21 +303,115 @@ function readCommentArray(
         postId,
       ),
     );
+
+  const commentById = new Map(
+    comments.map((comment) => [
+      comment.id,
+      comment,
+    ]),
+  );
+  const rootComments: ForumComment[] = [];
+
+  comments.forEach((comment) => {
+    const parent = comment.parentId
+      ? commentById.get(
+          comment.parentId,
+        )
+      : undefined;
+
+    if (parent) {
+      parent.replies.push(comment);
+      return;
+    }
+
+    rootComments.push(comment);
+  });
+
+  return rootComments;
+}
+
+function normalizeModerationLog(
+  item: BackendForumModerationLog,
+): ForumModerationLog {
+  return {
+    id: normalizeText(item.id),
+    targetType: normalizeText(
+      item.targetType,
+    ),
+    targetId: normalizeText(
+      item.targetId,
+    ),
+    action: normalizeText(
+      item.action,
+    ),
+    actorId: normalizeText(
+      item.actorId,
+    ),
+    actorRole: normalizeAuthorRole(
+      item.actorRole,
+    ),
+    reason: normalizeText(
+      item.reason,
+    ),
+    metadata: isRecord(item.metadata)
+      ? item.metadata
+      : null,
+    createdAt: normalizeText(
+      item.createdAt,
+    ),
+  };
+}
+
+function readModerationLogs(
+  value: unknown,
+) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(isRecord)
+    .map(normalizeModerationLog);
 }
 
 function normalizePost(
   item: BackendForumPost,
+  detail?: {
+    comments?: unknown;
+    logs?: unknown;
+    medicalDisclaimer?: unknown;
+  },
 ): ForumPost {
   const id = normalizeText(item.id);
+  const forumTopic = isRecord(
+    item.forumTopic,
+  )
+    ? item.forumTopic
+    : {};
+  const rawLocked =
+    item.isLocked ?? item.locked;
+  const commentable =
+    item.commentable !== undefined
+      ? normalizeBoolean(
+          item.commentable,
+        )
+      : rawLocked !== undefined
+        ? !normalizeBoolean(rawLocked)
+        : true;
 
   return {
     id,
-    topicId: normalizeText(
-      item.topicId,
-    ),
-    topicTitle: normalizeText(
-      item.topicTitle,
-    ),
+    topicId:
+      normalizeText(item.topicId) ||
+      normalizeText(
+        item.forumTopicId,
+      ) ||
+      normalizeText(forumTopic.id),
+    topicTitle:
+      normalizeText(item.topicTitle) ||
+      normalizeText(
+        forumTopic.title,
+      ),
     title:
       normalizeText(item.title) ||
       `Bài viết #${id}`,
@@ -298,14 +423,19 @@ function normalizePost(
     content: normalizeText(
       item.content,
     ),
+    coverImageUrl: normalizeText(
+      item.coverImageUrl,
+    ),
     category: normalizeCategory(
-      item.category,
+      item.category ??
+        forumTopic.category,
     ),
     authorId: normalizeText(
       item.authorId,
     ),
     authorName:
       normalizeText(item.authorName) ||
+      normalizeText(item.author) ||
       "Không rõ tác giả",
     authorEmail: normalizeText(
       item.authorEmail,
@@ -323,9 +453,8 @@ function normalizePost(
       item.isFeatured ??
         item.featured,
     ),
-    isLocked: normalizeBoolean(
-      item.isLocked ?? item.locked,
-    ),
+    isLocked: !commentable,
+    commentable,
     viewCount: Math.max(
       0,
       normalizeNumber(
@@ -333,7 +462,11 @@ function normalizePost(
       ),
     ),
     commentCount: Math.max(
-      0,
+      readCommentArray(
+        detail?.comments ??
+          item.comments,
+        id,
+      ).length,
       normalizeNumber(
         item.commentCount ??
           item.commentsCount,
@@ -346,9 +479,48 @@ function normalizePost(
           item.reportsCount,
       ),
     ),
+    interactionCount: Math.max(
+      0,
+      normalizeNumber(
+        item.interactionCount,
+        normalizeNumber(
+          item.commentCount ??
+            item.commentsCount,
+        ) +
+          normalizeNumber(
+            item.reportCount ??
+              item.reportsCount,
+          ),
+      ),
+    ),
     comments: readCommentArray(
-      item.comments,
+      detail?.comments ??
+        item.comments,
       id,
+    ),
+    medicalDisclaimer: normalizeText(
+      detail?.medicalDisclaimer,
+    ),
+    moderationLogs: readModerationLogs(
+      detail?.logs,
+    ),
+    approvedBy: normalizeText(
+      item.approvedBy,
+    ),
+    approvedAt: normalizeText(
+      item.approvedAt,
+    ),
+    moderatedBy: normalizeText(
+      item.moderatedBy,
+    ),
+    moderatedAt: normalizeText(
+      item.moderatedAt,
+    ),
+    moderationReason: normalizeText(
+      item.moderationReason,
+    ),
+    deletedAt: normalizeText(
+      item.deletedAt,
     ),
     createdAt: normalizeText(
       item.createdAt,
@@ -360,6 +532,38 @@ function normalizePost(
       item.publishedAt,
     ),
   };
+}
+
+function readPostMutationData(
+  value: unknown,
+): BackendForumPost {
+  if (!isRecord(value)) {
+    throw new Error(
+      "Dữ liệu bài viết trả về không hợp lệ.",
+    );
+  }
+
+  if (isRecord(value.post)) {
+    return value.post;
+  }
+
+  return value;
+}
+
+function readCommentMutationData(
+  value: unknown,
+): BackendForumComment {
+  if (!isRecord(value)) {
+    throw new Error(
+      "Dữ liệu bình luận trả về không hợp lệ.",
+    );
+  }
+
+  if (isRecord(value.comment)) {
+    return value.comment;
+  }
+
+  return value;
 }
 
 function normalizeReportTargetType(
@@ -712,15 +916,122 @@ export async function getForumPost(
   id: string,
 ) {
   const data =
-    await unwrapApiData<
-      BackendForumPost
-    >(
+    await unwrapApiData<unknown>(
       apiClient.get(
         `${ENDPOINT}/posts/${id}`,
       ),
     );
 
-  return normalizePost(data);
+  if (!isRecord(data)) {
+    throw new Error(
+      "Dữ liệu chi tiết bài viết không hợp lệ.",
+    );
+  }
+
+  const detail =
+    data as BackendForumPostDetailData;
+  const postSource = isRecord(
+    detail.post,
+  )
+    ? detail.post
+    : data;
+
+  return normalizePost(
+    postSource,
+    {
+      comments:
+        detail.comments ??
+        postSource.comments,
+      logs: detail.logs,
+      medicalDisclaimer:
+        detail.medicalDisclaimer,
+    },
+  );
+}
+
+export async function createForumPost(
+  input: CreateForumPostInput,
+) {
+  const response =
+    await unwrapApiResponse<unknown>(
+      apiClient.post(
+        `${ENDPOINT}/posts`,
+        compactObject({
+          topicId: input.topicId.trim(),
+          title: input.title.trim(),
+          content: input.content.trim(),
+          coverImageUrl:
+            input.coverImageUrl?.trim(),
+          status: input.status,
+          commentable: input.commentable,
+          isPinned: input.isPinned,
+          isFeatured: input.isFeatured,
+          moderationReason:
+            input.moderationReason?.trim(),
+        }),
+      ),
+    );
+
+  return {
+    ...response,
+    data: normalizePost(
+      readPostMutationData(
+        response.data,
+      ),
+    ),
+  };
+}
+
+export async function updateForumPost(
+  id: string,
+  input: UpdateForumPostInput,
+) {
+  const response =
+    await unwrapApiResponse<unknown>(
+      apiClient.patch(
+        `${ENDPOINT}/posts/${id}`,
+        compactObject({
+          topicId:
+            input.topicId?.trim(),
+          title: input.title?.trim(),
+          content: input.content?.trim(),
+          coverImageUrl:
+            input.coverImageUrl?.trim(),
+          status: input.status,
+          commentable:
+            input.commentable,
+          isPinned: input.isPinned,
+          isFeatured: input.isFeatured,
+          moderationReason:
+            input.moderationReason?.trim(),
+        }),
+      ),
+    );
+
+  return {
+    ...response,
+    data: normalizePost(
+      readPostMutationData(
+        response.data,
+      ),
+    ),
+  };
+}
+
+export async function deleteForumPost(
+  id: string,
+  input: DeleteForumPostInput,
+) {
+  return unwrapApiResponse<unknown>(
+    apiClient.delete(
+      `${ENDPOINT}/posts/${id}`,
+      {
+        params: {
+          reason: input.reason.trim(),
+        },
+      },
+    ),
+  );
 }
 
 export async function moderateForumPost(
@@ -771,6 +1082,51 @@ export async function moderateForumComment(
       response.data,
     ),
   };
+}
+
+export async function updateForumComment(
+  id: string,
+  input: UpdateForumCommentInput,
+) {
+  const response =
+    await unwrapApiResponse<unknown>(
+      apiClient.patch(
+        `${ENDPOINT}/comments/${id}`,
+        compactObject({
+          content:
+            input.content?.trim(),
+          parentId:
+            input.parentId?.trim(),
+          messageType:
+            input.messageType?.trim(),
+        }),
+      ),
+    );
+
+  return {
+    ...response,
+    data: normalizeComment(
+      readCommentMutationData(
+        response.data,
+      ),
+    ),
+  };
+}
+
+export async function deleteForumComment(
+  id: string,
+  input: DeleteForumCommentInput,
+) {
+  return unwrapApiResponse<unknown>(
+    apiClient.delete(
+      `${ENDPOINT}/comments/${id}`,
+      {
+        params: {
+          reason: input.reason.trim(),
+        },
+      },
+    ),
+  );
 }
 
 export async function getForumReports(
@@ -846,7 +1202,14 @@ export const forumApi = {
   updateTopic: updateForumTopic,
   getPosts: getForumPosts,
   getPost: getForumPost,
+  createPost: createForumPost,
+  updatePost: updateForumPost,
+  deletePost: deleteForumPost,
   moderatePost: moderateForumPost,
+  updateComment:
+    updateForumComment,
+  deleteComment:
+    deleteForumComment,
   moderateComment:
     moderateForumComment,
   getReports: getForumReports,

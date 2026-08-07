@@ -14,10 +14,12 @@ import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 const { Text } = Typography;
 
-const statusBadge: Record<PregnancyScheduleStatus, "processing" | "success" | "error"> = {
+const statusBadge: Record<PregnancyScheduleStatus, "processing" | "success" | "error" | "warning" | "default"> = {
   upcoming: "processing",
   done: "success",
   missed: "error",
+  action_required: "warning",
+  cancelled: "default",
 };
 
 const typeText: Record<PregnancyScheduleType, string> = {

@@ -36,34 +36,34 @@ import { PageHeader } from "@/management/components/ui/PageHeader";
 import { TableFilter } from "@/management/components/ui/TableFilter";
 import { CopyText } from "@/management/components/ui/CopyText";
 import {
-  deleteUser,
-  deleteUsers,
-  getUser,
-  getUsersPage,
+  deleteStaff,
+  deleteStaffs,
+  getStaff,
+  getStaffsPage,
   createStaffProfile,
-} from "@/management/features/users/users.api";
+} from "@/management/features/staffs/staffs.api";
 import { getFacilities } from "@/management/features/facilities/facilities.api";
-import type { User as BackendUser } from "@/management/features/users/users.types";
-import type { StaffPosition } from "@/management/features/users/users.types";
+import type { Staff as BackendStaff } from "@/management/features/staffs/staffs.types";
+import type { StaffPosition } from "@/management/features/staffs/staffs.types";
 import {
-  UserAccountFormModal,
+  StaffAccountFormModal,
   getAccountTypeLabel,
   getRoleColor,
   roleOptions,
   statusOptions,
-} from "./components/UserAccountFormModal";
+} from "./components/StaffAccountFormModal";
 import type {
   AccountType,
-  UserAccount,
+  StaffAccount,
   UserRole,
   UserStatus,
-} from "./components/UserAccountFormModal";
+} from "./components/StaffAccountFormModal";
 
 const { Text, Title } = Typography;
 
 type DeleteConfirmState =
   | { open: false }
-  | { open: true; mode: "single"; user: UserAccount }
+  | { open: true; mode: "single"; staff: StaffAccount }
   | { open: true; mode: "selected"; ids: string[]; count: number };
 
 interface StaffProfileFormValues {
@@ -199,10 +199,46 @@ function deriveAccountType(roleName?: string): AccountType {
   return "customer";
 }
 
-function normalizeUser(user: BackendUser): UserAccount {
+type StaffListUser = BackendStaff & {
+  facilityId?: string | number | null;
+  personalEmail?: string | null;
+  employeeCode?: string | null;
+};
+
+function getStaffProfile(user: StaffListUser): BackendStaff["staffProfile"] {
+  if (user.staffProfile) return user.staffProfile;
+
+  const facilityId = user.facilityId === null || user.facilityId === undefined
+    ? ""
+    : String(user.facilityId);
+  const roles = (user.roles ?? [])
+    .map((role) => role.name)
+    .filter((role): role is StaffPosition =>
+      role === "admin" || role === "doctor" || role === "nurse" || role === "staff",
+    );
+
+  if (!facilityId && !user.personalEmail && !user.employeeCode && roles.length === 0) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    staffId: user.id,
+    personalEmail: user.personalEmail || user.email,
+    employeeCode: user.employeeCode || "",
+    status: user.status,
+    facilityAssignments: facilityId
+      ? [{ facilityId, roles: roles.length ? roles : ["staff"] }]
+      : [],
+    doctor: null,
+  };
+}
+
+function normalizeStaff(user: BackendStaff): StaffAccount {
   const firstRole = user.roles?.[0];
+  const staffProfile = getStaffProfile(user);
   const roleName =
-    user.staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
+    staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
   const accountType = deriveAccountType(roleName);
 
   return {
@@ -212,16 +248,18 @@ function normalizeUser(user: BackendUser): UserAccount {
     phone: user.phone || "",
     role: toUiRole(roleName),
     roleLabel: formatBackendRoleLabel(roleName),
+    roles: user.roles ?? [],
     accountType,
     accountTypeLabel: getAccountTypeLabel(accountType),
     status: toUiStatus(user.status),
     createdAt: user.createdAt,
     lastLogin: undefined,
-    staffProfile: user.staffProfile,
+    staffProfile,
+    permissionOverrides: user.permissionOverrides ?? [],
   };
 }
 
-function exportUsersToCsv(users: UserAccount[]) {
+function exportStaffsToCsv(staffs: StaffAccount[]) {
   const headers = [
     "STT",
     "Họ tên",
@@ -233,15 +271,15 @@ function exportUsersToCsv(users: UserAccount[]) {
     "Ngày tạo",
   ];
 
-  const rows = users.map((user, index) => [
+  const rows = staffs.map((staff, index) => [
     index + 1,
-    user.fullName,
-    user.email,
-    user.phone || "Chưa cập nhật",
-    user.roleLabel,
-    user.status === "active" ? "Hoạt động" : "Đã khóa",
-    user.accountTypeLabel,
-    formatDate(user.createdAt),
+    staff.fullName,
+    staff.email,
+    staff.phone || "Chưa cập nhật",
+    staff.roleLabel,
+    staff.status === "active" ? "Hoạt động" : "Đã khóa",
+    staff.accountTypeLabel,
+    formatDate(staff.createdAt),
   ]);
 
   const csvContent = [headers, ...rows]
@@ -265,8 +303,8 @@ function exportUsersToCsv(users: UserAccount[]) {
 }
 
 export default function StaffsManagementPage() {
-  const [users, setUsers] = useState<UserAccount[]>([]);
-  const [totalUsers, setTotalUsers] = useState(0);
+  const [staffs, setStaffs] = useState<StaffAccount[]>([]);
+  const [totalStaffs, setTotalStaffs] = useState(0);
 
   const [query, setQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState<string>();
@@ -276,13 +314,13 @@ export default function StaffsManagementPage() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedStaffIds, setSelectedUserIds] = useState<string[]>([]);
 
-  const [detailUser, setDetailUser] = useState<UserAccount | null>(null);
-  const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+  const [detailStaff, setDetailStaff] = useState<StaffAccount | null>(null);
+  const [editingStaff, setEditingStaff] = useState<StaffAccount | null>(null);
   const [formModalOpen, setFormModalOpen] = useState(false);
-  const [staffProfileUser, setStaffProfileUser] =
-    useState<UserAccount | null>(null);
+  const [staffProfileStaff, setStaffProfileStaff] =
+    useState<StaffAccount | null>(null);
   const [staffProfileSubmitting, setStaffProfileSubmitting] = useState(false);
   const [staffFacilityOptions, setStaffFacilityOptions] = useState<
     Array<{ value: string; label: string }>
@@ -310,7 +348,7 @@ export default function StaffsManagementPage() {
       setError(null);
 
       try {
-        const response = await getUsersPage({
+        const response = await getStaffsPage({
           search: searchQuery,
           page: currentPage,
           limit: pageSize,
@@ -318,12 +356,12 @@ export default function StaffsManagementPage() {
 
         if (!mounted) return;
 
-        const backendUsers = Array.isArray(response.users)
+        const backendStaffs = Array.isArray(response.users)
           ? response.users
           : [];
 
-        setUsers(backendUsers.map((user) => normalizeUser(user)));
-        setTotalUsers(response.total ?? backendUsers.length);
+        setStaffs(backendStaffs.map((user) => normalizeStaff(user)));
+        setTotalStaffs(response.total ?? backendStaffs.length);
         setSelectedUserIds([]);
       } catch (err) {
         if (mounted) {
@@ -362,12 +400,12 @@ export default function StaffsManagementPage() {
     };
   }, []);
 
-  const filteredUsers = users;
+  const filteredStaffs = staffs;
 
-  const activeUsers = users.filter((user) => user.status === "active").length;
-  const lockedUsers = users.filter((user) => user.status === "locked").length;
+  const activeStaffs = staffs.filter((user) => user.status === "active").length;
+  const lockedStaffs = staffs.filter((user) => user.status === "locked").length;
 
-  const createdThisMonth = users.filter((user) => {
+  const createdThisMonth = staffs.filter((user) => {
     const createdDate = new Date(user.createdAt);
     const now = new Date();
 
@@ -378,34 +416,34 @@ export default function StaffsManagementPage() {
   }).length;
 
   function openCreateModal() {
-    setEditingUser(null);
+    setEditingStaff(null);
     setFormModalOpen(true);
   }
 
-  function openEditModal(user: UserAccount) {
-    setEditingUser(user);
+  function openEditModal(user: StaffAccount) {
+    setEditingStaff(user);
     setFormModalOpen(true);
   }
 
   function closeFormModal() {
     setFormModalOpen(false);
-    setEditingUser(null);
+    setEditingStaff(null);
   }
 
-  async function openDetailUser(user: UserAccount) {
-    setDetailUser(user);
+  async function openDetailStaff(user: StaffAccount) {
+    setDetailStaff(user);
 
     try {
-      const response = await getUser(user.id);
-      setDetailUser(normalizeUser(response));
+      const response = await getStaff(user.id);
+      setDetailStaff(normalizeStaff(response));
     } catch {
-      setDetailUser(user);
+      setDetailStaff(user);
     }
   }
 
-  async function openCreateStaffProfile(user: UserAccount) {
-    setStaffProfileUser(user);
-    setDetailUser(null);
+  async function openCreateStaffProfile(user: StaffAccount) {
+    setStaffProfileStaff(user);
+    setDetailStaff(null);
     staffProfileForm.setFieldsValue({
       personalEmail: "",
       position: "staff",
@@ -426,17 +464,17 @@ export default function StaffsManagementPage() {
   }
 
   async function submitStaffProfile(values: StaffProfileFormValues) {
-    if (!staffProfileUser) return;
+    if (!staffProfileStaff) return;
     setStaffProfileSubmitting(true);
     try {
-      const response = await createStaffProfile(staffProfileUser.id, values);
-      const refreshedUser = normalizeUser(await getUser(staffProfileUser.id));
-      setUsers((current) =>
+      const response = await createStaffProfile(staffProfileStaff.id, values);
+      const refreshedStaff = normalizeStaff(await getStaff(staffProfileStaff.id));
+      setStaffs((current) =>
         current.map((user) =>
-          user.id === refreshedUser.id ? refreshedUser : user,
+          user.id === refreshedStaff.id ? refreshedStaff : user,
         ),
       );
-      setStaffProfileUser(null);
+      setStaffProfileStaff(null);
       staffProfileForm.resetFields();
       Modal.success({
         title: response.message || "Tạo hồ sơ nhân viên thành công",
@@ -450,18 +488,18 @@ export default function StaffsManagementPage() {
     }
   }
 
-  function confirmDeleteUser(user: UserAccount) {
-    setDeleteConfirm({ open: true, mode: "single", user });
+  function confirmDeleteStaff(staff: StaffAccount) {
+    setDeleteConfirm({ open: true, mode: "single", staff });
   }
 
   function confirmDeleteSelected() {
-    if (selectedUserIds.length === 0) return;
+    if (selectedStaffIds.length === 0) return;
 
     setDeleteConfirm({
       open: true,
       mode: "selected",
-      ids: selectedUserIds,
-      count: selectedUserIds.length,
+      ids: selectedStaffIds,
+      count: selectedStaffIds.length,
     });
   }
 
@@ -480,16 +518,16 @@ export default function StaffsManagementPage() {
 
     try {
       if (deleteConfirm.mode === "single") {
-        const userId = deleteConfirm.user.id;
+        const userId = deleteConfirm.staff.id;
 
-        await deleteUser(userId);
+        await deleteStaff(userId);
 
-        setUsers((current) => current.filter((user) => user.id !== userId));
-        setTotalUsers((current) => Math.max(current - 1, 0));
+        setStaffs((current) => current.filter((user) => user.id !== userId));
+        setTotalStaffs((current) => Math.max(current - 1, 0));
         setSelectedUserIds((current) =>
           current.filter((id) => id !== userId),
         );
-        setDetailUser((current) => (current?.id === userId ? null : current));
+        setDetailStaff((current) => (current?.id === userId ? null : current));
 
         Modal.success({
           title: "Xóa tài khoản thành công",
@@ -500,13 +538,13 @@ export default function StaffsManagementPage() {
       } else {
         const ids = deleteConfirm.ids;
 
-        await deleteUsers(ids);
+        await deleteStaffs(ids);
 
-        setUsers((current) => current.filter((user) => !ids.includes(user.id)));
-        setTotalUsers((current) => Math.max(current - ids.length, 0));
+        setStaffs((current) => current.filter((user) => !ids.includes(user.id)));
+        setTotalStaffs((current) => Math.max(current - ids.length, 0));
         setSelectedUserIds([]);
         setCurrentPage(1);
-        setDetailUser((current) =>
+        setDetailStaff((current) =>
           current && ids.includes(current.id) ? null : current,
         );
 
@@ -536,7 +574,7 @@ export default function StaffsManagementPage() {
     }
   }
 
-  const columns: ColumnsType<UserAccount> = [
+  const columns: ColumnsType<StaffAccount> = [
     {
       title: "STT",
       width: 64,
@@ -622,7 +660,7 @@ export default function StaffsManagementPage() {
             icon={<Eye className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
-              void openDetailUser(record);
+              void openDetailStaff(record);
             }}
           />
 
@@ -641,7 +679,7 @@ export default function StaffsManagementPage() {
             icon={<Trash2 className="h-4 w-4" />}
             onClick={(event) => {
               event.stopPropagation();
-              confirmDeleteUser(record);
+              confirmDeleteStaff(record);
             }}
           />
         </Space>
@@ -686,7 +724,7 @@ export default function StaffsManagementPage() {
             <Button
               size="large"
               icon={<Download className="h-4 w-4" />}
-              onClick={() => exportUsersToCsv(filteredUsers)}
+              onClick={() => exportStaffsToCsv(filteredStaffs)}
             >
               Xuất danh sách
             </Button>
@@ -717,7 +755,7 @@ export default function StaffsManagementPage() {
           <Card className="border-slate-200 bg-white">
             <Statistic
               title={<span className="text-slate-500">Tổng tài khoản</span>}
-              value={totalUsers}
+              value={totalStaffs}
               formatter={(value) => (
                 <span className="text-slate-950">{value}</span>
               )}
@@ -727,7 +765,7 @@ export default function StaffsManagementPage() {
           <Card className="border-emerald-100 bg-emerald-50/60">
             <Statistic
               title={<span className="text-emerald-700">Đang hoạt động</span>}
-              value={activeUsers}
+              value={activeStaffs}
               formatter={(value) => (
                 <span className="text-emerald-950">{value}</span>
               )}
@@ -737,7 +775,7 @@ export default function StaffsManagementPage() {
           <Card className="border-red-100 bg-red-50/60">
             <Statistic
               title={<span className="text-red-700">Đã khóa</span>}
-              value={lockedUsers}
+              value={lockedStaffs}
               formatter={(value) => (
                 <span className="text-red-950">{value}</span>
               )}
@@ -772,13 +810,13 @@ export default function StaffsManagementPage() {
             <Space wrap>
               <Button
                 danger
-                disabled={selectedUserIds.length === 0}
+                disabled={selectedStaffIds.length === 0}
                 icon={<Trash2 className="h-4 w-4" />}
                 onClick={confirmDeleteSelected}
               >
                 Xóa đã chọn
-                {selectedUserIds.length > 0
-                  ? ` (${selectedUserIds.length})`
+                {selectedStaffIds.length > 0
+                  ? ` (${selectedStaffIds.length})`
                   : ""}
               </Button>
 
@@ -798,11 +836,11 @@ export default function StaffsManagementPage() {
             tableLayout="fixed"
             loading={loading || tableLoading}
             columns={columns}
-            dataSource={filteredUsers}
+            dataSource={filteredStaffs}
             className="management-table [&_.ant-table-cell]:px-3"
             scroll={{ x: 980 }}
             rowSelection={{
-              selectedRowKeys: selectedUserIds,
+              selectedRowKeys: selectedStaffIds,
               onChange: (selectedRowKeys) => {
                 setSelectedUserIds(selectedRowKeys.map(String));
               },
@@ -821,13 +859,13 @@ export default function StaffsManagementPage() {
                   return;
                 }
 
-                void openDetailUser(record);
+                void openDetailStaff(record);
               },
             })}
             pagination={{
               current: currentPage,
               pageSize,
-              total: filteredUsers.length,
+              total: filteredStaffs.length,
               showSizeChanger: true,
               pageSizeOptions: [10, 20, 50, 100],
               showQuickJumper: true,
@@ -842,41 +880,41 @@ export default function StaffsManagementPage() {
         </Card>
       </div>
 
-      <UserAccountFormModal
+      <StaffAccountFormModal
         open={formModalOpen}
-        editingUser={editingUser}
+        editingStaff={editingStaff}
         onClose={closeFormModal}
-        onSaved={(savedUser, mode) => {
+        onSaved={(savedStaff, mode) => {
           if (mode === "create") {
-            setUsers((current) => [savedUser, ...current]);
-            setTotalUsers((current) => current + 1);
+            setStaffs((current) => [savedStaff, ...current]);
+            setTotalStaffs((current) => current + 1);
             setCurrentPage(1);
             return;
           }
 
-          setUsers((current) =>
+          setStaffs((current) =>
             current.map((user) =>
-              user.id === savedUser.id ? savedUser : user,
+              user.id === savedStaff.id ? savedStaff : user,
             ),
           );
 
-          setDetailUser((current) =>
-            current?.id === savedUser.id ? savedUser : current,
+          setDetailStaff((current) =>
+            current?.id === savedStaff.id ? savedStaff : current,
           );
         }}
       />
 
       <Modal
-        open={Boolean(detailUser)}
+        open={Boolean(detailStaff)}
         width={760}
         centered
         title={null}
         footer={
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
-            {detailUser && !detailUser.staffProfile ? (
+            {detailStaff && !detailStaff.staffProfile ? (
               <Button
                 icon={<UserRoundPlus className="h-4 w-4" />}
-                onClick={() => void openCreateStaffProfile(detailUser)}
+                onClick={() => void openCreateStaffProfile(detailStaff)}
               >
                 Tạo hồ sơ nhân viên
               </Button>
@@ -884,16 +922,16 @@ export default function StaffsManagementPage() {
             <Button
               type="primary"
               icon={<X className="h-4 w-4" />}
-              onClick={() => setDetailUser(null)}
+              onClick={() => setDetailStaff(null)}
             >
               Đóng
             </Button>
           </div>
         }
-        onCancel={() => setDetailUser(null)}
+        onCancel={() => setDetailStaff(null)}
         mask={{ closable: true }}
       >
-        {detailUser ? (
+        {detailStaff ? (
           <div>
             <div className="mb-5 flex items-start gap-4 border-b border-slate-200 pb-4">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
@@ -902,21 +940,21 @@ export default function StaffsManagementPage() {
 
               <div className="min-w-0">
                 <Title level={3} className="!mb-1 !text-slate-950">
-                  {detailUser.fullName}
+                  {detailStaff.fullName}
                 </Title>
 
                 <Space size={8} wrap>
-                  <Tag color={getRoleColor(detailUser.role)}>
-                    {detailUser.roleLabel}
+                  <Tag color={getRoleColor(detailStaff.role)}>
+                    {detailStaff.roleLabel}
                   </Tag>
 
-                  {detailUser.status === "active" ? (
+                  {detailStaff.status === "active" ? (
                     <Tag color="green">Hoạt động</Tag>
                   ) : (
                     <Tag color="default">Đã khóa</Tag>
                   )}
 
-                  <Tag>{detailUser.accountTypeLabel}</Tag>
+                  <Tag>{detailStaff.accountTypeLabel}</Tag>
                 </Space>
               </div>
             </div>
@@ -933,33 +971,33 @@ export default function StaffsManagementPage() {
               }}
             >
               <Descriptions.Item label="Mã tài khoản" span={1}>
-                {detailUser.id}
+                {detailStaff.id}
               </Descriptions.Item>
 
               <Descriptions.Item label="Họ tên" span={1}>
-                {detailUser.fullName}
+                {detailStaff.fullName}
               </Descriptions.Item>
 
               <Descriptions.Item label="Email" span={1}>
-                {detailUser.email}
+                {detailStaff.email}
               </Descriptions.Item>
 
               <Descriptions.Item label="Số điện thoại" span={1}>
-                {detailUser.phone || "Chưa cập nhật"}
+                {detailStaff.phone || "Chưa cập nhật"}
               </Descriptions.Item>
 
               <Descriptions.Item label="Vai trò" span={1}>
-                <Tag color={getRoleColor(detailUser.role)}>
-                  {detailUser.roleLabel}
+                <Tag color={getRoleColor(detailStaff.role)}>
+                  {detailStaff.roleLabel}
                 </Tag>
               </Descriptions.Item>
 
               <Descriptions.Item label="Loại tài khoản" span={1}>
-                {detailUser.accountTypeLabel}
+                {detailStaff.accountTypeLabel}
               </Descriptions.Item>
 
               <Descriptions.Item label="Trạng thái" span={1}>
-                {detailUser.status === "active" ? (
+                {detailStaff.status === "active" ? (
                   <Tag color="green">Hoạt động</Tag>
                 ) : (
                   <Tag color="default">Đã khóa</Tag>
@@ -969,27 +1007,27 @@ export default function StaffsManagementPage() {
               <Descriptions.Item label="Ngày tạo" span={1}>
                 <Space size={6}>
                   <CalendarClock className="h-4 w-4 text-slate-400" />
-                  {formatDateTime(detailUser.createdAt)}
+                  {formatDateTime(detailStaff.createdAt)}
                 </Space>
               </Descriptions.Item>
 
               <Descriptions.Item label="Đăng nhập gần nhất" span={1}>
-                {formatDateTime(detailUser.lastLogin)}
+                {formatDateTime(detailStaff.lastLogin)}
               </Descriptions.Item>
 
               <Descriptions.Item label="Hồ sơ nhân viên" span={2}>
-                {detailUser.staffProfile ? (
+                {detailStaff.staffProfile ? (
                   <Space wrap>
                     <Tag color="blue">
-                      {detailUser.staffProfile.employeeCode}
+                      {detailStaff.staffProfile.employeeCode}
                     </Tag>
                     <span>
-                      {detailUser.staffProfile.facilityAssignments
+                      {detailStaff.staffProfile.facilityAssignments
                         .flatMap((assignment) => assignment.roles)
                         .map(formatBackendRoleLabel)
                         .join(", ")}
                     </span>
-                    <span>{detailUser.staffProfile.personalEmail}</span>
+                    <span>{detailStaff.staffProfile.personalEmail}</span>
                   </Space>
                 ) : (
                   <Tag>Chưa tạo</Tag>
@@ -998,13 +1036,13 @@ export default function StaffsManagementPage() {
 
               <Descriptions.Item label="Bảo mật" span={1}>
                 <Space size={6}>
-                  {detailUser.status === "locked" ? (
+                  {detailStaff.status === "locked" ? (
                     <Lock className="h-4 w-4 text-slate-400" />
                   ) : (
                     <ShieldCheck className="h-4 w-4 text-emerald-500" />
                   )}
 
-                  {detailUser.status === "locked"
+                  {detailStaff.status === "locked"
                     ? "Tài khoản đang bị khóa"
                     : "Tài khoản đang hoạt động bình thường"}
                 </Space>
@@ -1015,9 +1053,9 @@ export default function StaffsManagementPage() {
       </Modal>
 
       <Modal
-        open={Boolean(staffProfileUser)}
+        open={Boolean(staffProfileStaff)}
         title={`Tạo hồ sơ nhân viên${
-          staffProfileUser ? ` - ${staffProfileUser.fullName}` : ""
+          staffProfileStaff ? ` - ${staffProfileStaff.fullName}` : ""
         }`}
         okText="Tạo hồ sơ"
         cancelText="Hủy"
@@ -1025,7 +1063,7 @@ export default function StaffsManagementPage() {
         onOk={() => staffProfileForm.submit()}
         onCancel={() => {
           if (!staffProfileSubmitting) {
-            setStaffProfileUser(null);
+            setStaffProfileStaff(null);
             staffProfileForm.resetFields();
           }
         }}
@@ -1167,7 +1205,7 @@ export default function StaffsManagementPage() {
 
           {deleteConfirm.open && deleteConfirm.mode === "single" ? (
             <p className="mx-auto mt-2 max-w-[340px] truncate text-sm font-semibold text-slate-800">
-              {deleteConfirm.user.fullName} - {deleteConfirm.user.email}
+              {deleteConfirm.staff.fullName} - {deleteConfirm.staff.email}
             </p>
           ) : null}
 

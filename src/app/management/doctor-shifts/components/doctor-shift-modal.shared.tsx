@@ -503,6 +503,10 @@ export function DoctorShiftFormModalBase({
       form.resetFields();
       form.setFieldsValue({
         shiftDate: getCurrentDateKey(),
+        facilityId:
+          facilities.length === 1
+            ? facilities[0]?.id
+            : undefined,
         status: "available",
         note: "",
         assignments: [],
@@ -513,7 +517,13 @@ export function DoctorShiftFormModalBase({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [editingShift, form, mode, open]);
+  }, [
+    editingShift,
+    facilities,
+    form,
+    mode,
+    open,
+  ]);
 
   useEffect(() => {
     if (!open || !watchedFacilityId) {
@@ -1415,6 +1425,9 @@ export function DoctorShiftFormModalBase({
               <Select
                 showSearch
                 optionFilterProp="label"
+                disabled={
+                  facilities.length === 1
+                }
                 placeholder="Chọn cơ sở khám"
                 options={facilities.map(
                   (facility) => ({

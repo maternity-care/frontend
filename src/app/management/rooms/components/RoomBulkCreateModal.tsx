@@ -458,7 +458,9 @@ export function RoomBulkCreateModal({
         rooms: [
           {
             facilityId:
-              defaultFacilityId ?? "",
+              defaultFacilityId ??
+              facilities[0]?.id ??
+              "",
             name: "",
             roomTypeId: "",
             floor: "",
@@ -500,6 +502,7 @@ export function RoomBulkCreateModal({
     };
   }, [
     defaultFacilityId,
+    facilities,
     form,
     open,
   ]);
@@ -552,6 +555,63 @@ export function RoomBulkCreateModal({
     clearBackendFieldErrors(
       values.rooms.length,
     );
+
+    const allowedFacilityIds =
+      new Set(
+        facilities.map(
+          (facility) =>
+            String(
+              facility.id,
+            ),
+        ),
+      );
+    const invalidFacilityIndexes =
+      values.rooms
+        .map((room, index) =>
+          allowedFacilityIds.has(
+            String(
+              room.facilityId,
+            ),
+          )
+            ? -1
+            : index,
+        )
+        .filter(
+          (index) => index >= 0,
+        );
+
+    if (
+      invalidFacilityIndexes.length >
+      0
+    ) {
+      const message =
+        "Bạn không có quyền tạo phòng cho cơ sở đã chọn.";
+
+      form.setFields(
+        invalidFacilityIndexes.map(
+          (rowIndex) => ({
+            name: getRoomFieldPath(
+              rowIndex,
+              "facilityId",
+            ),
+            errors: [message],
+          }),
+        ),
+      );
+      setError(message);
+      messageApi.error(message);
+      form.scrollToField(
+        getRoomFieldPath(
+          invalidFacilityIndexes[0],
+          "facilityId",
+        ),
+        {
+          block: "center",
+        },
+      );
+      return;
+    }
+
     setSubmitting(true);
 
     const submittedRooms =
@@ -757,11 +817,11 @@ export function RoomBulkCreateModal({
               level={4}
               className="!mb-1 !text-slate-950"
             >
-              Tạo nhiều phòng
+              Thêm phòng
             </Title>
 
             <Text type="secondary">
-              Nhập danh sách phòng và bấm Tạo phòng để lưu trực tiếp.
+              Nhập thông tin phòng và bấm Tạo phòng để lưu trực tiếp.
             </Text>
           </div>
         </div>
@@ -890,6 +950,10 @@ export function RoomBulkCreateModal({
                           <Select
                             showSearch
                             optionFilterProp="label"
+                            disabled={
+                              facilities.length ===
+                              1
+                            }
                             placeholder="Chọn cơ sở"
                             options={facilities.map(
                               (
@@ -1054,6 +1118,7 @@ export function RoomBulkCreateModal({
                   add({
                     facilityId:
                       defaultFacilityId ??
+                      facilities[0]?.id ??
                       "",
                     name: "",
                     roomTypeId: "",

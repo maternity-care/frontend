@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -20,7 +20,7 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
-import { CalendarClock, CheckCircle2, Eye, FileText, LogIn, RefreshCw, Search, UserX, XCircle } from "lucide-react";
+import { CalendarClock, CheckCircle2, Eye, FilePlus2, FileText, LogIn, RefreshCw, Search, UserX, XCircle } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
@@ -41,6 +41,7 @@ import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { getManagementPregnancyProfiles, getManagementPregnancyProfileById } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.api";
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { PregnancyProfileDetailModal } from "@/fe/components/records/management/PregnancyProfileDetailModal";
+import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
 import { getDoctorAvailability } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import { useAuthStore } from "@/features/auth/auth.store";
 
@@ -113,6 +114,8 @@ export default function ManagementAppointmentsPage() {
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [profileDetail, setProfileDetail] = useState<ManagementPregnancyProfile | null>(null);
+  const [creatingMedicalRecordFor, setCreatingMedicalRecordFor] = useState<ManagementPregnancyProfile | null>(null);
+  const [medicalRecordAppointmentId, setMedicalRecordAppointmentId] = useState<string | null>(null);
   const [availableSlots, setAvailableSlots] = useState<Array<{ shiftId: string; label: string; startTime: string; endTime: string }>>([]);
   const [checkInForm] = Form.useForm<CheckInFormValues>();
   const [rescheduleForm] = Form.useForm<RescheduleFormValues>();
@@ -123,7 +126,7 @@ export default function ManagementAppointmentsPage() {
     [doctors],
   );
 
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     setLoading(true);
     try {
       setAppointments(await getManagementAppointments({
@@ -140,47 +143,59 @@ export default function ManagementAppointmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange, doctorId, scope, scopedFacilityId, search, status]);
 
   useEffect(() => {
-    loadAppointments();
-  }, [scope, status, search, scopedFacilityId, doctorId, dateRange]);
+    const timer = window.setTimeout(() => {
+      void loadAppointments();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadAppointments]);
 
   useEffect(() => {
-    setDoctorId(undefined);
-    if (!authUser || (!isSuperAdmin && !activeFacilityId)) {
-      setDoctors([]);
-      return;
-    }
-    getDoctors({ limit: 100, facilityId: isSuperAdmin ? facilityId : activeFacilityId ?? undefined })
-      .then((result) => setDoctors(result.items))
-      .catch(() => setDoctors([]));
+    const timer = window.setTimeout(() => {
+      setDoctorId(undefined);
+      if (!authUser || (!isSuperAdmin && !activeFacilityId)) {
+        setDoctors([]);
+        return;
+      }
+      void getDoctors({ limit: 100, facilityId: isSuperAdmin ? facilityId : activeFacilityId ?? undefined })
+        .then((result) => setDoctors(result.items))
+        .catch(() => setDoctors([]));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [activeFacilityId, authUser, facilityId, isSuperAdmin]);
 
   useEffect(() => {
-    if (!authUser) {
-      setFacilityOptions([]);
-      return;
-    }
-    if (!isSuperAdmin) {
-      setFacilityOptions(
-        activeFacility
-          ? [{ value: String(activeFacility.id), label: `${activeFacility.name} (${activeFacility.code})` }]
-          : [],
-      );
-      return;
-    }
-    getFacilities({ status: "active", limit: 100 })
-      .then((facilities) =>
+    const timer = window.setTimeout(() => {
+      if (!authUser) {
+        setFacilityOptions([]);
+        return;
+      }
+      if (!isSuperAdmin) {
         setFacilityOptions(
-          facilities.map((facility) => ({
-            value: facility.id,
-            label: `${facility.name} (${facility.code})`,
-          })),
-        ),
-      )
-      .catch(() => setFacilityOptions([]));
-  }, [activeFacility?.code, activeFacility?.id, activeFacility?.name, authUser, isSuperAdmin]);
+          activeFacility
+            ? [{ value: String(activeFacility.id), label: `${activeFacility.name} (${activeFacility.code})` }]
+            : [],
+        );
+        return;
+      }
+      void getFacilities({ status: "active", limit: 100 })
+        .then((facilities) =>
+          setFacilityOptions(
+            facilities.map((facility) => ({
+              value: facility.id,
+              label: `${facility.name} (${facility.code})`,
+            })),
+          ),
+        )
+        .catch(() => setFacilityOptions([]));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeFacility, authUser, isSuperAdmin]);
 
   const openCheckIn = async (appointment: ManagementAppointment) => {
     setSelectedAppointment(appointment);
@@ -346,6 +361,21 @@ export default function ManagementAppointmentsPage() {
     }
   };
 
+  const openCreateMedicalRecord = async (appointment: ManagementAppointment) => {
+    if (!appointment.pregnancyProfileId) {
+      message.warning("Lịch này chưa gắn hồ sơ thai kỳ.");
+      return;
+    }
+
+    try {
+      const profile = await getManagementPregnancyProfileById(appointment.pregnancyProfileId);
+      setMedicalRecordAppointmentId(appointment.id);
+      setCreatingMedicalRecordFor(profile);
+    } catch {
+      message.error("Không tải được hồ sơ để thêm kết quả khám.");
+    }
+  };
+
   const columns: ColumnsType<ManagementAppointment> = [
     {
       title: "Lịch",
@@ -388,6 +418,9 @@ export default function ManagementAppointmentsPage() {
       render: (_, item) => (
         <Space wrap>
           <Button size="small" icon={<Eye className="h-3.5 w-3.5" />} onClick={() => { setSelectedAppointment(item); setDetailOpen(true); }}>Chi tiết</Button>
+          {item.pregnancyProfileId ? (
+            <Button size="small" icon={<FilePlus2 className="h-3.5 w-3.5" />} onClick={() => openCreateMedicalRecord(item)}>Thêm kết quả</Button>
+          ) : null}
           {["booked", "confirmed", "rescheduled"].includes(item.status) ? (
             <Button size="small" type="primary" icon={<LogIn className="h-3.5 w-3.5" />} onClick={() => openCheckIn(item)}>Check-in</Button>
           ) : null}
@@ -580,6 +613,21 @@ export default function ManagementAppointmentsPage() {
         profile={profileDetail}
         onClose={() => setProfileDetail(null)}
         onEdit={() => undefined}
+      />
+
+      <CreateMedicalRecordModal
+        open={creatingMedicalRecordFor !== null}
+        profile={creatingMedicalRecordFor}
+        initialAppointmentId={medicalRecordAppointmentId}
+        onCancel={() => {
+          setCreatingMedicalRecordFor(null);
+          setMedicalRecordAppointmentId(null);
+        }}
+        onSuccess={() => {
+          setCreatingMedicalRecordFor(null);
+          setMedicalRecordAppointmentId(null);
+          loadAppointments();
+        }}
       />
     </AdminLayout>
   );

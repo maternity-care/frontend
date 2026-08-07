@@ -1,26 +1,27 @@
-// src/management/features/users/users.api.ts
+// src/management/features/staffs/staffs.api.ts
 
 import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
 import type {
-  CreateUserInput,
-  GetUsersParams,
-  UpdateUserInput,
+  CreateStaffInput,
+  GetStaffsParams,
+  UpdateStaffInput,
   CreateStaffProfileInput,
   StaffProfile,
-  User,
-  UsersListData,
-} from "./users.types";
+  Staff,
+  StaffsListData,
+  Permission,
+} from "./staffs.types";
 
-type BackendUsersPayload =
-  | UsersListData
-  | User[]
+type BackendStaffsPayload =
+  | StaffsListData
+  | Staff[]
   | {
-      data?: UsersListData | User[];
-      users?: User[];
+      data?: StaffsListData | Staff[];
+      users?: Staff[];
       total?: number;
     };
 
-function toQueryParams(params?: GetUsersParams) {
+function toQueryParams(params?: GetStaffsParams) {
   const queryParams = {
     search: params?.search?.trim() || undefined,
     name: params?.name?.trim() || undefined,
@@ -39,7 +40,7 @@ function toQueryParams(params?: GetUsersParams) {
   );
 }
 
-function normalizeUsersList(payload: BackendUsersPayload): UsersListData {
+function normalizeStaffsList(payload: BackendStaffsPayload): StaffsListData {
   const source =
     payload &&
     typeof payload === "object" &&
@@ -64,7 +65,7 @@ function normalizeUsersList(payload: BackendUsersPayload): UsersListData {
   };
 }
 
-function toCreatePayload(input: CreateUserInput) {
+function toCreatePayload(input: CreateStaffInput) {
   return {
     name: input.name.trim(),
     personalEmail: input.personalEmail.trim(),
@@ -79,7 +80,7 @@ function toCreatePayload(input: CreateUserInput) {
   };
 }
 
-function toUpdatePayload(input: UpdateUserInput) {
+function toUpdatePayload(input: UpdateStaffInput) {
   const payload = {
     name: input.name?.trim(),
     email: input.email?.trim(),
@@ -100,51 +101,55 @@ function toUpdatePayload(input: UpdateUserInput) {
   );
 }
 
-export async function getUsersPage(params?: GetUsersParams) {
-  const data = await unwrapApiData<BackendUsersPayload>(
+export async function getStaffsPage(params?: GetStaffsParams) {
+  const data = await unwrapApiData<BackendStaffsPayload>(
     apiClient.get("/management/staffs", {
       params: toQueryParams(params),
     }),
   );
 
-  return normalizeUsersList(data);
+  return normalizeStaffsList(data);
 }
 
-export async function getUsers(params?: GetUsersParams) {
-  const data = await getUsersPage(params);
+export async function getStaffs(params?: GetStaffsParams) {
+  const data = await getStaffsPage(params);
 
   return data.users;
 }
 
-export function createUser(input: CreateUserInput) {
-  return unwrapApiResponse<User>(
+export function getPermissions() {
+  return unwrapApiData<Permission[]>(apiClient.get("/management/permissions"));
+}
+
+export function createStaff(input: CreateStaffInput) {
+  return unwrapApiResponse<Staff>(
     apiClient.post("/management/staffs", toCreatePayload(input)),
   );
 }
 
-export function getUser(id: string) {
-  return unwrapApiData<User>(apiClient.get(`/management/staffs/${id}`));
+export function getStaff(id: string) {
+  return unwrapApiData<Staff>(apiClient.get(`/management/staffs/${id}`));
 }
 
-export function updateUser(id: string, input: UpdateUserInput) {
-  return unwrapApiResponse<User>(
+export function updateStaff(id: string, input: UpdateStaffInput) {
+  return unwrapApiResponse<Staff>(
     apiClient.patch(`/management/staffs/${id}`, toUpdatePayload(input)),
   );
 }
 
-export function deleteUser(id: string) {
+export function deleteStaff(id: string) {
   return unwrapApiResponse<null>(apiClient.delete(`/management/staffs/${id}`));
 }
 
 export function createStaffProfile(
-  userId: string,
+  staffId: string,
   input: CreateStaffProfileInput,
 ) {
   return unwrapApiResponse<StaffProfile>(
-    apiClient.post(`/management/staffs/${userId}/staff-profile`, input),
+    apiClient.post(`/management/staffs/${staffId}/staff-profile`, input),
   );
 }
 
-export async function deleteUsers(ids: string[]) {
-  await Promise.all(ids.map((id) => deleteUser(id)));
+export async function deleteStaffs(ids: string[]) {
+  await Promise.all(ids.map((id) => deleteStaff(id)));
 }

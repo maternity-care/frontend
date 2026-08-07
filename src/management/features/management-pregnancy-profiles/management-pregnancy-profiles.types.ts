@@ -162,6 +162,26 @@ export interface UpdateManagementPregnancyProfileInput {
   notes?: string | null;
 }
 
+export interface CreateManagementPregnancyProfileInput {
+  patientId: string;
+
+  lastMenstrualPeriod?: string | null;
+  expectedDueDate?: string | null;
+
+  fetalCount?: number;
+
+  gravida: number;
+  paraFullTerm?: number;
+  paraPremature?: number;
+  paraAbortion?: number;
+  paraLivingChildren?: number;
+
+  riskLevel: PregnancyRiskLevel;
+  status: "ACTIVE" | "COMPLETED" | "TERMINATED";
+
+  notes?: string | null;
+}
+
 export interface DeleteManagementPregnancyProfileInput {
   reason?: string;
 }

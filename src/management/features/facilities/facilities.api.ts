@@ -7,10 +7,12 @@ import type {
   BackendFacilityAdminOptionsResponse,
   BackendOperatingHour,
   BackendOperatingHourGroup,
+  ApplyFacilityOperatingHoursInput,
   CreateFacilityInput,
   Facility,
   FacilityAdminOption,
   FacilityAdminOptionsResult,
+  FacilityOperatingHoursApplyResult,
   FacilityListResult,
   FacilityLookupItem,
   FacilityOperatingHoursPreview,
@@ -22,6 +24,9 @@ import type {
   GetFacilityAdminOptionsParams,
   GetFacilityRoomTypesParams,
   GetFacilityLookupParams,
+  FacilityReactivateResult,
+  FacilitySuspendResult,
+  SuspendResourceInput,
   UpdateFacilityInput,
   UpdateFacilityOperatingHoursInput,
 } from "./facilities.types";
@@ -256,8 +261,6 @@ function toUpdatePayload(input: UpdateFacilityInput) {
     ward: input.ward?.trim(),
     latitude: input.latitude?.trim(),
     longitude: input.longitude?.trim(),
-    status:
-      input.status === undefined ? undefined : toBackendStatus(input.status),
   });
 }
 
@@ -397,6 +400,13 @@ type BackendOperatingHoursResponse =
       operatingHours?: BackendOperatingHour[];
       operatingHourGroups?: BackendOperatingHourGroup[];
     };
+
+type BackendOperatingHoursApplyResponse = BackendOperatingHoursResponse & {
+  slotStrategy?: FacilityOperatingHoursApplyResult["slotStrategy"];
+  summary?: FacilityOperatingHoursApplyResult["summary"];
+  impactedShifts?: FacilityOperatingHoursApplyResult["impactedShifts"];
+  impactedShiftSlots?: FacilityOperatingHoursApplyResult["impactedShiftSlots"];
+};
 
 function normalizeOperatingHoursPayload(
   data: BackendOperatingHoursResponse,
@@ -638,6 +648,38 @@ export async function updateFacility(id: string, input: UpdateFacilityInput) {
   });
 }
 
+export async function suspendFacility(
+  id: string,
+  input: SuspendResourceInput,
+) {
+  const response = await unwrapApiResponse<FacilitySuspendResult>(
+    apiClient.patch(`/management/facilities/${id}/suspend`, {
+      inactiveUntil: input.inactiveUntil || null,
+      reason: input.reason?.trim() || undefined,
+    }),
+  );
+
+  return Object.assign({}, response, {
+    data: {
+      ...response.data,
+      facility: normalizeFacility(response.data.facility),
+    },
+  });
+}
+
+export async function reactivateFacility(id: string) {
+  const response = await unwrapApiResponse<FacilityReactivateResult>(
+    apiClient.patch(`/management/facilities/${id}/reactivate`, {}),
+  );
+
+  return Object.assign({}, response, {
+    data: {
+      ...response.data,
+      facility: normalizeFacility(response.data.facility),
+    },
+  });
+}
+
 export async function getFacilityOperatingHours(id: string) {
   const data = await unwrapApiData<BackendOperatingHoursResponse>(
     apiClient.get(`/management/facilities/${id}/operating-hours`),
@@ -659,6 +701,31 @@ export async function updateFacilityOperatingHours(
   return normalizeOperatingHoursPayload(data);
 }
 
+export async function applyFacilityOperatingHours(
+  id: string,
+  input: ApplyFacilityOperatingHoursInput,
+): Promise<FacilityOperatingHoursApplyResult> {
+  const data = await unwrapApiData<BackendOperatingHoursApplyResponse>(
+    apiClient.patch(`/management/facilities/${id}/operating-hours/apply`, {
+      schedules: normalizeSchedules(input.schedules),
+      slotStrategy: input.slotStrategy,
+    }),
+  );
+  const operatingHoursPayload = normalizeOperatingHoursPayload(data);
+
+  return {
+    ...operatingHoursPayload,
+    slotStrategy: data.slotStrategy ?? input.slotStrategy ?? "strict",
+    summary: data.summary ?? {
+      impactedShiftCount: 0,
+      impactedShiftSlotCount: 0,
+      deactivatedShiftSlotCount: 0,
+    },
+    impactedShifts: data.impactedShifts ?? [],
+    impactedShiftSlots: data.impactedShiftSlots ?? [],
+  };
+}
+
 export function previewFacilityOperatingHours(
   id: string,
   input: UpdateFacilityOperatingHoursInput,
@@ -668,16 +735,6 @@ export function previewFacilityOperatingHours(
       schedules: normalizeSchedules(input.schedules),
     }),
   );
-}
-
-export async function deactivateFacility(id: string) {
-  const response = await unwrapApiResponse<BackendFacility>(
-    apiClient.patch(`/management/facilities/${id}/deactivate`, {}),
-  );
-
-  return Object.assign({}, response, {
-    data: normalizeFacility(response.data),
-  });
 }
 
 export function deleteFacility(id: string, reason: string) {

@@ -5,7 +5,12 @@ import type {
   CreateUserDto,
   UpdateUserDto,
   UsersListData,
+  LockUserDto,
 } from "./management-user.types";
+
+/**
+ * GET /management/users
+ */
 export const getUsers = (params?: GetUsersParams) => {
   return unwrapApiData<UsersListData>(
     apiClient.get("/management/users", { params })
@@ -28,6 +33,7 @@ export const createUser = (payload: CreateUserDto) => {
 
 /**
  * PATCH /management/users/{id}
+ * Hỗ trợ cập nhật status (active | inactive | locked)
  */
 export const updateUser = (id: string, payload: UpdateUserDto) => {
   return unwrapApiData<User>(
@@ -37,8 +43,12 @@ export const updateUser = (id: string, payload: UpdateUserDto) => {
 
 /**
  * DELETE /management/users/{id}
- * → Backend chỉ khóa tài khoản (status = locked), không xóa cứng
+ * → Khóa tài khoản (cần lý do)
  */
-export const lockUser = (id: string) => {
-  return unwrapApiData<null>(apiClient.delete(`/management/users/${id}`));
+export const lockUser = (id: string, payload: LockUserDto) => {
+  return unwrapApiData<null>(
+    apiClient.delete(`/management/users/${id}`, {
+      data: payload,
+    })
+  );
 };

@@ -9,12 +9,10 @@ import {
   Alert,
   Button,
   Card,
-  Descriptions,
   Input,
   Modal,
   Select,
   Space,
-  Statistic,
   Table,
   Tag,
   Tooltip,
@@ -25,21 +23,19 @@ import type {
   TablePaginationConfig,
 } from "antd/es/table";
 import {
-  CalendarClock,
   Eye,
   FilterX,
-  Mail,
-  MapPin,
   Pencil,
-  Phone,
   Plus,
   Search,
   Stethoscope,
   Trash2,
-  UserRound,
   X,
 } from "lucide-react";
 
+import {
+  useAuthStore,
+} from "@/features/auth/auth.store";
 import {
   AdminLayout,
 } from "@/management/components/layouts/AdminLayout";
@@ -48,10 +44,10 @@ import {
 } from "@/management/components/ui/PageHeader";
 import {
   deleteDoctor,
-  getDoctor,
   getDoctors,
 } from "@/management/features/doctors/doctors.api";
 import {
+  getFacility,
   getFacilities,
 } from "@/management/features/facilities/facilities.api";
 import {
@@ -65,22 +61,80 @@ import type {
   GetDoctorsParams,
 } from "@/management/features/doctors/doctors.types";
 import {
-  DoctorFormModal,
+  DoctorCreateModal,
+} from "./components/DoctorCreateModal";
+import {
+  DoctorDetailModal,
+} from "./components/DoctorDetailModal";
+import {
+  DoctorEditModal,
+} from "./components/DoctorEditModal";
+import {
   doctorStatusOptions,
-} from "./components/DoctorFormModal";
+} from "./components/doctor-form.shared";
 
 const {
   Text,
-  Title,
 } = Typography;
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 5;
 
 type CombinedSearchField =
   | "name"
   | "phone"
-  | "facilityId"
   | "employeeCode";
+
+type AuthRoleValue =
+  | string
+  | {
+      name?: string | null;
+    }
+  | null
+  | undefined;
+
+type AuthFacilityAssignment = {
+  facilityId?: string | number | null;
+  roles?: AuthRoleValue[] | null;
+};
+
+type DoctorAccessUser = {
+  facilityId?: string | number | null;
+  homeFacilityId?: string | number | null;
+  roles?: AuthRoleValue[] | null;
+  staffProfile?: {
+    facilityId?: string | number | null;
+    homeFacilityId?: string | number | null;
+    facilityAssignments?:
+      | AuthFacilityAssignment[]
+      | null;
+  } | null;
+};
+
+function readRoleName(
+  role: AuthRoleValue,
+) {
+  return typeof role === "string"
+    ? role
+    : role?.name;
+}
+
+function normalizeRoles(
+  values: AuthRoleValue[],
+) {
+  return new Set(
+    values
+      .map(readRoleName)
+      .filter(
+        (
+          role,
+        ): role is string =>
+          Boolean(role),
+      )
+      .map((role) =>
+        role.trim().toLowerCase(),
+      ),
+  );
+}
 
 type DoctorFilters = {
   keyword?: string;
@@ -187,35 +241,6 @@ function getErrorMessage(
   return "Đã có lỗi xảy ra. Vui lòng thử lại.";
 }
 
-function formatDateTime(
-  value?: string,
-) {
-  if (!value) {
-    return "Chưa cập nhật";
-  }
-
-  const date = new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return value;
-  }
-
-  return date.toLocaleString(
-    "vi-VN",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    },
-  );
-}
-
 function renderStatus(
   status: DoctorStatus,
 ) {
@@ -230,53 +255,9 @@ function renderStatus(
   );
 }
 
-function mergeDoctorDetail(
-  current: Doctor,
-  detail: Doctor,
-): Doctor {
-  const fallbackName =
-    `Bác sĩ #${detail.id}`;
-
-  return {
-    ...current,
-    ...detail,
-    name:
-      detail.name &&
-      detail.name !== fallbackName
-        ? detail.name
-        : current.name,
-    employeeCode:
-      detail.employeeCode ||
-      current.employeeCode,
-    personalEmail:
-      detail.personalEmail ||
-      current.personalEmail,
-    email:
-      detail.email ||
-      current.email,
-    phone:
-      detail.phone ||
-      current.phone,
-    address:
-      detail.address ||
-      current.address,
-    facilityId:
-      detail.facilityId ||
-      current.facilityId,
-    facilityIds:
-      detail.facilityIds.length > 0
-        ? detail.facilityIds
-        : current.facilityIds,
-    workingRoomTypeId:
-      detail.workingRoomTypeId ||
-      current.workingRoomTypeId,
-  };
-}
-
 /**
- * Tự nhận diện trường tìm kiếm từ một thanh search:
+ * Tự nhận diện trường tìm kiếm:
  * - Số điện thoại Việt Nam -> phone
- * - UUID hoặc chuỗi chỉ gồm số -> facilityId
  * - Mã dạng DR-001, BS001... -> employeeCode
  * - Còn lại -> name
  */
@@ -295,15 +276,6 @@ function inferSearchField(
   }
 
   if (
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      value,
-    ) ||
-    /^\d+$/.test(value)
-  ) {
-    return "facilityId";
-  }
-
-  if (
     /^[a-z]{1,12}[-_]?\d+$/i.test(
       value,
     )
@@ -318,6 +290,7 @@ function toApiParams(
   filters: DoctorFilters,
   page: number,
   limit: number,
+  facilityId?: string,
 ): GetDoctorsParams {
   const keyword =
     filters.keyword?.trim();
@@ -337,6 +310,9 @@ function toApiParams(
             keyword,
         }
       : {}),
+    facilityId:
+      facilityId?.trim() ||
+      undefined,
     specialty:
       filters.specialty?.trim() ||
       undefined,
@@ -355,6 +331,160 @@ export default function DoctorManagementPage() {
     modal,
     modalContextHolder,
   ] = Modal.useModal();
+  const roles = useAuthStore(
+    (state) => state.roles,
+  );
+  const user = useAuthStore(
+    (state) => state.user,
+  );
+  const activeFacilityId =
+    useAuthStore(
+      (state) =>
+        state.activeFacilityId,
+    );
+
+  const authUser =
+    user as unknown as
+      | DoctorAccessUser
+      | null;
+
+  const doctorAccess = useMemo(() => {
+    const globalRoles =
+      normalizeRoles([
+        ...(roles ?? []),
+        ...(authUser?.roles ?? []),
+      ]);
+
+    if (
+      globalRoles.has(
+        "super_admin",
+      )
+    ) {
+      return {
+        canViewAllFacilities: true,
+        canManage: false,
+        facilityId: "",
+      };
+    }
+
+    const assignments =
+      authUser?.staffProfile
+        ?.facilityAssignments ?? [];
+
+    const firstAdminAssignment =
+      assignments.find(
+        (assignment) =>
+          normalizeRoles(
+            assignment.roles ?? [],
+          ).has("admin"),
+      );
+
+    const resolvedFacilityId =
+      String(
+        activeFacilityId ??
+          authUser?.staffProfile
+            ?.facilityId ??
+          authUser?.staffProfile
+            ?.homeFacilityId ??
+          authUser?.facilityId ??
+          authUser?.homeFacilityId ??
+          firstAdminAssignment
+            ?.facilityId ??
+          "",
+      ).trim();
+
+    const matchedAssignment =
+      assignments.find(
+        (assignment) =>
+          String(
+            assignment.facilityId ??
+              "",
+          ).trim() ===
+          resolvedFacilityId,
+      );
+
+    const facilityRoles =
+      normalizeRoles(
+        matchedAssignment?.roles ??
+          [],
+      );
+
+    const hasAdminRole =
+      globalRoles.has("admin") ||
+      facilityRoles.has("admin");
+
+    return {
+      canViewAllFacilities: false,
+      canManage:
+        Boolean(
+          resolvedFacilityId,
+        ) &&
+        hasAdminRole,
+      facilityId:
+        hasAdminRole
+          ? resolvedFacilityId
+          : "",
+    };
+  }, [
+    activeFacilityId,
+    authUser,
+    roles,
+  ]);
+
+  const canViewAllFacilities =
+    doctorAccess.canViewAllFacilities;
+  const canManageDoctors =
+    doctorAccess.canManage;
+  const scopedFacilityId =
+    doctorAccess.facilityId;
+
+  function doctorBelongsToFacility(
+    doctor: Doctor,
+    facilityId: string,
+  ) {
+    if (!facilityId) return false;
+
+    if (
+      doctor.facilityIds.length >
+      0
+    ) {
+      return doctor.facilityIds.some(
+        (item) =>
+          String(item) ===
+          facilityId,
+      );
+    }
+
+    return (
+      String(
+        doctor.facilityId ?? "",
+      ) === facilityId
+    );
+  }
+
+  function canViewDoctor(
+    doctor: Doctor,
+  ) {
+    return (
+      canViewAllFacilities ||
+      doctorBelongsToFacility(
+        doctor,
+        scopedFacilityId,
+      )
+    );
+  }
+
+  function canManageDoctor(
+    doctor: Doctor,
+  ) {
+    return (
+      canManageDoctors &&
+      doctorBelongsToFacility(
+        doctor,
+        scopedFacilityId,
+      )
+    );
+  }
 
   const [doctors, setDoctors] =
     useState<Doctor[]>([]);
@@ -419,8 +549,8 @@ export default function DoctorManagementPage() {
     );
 
   const [
-    formModalOpen,
-    setFormModalOpen,
+    createModalOpen,
+    setCreateModalOpen,
   ] = useState(false);
 
   const [
@@ -433,11 +563,6 @@ export default function DoctorManagementPage() {
 
   const [loading, setLoading] =
     useState(true);
-
-  const [
-    detailLoading,
-    setDetailLoading,
-  ] = useState(false);
 
   const [
     deleteLoading,
@@ -477,10 +602,33 @@ export default function DoctorManagementPage() {
   useEffect(() => {
     let cancelled = false;
 
+    if (
+      !canViewAllFacilities &&
+      !scopedFacilityId
+    ) {
+      const timer =
+        window.setTimeout(() => {
+          setDoctors([]);
+          setTotal(0);
+          setLoading(false);
+        }, 0);
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }
+
     async function loadInitialData() {
+      setLoading(true);
+
       try {
         const result =
           await getDoctors({
+            facilityId:
+              canViewAllFacilities
+                ? undefined
+                : scopedFacilityId,
             page: 1,
             limit:
               DEFAULT_PAGE_SIZE,
@@ -490,10 +638,27 @@ export default function DoctorManagementPage() {
 
         if (cancelled) return;
 
+        const visibleDoctors =
+          canViewAllFacilities
+            ? result.items
+            : result.items.filter(
+                (doctor) =>
+                  doctorBelongsToFacility(
+                    doctor,
+                    scopedFacilityId,
+                  ),
+              );
+
         setDoctors(
-          result.items,
+          visibleDoctors,
         );
-        setTotal(result.total);
+        setTotal(
+          canViewAllFacilities ||
+          visibleDoctors.length ===
+            result.items.length
+            ? result.total
+            : visibleDoctors.length,
+        );
         setError(null);
       } catch (loadError) {
         if (!cancelled) {
@@ -515,20 +680,41 @@ export default function DoctorManagementPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    canViewAllFacilities,
+    scopedFacilityId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
 
+    if (
+      !canViewAllFacilities &&
+      !scopedFacilityId
+    ) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     async function loadDisplayLookups() {
+      const facilityRequest =
+        canViewAllFacilities
+          ? getFacilities({
+              page: 1,
+              limit: 100,
+            })
+          : getFacility(
+              scopedFacilityId,
+            ).then((facility) => [
+              facility,
+            ]);
+
       const [
         facilityResult,
         roomTypeResult,
       ] = await Promise.allSettled([
-        getFacilities({
-          page: 1,
-          limit: 100,
-        }),
+        facilityRequest,
         getRoomTypeLookup({
           status: "active",
           limit: 50,
@@ -575,89 +761,10 @@ export default function DoctorManagementPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const detailFacilityName =
-    useMemo(() => {
-      if (!detailDoctor) {
-        return "";
-      }
-
-      const facilityIds =
-        detailDoctor.facilityIds.length >
-        0
-          ? detailDoctor.facilityIds
-          : detailDoctor.facilityId
-            ? [
-                detailDoctor.facilityId,
-              ]
-            : [];
-
-      if (facilityIds.length === 0) {
-        return "Chưa được gán";
-      }
-
-      const names = Array.from(
-        new Set(facilityIds),
-      )
-        .map(
-          (facilityId) =>
-            facilityNameById[
-              facilityId
-            ],
-        )
-        .filter(
-          (
-            name,
-          ): name is string =>
-            Boolean(name),
-        );
-
-      return names.length > 0
-        ? names.join(", ")
-        : "Không tìm thấy tên cơ sở";
-    }, [
-      detailDoctor,
-      facilityNameById,
-    ]);
-
-  const detailRoomTypeName =
-    useMemo(() => {
-      if (!detailDoctor) {
-        return "";
-      }
-
-      if (
-        !detailDoctor.workingRoomTypeId
-      ) {
-        return "Chưa cập nhật";
-      }
-
-      return (
-        roomTypeNameById[
-          detailDoctor
-            .workingRoomTypeId
-        ] ||
-        "Không tìm thấy tên loại phòng"
-      );
-    }, [
-      detailDoctor,
-      roomTypeNameById,
-    ]);
-
-  const stats = useMemo(() => {
-    const active = doctors.filter(
-      (doctor) =>
-        doctor.status ===
-        "active",
-    ).length;
-
-    return {
-      active,
-      inactive:
-        doctors.length - active,
-    };
-  }, [doctors]);
+  }, [
+    canViewAllFacilities,
+    scopedFacilityId,
+  ]);
 
   function buildFilters(
     overrides: Partial<DoctorFilters> = {},
@@ -692,11 +799,31 @@ export default function DoctorManagementPage() {
             filters,
             page,
             limit,
+            canViewAllFacilities
+              ? undefined
+              : scopedFacilityId,
           ),
         );
 
-      setDoctors(result.items);
-      setTotal(result.total);
+      const visibleDoctors =
+        canViewAllFacilities
+          ? result.items
+          : result.items.filter(
+              (doctor) =>
+                doctorBelongsToFacility(
+                  doctor,
+                  scopedFacilityId,
+                ),
+            );
+
+      setDoctors(visibleDoctors);
+      setTotal(
+        canViewAllFacilities ||
+        visibleDoctors.length ===
+          result.items.length
+          ? result.total
+          : visibleDoctors.length,
+      );
       setCurrentPage(
         result.page,
       );
@@ -757,87 +884,66 @@ export default function DoctorManagementPage() {
     );
   }
 
-  async function openDetail(
+  function openDetail(
     doctor: Doctor,
   ) {
-    setDetailDoctor(doctor);
-    setDetailLoading(true);
-
-    try {
-      const detail =
-        await getDoctor(
-          doctor.id,
-        );
-
-      setDetailDoctor(
-        mergeDoctorDetail(
-          doctor,
-          detail,
-        ),
-      );
-    } catch (detailError) {
-      setError(
-        getErrorMessage(
-          detailError,
-        ),
-      );
-    } finally {
-      setDetailLoading(false);
+    if (!canViewDoctor(doctor)) {
+      return;
     }
+
+    setDetailDoctor(doctor);
   }
 
   function openCreate() {
+    if (!canManageDoctors) {
+      return;
+    }
+
     setEditingDoctor(null);
-    setFormModalOpen(true);
+    setCreateModalOpen(true);
   }
 
   function openEdit(
     doctor: Doctor,
   ) {
-    setEditingDoctor(doctor);
-    setFormModalOpen(true);
-  }
-
-  function closeFormModal() {
-    setFormModalOpen(false);
-    setEditingDoctor(null);
-  }
-
-  function handleDoctorSaved(
-    savedDoctor: Doctor,
-    mode:
-      | "create"
-      | "update",
-  ) {
-    setDetailDoctor(
-      (current) =>
-        current?.id ===
-        savedDoctor.id
-          ? mergeDoctorDetail(
-              current,
-              savedDoctor,
-            )
-          : current,
-    );
-
-    const targetPage =
-      mode === "create"
-        ? 1
-        : currentPage;
-
-    if (mode === "create") {
-      setCurrentPage(1);
+    if (!canManageDoctor(doctor)) {
+      return;
     }
+
+    setCreateModalOpen(false);
+    setDetailDoctor(null);
+    setEditingDoctor(doctor);
+  }
+
+  function handleDoctorCreated() {
+    setCreateModalOpen(false);
+    setCurrentPage(1);
 
     void loadDoctors(
       appliedFilters,
-      targetPage,
+      1,
+      pageSize,
+    );
+  }
+
+  function handleDoctorUpdated() {
+    setEditingDoctor(null);
+    setDetailDoctor(null);
+
+    void loadDoctors(
+      appliedFilters,
+      currentPage,
       pageSize,
     );
   }
 
   async function confirmDelete() {
-    if (!deletingDoctor) {
+    if (
+      !deletingDoctor ||
+      !canManageDoctor(
+        deletingDoctor,
+      )
+    ) {
       return;
     }
 
@@ -1048,57 +1154,72 @@ export default function DoctorManagementPage() {
       {
         title: "Thao tác",
         key: "actions",
-        width: 132,
+        width: canManageDoctors
+          ? 132
+          : 64,
         align: "center",
         render: (
           _value,
           doctor,
-        ) => (
-          <Space size={4}>
-            <Tooltip title="Xem chi tiết">
-              <Button
-                icon={
-                  <Eye className="h-4 w-4" />
-                }
-                onClick={(event) => {
-                  event.stopPropagation();
+        ) => {
+          const canManageCurrentDoctor =
+            canManageDoctor(
+              doctor,
+            );
 
-                  void openDetail(
-                    doctor,
-                  );
-                }}
-              />
-            </Tooltip>
+          return (
+            <Space size={4}>
+              <Tooltip title="Xem chi tiết">
+                <Button
+                  icon={
+                    <Eye className="h-4 w-4" />
+                  }
+                  onClick={(event) => {
+                    event.stopPropagation();
 
-            <Tooltip title="Cập nhật">
-              <Button
-                icon={
-                  <Pencil className="h-4 w-4" />
-                }
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEdit(doctor);
-                }}
-              />
-            </Tooltip>
+                    void openDetail(
+                      doctor,
+                    );
+                  }}
+                />
+              </Tooltip>
 
-            <Tooltip title="Xóa bác sĩ">
-              <Button
-                danger
-                icon={
-                  <Trash2 className="h-4 w-4" />
-                }
-                onClick={(event) => {
-                  event.stopPropagation();
+              {canManageCurrentDoctor ? (
+                <>
+                  <Tooltip title="Cập nhật">
+                    <Button
+                      icon={
+                        <Pencil className="h-4 w-4" />
+                      }
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEdit(
+                          doctor,
+                        );
+                      }}
+                    />
+                  </Tooltip>
 
-                  setDeletingDoctor(
-                    doctor,
-                  );
-                }}
-              />
-            </Tooltip>
-          </Space>
-        ),
+                  <Tooltip title="Xóa bác sĩ">
+                    <Button
+                      danger
+                      icon={
+                        <Trash2 className="h-4 w-4" />
+                      }
+                      onClick={(event) => {
+                        event.stopPropagation();
+
+                        setDeletingDoctor(
+                          doctor,
+                        );
+                      }}
+                    />
+                  </Tooltip>
+                </>
+              ) : null}
+            </Space>
+          );
+        },
       },
     ];
 
@@ -1132,30 +1253,7 @@ export default function DoctorManagementPage() {
           />
         ) : null}
 
-        <div className="order-1 grid gap-4 md:grid-cols-3">
-          <Card className="border-slate-200 bg-white">
-            <Statistic
-              title="Tổng bác sĩ"
-              value={total}
-            />
-          </Card>
-
-          <Card className="border-emerald-100 bg-emerald-50/60">
-            <Statistic
-              title="Hoạt động trên trang"
-              value={stats.active}
-            />
-          </Card>
-
-          <Card className="border-slate-200 bg-slate-50/70">
-            <Statistic
-              title="Ngừng hoạt động trên trang"
-              value={stats.inactive}
-            />
-          </Card>
-        </div>
-
-        <Card className="order-2 border-slate-200 bg-white">
+        <Card className="order-1 border-slate-200 bg-white">
           <div
             className="flex flex-wrap items-center gap-3"
             style={{
@@ -1169,8 +1267,8 @@ export default function DoctorManagementPage() {
               prefix={
                 <Search className="h-4 w-4 text-slate-400" />
               }
-              placeholder="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
-              title="Tìm theo họ tên, số điện thoại, mã cơ sở hoặc mã nhân viên"
+              placeholder="Tìm theo họ tên, số điện thoại hoặc mã nhân viên"
+              title="Tìm theo họ tên, số điện thoại hoặc mã nhân viên"
               style={{
                 width: 300,
                 minWidth: 300,
@@ -1315,7 +1413,7 @@ export default function DoctorManagementPage() {
         </Card>
 
         <Card
-          className="order-3 overflow-hidden border-slate-200 bg-white"
+          className="order-2 overflow-hidden border-slate-200 bg-white"
           styles={{
             body: {
               padding: 0,
@@ -1329,17 +1427,19 @@ export default function DoctorManagementPage() {
             </div>
           }
           extra={
-            <Button
-              type="primary"
-              icon={
-                <Plus className="h-4 w-4" />
-              }
-              onClick={
-                openCreate
-              }
-            >
-              Thêm bác sĩ
-            </Button>
+            canManageDoctors ? (
+              <Button
+                type="primary"
+                icon={
+                  <Plus className="h-4 w-4" />
+                }
+                onClick={
+                  openCreate
+                }
+              >
+                Thêm bác sĩ
+              </Button>
+            ) : null
           }
         >
           <Table<Doctor>
@@ -1377,6 +1477,7 @@ export default function DoctorManagementPage() {
               total,
               showSizeChanger: true,
               pageSizeOptions: [
+                5,
                 10,
                 20,
                 50,
@@ -1395,332 +1496,83 @@ export default function DoctorManagementPage() {
         </Card>
       </div>
 
-      <DoctorFormModal
-        open={formModalOpen}
-        editingDoctor={
-          editingDoctor
+      {canManageDoctors ? (
+        <>
+          <DoctorCreateModal
+            open={createModalOpen}
+            allowedFacilityId={
+              scopedFacilityId
+            }
+            onClose={() =>
+              setCreateModalOpen(
+                false,
+              )
+            }
+            onCreated={
+              handleDoctorCreated
+            }
+          />
+
+          <DoctorEditModal
+            open={Boolean(
+              editingDoctor,
+            )}
+            doctor={editingDoctor}
+            allowedFacilityId={
+              scopedFacilityId
+            }
+            onClose={() =>
+              setEditingDoctor(null)
+            }
+            onUpdated={
+              handleDoctorUpdated
+            }
+          />
+        </>
+      ) : null}
+
+      <DoctorDetailModal
+        open={Boolean(
+          detailDoctor,
+        )}
+        doctor={detailDoctor}
+        canManage={
+          detailDoctor
+            ? canManageDoctor(
+                detailDoctor,
+              )
+            : false
         }
-        onClose={
-          closeFormModal
+        allowedFacilityId={
+          canViewAllFacilities
+            ? undefined
+            : scopedFacilityId
         }
-        onSaved={
-          handleDoctorSaved
+        facilityNameById={
+          facilityNameById
+        }
+        roomTypeNameById={
+          roomTypeNameById
+        }
+        onClose={() =>
+          setDetailDoctor(null)
+        }
+        onEdit={(doctor) => {
+          setDetailDoctor(null);
+          openEdit(doctor);
+        }}
+        onError={(message) =>
+          setError(message)
         }
       />
 
       <Modal
-        open={Boolean(
-          detailDoctor,
-        )}
-        width={900}
-        centered
-        title={null}
-        closable={false}
-        footer={
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-2">
-            {detailDoctor ? (
-              <Button
-                icon={
-                  <Pencil className="h-4 w-4" />
-                }
-                onClick={() => {
-                  const doctor =
-                    detailDoctor;
-
-                  setDetailDoctor(
-                    null,
-                  );
-
-                  openEdit(doctor);
-                }}
-              >
-                Cập nhật
-              </Button>
-            ) : null}
-
-            <Button
-              type="primary"
-              icon={
-                <X className="h-4 w-4" />
-              }
-              onClick={() =>
-                setDetailDoctor(
-                  null,
-                )
-              }
-            >
-              Đóng
-            </Button>
-          </div>
+        open={
+          canManageDoctors &&
+          Boolean(
+            deletingDoctor,
+          )
         }
-        onCancel={() =>
-          setDetailDoctor(null)
-        }
-        mask={{
-          closable:
-            !detailLoading,
-        }}
-        styles={{
-          body: {
-            padding: 0,
-          },
-        }}
-      >
-        {detailDoctor ? (
-          <div className="flex max-h-[78vh] flex-col">
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-[18px] py-4">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
-                  <Stethoscope className="h-5 w-5" />
-                </div>
-
-                <div className="min-w-0">
-                  <Title
-                    level={4}
-                    className="!mb-0.5 !text-slate-950"
-                  >
-                    {detailDoctor.name}
-                  </Title>
-
-                  <Text
-                    type="secondary"
-                    className="mb-2 block"
-                  >
-                    {detailDoctor.title ||
-                      "Bác sĩ"}{" "}
-                    ·{" "}
-                    {detailDoctor.specialty ||
-                      "Chưa cập nhật chuyên khoa"}
-                  </Text>
-
-                  <Space size={8} wrap>
-                    {renderStatus(
-                      detailDoctor.status,
-                    )}
-
-                    <Tag color="blue">
-                      {detailDoctor.licenseNo ||
-                        "Chưa có giấy phép"}
-                    </Tag>
-                  </Space>
-                </div>
-              </div>
-
-              <Button
-                type="text"
-                shape="circle"
-                aria-label="Đóng"
-                title="Đóng"
-                icon={
-                  <X className="h-5 w-5" />
-                }
-                className="shrink-0"
-                onClick={() =>
-                  setDetailDoctor(null)
-                }
-              />
-            </div>
-
-            <div className="min-h-0 overflow-y-auto px-[18px] py-4 pr-3">
-            <Descriptions
-              bordered
-              column={2}
-              size="small"
-              styles={{
-                label: {
-                  width: 145,
-                  fontWeight: 600,
-                },
-                content: {
-                  minWidth: 0,
-                },
-              }}
-            >
-              <Descriptions.Item
-                label="Mã bác sĩ"
-                span={1}
-              >
-                {detailDoctor.id}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Staff ID"
-                span={1}
-              >
-                {detailDoctor.staffId ||
-                  "Chưa cập nhật"}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Họ và tên"
-                span={1}
-              >
-                <Space size={6}>
-                  <UserRound className="h-4 w-4 text-slate-400" />
-                  {detailDoctor.name}
-                </Space>
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Mã nhân viên"
-                span={1}
-              >
-                {detailDoctor.employeeCode ||
-                  "Chưa cập nhật"}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Email công việc"
-                span={1}
-              >
-                <Space size={6}>
-                  <Mail className="h-4 w-4 text-slate-400" />
-                  {detailDoctor.email ||
-                    "Chưa cập nhật"}
-                </Space>
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Email cá nhân"
-                span={1}
-              >
-                {detailDoctor.personalEmail ||
-                  "Chưa cập nhật"}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Số điện thoại"
-                span={1}
-              >
-                <Space size={6}>
-                  <Phone className="h-4 w-4 text-slate-400" />
-                  {detailDoctor.phone ||
-                    "Chưa cập nhật"}
-                </Space>
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Cơ sở làm việc"
-                span={1}
-              >
-                {detailFacilityName}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Giấy phép hành nghề"
-                span={1}
-              >
-                {detailDoctor.licenseNo ||
-                  "Chưa cập nhật"}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Học hàm / chức danh"
-                span={1}
-              >
-                {detailDoctor.title ||
-                  "Chưa cập nhật"}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Chuyên khoa"
-                span={1}
-              >
-                {detailDoctor.specialty ||
-                  "Chưa cập nhật"}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Số năm kinh nghiệm"
-                span={1}
-              >
-                {
-                  detailDoctor
-                    .yearsOfExperience
-                }{" "}
-                năm
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Loại phòng làm việc"
-                span={1}
-              >
-                {detailRoomTypeName}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Trạng thái bác sĩ"
-                span={1}
-              >
-                {renderStatus(
-                  detailDoctor.status,
-                )}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Trạng thái nhân sự"
-                span={2}
-              >
-                {renderStatus(
-                  detailDoctor.staffStatus,
-                )}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Địa chỉ"
-                span={2}
-              >
-                <Space
-                  size={6}
-                  align="start"
-                >
-                  <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
-                  {detailDoctor.address ||
-                    "Chưa cập nhật"}
-                </Space>
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Giới thiệu chuyên môn"
-                span={2}
-              >
-                {detailDoctor.bio ||
-                  "Chưa cập nhật"}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Ngày tạo"
-                span={1}
-              >
-                <Space size={6}>
-                  <CalendarClock className="h-4 w-4 text-slate-400" />
-                  {formatDateTime(
-                    detailDoctor.createdAt,
-                  )}
-                </Space>
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Cập nhật lần cuối"
-                span={1}
-              >
-                <Space size={6}>
-                  <CalendarClock className="h-4 w-4 text-slate-400" />
-                  {formatDateTime(
-                    detailDoctor.updatedAt,
-                  )}
-                </Space>
-              </Descriptions.Item>
-            </Descriptions>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal
-        open={Boolean(
-          deletingDoctor,
-        )}
         centered
         width={456}
         title={null}

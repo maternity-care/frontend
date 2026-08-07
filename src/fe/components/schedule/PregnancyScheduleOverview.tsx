@@ -39,11 +39,14 @@ export function PregnancyScheduleOverview({
   const [createScheduleDate, setCreateScheduleDate] = useState<Dayjs | undefined>();
 
   useEffect(() => {
-    setLoadingSchedules(true);
-    getMySchedules()
-      .then(setSchedules)
-      .catch(() => message.warning("Không tải được lịch cá nhân."))
-      .finally(() => setLoadingSchedules(false));
+    const timer = window.setTimeout(() => {
+      setLoadingSchedules(true);
+      getMySchedules()
+        .then(setSchedules)
+        .catch(() => message.warning("Không tải được lịch cá nhân."))
+        .finally(() => setLoadingSchedules(false));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const sortedSchedules = useMemo(() => {
@@ -58,6 +61,10 @@ export function PregnancyScheduleOverview({
   const upcomingSchedules = sortedSchedules.filter(
     (item) => item.status === "upcoming"
   );
+  const schedulesNeedingAction = sortedSchedules.filter(
+    (item) => item.status === "action_required"
+  );
+  const visibleUpcomingSchedules = [...schedulesNeedingAction, ...upcomingSchedules];
 
   const nextSchedule = upcomingSchedules[0];
 
@@ -220,7 +227,7 @@ export function PregnancyScheduleOverview({
       <Row gutter={[24, 24]}>
         <Col xs={24} xl={8}>
           <ScheduleList
-            schedules={upcomingSchedules}
+            schedules={visibleUpcomingSchedules}
             onDelete={handleDeleteSchedule}
             onOpenGoogleCalendar={handleOpenGoogleCalendar}
           />
