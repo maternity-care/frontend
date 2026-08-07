@@ -9,6 +9,7 @@ import type {
   BackendAppointment,
   Appointment,
   PendingMedicalRecordFile,
+  MedicalRecordDoctor,
 } from "./management-medical-records.types";
 
 const MEDICAL_RECORDS_URL = "/management/medical-records";
@@ -41,6 +42,26 @@ function normalizeFile(file: BackendMedicalRecordFile): MedicalRecordFile {
   };
 }
 
+function normalizeDoctor(
+  doctor?: {
+    id?: string | number;
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    employeeCode?: string | null;
+  } | null,
+): MedicalRecordDoctor | null {
+  if (!doctor) return null;
+
+  return {
+    id: toStringValue(doctor.id),
+    name: doctor.name ?? null,
+    email: doctor.email ?? null,
+    phone: doctor.phone ?? null,
+    employeeCode: doctor.employeeCode ?? null,
+  };
+}
+
 function normalizeAppointment(item: BackendAppointment): Appointment {
   return {
     id: toStringValue(item.id),
@@ -55,7 +76,12 @@ function normalizeAppointment(item: BackendAppointment): Appointment {
 }
 
 export function normalizeMedicalRecord(
-  record: BackendMedicalRecord,
+  record: BackendMedicalRecord & {
+    doctor?: {
+      id?: string | number;
+      name?: string | null;
+    };
+  },
 ): MedicalRecord {
   return {
     id: toStringValue(record.id),
@@ -69,6 +95,7 @@ export function normalizeMedicalRecord(
     files: (record.files ?? []).map(normalizeFile),
     createdAt: record.createdAt ?? null,
     updatedAt: record.updatedAt ?? null,
+    doctor: normalizeDoctor(record.doctor),
   };
 }
 

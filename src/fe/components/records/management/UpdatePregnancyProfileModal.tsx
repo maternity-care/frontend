@@ -153,9 +153,9 @@ export function UpdatePregnancyProfileModal({
           showIcon
           style={{ marginBottom: 20 }}
           title={profile.user?.name || "Chưa cập nhật tên thai phụ"}
-          description={`Mã hồ sơ: ${
-            profile.code || profile.id
-          } • Mã bệnh nhân: ${profile.patientId || "Chưa có"}`}
+          // description={`Mã hồ sơ: ${
+          //   profile.code || profile.id
+          // } • Mã bệnh nhân: ${profile.patientId || "Chưa có"}`}
         />
       )}
 
