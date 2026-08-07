@@ -153,7 +153,7 @@ export function UpdateMedicalRecordModal({
     Modal.confirm({
       title: "Xóa kết quả khám?",
       content:
-        "Hành động này không thể hoàn tác. Các file đính kèm sẽ không bị xóa.",
+        "Bạn có chắc chắn muốn xóa kết quả khám này? Hành động này không thể hoàn tác.",
       okText: "Xóa",
       okButtonProps: { danger: true },
       cancelText: "Hủy",
@@ -208,7 +208,7 @@ export function UpdateMedicalRecordModal({
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          title={`Mã lịch hẹn: ${record.appointmentId || "—"} • Bác sĩ: ${record.doctorId || "—"}`}
+          title={`Bác sĩ phụ trách: ${record.doctor?.name || "—"}`}
         />
       )}
 
