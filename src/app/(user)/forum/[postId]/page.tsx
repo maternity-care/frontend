@@ -42,6 +42,12 @@ import {
 } from "lucide-react";
 
 import {
+  useAuthStore,
+} from "@/features/auth/auth.store";
+import {
+  ForumRichContent,
+} from "@/app/(user)/forum/ForumRichContent";
+import {
   SiteFooter,
 } from "@/fe/components/layout/SiteFooter";
 import {
@@ -51,7 +57,6 @@ import {
   getForumPost,
   getForumPosts,
 } from "@/features/forum/forum.api";
-import { useForumRealtime } from "@/features/forum/useForumRealtime";
 import type {
   ForumAuthor,
   ForumComment,
@@ -225,6 +230,12 @@ export default function ForumPostDetailPage() {
   const {
     message: messageApi,
   } = App.useApp();
+  const currentUser =
+    useAuthStore(
+      (state) => state.user,
+    );
+  const isLoggedIn =
+    Boolean(currentUser);
   const [reportForm] =
     Form.useForm<ReportFormValues>();
 
@@ -325,11 +336,6 @@ export default function ForumPostDetailPage() {
     [params.postId],
   );
 
-  useForumRealtime({
-    postId: params.postId,
-    onEvent: () => void loadPost(),
-  });
-
   useEffect(() => {
     const timer =
       window.setTimeout(() => {
@@ -357,6 +363,13 @@ export default function ForumPostDetailPage() {
     parentId?: string,
   ) {
     if (!post) return;
+
+    if (!isLoggedIn) {
+      messageApi.warning(
+        "Vui lòng đăng nhập để bình luận.",
+      );
+      return;
+    }
 
     if (post.isLocked) {
       messageApi.warning(
@@ -416,6 +429,13 @@ export default function ForumPostDetailPage() {
       null
     >,
   ) {
+    if (!isLoggedIn) {
+      messageApi.warning(
+        "Vui lòng đăng nhập để báo cáo nội dung.",
+      );
+      return;
+    }
+
     reportForm.resetFields();
     setReportTarget(target);
   }
@@ -424,6 +444,13 @@ export default function ForumPostDetailPage() {
     values: ReportFormValues,
   ) {
     if (!reportTarget) return;
+
+    if (!isLoggedIn) {
+      messageApi.warning(
+        "Vui lòng đăng nhập để báo cáo nội dung.",
+      );
+      return;
+    }
 
     setReportSubmitting(true);
 
@@ -569,6 +596,11 @@ export default function ForumPostDetailPage() {
 
             <Space wrap>
               <Button
+                title={
+                  isLoggedIn
+                    ? "Báo cáo bài viết"
+                    : "Đăng nhập để báo cáo"
+                }
                 icon={
                   <Flag className="h-4 w-4" />
                 }
@@ -710,10 +742,17 @@ export default function ForumPostDetailPage() {
                       </Paragraph>
                     ) : null}
 
-                    <Paragraph className="!mb-0 !whitespace-pre-wrap !text-[15px] !leading-7 !text-slate-700">
-                      {post.content ||
-                        "Nội dung chưa được cập nhật."}
-                    </Paragraph>
+                    {post.content ? (
+                      <ForumRichContent
+                        html={
+                          post.content
+                        }
+                      />
+                    ) : (
+                      <Paragraph className="!mb-0 !text-[15px] !leading-7 !text-slate-700">
+                        Nội dung chưa được cập nhật.
+                      </Paragraph>
+                    )}
                   </article>
                 </div>
               </Card>
@@ -820,6 +859,16 @@ export default function ForumPostDetailPage() {
                 className="!rounded-2xl !border-slate-200"
                 title="Trả lời bài viết"
               >
+                {!isLoggedIn ? (
+                  <Alert
+                    type="info"
+                    showIcon
+                    className="mb-3"
+                    title="Bạn vẫn có thể xem Forum khi chưa đăng nhập."
+                    description="Đăng nhập để bình luận, trả lời hoặc báo cáo nội dung."
+                  />
+                ) : null}
+
                 {post.isLocked ? (
                   <Alert
                     type="warning"
@@ -831,6 +880,9 @@ export default function ForumPostDetailPage() {
                     <TextArea
                       value={
                         commentContent
+                      }
+                      disabled={
+                        !isLoggedIn
                       }
                       rows={6}
                       maxLength={1000}
@@ -852,6 +904,9 @@ export default function ForumPostDetailPage() {
                         className="!bg-pink-500"
                         loading={
                           commentSubmitting
+                        }
+                        disabled={
+                          !isLoggedIn
                         }
                         onClick={() =>
                           void submitComment()

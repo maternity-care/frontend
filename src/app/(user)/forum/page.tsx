@@ -23,6 +23,7 @@ import {
   Pagination,
   Segmented,
   Select,
+  Space,
   Tag,
   Typography,
 } from "antd";
@@ -43,6 +44,12 @@ import {
 } from "lucide-react";
 
 import {
+  useAuthStore,
+} from "@/features/auth/auth.store";
+import {
+  RichTextEditor,
+} from "@/app/(user)/forum/RichTextEditor";
+import {
   SiteFooter,
 } from "@/fe/components/layout/SiteFooter";
 import {
@@ -51,7 +58,6 @@ import {
   getForumPosts,
   getForumTopics,
 } from "@/features/forum/forum.api";
-import { useForumRealtime } from "@/features/forum/useForumRealtime";
 import type {
   ForumCategory,
   ForumCategoryCode,
@@ -63,7 +69,6 @@ const {
   Text,
   Title,
 } = Typography;
-const { TextArea } = Input;
 
 type CategoryFilter =
   | "all"
@@ -185,6 +190,12 @@ export default function ForumPage() {
   const {
     message: messageApi,
   } = App.useApp();
+  const currentUser =
+    useAuthStore(
+      (state) => state.user,
+    );
+  const isLoggedIn =
+    Boolean(currentUser);
   const [form] =
     Form.useForm<CreatePostValues>();
 
@@ -333,8 +344,6 @@ export default function ForumPage() {
       topicId,
     ]);
 
-  useForumRealtime({ onEvent: () => void loadPosts() });
-
   useEffect(() => {
     const timer =
       window.setTimeout(() => {
@@ -392,6 +401,13 @@ export default function ForumPage() {
     );
 
   function openCreatePost() {
+    if (!isLoggedIn) {
+      messageApi.warning(
+        "Vui lòng đăng nhập để đăng bài viết.",
+      );
+      return;
+    }
+
     form.resetFields();
     form.setFieldsValue({
       topicId:
@@ -407,6 +423,13 @@ export default function ForumPage() {
   async function submitPost(
     values: CreatePostValues,
   ) {
+    if (!isLoggedIn) {
+      messageApi.warning(
+        "Vui lòng đăng nhập để đăng bài viết.",
+      );
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -462,6 +485,11 @@ export default function ForumPage() {
 
               <Button
                 type="primary"
+                title={
+                  isLoggedIn
+                    ? "Đăng bài viết"
+                    : "Đăng nhập để đăng bài viết"
+                }
                 icon={
                   <MessageSquarePlus className="h-4 w-4" />
                 }
@@ -941,7 +969,7 @@ export default function ForumPage() {
             showIcon
             className="mb-4 !rounded-xl"
             title="Bài viết mới sẽ được gửi kiểm duyệt."
-            description="Moderator kiểm tra nội dung trước khi bài được hiển thị công khai."
+            
           />
 
           <Form.Item
@@ -1000,23 +1028,63 @@ export default function ForumPage() {
             label="Nội dung"
             rules={[
               {
-                required: true,
-                whitespace: true,
-                message:
-                  "Vui lòng nhập nội dung.",
-              },
-              {
-                min: 20,
-                message:
-                  "Nội dung cần ít nhất 20 ký tự.",
+                validator: async (
+                  _rule,
+                  content?: string,
+                ) => {
+                  const html =
+                    String(
+                      content ?? "",
+                    );
+                  const plainText =
+                    html
+                      .replace(
+                        /<[^>]*>/g,
+                        "",
+                      )
+                      .replace(
+                        /&nbsp;/g,
+                        " ",
+                      )
+                      .trim();
+                  const hasImage =
+                    /<img[\s\S]*?>/i.test(
+                      html,
+                    );
+
+                  if (
+                    !plainText &&
+                    !hasImage
+                  ) {
+                    throw new Error(
+                      "Vui lòng nhập nội dung.",
+                    );
+                  }
+
+                  if (
+                    plainText.length <
+                      20 &&
+                    !hasImage
+                  ) {
+                    throw new Error(
+                      "Nội dung cần ít nhất 20 ký tự.",
+                    );
+                  }
+
+                  if (
+                    html.length >
+                    50000
+                  ) {
+                    throw new Error(
+                      "Nội dung bài viết quá dài.",
+                    );
+                  }
+                },
               },
             ]}
           >
-            <TextArea
-              rows={9}
-              showCount
-              maxLength={5000}
-              placeholder="Trình bày chi tiết vấn đề, câu hỏi hoặc kinh nghiệm của bạn..."
+            <RichTextEditor
+              placeholder="Nhập nội dung bài viết..."
             />
           </Form.Item>
 
