@@ -49,7 +49,6 @@ import {
 import {
   createForumPost,
   getForumCategories,
-  getForumDisclaimer,
   getForumPosts,
   getForumTopics,
 } from "@/features/forum/forum.api";
@@ -195,11 +194,6 @@ export default function ForumPage() {
     useState<ForumTopic[]>([]);
   const [posts, setPosts] =
     useState<ForumPost[]>([]);
-  const [disclaimer, setDisclaimer] =
-    useState(
-      "Thông tin tham khảo, không thay thế tư vấn bác sĩ.",
-    );
-
   const [search, setSearch] =
     useState("");
   const [category, setCategory] =
@@ -252,18 +246,13 @@ export default function ForumPage() {
 
       try {
         const [
-          nextDisclaimer,
           nextCategories,
           nextTopics,
         ] = await Promise.all([
-          getForumDisclaimer(),
           getForumCategories(),
           getForumTopics(),
         ]);
 
-        setDisclaimer(
-          nextDisclaimer.message,
-        );
         setCategories(
           nextCategories.filter(
             (item) =>
@@ -329,13 +318,6 @@ export default function ForumPage() {
             : result.total,
         );
 
-        if (
-          result.medicalDisclaimer
-        ) {
-          setDisclaimer(
-            result.medicalDisclaimer,
-          );
-        }
       } catch (loadError) {
         setError(
           getErrorMessage(loadError),
@@ -494,14 +476,6 @@ export default function ForumPage() {
             </div>
           </section>
 
-          <Alert
-            type="warning"
-            showIcon
-            className="mt-4 !rounded-2xl !border-amber-200"
-            title={disclaimer}
-            description="Không tự ý dùng thuốc hoặc trì hoãn khám bệnh dựa trên nội dung trong Forum."
-          />
-
           {error ? (
             <Alert
               type="error"
@@ -516,7 +490,7 @@ export default function ForumPage() {
           ) : null}
 
           <div className="mt-5 grid gap-5 xl:grid-cols-[240px_minmax(0,1fr)_280px]">
-            <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
+            <aside className="flex flex-col gap-5 xl:sticky xl:top-5 xl:self-start">
               <SidebarSection title="Chuyên mục">
                 <div className="space-y-1">
                   {[
@@ -852,7 +826,7 @@ export default function ForumPage() {
               </Card>
             </section>
 
-            <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
+            <aside className="flex flex-col gap-5 xl:sticky xl:top-5 xl:self-start">
               <SidebarSection title="Quy tắc cộng đồng">
                 <div className="space-y-3 text-sm leading-6 text-slate-600">
                   <p className="mb-0">
