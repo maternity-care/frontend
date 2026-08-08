@@ -9,17 +9,24 @@ import {
   Input,
   Modal,
   Space,
-  Statistic,
   Table,
   Tag,
   Typography,
 } from "antd";
-import { Building2, Eye, PauseCircle, Pencil, PlayCircle, Plus, Trash2, X } from "lucide-react";
+import {
+  Building2,
+  Eye,
+  PauseCircle,
+  Pencil,
+  PlayCircle,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { CopyText } from "@/management/components/ui/CopyText";
-import { PageHeader } from "@/management/components/ui/PageHeader";
 import { TableFilter } from "@/management/components/ui/TableFilter";
 import {
   createFacility,
@@ -154,13 +161,7 @@ export default function FacilityManagementPage() {
         setLoading(false);
       }
     },
-    [
-      cityFilter,
-      currentPage,
-      pageSize,
-      query,
-      statusFilter,
-    ],
+    [cityFilter, currentPage, pageSize, query, statusFilter],
   );
 
   useEffect(() => {
@@ -170,18 +171,6 @@ export default function FacilityManagementPage() {
 
     return () => window.clearTimeout(timer);
   }, [reloadFacilities]);
-
-  const activeFacilities = facilities.filter(
-    (facility) => facility.status === "active",
-  ).length;
-
-  const suspendedFacilities = facilities.filter(
-    (facility) => facility.status === "suspended",
-  ).length;
-
-  const openFacilities = facilities.filter(
-    (facility) => facility.isOpenNow,
-  ).length;
 
   const cityOptions = useMemo(() => {
     return Array.from(
@@ -356,8 +345,7 @@ export default function FacilityManagementPage() {
     setError(null);
 
     try {
-      const deletedCount =
-        target.mode === "single" ? 1 : target.ids.length;
+      const deletedCount = target.mode === "single" ? 1 : target.ids.length;
 
       if (target.mode === "single") {
         await deleteFacility(target.facility.id, reason);
@@ -379,10 +367,7 @@ export default function FacilityManagementPage() {
         );
       }
 
-      const remainingTotal = Math.max(
-        0,
-        totalFacilities - deletedCount,
-      );
+      const remainingTotal = Math.max(0, totalFacilities - deletedCount);
       const lastAvailablePage = Math.max(
         1,
         Math.ceil(remainingTotal / pageSize),
@@ -551,7 +536,9 @@ export default function FacilityManagementPage() {
             }}
           />
           <Button
-            title={record.status === "active" ? "Tạm ngưng cơ sở" : "Mở lại cơ sở"}
+            title={
+              record.status === "active" ? "Tạm ngưng cơ sở" : "Mở lại cơ sở"
+            }
             icon={
               record.status === "active" ? (
                 <PauseCircle className="h-4 w-4" />
@@ -589,10 +576,14 @@ export default function FacilityManagementPage() {
   return (
     <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
       {modalContextHolder}
-      <PageHeader
-        title={FACILITY_MESSAGES.PAGE_TITLE}
-        description={FACILITY_MESSAGES.PAGE_DESCRIPTION}
-      />
+      <div>
+        <h1 className="mb-1 text-3xl font-semibold tracking-tight text-slate-900">
+          {FACILITY_MESSAGES.PAGE_TITLE}
+        </h1>
+        <p className="mb-0 text-sm text-slate-500">
+          {FACILITY_MESSAGES.PAGE_DESCRIPTION}
+        </p>
+      </div>
 
       <Modal
         open={Boolean(statusAction)}
@@ -629,13 +620,16 @@ export default function FacilityManagementPage() {
                 onChange={(event) => setStatusInactiveUntil(event.target.value)}
               />
               <Text type="secondary" className="mt-1 block text-xs">
-                Bỏ trống nếu tạm ngưng vô thời hạn. Hệ thống sẽ hủy ca trực tương lai trong khoảng tạm ngưng và chỉ ghi nhận lịch hẹn bị ảnh hưởng.
+                Bỏ trống nếu tạm ngưng vô thời hạn. Hệ thống sẽ hủy ca trực
+                tương lai trong khoảng tạm ngưng và chỉ ghi nhận lịch hẹn bị ảnh
+                hưởng.
               </Text>
             </div>
           </Space>
         ) : (
           <Text>
-            Cơ sở sẽ được mở lại. Chỉ những phòng bị tạm ngưng theo cơ sở sẽ được mở lại cùng cơ sở.
+            Cơ sở sẽ được mở lại. Chỉ những phòng bị tạm ngưng theo cơ sở sẽ
+            được mở lại cùng cơ sở.
           </Text>
         )}
       </Modal>
@@ -651,7 +645,7 @@ export default function FacilityManagementPage() {
           />
         ) : null}
 
-        <div className="order-2">
+        <div>
           <TableFilter
             columns={[
               {
@@ -694,35 +688,8 @@ export default function FacilityManagementPage() {
           />
         </div>
 
-        <div className="order-1 grid gap-4 md:grid-cols-4">
-          <Card className="border-slate-200 bg-white">
-            <Statistic
-              title={FACILITY_MESSAGES.TOTAL_FACILITIES}
-              value={totalFacilities}
-            />
-          </Card>
-          <Card className="border-emerald-100 bg-emerald-50/60">
-            <Statistic
-              title={`${FACILITY_MESSAGES.ACTIVE_FACILITIES} (trang hiện tại)`}
-              value={activeFacilities}
-            />
-          </Card>
-          <Card className="border-red-100 bg-red-50/60">
-            <Statistic
-              title={`${FACILITY_MESSAGES.SUSPENDED_FACILITIES} (trang hiện tại)`}
-              value={suspendedFacilities}
-            />
-          </Card>
-          <Card className="border-blue-100 bg-blue-50/60">
-            <Statistic
-              title="Đang mở cửa (trang hiện tại)"
-              value={openFacilities}
-            />
-          </Card>
-        </div>
-
         <Card
-          className="order-3 overflow-hidden border-slate-200 bg-white"
+          className="overflow-hidden border-slate-200 bg-white"
           styles={{ body: { padding: 0 } }}
           title={
             <div>
