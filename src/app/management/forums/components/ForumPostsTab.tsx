@@ -55,10 +55,6 @@ type ForumPostsTabProps = {
   navigation: ReactNode;
   focusPostId?: string;
   realtimeVersion?: number;
-  onSummaryChange: (summary: {
-    total: number;
-    pending: number;
-  }) => void;
 };
 
 type ModerationRequest =
@@ -943,7 +939,6 @@ export function ForumPostsTab({
   navigation,
   focusPostId,
   realtimeVersion = 0,
-  onSummaryChange,
 }: ForumPostsTabProps) {
   const { message } = App.useApp();
 
@@ -1001,13 +996,6 @@ export function ForumPostsTab({
       setTotal(result.total);
       setPage(result.page);
       setPageSize(result.limit);
-      onSummaryChange({
-        total: result.total,
-        pending: newestPosts.filter(
-          (post) =>
-            post.status === "pending",
-        ).length,
-      });
     } catch (loadError) {
       setError(getErrorMessage(loadError));
     } finally {
@@ -1017,7 +1005,6 @@ export function ForumPostsTab({
     authorRoleFilter,
     categoryFilter,
     keyword,
-    onSummaryChange,
     page,
     pageSize,
     statusFilter,

@@ -35,10 +35,6 @@ const { TextArea } = Input;
 
 type ForumReportsTabProps = {
   realtimeVersion?: number;
-  onSummaryChange: (summary: {
-    total: number;
-    needAction: number;
-  }) => void;
 };
 
 type ReportResolveRequest = {
@@ -174,7 +170,6 @@ function ReportResolveModal({
 
 export function ForumReportsTab({
   realtimeVersion = 0,
-  onSummaryChange,
 }: ForumReportsTabProps) {
   const { message } = App.useApp();
 
@@ -199,18 +194,12 @@ export function ForumReportsTab({
       setTotal(result.total);
       setPage(result.page);
       setPageSize(result.limit);
-      onSummaryChange({
-        total: result.total,
-        needAction: result.items.filter(
-          (report) => !isResolvedStatus(report.status),
-        ).length,
-      });
     } catch (loadError) {
       setError(getErrorMessage(loadError));
     } finally {
       setLoading(false);
     }
-  }, [onSummaryChange, page, pageSize]);
+  }, [page, pageSize]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadReports(), 0);
