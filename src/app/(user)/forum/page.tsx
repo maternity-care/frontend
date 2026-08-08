@@ -219,6 +219,18 @@ export default function ForumPage() {
     useState(1);
   const [total, setTotal] =
     useState(0);
+  const [
+    categoryCounts,
+    setCategoryCounts,
+  ] = useState<
+    Map<CategoryFilter, number>
+  >(
+    () =>
+      new Map<
+        CategoryFilter,
+        number
+      >(),
+  );
 
   const [loading, setLoading] =
     useState(true);
@@ -264,19 +276,72 @@ export default function ForumPage() {
           getForumTopics(),
         ]);
 
-        setCategories(
+        const activeCategories =
           nextCategories.filter(
             (item) =>
               item.status ===
               "active",
-          ),
-        );
-        setTopics(
+          );
+        const activeTopics =
           nextTopics.filter(
             (item) =>
               item.status ===
               "active",
-          ),
+          );
+
+        setCategories(
+          activeCategories,
+        );
+        setTopics(
+          activeTopics,
+        );
+
+        const countResults =
+          await Promise.all([
+            getForumPosts({
+              page: 1,
+              limit: 1,
+              status:
+                "published",
+            }),
+            ...activeCategories.map(
+              (item) =>
+                getForumPosts({
+                  page: 1,
+                  limit: 1,
+                  category:
+                    item.code,
+                  status:
+                    "published",
+                }),
+            ),
+          ]);
+
+        const nextCounts =
+          new Map<
+            CategoryFilter,
+            number
+          >();
+
+        nextCounts.set(
+          "all",
+          countResults[0]
+            ?.total ?? 0,
+        );
+
+        activeCategories.forEach(
+          (item, index) => {
+            nextCounts.set(
+              item.code,
+              countResults[
+                index + 1
+              ]?.total ?? 0,
+            );
+          },
+        );
+
+        setCategoryCounts(
+          nextCounts,
         );
       } catch (loadError) {
         setError(
@@ -363,35 +428,6 @@ export default function ForumPage() {
     return () =>
       window.clearTimeout(timer);
   }, [loadPosts]);
-
-  const categoryCounts =
-    useMemo(() => {
-      const counts = new Map<
-        CategoryFilter,
-        number
-      >([
-        ["all", total],
-      ]);
-
-      categories.forEach(
-        (item) => {
-          counts.set(
-            item.code,
-            posts.filter(
-              (post) =>
-                post.category ===
-                item.code,
-            ).length,
-          );
-        },
-      );
-
-      return counts;
-    }, [
-      categories,
-      posts,
-      total,
-    ]);
 
   const popularTopics =
     useMemo(
