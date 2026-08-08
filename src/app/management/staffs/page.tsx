@@ -313,7 +313,7 @@ export default function StaffsManagementPage() {
   const [facilityFilter, setFacilityFilter] = useState<string | undefined>();
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(50);
   const [selectedStaffIds, setSelectedUserIds] = useState<string[]>([]);
 
   const [detailStaff, setDetailStaff] = useState<StaffAccount | null>(null);
@@ -865,7 +865,7 @@ export default function StaffsManagementPage() {
             pagination={{
               current: currentPage,
               pageSize,
-              total: filteredStaffs.length,
+              total: totalStaffs,
               showSizeChanger: true,
               pageSizeOptions: [10, 20, 50, 100],
               showQuickJumper: true,

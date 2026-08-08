@@ -35,7 +35,7 @@ export default function UserManagementPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<UserStatus>();
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(50);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
