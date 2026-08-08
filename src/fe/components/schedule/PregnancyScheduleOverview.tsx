@@ -204,14 +204,14 @@ export function PregnancyScheduleOverview({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button
+          {/* <Button
             size="large"
             icon={<Download className="h-4 w-4" />}
             disabled={!sortedSchedules.length}
             onClick={handleImportAllToCalendar}
           >
             Import tất cả
-          </Button>
+          </Button> */}
 
           <Button
             type="primary"

@@ -20,10 +20,24 @@ const statusColorMap: Record<string, string> = {
   deleted: "red",
 };
 
+const statusLabelMap: Record<string, string> = {
+  active: "Đang hoạt động",
+  ACTIVE: "Đang hoạt động",
+  completed: "Hoàn thành",
+  terminated: "Đã chấm dứt",
+  deleted: "Đã xóa",
+};
+
 const riskColorMap: Record<string, string> = {
   low: "success",
   medium: "warning",
   high: "error",
+};
+
+const riskLabelMap: Record<string, string> = {
+  low: "Nguy cơ thấp",
+  medium: "Nguy cơ trung bình",
+  high: "Nguy cơ cao",
 };
 
 export default function PregnancyProfileCard({
@@ -38,7 +52,7 @@ export default function PregnancyProfileCard({
           <Text strong>{profile.code ?? "Hồ sơ thai"}</Text>
           {profile.status && (
             <Tag color={statusColorMap[profile.status] ?? "default"}>
-              {profile.status.toUpperCase()}
+              {statusLabelMap[profile.status] ?? profile.status}
             </Tag>
           )}
         </Space>
@@ -46,7 +60,7 @@ export default function PregnancyProfileCard({
       extra={
         profile.riskLevel ? (
           <Tag color={riskColorMap[profile.riskLevel] ?? "default"}>
-            Risk: {profile.riskLevel}
+            {riskLabelMap[profile.riskLevel] ?? profile.riskLevel}
           </Tag>
         ) : null
       }
