@@ -410,7 +410,7 @@ export default function FacilityManagementPage() {
   const columns: ColumnsType<Facility> = [
     {
       title: FACILITY_MESSAGES.STT,
-      width: 64,
+      width: 56,
       align: "center",
       render: (_value, _record, index) =>
         (currentPage - 1) * pageSize + index + 1,
@@ -418,7 +418,7 @@ export default function FacilityManagementPage() {
     {
       title: FACILITY_MESSAGES.FACILITY_NAME,
       dataIndex: "name",
-      width: 220,
+      width: 190,
       render: (name: string, record) => (
         <Space size={10}>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-white">
@@ -438,7 +438,7 @@ export default function FacilityManagementPage() {
     {
       title: "Chủ cơ sở",
       dataIndex: "ownerName",
-      width: 180,
+      width: 160,
       render: (ownerName: string, record) => (
         <div>
           <div className="font-medium text-slate-900">{ownerName}</div>
@@ -450,19 +450,9 @@ export default function FacilityManagementPage() {
       ),
     },
     {
-      title: FACILITY_MESSAGES.ADDRESS,
-      dataIndex: "address",
-      width: 260,
-      render: (address: string, record) => (
-        <span className="whitespace-normal break-words text-slate-600">
-          {[address, record.ward, record.city].filter(Boolean).join(", ")}
-        </span>
-      ),
-    },
-    {
       title: FACILITY_MESSAGES.HOTLINE,
       dataIndex: "hotline",
-      width: 140,
+      width: 125,
       align: "center",
       render: (hotline: string) => (
         <CopyText value={hotline} copiedMessage="Đã sao chép hotline" />
@@ -471,7 +461,7 @@ export default function FacilityManagementPage() {
     {
       title: "Giờ hoạt động",
       dataIndex: "operatingHourGroups",
-      width: 230,
+      width: 190,
       render: (_value, record) => (
         <div className="space-y-1">
           {record.operatingHourGroups.length > 0 ? (
@@ -492,7 +482,7 @@ export default function FacilityManagementPage() {
     {
       title: "Hiện tại",
       dataIndex: "operatingStatus",
-      width: 150,
+      width: 120,
       align: "center",
       render: (_value, record) => (
         <Tag color={record.isOpenNow ? "green" : "orange"}>
@@ -503,7 +493,7 @@ export default function FacilityManagementPage() {
     {
       title: FACILITY_MESSAGES.STATUS,
       dataIndex: "status",
-      width: 130,
+      width: 110,
       align: "center",
       render: (status: FacilityStatus) => (
         <Tag color={status === "active" ? "green" : "default"}>
@@ -514,11 +504,10 @@ export default function FacilityManagementPage() {
     {
       title: FACILITY_MESSAGES.ACTIONS,
       key: "actions",
-      width: 210,
-      fixed: "right",
+      width: 170,
       align: "center",
       render: (_value, record) => (
-        <Space size={8}>
+        <Space size={6}>
           <Button
             title={FACILITY_MESSAGES.VIEW_DETAIL}
             icon={<Eye className="h-4 w-4" />}
@@ -731,7 +720,6 @@ export default function FacilityManagementPage() {
             loading={loading || tableLoading}
             columns={columns}
             dataSource={facilities}
-            scroll={{ x: 1500 }}
             pagination={{
               current: currentPage,
               pageSize,
