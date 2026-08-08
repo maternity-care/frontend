@@ -7,9 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type {
-  ChangeEvent,
-} from "react";
 import {
   Alert,
   App,
@@ -35,9 +32,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
-  ImagePlus,
   Italic,
-  Link2,
   List,
   ListOrdered,
   Pencil,
@@ -98,7 +93,6 @@ type PostEditorValues = {
   topicId: string;
   title: string;
   content: string;
-  coverImageUrl?: string;
   status: ForumPostStatus;
   commentable: boolean;
   isPinned: boolean;
@@ -260,10 +254,6 @@ function RichTextEditor({
     useRef<HTMLDivElement | null>(
       null,
     );
-  const imageInputRef =
-    useRef<HTMLInputElement | null>(
-      null,
-    );
   const savedRangeRef =
     useRef<Range | null>(null);
 
@@ -349,76 +339,6 @@ function RichTextEditor({
 
     emitChange();
     saveSelection();
-  }
-
-  function insertLink() {
-    saveSelection();
-
-    const href = window.prompt(
-      "Nhập đường dẫn liên kết:",
-      "https://",
-    );
-
-    if (!href) {
-      return;
-    }
-
-    runCommand(
-      "createLink",
-      href,
-    );
-  }
-
-  function openImagePicker() {
-    saveSelection();
-    imageInputRef.current?.click();
-  }
-
-  function handleImageChange(
-    event:
-      ChangeEvent<HTMLInputElement>,
-  ) {
-    const file =
-      event.target.files?.[0];
-
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
-    if (
-      !file.type.startsWith(
-        "image/",
-      )
-    ) {
-      return;
-    }
-
-    const reader =
-      new FileReader();
-
-    reader.onload = () => {
-      if (
-        typeof reader.result !==
-        "string"
-      ) {
-        return;
-      }
-
-      focusEditor();
-
-      document.execCommand(
-        "insertHTML",
-        false,
-        `<p><img src="${reader.result}" alt="Ảnh bài viết" style="display:block;max-width:100%;height:auto;margin:12px auto;border-radius:10px;" /></p><p><br></p>`,
-      );
-
-      emitChange();
-      saveSelection();
-    };
-
-    reader.readAsDataURL(file);
   }
 
   const toolbarButtonClass =
@@ -746,50 +666,6 @@ function RichTextEditor({
           </button>
         </Tooltip>
 
-        <Tooltip title="Chèn liên kết">
-          <button
-            type="button"
-            className={
-              toolbarButtonClass
-            }
-            onMouseDown={(event) =>
-              event.preventDefault()
-            }
-            onClick={insertLink}
-          >
-            <Link2 className="h-4 w-4" />
-          </button>
-        </Tooltip>
-
-        <Tooltip title="Chọn ảnh từ máy">
-          <button
-            type="button"
-            className={
-              toolbarButtonClass
-            }
-            onMouseDown={(event) =>
-              event.preventDefault()
-            }
-            onClick={
-              openImagePicker
-            }
-          >
-            <ImagePlus className="h-4 w-4" />
-          </button>
-        </Tooltip>
-
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          style={{
-            display: "none",
-          }}
-          onChange={
-            handleImageChange
-          }
-        />
       </div>
 
       <div className="relative">
@@ -877,10 +753,6 @@ function PostEditorModal({
         title: state.post.title,
         content:
           state.post.content,
-        coverImageUrl:
-          state.post
-            .coverImageUrl ||
-          undefined,
         status:
           state.post.status,
         commentable:
@@ -902,8 +774,6 @@ function PostEditorModal({
       topicId: undefined,
       title: "",
       content: "",
-      coverImageUrl:
-        undefined,
       status: "pending",
       commentable: true,
       isPinned: false,
@@ -1078,20 +948,6 @@ function PostEditorModal({
             ]}
           >
             <RichTextEditor />
-          </Form.Item>
-
-          <Form.Item
-            name="coverImageUrl"
-            label="Đường dẫn ảnh bìa"
-            rules={[
-              {
-                type: "url",
-                message:
-                  "Đường dẫn ảnh bìa không hợp lệ.",
-              },
-            ]}
-          >
-            <Input placeholder="https://cdn.example.com/forum-cover.jpg" />
           </Form.Item>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1310,8 +1166,6 @@ export function ForumPostAdminTab({
           title: values.title,
           content:
             values.content,
-          coverImageUrl:
-            values.coverImageUrl,
           status:
             values.status,
           commentable:
@@ -1340,8 +1194,6 @@ export function ForumPostAdminTab({
           title: values.title,
           content:
             values.content,
-          coverImageUrl:
-            values.coverImageUrl,
           status:
             values.status,
           commentable:
@@ -1612,15 +1464,6 @@ export function ForumPostAdminTab({
           onClose={() =>
             setError(null)
           }
-        />
-      ) : null}
-
-      {!canHardDelete ? (
-        <Alert
-          type="info"
-          showIcon
-          title="Quyền xóa cứng"
-          description="Tài khoản quản trị viên có thể tạo và chỉnh sửa bài viết. Xóa cứng chỉ dành cho Super Admin."
         />
       ) : null}
 

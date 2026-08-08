@@ -35,10 +35,6 @@ const { TextArea } = Input;
 
 type ForumReportsTabProps = {
   realtimeVersion?: number;
-  onSummaryChange: (summary: {
-    total: number;
-    needAction: number;
-  }) => void;
 };
 
 type ReportResolveRequest = {
@@ -78,6 +74,77 @@ function formatDateTime(value?: string) {
 
 function isResolvedStatus(status: string) {
   return ["resolved", "dismissed"].includes(status.toLowerCase());
+}
+
+function getReportStatusLabel(
+  status: string,
+) {
+  const normalized =
+    status.trim().toLowerCase();
+
+  const labels: Record<string, string> = {
+    open: "Chưa xử lý",
+    pending: "Chờ xử lý",
+    processing: "Đang xử lý",
+    in_progress: "Đang xử lý",
+    resolved: "Đã xử lý",
+    dismissed: "Đã bỏ qua",
+    closed: "Đã đóng",
+  };
+
+  return (
+    labels[normalized] ||
+    status ||
+    "Chưa xử lý"
+  );
+}
+
+function getReportDisplayContent(
+  report: ForumReport,
+) {
+  const reason =
+    report.reason.trim();
+  const description =
+    report.description.trim();
+
+  if (
+    description ||
+    !reason.includes(":")
+  ) {
+    return {
+      reason:
+        reason ||
+        "Không rõ lý do",
+      description:
+        description ||
+        "Không có mô tả.",
+    };
+  }
+
+  const separatorIndex =
+    reason.indexOf(":");
+  const reasonTitle =
+    reason
+      .slice(
+        0,
+        separatorIndex,
+      )
+      .trim();
+  const reasonDescription =
+    reason
+      .slice(
+        separatorIndex + 1,
+      )
+      .trim();
+
+  return {
+    reason:
+      reasonTitle ||
+      "Không rõ lý do",
+    description:
+      reasonDescription ||
+      "Không có mô tả.",
+  };
 }
 
 function ReportResolveModal({
@@ -132,11 +199,27 @@ function ReportResolveModal({
           Mã báo cáo
         </Text>
         <Text strong>{request.report.id}</Text>
-        <Paragraph className="!mb-0 !mt-3">
-          {request.report.description ||
-            request.report.reason ||
-            "Không có mô tả."}
-        </Paragraph>
+        {(() => {
+          const display =
+            getReportDisplayContent(
+              request.report,
+            );
+
+          return (
+            <>
+              <Tag
+                color="red"
+                className="!mt-3"
+              >
+                {display.reason}
+              </Tag>
+
+              <Paragraph className="!mb-0 !mt-3">
+                {display.description}
+              </Paragraph>
+            </>
+          );
+        })()}
       </div>
 
       <div className="mt-4">
@@ -174,7 +257,6 @@ function ReportResolveModal({
 
 export function ForumReportsTab({
   realtimeVersion = 0,
-  onSummaryChange,
 }: ForumReportsTabProps) {
   const { message } = App.useApp();
 
@@ -199,18 +281,12 @@ export function ForumReportsTab({
       setTotal(result.total);
       setPage(result.page);
       setPageSize(result.limit);
-      onSummaryChange({
-        total: result.total,
-        needAction: result.items.filter(
-          (report) => !isResolvedStatus(report.status),
-        ).length,
-      });
     } catch (loadError) {
       setError(getErrorMessage(loadError));
     } finally {
       setLoading(false);
     }
-  }, [onSummaryChange, page, pageSize]);
+  }, [page, pageSize]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadReports(), 0);
@@ -296,14 +372,27 @@ export function ForumReportsTab({
     {
       title: "Lý do",
       width: "24%",
-      render: (_value, report) => (
-        <div>
-          <Tag color="red">{report.reason || "Không rõ lý do"}</Tag>
-          <Paragraph ellipsis={{ rows: 2 }} className="!mb-0 !mt-2">
-            {report.description || "Không có mô tả."}
-          </Paragraph>
-        </div>
-      ),
+      render: (_value, report) => {
+        const display =
+          getReportDisplayContent(
+            report,
+          );
+
+        return (
+          <div>
+            <Tag color="red">
+              {display.reason}
+            </Tag>
+
+            <Paragraph
+              ellipsis={{ rows: 2 }}
+              className="!mb-0 !mt-2"
+            >
+              {display.description}
+            </Paragraph>
+          </div>
+        );
+      },
     },
     {
       title: "Người báo cáo",
@@ -333,8 +422,18 @@ export function ForumReportsTab({
       width: "10%",
       align: "center",
       render: (value: string) => (
-        <Tag color={isResolvedStatus(value) ? "green" : "red"}>
-          {value || "Chưa xử lý"}
+        <Tag
+          color={
+            isResolvedStatus(
+              value,
+            )
+              ? "green"
+              : "red"
+          }
+        >
+          {getReportStatusLabel(
+            value,
+          )}
         </Tag>
       ),
     },
