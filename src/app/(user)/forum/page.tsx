@@ -83,7 +83,6 @@ type CreatePostValues = {
   topicId: string;
   title: string;
   content: string;
-  coverImageUrl?: string;
 };
 
 const PAGE_SIZE = 10;
@@ -498,7 +497,6 @@ export default function ForumPage() {
         topics[0]?.id,
       title: "",
       content: "",
-      coverImageUrl: "",
     });
     setCreateModalOpen(true);
   }
@@ -1160,19 +1158,6 @@ export default function ForumPage() {
             />
           </Form.Item>
 
-          <Form.Item
-            name="coverImageUrl"
-            label="Ảnh bìa"
-            rules={[
-              {
-                type: "url",
-                message:
-                  "URL ảnh bìa không hợp lệ.",
-              },
-            ]}
-          >
-            <Input placeholder="https://cdn.example.com/forum-cover.jpg" />
-          </Form.Item>
         </Form>
       </Modal>
 
