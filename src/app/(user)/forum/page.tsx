@@ -96,12 +96,59 @@ function getErrorMessage(
     : "Không thể tải dữ liệu diễn đàn.";
 }
 
-function formatNumber(
-  value: number,
+function htmlToPlainText(
+  value: string,
 ) {
-  return new Intl.NumberFormat(
-    "vi-VN",
-  ).format(value);
+  return value
+    .replace(
+      /<br\s*\/?\s*>/gi,
+      " ",
+    )
+    .replace(
+      /<\/p\s*>/gi,
+      " ",
+    )
+    .replace(
+      /<\/div\s*>/gi,
+      " ",
+    )
+    .replace(
+      /<\/li\s*>/gi,
+      " ",
+    )
+    .replace(
+      /<[^>]+>/g,
+      "",
+    )
+    .replace(
+      /&nbsp;/gi,
+      " ",
+    )
+    .replace(
+      /&amp;/gi,
+      "&",
+    )
+    .replace(
+      /&lt;/gi,
+      "<",
+    )
+    .replace(
+      /&gt;/gi,
+      ">",
+    )
+    .replace(
+      /&quot;/gi,
+      '"',
+    )
+    .replace(
+      /&#39;/gi,
+      "'",
+    )
+    .replace(
+      /\s+/g,
+      " ",
+    )
+    .trim();
 }
 
 function formatDateTime(
@@ -698,13 +745,10 @@ export default function ForumPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[minmax(0,1fr)_88px_88px_170px] border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className="grid grid-cols-[minmax(0,1fr)_88px_170px] border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <span>Bài viết</span>
                   <span className="text-center">
                     Trả lời
-                  </span>
-                  <span className="text-center">
-                    Lượt xem
                   </span>
                   <span>
                     Cập nhật
@@ -743,7 +787,7 @@ export default function ForumPage() {
                         <article
                           key={post.id}
                           className={[
-                            "grid grid-cols-[minmax(0,1fr)_88px_88px_170px] items-center px-4 py-4 transition hover:bg-slate-50",
+                            "grid grid-cols-[minmax(0,1fr)_88px_170px] items-center px-4 py-4 transition hover:bg-slate-50",
                             post.isPinned
                               ? "bg-amber-50/40"
                               : "bg-white",
@@ -798,8 +842,11 @@ export default function ForumPage() {
                               </Link>
 
                               <p className="mb-2 line-clamp-1 text-sm text-slate-500">
-                                {post.excerpt ||
-                                  post.content}
+                                {htmlToPlainText(
+                                  post.excerpt ||
+                                    post.content,
+                                ) ||
+                                  "Chưa có nội dung."}
                               </p>
 
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
@@ -840,17 +887,6 @@ export default function ForumPage() {
                             </p>
                             <p className="mb-0 text-[11px] text-slate-400">
                               phản hồi
-                            </p>
-                          </div>
-
-                          <div className="text-center">
-                            <p className="mb-0 text-sm font-semibold text-slate-900">
-                              {formatNumber(
-                                post.views,
-                              )}
-                            </p>
-                            <p className="mb-0 text-[11px] text-slate-400">
-                              lượt xem
                             </p>
                           </div>
 
