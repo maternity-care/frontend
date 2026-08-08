@@ -317,45 +317,91 @@ export interface DeleteForumCommentInput {
   reason: string;
 }
 
+export type ForumReportTargetType =
+  | "post"
+  | "comment"
+  | "unknown";
+
+export interface BackendForumReportTargetContent {
+  type?: unknown;
+  id?: unknown;
+  postId?: unknown;
+  postTitle?: unknown;
+  parentId?: unknown;
+  title?: unknown;
+  content?: unknown;
+  author?: unknown;
+  authorId?: unknown;
+  authorRole?: unknown;
+  status?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface ForumReportTargetContent {
+  type: ForumReportTargetType;
+  id: string;
+  postId: string;
+  postTitle: string;
+  parentId: string;
+  title: string;
+  content: string;
+  author: string;
+  authorId: string;
+  authorRole: ForumAuthorRole;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BackendForumReport {
   id?: unknown;
+  handlerId?: unknown;
+  reporterId?: unknown;
+  reporterRole?: unknown;
   targetType?: unknown;
   contentType?: unknown;
   targetId?: unknown;
   contentId?: unknown;
   postId?: unknown;
   commentId?: unknown;
-  reporterId?: unknown;
   reporterName?: unknown;
   reporterEmail?: unknown;
   reason?: unknown;
   description?: unknown;
   note?: unknown;
+  resolutionNote?: unknown;
+  resolutionAction?: unknown;
   status?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
   handledAt?: unknown;
   handledBy?: unknown;
+  resolvedBy?: unknown;
+  resolvedAt?: unknown;
   resolution?: unknown;
+  targetContent?: BackendForumReportTargetContent | null;
 }
-
-export type ForumReportTargetType =
-  | "post"
-  | "comment"
-  | "unknown";
 
 export interface ForumReport {
   id: string;
+  handlerId: string;
+  reporterId: string;
+  reporterRole: ForumAuthorRole;
   targetType: ForumReportTargetType;
   targetId: string;
-  reporterId: string;
   reporterName: string;
   reporterEmail: string;
   reason: string;
   description: string;
+  resolutionNote: string;
+  resolutionAction: ForumReportResolveAction | "";
   status: string;
   createdAt: string;
   updatedAt: string;
+  resolvedBy: string;
+  resolvedAt: string;
+  targetContent: ForumReportTargetContent | null;
   handledAt: string;
   handledBy: string;
   resolution: string;
