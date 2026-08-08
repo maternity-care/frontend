@@ -83,7 +83,6 @@ type CreatePostValues = {
   topicId: string;
   title: string;
   content: string;
-  coverImageUrl?: string;
 };
 
 const PAGE_SIZE = 10;
@@ -96,12 +95,59 @@ function getErrorMessage(
     : "Không thể tải dữ liệu diễn đàn.";
 }
 
-function formatNumber(
-  value: number,
+function htmlToPlainText(
+  value: string,
 ) {
-  return new Intl.NumberFormat(
-    "vi-VN",
-  ).format(value);
+  return value
+    .replace(
+      /<br\s*\/?\s*>/gi,
+      " ",
+    )
+    .replace(
+      /<\/p\s*>/gi,
+      " ",
+    )
+    .replace(
+      /<\/div\s*>/gi,
+      " ",
+    )
+    .replace(
+      /<\/li\s*>/gi,
+      " ",
+    )
+    .replace(
+      /<[^>]+>/g,
+      "",
+    )
+    .replace(
+      /&nbsp;/gi,
+      " ",
+    )
+    .replace(
+      /&amp;/gi,
+      "&",
+    )
+    .replace(
+      /&lt;/gi,
+      "<",
+    )
+    .replace(
+      /&gt;/gi,
+      ">",
+    )
+    .replace(
+      /&quot;/gi,
+      '"',
+    )
+    .replace(
+      /&#39;/gi,
+      "'",
+    )
+    .replace(
+      /\s+/g,
+      " ",
+    )
+    .trim();
 }
 
 function formatDateTime(
@@ -219,6 +265,18 @@ export default function ForumPage() {
     useState(1);
   const [total, setTotal] =
     useState(0);
+  const [
+    categoryCounts,
+    setCategoryCounts,
+  ] = useState<
+    Map<CategoryFilter, number>
+  >(
+    () =>
+      new Map<
+        CategoryFilter,
+        number
+      >(),
+  );
 
   const [loading, setLoading] =
     useState(true);
@@ -264,19 +322,72 @@ export default function ForumPage() {
           getForumTopics(),
         ]);
 
-        setCategories(
+        const activeCategories =
           nextCategories.filter(
             (item) =>
               item.status ===
               "active",
-          ),
-        );
-        setTopics(
+          );
+        const activeTopics =
           nextTopics.filter(
             (item) =>
               item.status ===
               "active",
-          ),
+          );
+
+        setCategories(
+          activeCategories,
+        );
+        setTopics(
+          activeTopics,
+        );
+
+        const countResults =
+          await Promise.all([
+            getForumPosts({
+              page: 1,
+              limit: 1,
+              status:
+                "published",
+            }),
+            ...activeCategories.map(
+              (item) =>
+                getForumPosts({
+                  page: 1,
+                  limit: 1,
+                  category:
+                    item.code,
+                  status:
+                    "published",
+                }),
+            ),
+          ]);
+
+        const nextCounts =
+          new Map<
+            CategoryFilter,
+            number
+          >();
+
+        nextCounts.set(
+          "all",
+          countResults[0]
+            ?.total ?? 0,
+        );
+
+        activeCategories.forEach(
+          (item, index) => {
+            nextCounts.set(
+              item.code,
+              countResults[
+                index + 1
+              ]?.total ?? 0,
+            );
+          },
+        );
+
+        setCategoryCounts(
+          nextCounts,
         );
       } catch (loadError) {
         setError(
@@ -364,35 +475,6 @@ export default function ForumPage() {
       window.clearTimeout(timer);
   }, [loadPosts]);
 
-  const categoryCounts =
-    useMemo(() => {
-      const counts = new Map<
-        CategoryFilter,
-        number
-      >([
-        ["all", total],
-      ]);
-
-      categories.forEach(
-        (item) => {
-          counts.set(
-            item.code,
-            posts.filter(
-              (post) =>
-                post.category ===
-                item.code,
-            ).length,
-          );
-        },
-      );
-
-      return counts;
-    }, [
-      categories,
-      posts,
-      total,
-    ]);
-
   const popularTopics =
     useMemo(
       () =>
@@ -415,7 +497,6 @@ export default function ForumPage() {
         topics[0]?.id,
       title: "",
       content: "",
-      coverImageUrl: "",
     });
     setCreateModalOpen(true);
   }
@@ -662,13 +743,10 @@ export default function ForumPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[minmax(0,1fr)_88px_88px_170px] border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className="grid grid-cols-[minmax(0,1fr)_88px_170px] border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <span>Bài viết</span>
                   <span className="text-center">
                     Trả lời
-                  </span>
-                  <span className="text-center">
-                    Lượt xem
                   </span>
                   <span>
                     Cập nhật
@@ -707,7 +785,7 @@ export default function ForumPage() {
                         <article
                           key={post.id}
                           className={[
-                            "grid grid-cols-[minmax(0,1fr)_88px_88px_170px] items-center px-4 py-4 transition hover:bg-slate-50",
+                            "grid grid-cols-[minmax(0,1fr)_88px_170px] items-center px-4 py-4 transition hover:bg-slate-50",
                             post.isPinned
                               ? "bg-amber-50/40"
                               : "bg-white",
@@ -762,8 +840,11 @@ export default function ForumPage() {
                               </Link>
 
                               <p className="mb-2 line-clamp-1 text-sm text-slate-500">
-                                {post.excerpt ||
-                                  post.content}
+                                {htmlToPlainText(
+                                  post.excerpt ||
+                                    post.content,
+                                ) ||
+                                  "Chưa có nội dung."}
                               </p>
 
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
@@ -804,17 +885,6 @@ export default function ForumPage() {
                             </p>
                             <p className="mb-0 text-[11px] text-slate-400">
                               phản hồi
-                            </p>
-                          </div>
-
-                          <div className="text-center">
-                            <p className="mb-0 text-sm font-semibold text-slate-900">
-                              {formatNumber(
-                                post.views,
-                              )}
-                            </p>
-                            <p className="mb-0 text-[11px] text-slate-400">
-                              lượt xem
                             </p>
                           </div>
 
@@ -1088,19 +1158,6 @@ export default function ForumPage() {
             />
           </Form.Item>
 
-          <Form.Item
-            name="coverImageUrl"
-            label="Ảnh bìa"
-            rules={[
-              {
-                type: "url",
-                message:
-                  "URL ảnh bìa không hợp lệ.",
-              },
-            ]}
-          >
-            <Input placeholder="https://cdn.example.com/forum-cover.jpg" />
-          </Form.Item>
         </Form>
       </Modal>
 

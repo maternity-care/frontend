@@ -1,38 +1,56 @@
 "use client";
 
 import {
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
-import { useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import {
+  useSearchParams,
+} from "next/navigation";
+import type {
+  ReactNode,
+} from "react";
 import {
   Card,
-  Col,
-  Row,
   Segmented,
-  Statistic,
 } from "antd";
 import {
-  CircleAlert,
   FilePenLine,
-  FileText,
   Flag,
   MessagesSquare,
   Tags,
 } from "lucide-react";
 
-import { useAuthStore } from "@/features/auth/auth.store";
-import { AdminLayout } from "@/management/components/layouts/AdminLayout";
-import { PageHeader } from "@/management/components/ui/PageHeader";
-import type { ForumTopic } from "@/management/features/forums/forums.types";
-import { useForumRealtime } from "@/features/forum/useForumRealtime";
-import { ForumPostAdminTab } from "./components/ForumPostAdminTab";
-import { ForumPostsTab } from "./components/ForumPostsTab";
-import { ForumReportsTab } from "./components/ForumReportsTab";
-import { ForumTopicsTab } from "./components/ForumTopicsTab";
+import {
+  useAuthStore,
+} from "@/features/auth/auth.store";
+import {
+  useForumRealtime,
+} from "@/features/forum/useForumRealtime";
+import {
+  AdminLayout,
+} from "@/management/components/layouts/AdminLayout";
+import {
+  PageHeader,
+} from "@/management/components/ui/PageHeader";
+import type {
+  ForumTopic,
+} from "@/management/features/forums/forums.types";
+import {
+  ForumPostAdminTab,
+} from "./components/ForumPostAdminTab";
+import {
+  ForumPostsTab,
+} from "./components/ForumPostsTab";
+import {
+  ForumReportsTab,
+} from "./components/ForumReportsTab";
+import {
+  ForumTopicsTab,
+} from "./components/ForumTopicsTab";
 
 type ForumView =
   | "posts"
@@ -45,45 +63,40 @@ type ForumNavigationOption = {
   label: ReactNode;
 };
 
-type PostSummary = {
-  total: number;
-  pending: number;
-};
-
-type ReportSummary = {
-  total: number;
-  needAction: number;
-};
-
-export default function ForumManagementPage() {
-  const searchParams = useSearchParams();
+function ForumManagementContent() {
+  const searchParams =
+    useSearchParams();
   const roles = useAuthStore(
     (state) => state.roles,
   );
+
   const isForumAdmin =
     roles.includes("admin") ||
-    roles.includes("super_admin");
-  const isSuperAdmin =
-    roles.includes("super_admin");
+    roles.includes(
+      "super_admin",
+    );
 
-  const [view, setView] =
-    useState<ForumView>("posts");
-  const [realtimeVersion, setRealtimeVersion] = useState(0);
-  const [topics, setTopics] = useState<
-    ForumTopic[]
-  >([]);
-  const [postSummary, setPostSummary] =
-    useState<PostSummary>({
-      total: 0,
-      pending: 0,
-    });
+  const isSuperAdmin =
+    roles.includes(
+      "super_admin",
+    );
+
   const [
-    reportSummary,
-    setReportSummary,
-  ] = useState<ReportSummary>({
-    total: 0,
-    needAction: 0,
-  });
+    view,
+    setView,
+  ] = useState<ForumView>(
+    "posts",
+  );
+  const [
+    realtimeVersion,
+    setRealtimeVersion,
+  ] = useState(0);
+  const [
+    topics,
+    setTopics,
+  ] = useState<ForumTopic[]>(
+    [],
+  );
 
   const activeView =
     !isForumAdmin &&
@@ -92,25 +105,45 @@ export default function ForumManagementPage() {
       : view;
 
   useEffect(() => {
-    const requestedView = searchParams.get("view");
+    const requestedView =
+      searchParams.get("view");
+
     if (
       requestedView === "posts" ||
-      requestedView === "post-admin" ||
+      requestedView ===
+        "post-admin" ||
       requestedView === "reports" ||
       requestedView === "topics"
     ) {
-      const timer = window.setTimeout(() => setView(requestedView), 0);
-      return () => window.clearTimeout(timer);
+      const timer =
+        window.setTimeout(
+          () =>
+            setView(
+              requestedView,
+            ),
+          0,
+        );
+
+      return () =>
+        window.clearTimeout(
+          timer,
+        );
     }
   }, [searchParams]);
 
   useForumRealtime({
     management: true,
-    onEvent: () => setRealtimeVersion((current) => current + 1),
+    onEvent: () =>
+      setRealtimeVersion(
+        (current) =>
+          current + 1,
+      ),
   });
 
   const navigationOptions =
-    useMemo<ForumNavigationOption[]>(
+    useMemo<
+      ForumNavigationOption[]
+    >(
       () => [
         {
           value: "posts",
@@ -159,24 +192,13 @@ export default function ForumManagementPage() {
 
   const handleTopicsChange =
     useCallback(
-      (nextTopics: ForumTopic[]) => {
-        setTopics(nextTopics);
-      },
-      [],
-    );
-
-  const handlePostSummaryChange =
-    useCallback(
-      (summary: PostSummary) => {
-        setPostSummary(summary);
-      },
-      [],
-    );
-
-  const handleReportSummaryChange =
-    useCallback(
-      (summary: ReportSummary) => {
-        setReportSummary(summary);
+      (
+        nextTopics:
+          ForumTopic[],
+      ) => {
+        setTopics(
+          nextTopics,
+        );
       },
       [],
     );
@@ -184,7 +206,9 @@ export default function ForumManagementPage() {
   const navigation = (
     <Segmented<ForumView>
       value={activeView}
-      options={navigationOptions}
+      options={
+        navigationOptions
+      }
       onChange={setView}
     />
   );
@@ -197,59 +221,8 @@ export default function ForumManagementPage() {
       />
 
       <div className="mt-6 flex flex-col gap-5">
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} xl={6}>
-            <Card>
-              <Statistic
-                title="Tổng bài viết"
-                value={postSummary.total}
-                prefix={
-                  <FileText className="mr-2 h-5 w-5 text-blue-600" />
-                }
-              />
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={12} xl={6}>
-            <Card className="border-amber-100 bg-amber-50/60">
-              <Statistic
-                title="Chờ duyệt trên trang"
-                value={postSummary.pending}
-                prefix={
-                  <CircleAlert className="mr-2 h-5 w-5 text-amber-600" />
-                }
-              />
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={12} xl={6}>
-            <Card className="border-red-100 bg-red-50/60">
-              <Statistic
-                title="Báo cáo cần xử lý"
-                value={
-                  reportSummary.needAction
-                }
-                prefix={
-                  <Flag className="mr-2 h-5 w-5 text-red-600" />
-                }
-              />
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={12} xl={6}>
-            <Card className="border-purple-100 bg-purple-50/60">
-              <Statistic
-                title="Tổng chủ đề"
-                value={topics.length}
-                prefix={
-                  <Tags className="mr-2 h-5 w-5 text-purple-600" />
-                }
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        {activeView !== "posts" ? (
+        {activeView !==
+        "posts" ? (
           <Card className="border-slate-200 bg-white">
             {navigation}
           </Card>
@@ -257,18 +230,25 @@ export default function ForumManagementPage() {
 
         <div
           className={
-            activeView === "posts"
+            activeView ===
+            "posts"
               ? "block"
               : "hidden"
           }
         >
           <ForumPostsTab
             topics={topics}
-            navigation={navigation}
-            focusPostId={searchParams.get("postId") ?? undefined}
-            realtimeVersion={realtimeVersion}
-            onSummaryChange={
-              handlePostSummaryChange
+            navigation={
+              navigation
+            }
+            focusPostId={
+              searchParams.get(
+                "postId",
+              ) ??
+              undefined
+            }
+            realtimeVersion={
+              realtimeVersion
             }
           />
         </div>
@@ -284,7 +264,9 @@ export default function ForumManagementPage() {
           >
             <ForumPostAdminTab
               topics={topics}
-              realtimeVersion={realtimeVersion}
+              realtimeVersion={
+                realtimeVersion
+              }
               canHardDelete={
                 isSuperAdmin
               }
@@ -294,22 +276,23 @@ export default function ForumManagementPage() {
 
         <div
           className={
-            activeView === "reports"
+            activeView ===
+            "reports"
               ? "block"
               : "hidden"
           }
         >
           <ForumReportsTab
-            realtimeVersion={realtimeVersion}
-            onSummaryChange={
-              handleReportSummaryChange
+            realtimeVersion={
+              realtimeVersion
             }
           />
         </div>
 
         <div
           className={
-            activeView === "topics"
+            activeView ===
+            "topics"
               ? "block"
               : "hidden"
           }
@@ -324,3 +307,18 @@ export default function ForumManagementPage() {
     </AdminLayout>
   );
 }
+
+export default function ForumManagementPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
+          Đang tải quản lý diễn đàn...
+        </div>
+      }
+    >
+      <ForumManagementContent />
+    </Suspense>
+  );
+}
+

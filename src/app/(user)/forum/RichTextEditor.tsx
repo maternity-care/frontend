@@ -4,9 +4,6 @@ import {
   useEffect,
   useRef,
 } from "react";
-import type {
-  ChangeEvent,
-} from "react";
 import {
   Select,
   Tooltip,
@@ -17,9 +14,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
-  ImagePlus,
   Italic,
-  Link2,
   List,
   ListOrdered,
   Redo2,
@@ -42,10 +37,6 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const editorRef =
     useRef<HTMLDivElement | null>(
-      null,
-    );
-  const imageInputRef =
-    useRef<HTMLInputElement | null>(
       null,
     );
   const savedRangeRef =
@@ -140,77 +131,6 @@ export function RichTextEditor({
     saveSelection();
   }
 
-  function insertLink() {
-    saveSelection();
-
-    const href =
-      window.prompt(
-        "Nhập đường dẫn liên kết:",
-        "https://",
-      );
-
-    if (!href) {
-      return;
-    }
-
-    runCommand(
-      "createLink",
-      href,
-    );
-  }
-
-  function openImagePicker() {
-    saveSelection();
-    imageInputRef.current?.click();
-  }
-
-  function handleImageChange(
-    event:
-      ChangeEvent<HTMLInputElement>,
-  ) {
-    const file =
-      event.target.files?.[0];
-
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
-    if (
-      !file.type.startsWith(
-        "image/",
-      )
-    ) {
-      return;
-    }
-
-    const reader =
-      new FileReader();
-
-    reader.onload = () => {
-      if (
-        typeof reader.result !==
-        "string"
-      ) {
-        return;
-      }
-
-      focusEditor();
-
-      document.execCommand(
-        "insertHTML",
-        false,
-        `<p><img src="${reader.result}" alt="Ảnh bài viết" style="display:block;max-width:100%;height:auto;margin:12px auto;border-radius:10px;" /></p><p><br></p>`,
-      );
-
-      emitChange();
-      saveSelection();
-    };
-
-    reader.readAsDataURL(file);
-  }
-
   const toolbarButtonClass =
     "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-200 hover:text-slate-950";
 
@@ -266,9 +186,9 @@ export function RichTextEditor({
           }
           className="shrink-0"
           style={{
-            width: 82,
-            minWidth: 82,
-            maxWidth: 82,
+            width: 85,
+            minWidth: 85,
+            maxWidth: 85,
           }}
           options={[
             {
@@ -309,9 +229,9 @@ export function RichTextEditor({
           }
           className="shrink-0"
           style={{
-            width: 64,
-            minWidth: 64,
-            maxWidth: 64,
+            width: 70,
+            minWidth: 70,
+            maxWidth: 70,
           }}
           options={[
             {
@@ -521,47 +441,6 @@ export function RichTextEditor({
           </button>
         </Tooltip>
 
-        <Tooltip title="Chèn liên kết">
-          <button
-            type="button"
-            className={
-              toolbarButtonClass
-            }
-            onMouseDown={(event) =>
-              event.preventDefault()
-            }
-            onClick={insertLink}
-          >
-            <Link2 className="h-4 w-4" />
-          </button>
-        </Tooltip>
-
-        <Tooltip title="Chọn ảnh từ máy">
-          <button
-            type="button"
-            className={
-              toolbarButtonClass
-            }
-            onMouseDown={(event) =>
-              event.preventDefault()
-            }
-            onClick={
-              openImagePicker
-            }
-          >
-            <ImagePlus className="h-4 w-4" />
-          </button>
-        </Tooltip>
-
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={
-            handleImageChange
-          }
-        />
       </div>
 
       <div className="relative">
