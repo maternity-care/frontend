@@ -30,7 +30,6 @@ import {
   ArrowLeft,
   BadgeCheck,
   CalendarDays,
-  Eye,
   Flag,
   Lock,
   MessageCircle,
@@ -631,13 +630,18 @@ export default function ForumPostDetailPage() {
           <Alert
             type="warning"
             showIcon
-            className="mb-4 !rounded-xl !border-amber-200"
+            className="!rounded-xl !border-amber-200"
             title={disclaimer}
-            description="Không tự ý sử dụng thuốc hoặc thay đổi phác đồ điều trị dựa trên nội dung trong Forum."
+            description="Không tự ý sử dụng thuốc hoặc thay đổi phác đồ điều trị dựa trên nội dung trong Diễn đàn."
           />
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_290px]">
-            <section className="min-w-0 space-y-4">
+          <div
+            className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_290px]"
+            style={{
+              marginTop: 24,
+            }}
+          >
+            <section className="flex min-w-0 flex-col gap-5">
               <Card
                 className="!rounded-2xl !border-slate-200"
                 styles={{
@@ -709,11 +713,6 @@ export default function ForumPostDetailPage() {
                         </span>
 
                         <span className="inline-flex items-center gap-1">
-                          <Eye className="h-3.5 w-3.5" />
-                          {post.views} lượt xem
-                        </span>
-
-                        <span className="inline-flex items-center gap-1">
                           <MessageCircle className="h-3.5 w-3.5" />
                           {
                             visibleComments.length
@@ -757,107 +756,87 @@ export default function ForumPostDetailPage() {
                 </div>
               </Card>
 
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
-                <div>
-                  <Text strong>
-                    Phản hồi trong bài viết
-                  </Text>
-                  <Text
-                    type="secondary"
-                    className="ml-2 text-xs"
-                  >
-                    {
-                      visibleComments.length
-                    }{" "}
-                    bình luận
-                  </Text>
-                </div>
-
-                <Button
-                  icon={
-                    <Reply className="h-4 w-4" />
-                  }
-                  disabled={
-                    post.isLocked
-                  }
-                  onClick={() => {
-                    document
-                      .getElementById(
-                        "reply-composer",
-                      )
-                      ?.scrollIntoView({
-                        behavior:
-                          "smooth",
-                      });
-                  }}
-                >
-                  Trả lời
-                </Button>
-              </div>
-
-              {visibleComments.length ===
-              0 ? (
-                <Card className="!rounded-2xl !border-slate-200">
+              <Card
+                className="!rounded-2xl !border-slate-200"
+                title="Bình luận"
+                styles={{
+                  body: {
+                    padding:
+                      visibleComments.length > 0
+                        ? 16
+                        : 24,
+                  },
+                }}
+              >
+                {visibleComments.length ===
+                0 ? (
                   <Empty description="Chưa có bình luận." />
-                </Card>
-              ) : (
-                visibleComments.map(
-                  (comment, index) => (
-                    <CommentCard
-                      key={comment.id}
-                      comment={comment}
-                      index={index}
-                      replyingTo={
-                        replyingTo
-                      }
-                      replyContent={
-                        replyContent
-                      }
-                      submitting={
-                        commentSubmitting
-                      }
-                      onReply={() => {
-                        setReplyingTo(
-                          comment.id,
-                        );
-                        setReplyContent(
-                          "",
-                        );
-                      }}
-                      onCancelReply={() => {
-                        setReplyingTo(
-                          null,
-                        );
-                        setReplyContent(
-                          "",
-                        );
-                      }}
-                      onReplyContentChange={
-                        setReplyContent
-                      }
-                      onSubmitReply={() =>
-                        void submitComment(
-                          comment.id,
-                        )
-                      }
-                      onReport={() =>
-                        openReport({
-                          type:
-                            "comment",
-                          id: comment.id,
-                          label:
-                            "bình luận",
-                        })
-                      }
-                    />
-                  ),
-                )
-              )}
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {visibleComments.map(
+                      (comment, index) => (
+                        <CommentCard
+                          key={comment.id}
+                          comment={comment}
+                          index={index}
+                          replyingTo={
+                            replyingTo
+                          }
+                          replyContent={
+                            replyContent
+                          }
+                          submitting={
+                            commentSubmitting
+                          }
+                          onReply={() => {
+                            setReplyingTo(
+                              comment.id,
+                            );
+                            setReplyContent(
+                              "",
+                            );
+                          }}
+                          onCancelReply={() => {
+                            setReplyingTo(
+                              null,
+                            );
+                            setReplyContent(
+                              "",
+                            );
+                          }}
+                          onReplyContentChange={
+                            setReplyContent
+                          }
+                          onSubmitReply={() =>
+                            void submitComment(
+                              comment.id,
+                            )
+                          }
+                          onReport={() =>
+                            openReport({
+                              type:
+                                "comment",
+                              id: comment.id,
+                              label:
+                                "bình luận",
+                            })
+                          }
+                        />
+                      ),
+                    )}
+                  </div>
+                )}
+              </Card>
 
               <Card
                 id="reply-composer"
                 className="!rounded-2xl !border-slate-200"
                 title="Trả lời bài viết"
+                styles={{
+                  body: {
+                    paddingBottom: 22,
+                  },
+                }}
               >
                 {!isLoggedIn ? (
                   <Alert
@@ -887,6 +866,7 @@ export default function ForumPostDetailPage() {
                       rows={6}
                       maxLength={1000}
                       showCount
+                      className="!mb-1"
                       placeholder="Nhập nội dung phản hồi..."
                       onChange={(event) =>
                         setCommentContent(
@@ -895,7 +875,7 @@ export default function ForumPostDetailPage() {
                       }
                     />
 
-                    <div className="mt-3 flex justify-end">
+                    <div className="mt-7 flex justify-end">
                       <Button
                         type="primary"
                         icon={
@@ -920,37 +900,7 @@ export default function ForumPostDetailPage() {
               </Card>
             </section>
 
-            <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
-              <Card
-                size="small"
-                className="!rounded-2xl !border-slate-200"
-                title="Thông tin bài viết"
-              >
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-xl bg-slate-50 p-3 text-center">
-                    <Eye className="mx-auto h-4 w-4 text-slate-400" />
-                    <p className="mb-0 mt-1 font-semibold text-slate-900">
-                      {post.views}
-                    </p>
-                    <p className="mb-0 text-xs text-slate-500">
-                      Lượt xem
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-50 p-3 text-center">
-                    <MessageCircle className="mx-auto h-4 w-4 text-slate-400" />
-                    <p className="mb-0 mt-1 font-semibold text-slate-900">
-                      {
-                        visibleComments.length
-                      }
-                    </p>
-                    <p className="mb-0 text-xs text-slate-500">
-                      Phản hồi
-                    </p>
-                  </div>
-                </div>
-              </Card>
-
+            <aside className="flex flex-col gap-5 xl:sticky xl:top-5 xl:self-start">
               <Card
                 size="small"
                 className="!rounded-2xl !border-slate-200"
@@ -1104,7 +1054,7 @@ function CommentCard({
   onReport: () => void;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-4">
       <Card
         className="!rounded-2xl !border-slate-200"
         styles={{
