@@ -583,6 +583,72 @@ function normalizeReportTargetType(
   return "unknown";
 }
 
+function normalizeReportResolveAction(
+  value: unknown,
+): ForumReport["resolutionAction"] {
+  const action = normalizeText(
+    value,
+  ).toLowerCase();
+
+  if (
+    action === "hide" ||
+    action === "delete" ||
+    action === "dismiss"
+  ) {
+    return action;
+  }
+
+  return "";
+}
+
+function normalizeReportTargetContent(
+  value: unknown,
+): ForumReport["targetContent"] {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    type: normalizeReportTargetType(
+      value.type,
+    ),
+    id: normalizeText(value.id),
+    postId: normalizeText(
+      value.postId,
+    ),
+    postTitle: normalizeText(
+      value.postTitle,
+    ),
+    parentId: normalizeText(
+      value.parentId,
+    ),
+    title: normalizeText(
+      value.title,
+    ),
+    content: normalizeText(
+      value.content,
+    ),
+    author: normalizeText(
+      value.author,
+    ),
+    authorId: normalizeText(
+      value.authorId,
+    ),
+    authorRole: normalizeAuthorRole(
+      value.authorRole,
+    ),
+    status: normalizeText(
+      value.status,
+    ),
+    createdAt: normalizeText(
+      value.createdAt,
+    ),
+    updatedAt: normalizeText(
+      value.updatedAt,
+    ),
+  };
+}
+
 function normalizeReport(
   item: BackendForumReport,
 ): ForumReport {
@@ -603,45 +669,87 @@ function normalizeReport(
           )
     );
 
+  const resolutionAction =
+    normalizeReportResolveAction(
+      item.resolutionAction ??
+        item.resolution,
+    );
+
+  const resolutionNote =
+    normalizeText(
+      item.resolutionNote,
+    ) ||
+    normalizeText(
+      item.description,
+    ) ||
+    normalizeText(item.note);
+
+  const resolvedBy =
+    normalizeText(
+      item.resolvedBy,
+    ) ||
+    normalizeText(
+      item.handledBy,
+    ) ||
+    normalizeText(
+      item.handlerId,
+    );
+
+  const resolvedAt =
+    normalizeText(
+      item.resolvedAt,
+    ) ||
+    normalizeText(
+      item.handledAt,
+    );
+
   return {
     id: normalizeText(item.id),
-    targetType,
-    targetId,
+    handlerId: normalizeText(
+      item.handlerId,
+    ),
     reporterId: normalizeText(
       item.reporterId,
     ),
+    reporterRole: normalizeAuthorRole(
+      item.reporterRole,
+    ),
+    targetType,
+    targetId,
     reporterName:
       normalizeText(
         item.reporterName,
-      ) || "Không rõ người báo cáo",
+      ) ||
+      "Không rõ người báo cáo",
     reporterEmail: normalizeText(
       item.reporterEmail,
     ),
     reason: normalizeText(
       item.reason,
     ),
-    description:
-      normalizeText(
-        item.description,
-      ) || normalizeText(item.note),
+    description: "",
+    resolutionNote,
+    resolutionAction,
     status:
       normalizeText(item.status) ||
-      "open",
+      "pending",
     createdAt: normalizeText(
       item.createdAt,
     ),
     updatedAt: normalizeText(
       item.updatedAt,
     ),
-    handledAt: normalizeText(
-      item.handledAt,
-    ),
-    handledBy: normalizeText(
-      item.handledBy,
-    ),
-    resolution: normalizeText(
-      item.resolution,
-    ),
+    resolvedBy,
+    resolvedAt,
+    targetContent:
+      normalizeReportTargetContent(
+        item.targetContent,
+      ),
+
+    handledAt: resolvedAt,
+    handledBy: resolvedBy,
+    resolution:
+      resolutionAction,
   };
 }
 

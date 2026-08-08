@@ -16,6 +16,7 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
+  Eye,
   EyeOff,
   Trash2,
   XCircle,
@@ -97,6 +98,91 @@ function getReportStatusLabel(
     status ||
     "Chưa xử lý"
   );
+}
+
+function getContentStatusLabel(
+  status: string,
+) {
+  const normalized =
+    status.trim().toLowerCase();
+
+  const labels: Record<string, string> = {
+    pending: "Chờ duyệt",
+    published: "Đã xuất bản",
+    hidden: "Đã ẩn",
+    rejected: "Đã từ chối",
+    deleted: "Đã xóa",
+    active: "Hoạt động",
+    inactive: "Ngừng hoạt động",
+  };
+
+  return (
+    labels[normalized] ||
+    status ||
+    "Chưa cập nhật"
+  );
+}
+
+function getReporterRoleLabel(
+  role: ForumReport["reporterRole"],
+) {
+  const labels: Record<
+    ForumReport["reporterRole"],
+    string
+  > = {
+    user: "Người dùng",
+    staff: "Nhân viên",
+    doctor: "Bác sĩ",
+    moderator: "Kiểm duyệt viên",
+    admin: "Quản trị viên",
+  };
+
+  return labels[role] ?? role;
+}
+
+function stripReportHtml(
+  value: string,
+) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getTargetContentSummary(
+  report: ForumReport,
+) {
+  const target =
+    report.targetContent;
+
+  if (!target) {
+    return {
+      title:
+        report.targetType === "post"
+          ? "Bài viết không còn tồn tại"
+          : report.targetType === "comment"
+            ? "Bình luận không còn tồn tại"
+            : "Nội dung không còn tồn tại",
+      content: "",
+    };
+  }
+
+  return {
+    title:
+      target.title ||
+      target.postTitle ||
+      (
+        target.type === "comment"
+          ? "Bình luận"
+          : "Bài viết"
+      ),
+    content:
+      stripReportHtml(
+        target.content,
+      ),
+  };
 }
 
 function getReportDisplayContent(
@@ -204,6 +290,10 @@ function ReportResolveModal({
             getReportDisplayContent(
               request.report,
             );
+          const target =
+            getTargetContentSummary(
+              request.report,
+            );
 
           return (
             <>
@@ -217,6 +307,31 @@ function ReportResolveModal({
               <Paragraph className="!mb-0 !mt-3">
                 {display.description}
               </Paragraph>
+
+              <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                <Text
+                  type="secondary"
+                  className="block text-xs"
+                >
+                  Nội dung bị báo cáo
+                </Text>
+
+                <Text
+                  strong
+                  className="mt-1 block"
+                >
+                  {target.title}
+                </Text>
+
+                {target.content ? (
+                  <Paragraph
+                    ellipsis={{ rows: 3 }}
+                    className="!mb-0 !mt-2"
+                  >
+                    {target.content}
+                  </Paragraph>
+                ) : null}
+              </div>
             </>
           );
         })()}
@@ -255,6 +370,188 @@ function ReportResolveModal({
   );
 }
 
+function ReportTargetContentModal({
+  report,
+  onClose,
+  onResolve,
+}: {
+  report: ForumReport | null;
+  onClose: () => void;
+  onResolve: (
+    report: ForumReport,
+    action: ForumReportResolveAction,
+  ) => void;
+}) {
+  if (!report) return null;
+
+  const target =
+    getTargetContentSummary(
+      report,
+    );
+  const rawTarget =
+    report.targetContent;
+  const disabled =
+    isResolvedStatus(
+      report.status,
+    );
+
+  return (
+    <Modal
+      open
+      centered
+      width={760}
+      title="Nội dung bị báo cáo"
+      footer={
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            onClick={onClose}
+          >
+            Đóng
+          </Button>
+
+          <Button
+            disabled={disabled}
+            icon={
+              <EyeOff className="h-4 w-4" />
+            }
+            onClick={() =>
+              onResolve(
+                report,
+                "hide",
+              )
+            }
+          >
+            Ẩn nội dung
+          </Button>
+
+          <Button
+            danger
+            disabled={disabled}
+            icon={
+              <Trash2 className="h-4 w-4" />
+            }
+            onClick={() =>
+              onResolve(
+                report,
+                "delete",
+              )
+            }
+          >
+            Xóa nội dung
+          </Button>
+
+          <Button
+            disabled={disabled}
+            icon={
+              <XCircle className="h-4 w-4" />
+            }
+            onClick={() =>
+              onResolve(
+                report,
+                "dismiss",
+              )
+            }
+          >
+            Bỏ qua báo cáo
+          </Button>
+        </div>
+      }
+      onCancel={onClose}
+      styles={{
+        body: {
+          maxHeight: "70vh",
+          overflowY: "auto",
+        },
+      }}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Tag
+            color={
+              report.targetType === "post"
+                ? "blue"
+                : report.targetType === "comment"
+                  ? "purple"
+                  : "default"
+            }
+          >
+            {report.targetType === "post"
+              ? "Bài viết"
+              : report.targetType === "comment"
+                ? "Bình luận"
+                : "Không xác định"}
+          </Tag>
+
+          <Text type="secondary">
+            Mã nội dung: #{report.targetId}
+          </Text>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <Text
+            type="secondary"
+            className="block text-xs"
+          >
+            Tiêu đề
+          </Text>
+
+          <Text
+            strong
+            className="mt-1 block break-words"
+          >
+            {target.title}
+          </Text>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <Text
+            type="secondary"
+            className="block text-xs"
+          >
+            Nội dung đầy đủ
+          </Text>
+
+          <Paragraph className="!mb-0 !mt-2 !whitespace-pre-wrap !break-words !leading-7">
+            {target.content ||
+              "Nội dung không còn tồn tại hoặc không có dữ liệu."}
+          </Paragraph>
+        </div>
+
+        {rawTarget ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 p-3">
+              <Text
+                type="secondary"
+                className="block text-xs"
+              >
+                Tác giả
+              </Text>
+              <Text strong>
+                {rawTarget.author ||
+                  "Chưa cập nhật"}
+              </Text>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-3">
+              <Text
+                type="secondary"
+                className="block text-xs"
+              >
+                Trạng thái nội dung
+              </Text>
+              <Text>
+                {getContentStatusLabel(
+                  rawTarget.status,
+                )}
+              </Text>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </Modal>
+  );
+}
+
 export function ForumReportsTab({
   realtimeVersion = 0,
 }: ForumReportsTabProps) {
@@ -269,6 +566,12 @@ export function ForumReportsTab({
   const [error, setError] = useState<string | null>(null);
   const [resolveRequest, setResolveRequest] =
     useState<ReportResolveRequest | null>(null);
+  const [
+    viewingContentReport,
+    setViewingContentReport,
+  ] = useState<ForumReport | null>(
+    null,
+  );
 
   const loadReports = useCallback(async () => {
     setLoading(true);
@@ -332,7 +635,7 @@ export function ForumReportsTab({
     {
       title: "Mã báo cáo",
       dataIndex: "id",
-      width: "9%",
+      width: "7%",
       render: (value: string) => (
         <Text
           strong
@@ -344,34 +647,73 @@ export function ForumReportsTab({
       ),
     },
     {
-      title: "Đối tượng",
-      width: "12%",
-      render: (_value, report) => (
-        <div>
-          <Tag
-            color={
-              report.targetType === "post"
-                ? "blue"
-                : report.targetType === "comment"
-                  ? "purple"
-                  : "default"
-            }
-          >
-            {report.targetType === "post"
-              ? "Bài viết"
-              : report.targetType === "comment"
-                ? "Bình luận"
-                : "Không xác định"}
-          </Tag>
-          <Text type="secondary" className="mt-1 block text-xs">
-            {report.targetId || "Chưa có mã nội dung"}
-          </Text>
-        </div>
-      ),
+      title: "Nội dung bị báo cáo",
+      width: "17%",
+      render: (_value, report) => {
+        const target =
+          getTargetContentSummary(
+            report,
+          );
+
+        return (
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1">
+              <Tag
+                color={
+                  report.targetType === "post"
+                    ? "blue"
+                    : report.targetType === "comment"
+                      ? "purple"
+                      : "default"
+                }
+              >
+                {report.targetType === "post"
+                  ? "Bài viết"
+                  : report.targetType === "comment"
+                    ? "Bình luận"
+                    : "Không xác định"}
+              </Tag>
+
+              <Text
+                type="secondary"
+                className="text-xs"
+              >
+                #{report.targetId}
+              </Text>
+            </div>
+
+            <Text
+              strong
+              ellipsis={{
+                tooltip: target.title,
+              }}
+              className="mt-1 block"
+            >
+              {target.title}
+            </Text>
+
+            {target.content ? (
+              <Paragraph
+                ellipsis={{ rows: 2 }}
+                className="!mb-0 !mt-1 !text-xs !text-slate-500"
+              >
+                {target.content}
+              </Paragraph>
+            ) : (
+              <Text
+                type="secondary"
+                className="mt-1 block text-xs"
+              >
+                Không có nội dung xem trước
+              </Text>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: "Lý do",
-      width: "24%",
+      width: "18%",
       render: (_value, report) => {
         const display =
           getReportDisplayContent(
@@ -396,7 +738,7 @@ export function ForumReportsTab({
     },
     {
       title: "Người báo cáo",
-      width: "17%",
+      width: "14%",
       render: (_value, report) => (
         <div>
           <Text
@@ -413,59 +755,107 @@ export function ForumReportsTab({
           >
             {report.reporterEmail}
           </Text>
+
+          <Text
+            type="secondary"
+            className="mt-1 block text-xs"
+          >
+            {getReporterRoleLabel(
+              report.reporterRole,
+            )}
+          </Text>
         </div>
       ),
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: "10%",
+      width: "11%",
       align: "center",
-      render: (value: string) => (
-        <Tag
-          color={
-            isResolvedStatus(
+      render: (
+        value: string,
+        report,
+      ) => (
+        <div>
+          <Tag
+            color={
+              isResolvedStatus(
+                value,
+              )
+                ? "green"
+                : "red"
+            }
+          >
+            {getReportStatusLabel(
               value,
-            )
-              ? "green"
-              : "red"
-          }
-        >
-          {getReportStatusLabel(
-            value,
-          )}
-        </Tag>
+            )}
+          </Tag>
+
+          {report.resolutionAction ? (
+            <Text
+              type="secondary"
+              className="mt-1 block text-xs"
+            >
+              {
+                REPORT_ACTION_OPTIONS.find(
+                  (item) =>
+                    item.value ===
+                    report.resolutionAction,
+                )?.label
+              }
+            </Text>
+          ) : null}
+        </div>
       ),
     },
     {
       title: "Ngày gửi",
       dataIndex: "createdAt",
-      width: "11%",
+      width: "9%",
       render: (value: string) => formatDateTime(value),
     },
     {
       title: "Hành động",
-      width: "12%",
+      width: "16%",
       align: "center",
       render: (_value, report) => {
-        const disabled = isResolvedStatus(
-          report.status,
-        );
+        const disabled =
+          isResolvedStatus(
+            report.status,
+          );
 
         return (
-          <Space size={6}>
+          <Space
+            size={6}
+            className="!flex !justify-center"
+          >
+            <Tooltip title="Xem chi tiết">
+              <Button
+                icon={
+                  <Eye className="h-4 w-4" />
+                }
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setViewingContentReport(
+                    report,
+                  );
+                }}
+              />
+            </Tooltip>
+
             <Tooltip title="Ẩn nội dung">
               <Button
                 disabled={disabled}
                 icon={
                   <EyeOff className="h-4 w-4" />
                 }
-                onClick={() =>
+                onClick={(event) => {
+                  event.stopPropagation();
                   setResolveRequest({
                     report,
                     action: "hide",
-                  })
-                }
+                  });
+                }}
               />
             </Tooltip>
 
@@ -476,12 +866,13 @@ export function ForumReportsTab({
                 icon={
                   <Trash2 className="h-4 w-4" />
                 }
-                onClick={() =>
+                onClick={(event) => {
+                  event.stopPropagation();
                   setResolveRequest({
                     report,
                     action: "delete",
-                  })
-                }
+                  });
+                }}
               />
             </Tooltip>
 
@@ -491,12 +882,13 @@ export function ForumReportsTab({
                 icon={
                   <XCircle className="h-4 w-4" />
                 }
-                onClick={() =>
+                onClick={(event) => {
+                  event.stopPropagation();
                   setResolveRequest({
                     report,
                     action: "dismiss",
-                  })
-                }
+                  });
+                }}
               />
             </Tooltip>
           </Space>
@@ -552,6 +944,27 @@ export function ForumReportsTab({
           />
         </Card>
       </div>
+
+      <ReportTargetContentModal
+        report={viewingContentReport}
+        onClose={() =>
+          setViewingContentReport(
+            null,
+          )
+        }
+        onResolve={(
+          report,
+          action,
+        ) => {
+          setViewingContentReport(
+            null,
+          );
+          setResolveRequest({
+            report,
+            action,
+          });
+        }}
+      />
 
       <ReportResolveModal
         request={resolveRequest}

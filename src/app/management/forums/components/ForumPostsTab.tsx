@@ -162,6 +162,55 @@ function authorRoleLabel(role: ForumAuthorRole) {
   );
 }
 
+function moderationTargetLabel(
+  targetType: string,
+) {
+  const normalized =
+    targetType.trim().toLowerCase();
+
+  const labels: Record<string, string> = {
+    post: "Bài viết",
+    comment: "Bình luận",
+  };
+
+  return (
+    labels[normalized] ||
+    targetType ||
+    "Nội dung"
+  );
+}
+
+function moderationActionLabel(
+  action: string,
+) {
+  const normalized =
+    action.trim().toLowerCase();
+
+  const labels: Record<string, string> = {
+    submit: "Gửi bài",
+    approve: "Duyệt bài",
+    hide: "Ẩn",
+    reject: "Từ chối",
+    delete: "Xóa",
+    lock: "Khóa bình luận",
+    unlock: "Mở khóa bình luận",
+    pin: "Ghim bài",
+    unpin: "Bỏ ghim",
+    feature: "Đánh dấu nổi bật",
+    unfeature: "Bỏ đánh dấu nổi bật",
+    update: "Cập nhật",
+    edit: "Chỉnh sửa",
+    create: "Tạo mới",
+    restore: "Khôi phục",
+  };
+
+  return (
+    labels[normalized] ||
+    action ||
+    "Cập nhật"
+  );
+}
+
 function postStatusTag(status: ForumPostStatus) {
   const colors: Record<ForumPostStatus, string> = {
     pending: "gold",
@@ -872,12 +921,14 @@ function PostDetailModal({
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <Space wrap>
                           <Tag color="blue">
-                            {log.targetType ||
-                              "nội dung"}
+                            {moderationTargetLabel(
+                              log.targetType,
+                            )}
                           </Tag>
                           <Text strong>
-                            {log.action ||
-                              "Cập nhật"}
+                            {moderationActionLabel(
+                              log.action,
+                            )}
                           </Text>
                           <Text type="secondary">
                             bởi{" "}
