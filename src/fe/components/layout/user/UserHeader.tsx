@@ -119,7 +119,7 @@ export function UserHeader() {
       label: "Lịch khám cần xử lý",
     },
     {
-      key: "record_keeping",
+      key: "pregnancy-profiles",
       icon: <SquareLibrary className="h-4 w-4" />,
       label: RESPONSE_MESSAGES.NAVIGATION.record_keeping,
     },
