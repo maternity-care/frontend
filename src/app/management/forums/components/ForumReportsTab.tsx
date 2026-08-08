@@ -99,6 +99,68 @@ function getReportStatusLabel(
   );
 }
 
+function getReporterRoleLabel(
+  role: ForumReport["reporterRole"],
+) {
+  const labels: Record<
+    ForumReport["reporterRole"],
+    string
+  > = {
+    user: "Người dùng",
+    staff: "Nhân viên",
+    doctor: "Bác sĩ",
+    moderator: "Kiểm duyệt viên",
+    admin: "Quản trị viên",
+  };
+
+  return labels[role] ?? role;
+}
+
+function stripReportHtml(
+  value: string,
+) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getTargetContentSummary(
+  report: ForumReport,
+) {
+  const target =
+    report.targetContent;
+
+  if (!target) {
+    return {
+      title:
+        report.targetType === "post"
+          ? "Bài viết không còn tồn tại"
+          : report.targetType === "comment"
+            ? "Bình luận không còn tồn tại"
+            : "Nội dung không còn tồn tại",
+      content: "",
+    };
+  }
+
+  return {
+    title:
+      target.title ||
+      target.postTitle ||
+      (
+        target.type === "comment"
+          ? "Bình luận"
+          : "Bài viết"
+      ),
+    content:
+      stripReportHtml(
+        target.content,
+      ),
+  };
+}
+
 function getReportDisplayContent(
   report: ForumReport,
 ) {
@@ -204,6 +266,10 @@ function ReportResolveModal({
             getReportDisplayContent(
               request.report,
             );
+          const target =
+            getTargetContentSummary(
+              request.report,
+            );
 
           return (
             <>
@@ -217,6 +283,31 @@ function ReportResolveModal({
               <Paragraph className="!mb-0 !mt-3">
                 {display.description}
               </Paragraph>
+
+              <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                <Text
+                  type="secondary"
+                  className="block text-xs"
+                >
+                  Nội dung bị báo cáo
+                </Text>
+
+                <Text
+                  strong
+                  className="mt-1 block"
+                >
+                  {target.title}
+                </Text>
+
+                {target.content ? (
+                  <Paragraph
+                    ellipsis={{ rows: 3 }}
+                    className="!mb-0 !mt-2"
+                  >
+                    {target.content}
+                  </Paragraph>
+                ) : null}
+              </div>
             </>
           );
         })()}
@@ -332,7 +423,7 @@ export function ForumReportsTab({
     {
       title: "Mã báo cáo",
       dataIndex: "id",
-      width: "9%",
+      width: "8%",
       render: (value: string) => (
         <Text
           strong
@@ -344,34 +435,66 @@ export function ForumReportsTab({
       ),
     },
     {
-      title: "Đối tượng",
-      width: "12%",
-      render: (_value, report) => (
-        <div>
-          <Tag
-            color={
-              report.targetType === "post"
-                ? "blue"
-                : report.targetType === "comment"
-                  ? "purple"
-                  : "default"
-            }
-          >
-            {report.targetType === "post"
-              ? "Bài viết"
-              : report.targetType === "comment"
-                ? "Bình luận"
-                : "Không xác định"}
-          </Tag>
-          <Text type="secondary" className="mt-1 block text-xs">
-            {report.targetId || "Chưa có mã nội dung"}
-          </Text>
-        </div>
-      ),
+      title: "Nội dung bị báo cáo",
+      width: "21%",
+      render: (_value, report) => {
+        const target =
+          getTargetContentSummary(
+            report,
+          );
+
+        return (
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1">
+              <Tag
+                color={
+                  report.targetType === "post"
+                    ? "blue"
+                    : report.targetType === "comment"
+                      ? "purple"
+                      : "default"
+                }
+              >
+                {report.targetType === "post"
+                  ? "Bài viết"
+                  : report.targetType === "comment"
+                    ? "Bình luận"
+                    : "Không xác định"}
+              </Tag>
+
+              <Text
+                type="secondary"
+                className="text-xs"
+              >
+                #{report.targetId}
+              </Text>
+            </div>
+
+            <Text
+              strong
+              ellipsis={{
+                tooltip: target.title,
+              }}
+              className="mt-1 block"
+            >
+              {target.title}
+            </Text>
+
+            {target.content ? (
+              <Paragraph
+                ellipsis={{ rows: 2 }}
+                className="!mb-0 !mt-1 !text-xs !text-slate-500"
+              >
+                {target.content}
+              </Paragraph>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       title: "Lý do",
-      width: "24%",
+      width: "20%",
       render: (_value, report) => {
         const display =
           getReportDisplayContent(
@@ -396,7 +519,7 @@ export function ForumReportsTab({
     },
     {
       title: "Người báo cáo",
-      width: "17%",
+      width: "15%",
       render: (_value, report) => (
         <div>
           <Text
@@ -413,39 +536,68 @@ export function ForumReportsTab({
           >
             {report.reporterEmail}
           </Text>
+
+          <Text
+            type="secondary"
+            className="mt-1 block text-xs"
+          >
+            {getReporterRoleLabel(
+              report.reporterRole,
+            )}
+          </Text>
         </div>
       ),
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: "10%",
+      width: "12%",
       align: "center",
-      render: (value: string) => (
-        <Tag
-          color={
-            isResolvedStatus(
+      render: (
+        value: string,
+        report,
+      ) => (
+        <div>
+          <Tag
+            color={
+              isResolvedStatus(
+                value,
+              )
+                ? "green"
+                : "red"
+            }
+          >
+            {getReportStatusLabel(
               value,
-            )
-              ? "green"
-              : "red"
-          }
-        >
-          {getReportStatusLabel(
-            value,
-          )}
-        </Tag>
+            )}
+          </Tag>
+
+          {report.resolutionAction ? (
+            <Text
+              type="secondary"
+              className="mt-1 block text-xs"
+            >
+              {
+                REPORT_ACTION_OPTIONS.find(
+                  (item) =>
+                    item.value ===
+                    report.resolutionAction,
+                )?.label
+              }
+            </Text>
+          ) : null}
+        </div>
       ),
     },
     {
       title: "Ngày gửi",
       dataIndex: "createdAt",
-      width: "11%",
+      width: "10%",
       render: (value: string) => formatDateTime(value),
     },
     {
       title: "Hành động",
-      width: "12%",
+      width: "9%",
       align: "center",
       render: (_value, report) => {
         const disabled = isResolvedStatus(
