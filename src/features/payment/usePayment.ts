@@ -70,6 +70,8 @@ function extractQrUrl(order: PaymentOrder): string | null {
   return null;
 }
 
+export const PAYMENT_ORDER_KEY = "payment:current-order";
+
 export function usePayment({
   management = false,
   onResult,
@@ -119,7 +121,7 @@ export function usePayment({
       setIsConnected(true);
       onConnectedRef.current?.();
       if (currentOrderIdRef.current) {
-        socket.emit("order:join", { orderId: currentOrderIdRef.current });
+        socket.emit("order:join", { code: currentOrderIdRef.current });
       }
     });
 
@@ -133,7 +135,7 @@ export function usePayment({
     socket.on("order:result", (payload: OrderResultEvent) => {
       if (
         currentOrderIdRef.current &&
-        payload.orderId !== currentOrderIdRef.current
+        payload.code !== currentOrderIdRef.current
       ) {
         return;
       }
@@ -142,6 +144,7 @@ export function usePayment({
         setIsPaid(true);
         setLoading(false);
         setError(null);
+        sessionStorage.removeItem(PAYMENT_ORDER_KEY);
       } else if (
         payload.status === "failed" ||
         payload.status === "cancelled"
@@ -159,11 +162,11 @@ export function usePayment({
   }, [management]);
 
   const joinOrder = useCallback(
-    (orderId: string) => {
-      currentOrderIdRef.current = orderId;
+    (code: string) => {
+      currentOrderIdRef.current = code;
       const socket = getSocket();
       if (socket.connected) {
-        socket.emit("order:join", { orderId });
+        socket.emit("order:join", { code: code });
       }
     },
     [getSocket],
@@ -178,14 +181,26 @@ export function usePayment({
       setQrUrl(null);
 
       try {
+        const oldOrder = sessionStorage.getItem(PAYMENT_ORDER_KEY);
+        if (oldOrder) {
+          const parsedOrder = JSON.parse(oldOrder) as PaymentOrder;
+          setOrder(parsedOrder);
+          const url = extractQrUrl(parsedOrder);
+          setQrUrl(url);
+          if (parsedOrder.code) {
+            joinOrder(parsedOrder.code);
+          }
+          return parsedOrder;
+        }
         const newOrder = await createOrder(payload);
+        sessionStorage.setItem(PAYMENT_ORDER_KEY, JSON.stringify(newOrder));
         setOrder(newOrder);
 
         const url = extractQrUrl(newOrder);
         setQrUrl(url);
 
-        if (newOrder.id) {
-          joinOrder(newOrder.id);
+        if (newOrder.code) {
+          joinOrder(newOrder.code);
         }
 
         // Vẫn loading = true cho đến khi order:result (paid)
