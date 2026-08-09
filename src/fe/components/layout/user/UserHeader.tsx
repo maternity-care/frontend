@@ -4,7 +4,6 @@ import type { MenuProps } from "antd";
 import { Avatar, Button, Dropdown, Layout, Typography, message } from "antd";
 import {
   CalendarDays,
-  CalendarX2,
   ChevronDown,
   HeartPulse,
   LogOut,
@@ -92,11 +91,6 @@ export function UserHeader() {
       return;
     }
 
-    if (key === "appointment-disruptions") {
-      router.push("/appointment-disruptions");
-      return;
-    }
-
     if (key === "logout") {
       await handleLogout();
     }
@@ -112,11 +106,6 @@ export function UserHeader() {
       key: "schedule",
       icon: <CalendarDays className="h-4 w-4" />,
       label: RESPONSE_MESSAGES.NAVIGATION.SCHEDULE,
-    },
-    {
-      key: "appointment-disruptions",
-      icon: <CalendarX2 className="h-4 w-4" />,
-      label: "Lịch khám cần xử lý",
     },
     {
       key: "record_keeping",

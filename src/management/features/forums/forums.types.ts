@@ -323,6 +323,7 @@ export interface BackendForumReport {
   contentType?: unknown;
   targetId?: unknown;
   contentId?: unknown;
+  targetContent?: BackendForumReportTargetContent | null;
   postId?: unknown;
   commentId?: unknown;
   reporterId?: unknown;
@@ -339,15 +340,48 @@ export interface BackendForumReport {
   resolution?: unknown;
 }
 
+export interface BackendForumReportTargetContent {
+  type?: unknown;
+  id?: unknown;
+  title?: unknown;
+  postId?: unknown;
+  postTitle?: unknown;
+  parentId?: unknown;
+  content?: unknown;
+  author?: unknown;
+  authorId?: unknown;
+  authorRole?: unknown;
+  status?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
 export type ForumReportTargetType =
   | "post"
   | "comment"
   | "unknown";
 
+export interface ForumReportTargetContent {
+  type: ForumReportTargetType;
+  id: string;
+  title: string;
+  postId: string;
+  postTitle: string;
+  parentId: string;
+  content: string;
+  authorName: string;
+  authorId: string;
+  authorRole: ForumAuthorRole;
+  status: ForumPostStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ForumReport {
   id: string;
   targetType: ForumReportTargetType;
   targetId: string;
+  targetContent: ForumReportTargetContent | null;
   reporterId: string;
   reporterName: string;
   reporterEmail: string;

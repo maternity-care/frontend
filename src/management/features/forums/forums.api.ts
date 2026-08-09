@@ -583,6 +583,54 @@ function normalizeReportTargetType(
   return "unknown";
 }
 
+function normalizeReportTargetContent(
+  value: unknown,
+) {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    type: normalizeReportTargetType(
+      value.type,
+    ),
+    id: normalizeText(value.id),
+    title: normalizeText(
+      value.title,
+    ),
+    postId: normalizeText(
+      value.postId,
+    ),
+    postTitle: normalizeText(
+      value.postTitle,
+    ),
+    parentId: normalizeText(
+      value.parentId,
+    ),
+    content: normalizeText(
+      value.content,
+    ),
+    authorName: normalizeText(
+      value.author,
+    ),
+    authorId: normalizeText(
+      value.authorId,
+    ),
+    authorRole: normalizeAuthorRole(
+      value.authorRole,
+    ),
+    status: normalizePostStatus(
+      value.status,
+    ),
+    createdAt: normalizeText(
+      value.createdAt,
+    ),
+    updatedAt: normalizeText(
+      value.updatedAt,
+    ),
+  };
+}
+
 function normalizeReport(
   item: BackendForumReport,
 ): ForumReport {
@@ -607,6 +655,10 @@ function normalizeReport(
     id: normalizeText(item.id),
     targetType,
     targetId,
+    targetContent:
+      normalizeReportTargetContent(
+        item.targetContent,
+      ),
     reporterId: normalizeText(
       item.reporterId,
     ),

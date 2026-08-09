@@ -15,6 +15,7 @@ import {
   buildGoogleCalendarUrl,
   downloadSchedulesIcs,
 } from "@/features/schedule/schedule.utils";
+import { AppointmentDisruptionsPanel } from "@/features/appointment-disruptions/AppointmentDisruptionsPanel";
 import { CreateScheduleModal } from "./CreateScheduleModal";
 import { ScheduleList } from "./ScheduleList";
 import { ScheduleCalendar } from "./ScheduleCalendar";
@@ -192,6 +193,8 @@ export function PregnancyScheduleOverview({
         </Row>
       </Card>
       </Spin>
+
+      <AppointmentDisruptionsPanel hideWhenEmpty />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>

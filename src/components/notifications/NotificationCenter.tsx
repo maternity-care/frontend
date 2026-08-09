@@ -83,7 +83,7 @@ export function NotificationCenter() {
       router.push(isManagement ? '/management/forums?view=reports' : '/forum');
       return;
     }
-    router.push(isManagement ? '/management/appointment-disruptions' : '/appointment-disruptions');
+    router.push(isManagement ? '/management/appointment-disruptions' : '/schedule#appointment-disruptions');
   };
 
   const markAllRead = async () => {

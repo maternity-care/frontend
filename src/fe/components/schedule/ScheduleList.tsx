@@ -98,7 +98,7 @@ export function ScheduleList({
                   <Button
                     type="primary"
                     size="small"
-                    href="/appointment-disruptions"
+                    href="/schedule#appointment-disruptions"
                     icon={<AlertTriangle className="h-3.5 w-3.5" />}
                   >
                     Xử lý lịch
