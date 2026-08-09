@@ -152,6 +152,7 @@ export function usePayment({
         setIsPaid(false);
         setLoading(false);
         setError(payload.message ?? "Thanh toán thất bại");
+        sessionStorage.removeItem(PAYMENT_ORDER_KEY);
       }
 
       onResultRef.current?.(payload);
