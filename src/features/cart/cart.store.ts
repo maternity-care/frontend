@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { PAYMENT_ORDER_KEY } from "../payment/usePayment";
 
 export type CartPackageItem = {
   packageId: string;
@@ -16,7 +17,9 @@ export type CartPackageItem = {
 
 type CartState = {
   items: CartPackageItem[];
-  addItem: (item: Omit<CartPackageItem, "quantity"> & { quantity?: number }) => void;
+  addItem: (
+    item: Omit<CartPackageItem, "quantity"> & { quantity?: number },
+  ) => void;
   removeItem: (packageId: string, facilityId: string) => void;
   clear: () => void;
   totalAmount: () => number;
@@ -57,19 +60,21 @@ export const useCartStore = create<CartState>()(
       removeItem: (packageId, facilityId) => {
         set((state) => ({
           items: state.items.filter(
-            (i) =>
-              !(i.packageId === packageId && i.facilityId === facilityId),
+            (i) => !(i.packageId === packageId && i.facilityId === facilityId),
           ),
         }));
+        sessionStorage.removeItem(PAYMENT_ORDER_KEY);
       },
 
-      clear: () => set({ items: [] }),
+      clear: () => {
+        set({ items: [] });
+        sessionStorage.removeItem(PAYMENT_ORDER_KEY);
+      },
 
       totalAmount: () =>
         get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
 
-      totalItems: () =>
-        get().items.reduce((sum, i) => sum + i.quantity, 0),
+      totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
     }),
     {
       name: "maternity-cart",

@@ -33,6 +33,11 @@ function formatPrice(value: number) {
   return `${value.toLocaleString("vi-VN")}đ`;
 }
 
+export enum OrderItemType {
+  NORMAL_SERVICE = 'normalService', // nếu mua lẻ các dịch vụ, không mua gói (thường chỉ đến khám, có thể có siêu âm, dạng dùng 1 lần)
+  PACKAGE = 'package', // mua theo package
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { user, refreshToken } = useAuthStore();
@@ -80,7 +85,7 @@ export default function CheckoutPage() {
 
     const orderItems = items.map((i) => ({
       itemId: String(i.packageId),
-      itemType: "maternity_package" as const,
+      itemType: "package" as const,
       // name: i.packageName,
       quantity: i.quantity,
       // unitPrice: i.price,
