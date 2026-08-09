@@ -71,6 +71,33 @@ const WORKING_DAY_OPTIONS: Array<{
   { label: "Chủ nhật", value: "SUN" },
 ];
 
+function getSlotWorkingDayOptions(
+  slot?: ShiftSlotLookupItem | null,
+) {
+  const applicableDays =
+    slot?.applicableDays?.length
+      ? new Set(slot.applicableDays)
+      : null;
+
+  return WORKING_DAY_OPTIONS.filter(
+    (option) =>
+      !applicableDays ||
+      applicableDays.has(option.value),
+  );
+}
+
+function getDefaultWorkingDays(
+  slot?: ShiftSlotLookupItem | null,
+): DoctorShiftWorkingDay[] {
+  const slotDays = getSlotWorkingDayOptions(slot).map(
+    (option) => option.value,
+  );
+
+  return slotDays.length > 0
+    ? slotDays
+    : ["MON", "TUE", "WED", "THU", "FRI"];
+}
+
 type WeeklyUpdateStatus = Extract<
   DoctorShiftStatus,
   "available" | "off"
@@ -1602,7 +1629,9 @@ export function DoctorShiftWeeklyUpdateModal({
                                             >
                                               <Checkbox.Group
                                                 options={
-                                                  WORKING_DAY_OPTIONS
+                                                  getSlotWorkingDayOptions(
+                                                    slot,
+                                                  )
                                                 }
                                                 className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7"
                                               />
@@ -1624,11 +1653,9 @@ export function DoctorShiftWeeklyUpdateModal({
                                         staffId: "",
                                         roomId: "",
                                         workingDays: [
-                                          "MON",
-                                          "TUE",
-                                          "WED",
-                                          "THU",
-                                          "FRI",
+                                          ...getDefaultWorkingDays(
+                                            slot,
+                                          ),
                                         ],
                                         maxAppointments:
                                           8,

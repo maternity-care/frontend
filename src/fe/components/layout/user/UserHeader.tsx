@@ -89,13 +89,13 @@ export function UserHeader() {
       return;
     }
 
-    if (key === "pregnancy-profiles") {
-      router.push("/pregnancy-profiles");
+    if (key === "appointment-disruptions") {
+      router.push("/appointment-disruptions");
       return;
     }
 
-    if (key === "appointment-disruptions") {
-      router.push("/appointment-disruptions");
+    if (key === "pregnancy-profiles") {
+      router.push("/pregnancy-profiles");
       return;
     }
 

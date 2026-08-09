@@ -2,6 +2,15 @@ export type ShiftSlotStatus =
   | "active"
   | "inactive";
 
+export type ShiftSlotApplicableDay =
+  | "MON"
+  | "TUE"
+  | "WED"
+  | "THU"
+  | "FRI"
+  | "SAT"
+  | "SUN";
+
 export interface BackendShiftSlot {
   id: string;
   facilityId: string;
@@ -12,6 +21,7 @@ export interface BackendShiftSlot {
   startTime: string;
   endTime: string;
   isOvernight: boolean;
+  applicableDays?: ShiftSlotApplicableDay[] | string[] | null;
   status: ShiftSlotStatus | string;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +45,7 @@ export interface ShiftSlot {
   startTime: string;
   endTime: string;
   isOvernight: boolean;
+  applicableDays: ShiftSlotApplicableDay[];
   status: ShiftSlotStatus;
   createdAt: string;
   updatedAt: string;
@@ -55,6 +66,7 @@ export interface BackendShiftSlotLookupItem {
   name: string;
   startTime: string;
   endTime: string;
+  applicableDays?: ShiftSlotApplicableDay[] | string[] | null;
   status: ShiftSlotStatus | string;
 }
 
@@ -65,6 +77,7 @@ export interface ShiftSlotLookupItem {
   name: string;
   startTime: string;
   endTime: string;
+  applicableDays: ShiftSlotApplicableDay[];
   status: ShiftSlotStatus;
 }
 
@@ -89,6 +102,7 @@ export interface CreateShiftSlotInput {
   startTime: string;
   endTime: string;
   isOvernight: boolean;
+  applicableDays?: ShiftSlotApplicableDay[];
   status: ShiftSlotStatus;
 }
 
@@ -98,6 +112,7 @@ export interface UpdateShiftSlotInput {
   startTime?: string;
   endTime?: string;
   isOvernight?: boolean;
+  applicableDays?: ShiftSlotApplicableDay[];
   status?: ShiftSlotStatus;
 }
 
