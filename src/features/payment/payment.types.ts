@@ -7,7 +7,14 @@ export type OrderStatus =
   | "refunded"
   | string;
 
-export type OrderType = "normal_service" | "package" | "subscription" | string;
+export type OrderType = "normal_service" | "maternity_package" | "mixed";
+
+export type OrderItemType =
+  | "service"
+  | "maternity_package"
+  | "package"
+  | "product"
+  | string;
 
 export type PaymentMethod =
   | "sepay"
@@ -46,67 +53,51 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
-/** Response có phân trang (giả định shape phổ biến) */
 export interface PaginatedData<T> {
   items: T[];
   meta: PaginationMeta;
 }
 
 // ============================================
-// Order Item
+// Create Order (khớp CreateOrderDto BE)
+// ============================================
+
+export interface CreateOrderItemPayload {
+  itemId: string;
+  itemType: OrderItemType;
+  // name: string;
+  quantity: number;
+  // unitPrice: number;
+  // metadata?: Record<string, unknown>;
+}
+
+export interface CreateOrderPayload {
+  facilityId: string;
+  orderType: OrderType;
+  orderItems: CreateOrderItemPayload[];
+  // subtotalAmount: number;
+  // discountAmount: number;
+  // totalAmount: number;
+}
+
+// ============================================
+// Order / Invoice / Payment (response)
 // ============================================
 
 export interface OrderItem {
   id?: string;
+  itemId?: string;
+  itemType?: OrderItemType;
+  name?: string;
   serviceId?: string;
   serviceName?: string;
   quantity?: number;
   unitPrice?: number;
   amount?: number;
   discountAmount?: number;
+  metadata?: Record<string, unknown>;
   [key: string]: unknown;
 }
-
-// ============================================
-// Payment Order
-// ============================================
-
-export interface PaymentOrder {
-  id: string;
-  code?: string;
-  facilityId?: string;
-  facilityName?: string;
-  customerId?: string;
-  customerName?: string;
-  pregnancyProfileId?: string;
-  orderType?: OrderType;
-  orderItems?: OrderItem[] | string[];
-  subtotalAmount?: number;
-  discountAmount?: number;
-  totalAmount?: number;
-  paidAmount?: number;
-  status?: OrderStatus;
-  paymentMethod?: PaymentMethod;
-  invoice?: Invoice;
-  payments?: PaymentTransaction[];
-  createdAt?: string;
-  updatedAt?: string;
-  cancelledAt?: string;
-  [key: string]: unknown;
-}
-
-export interface CreateOrderPayload {
-  facilityId: string;
-  orderType: OrderType;
-  orderItems: string[];
-  subtotalAmount: number;
-  discountAmount: number;
-  totalAmount: number;
-}
-
-// ============================================
-// Invoice
-// ============================================
 
 export interface Invoice {
   id: string;
@@ -124,10 +115,6 @@ export interface Invoice {
   [key: string]: unknown;
 }
 
-// ============================================
-// Payment Transaction
-// ============================================
-
 export interface PaymentTransaction {
   id: string;
   orderId?: string;
@@ -142,6 +129,34 @@ export interface PaymentTransaction {
   paidAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  [key: string]: unknown;
+}
+
+export interface PaymentOrder {
+  id: string;
+  code?: string;
+  facilityId?: string;
+  facilityName?: string;
+  customerId?: string;
+  customerName?: string;
+  pregnancyProfileId?: string;
+  orderType?: OrderType;
+  orderItems?: OrderItem[];
+  subtotalAmount?: number;
+  discountAmount?: number;
+  totalAmount?: number;
+  paidAmount?: number;
+  status?: OrderStatus;
+  paymentMethod?: PaymentMethod;
+  invoice?: Invoice;
+  payments?: PaymentTransaction[];
+  qrUrl?: string;
+  paymentQrUrl?: string;
+  qrCodeUrl?: string;
+  sepayQrUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  cancelledAt?: string;
   [key: string]: unknown;
 }
 

@@ -7,6 +7,7 @@ import {
   CalendarX2,
   ChevronDown,
   HeartPulse,
+  Home,
   LogOut,
   SquareLibrary,
   UserRound,
@@ -18,6 +19,7 @@ import { useAuthStore } from "@/features/auth/auth.store";
 import useAuth from "@/hooks/useAuth";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { CartButton } from "@/fe/components/layout/CartButton";
 
 const { Header } = Layout;
 const { Text } = Typography;
@@ -145,40 +147,62 @@ export function UserHeader() {
             <div className="text-base font-semibold text-slate-950">
               {RESPONSE_MESSAGES.COMMON.DEFAULT_NAME}
             </div>
-            <div className="text-xs text-slate-500">{RESPONSE_MESSAGES.COMMON.PREGNANT}</div>
+            <div className="text-xs text-slate-500">
+              {RESPONSE_MESSAGES.COMMON.PREGNANT}
+            </div>
           </div>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Giỏ hàng – bên trái NotificationCenter */}
+          <CartButton />
+
           <NotificationCenter />
-        <Dropdown
-          menu={{
-            items: menuItems,
-            onClick: handleMenuClick,
-          }}
-          placement="bottomRight"
-          trigger={["click"]}
-        >
+
+          {/* Nút về trang chủ public "/" */}
           <Button
             type="text"
-            className="!flex !h-11 !items-center !gap-2 !rounded-full !px-2"
+            className="!flex !h-10 !items-center !gap-1.5 !rounded-full !px-2.5 !text-slate-700 hover:!bg-pink-50 hover:!text-pink-700"
+            onClick={() => router.push("/")}
+            aria-label="Về trang chủ"
           >
-            <Avatar className="!bg-pink-500">
-              {getInitials(currentUser?.name)}
-            </Avatar>
-
-            <div className="hidden text-left sm:block">
-              <Text strong className="block max-w-36 truncate">
-                {currentUser?.name || RESPONSE_MESSAGES.COMMON.PREGNANT}
-              </Text>
-              <Text type="secondary" className="block max-w-36 truncate text-xs">
-                {currentUser?.email || ""}
-              </Text>
-            </div>
-
-            <ChevronDown className="h-4 w-4 text-slate-500" />
+            <Home className="h-5 w-5" />
+            <span className="hidden sm:inline text-sm font-medium">
+              Trang chủ
+            </span>
           </Button>
-        </Dropdown>
+
+          <Dropdown
+            menu={{
+              items: menuItems,
+              onClick: handleMenuClick,
+            }}
+            placement="bottomRight"
+            trigger={["click"]}
+          >
+            <Button
+              type="text"
+              className="!flex !h-11 !items-center !gap-2 !rounded-full !px-2"
+            >
+              <Avatar className="!bg-pink-500">
+                {getInitials(currentUser?.name)}
+              </Avatar>
+
+              <div className="hidden text-left sm:block">
+                <Text strong className="block max-w-36 truncate">
+                  {currentUser?.name || RESPONSE_MESSAGES.COMMON.PREGNANT}
+                </Text>
+                <Text
+                  type="secondary"
+                  className="block max-w-36 truncate text-xs"
+                >
+                  {currentUser?.email || ""}
+                </Text>
+              </div>
+
+              <ChevronDown className="h-4 w-4 text-slate-500" />
+            </Button>
+          </Dropdown>
         </div>
       </Header>
     </>
