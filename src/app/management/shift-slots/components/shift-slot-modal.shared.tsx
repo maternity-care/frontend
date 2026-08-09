@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   App,
+  Checkbox,
   Col,
   Form,
   Input,
@@ -20,10 +21,24 @@ import {
 import type {
   CreateShiftSlotInput,
   ShiftSlot,
+  ShiftSlotApplicableDay,
   ShiftSlotStatus,
 } from "@/management/features/shift-slots/shift-slots.types";
 
 const { Text, Title } = Typography;
+
+const APPLICABLE_DAY_OPTIONS: Array<{
+  label: string;
+  value: ShiftSlotApplicableDay;
+}> = [
+  { label: "Thứ 2", value: "MON" },
+  { label: "Thứ 3", value: "TUE" },
+  { label: "Thứ 4", value: "WED" },
+  { label: "Thứ 5", value: "THU" },
+  { label: "Thứ 6", value: "FRI" },
+  { label: "Thứ 7", value: "SAT" },
+  { label: "Chủ nhật", value: "SUN" },
+];
 
 export type FacilityOption = {
   id: string;
@@ -37,6 +52,7 @@ export type ShiftSlotFormValues = {
   name: string;
   startTime: string;
   endTime: string;
+  applicableDays?: ShiftSlotApplicableDay[];
   status: ShiftSlotStatus;
 };
 
@@ -127,6 +143,8 @@ function hasSlotChanges(
     values.startTime !== editingSlot.startTime ||
     values.endTime !== editingSlot.endTime ||
     isOvernight !== editingSlot.isOvernight ||
+    (values.applicableDays ?? []).join(",") !==
+      (editingSlot.applicableDays ?? []).join(",") ||
     values.status !== editingSlot.status
   );
 }
@@ -174,6 +192,7 @@ export function ShiftSlotFormModalBase({
           name: editingSlot.name,
           startTime: editingSlot.startTime,
           endTime: editingSlot.endTime,
+          applicableDays: editingSlot.applicableDays,
           status: editingSlot.status,
         });
         return;
@@ -290,6 +309,12 @@ export function ShiftSlotFormModalBase({
             values.startTime,
             values.endTime,
           ),
+          applicableDays: mode === "edit"
+            ? values.applicableDays ?? []
+            : values.applicableDays &&
+                values.applicableDays.length > 0
+              ? values.applicableDays
+              : undefined,
           status: values.status ?? "active",
         });
 
@@ -471,6 +496,18 @@ export function ShiftSlotFormModalBase({
               ]}
             >
               <Input type="time" />
+            </Form.Item>
+          </Col>
+
+          <Col xs={24}>
+            <Form.Item
+              name="applicableDays"
+              label="Ngày áp dụng"
+            >
+              <Checkbox.Group
+                options={APPLICABLE_DAY_OPTIONS}
+                className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7"
+              />
             </Form.Item>
           </Col>
 

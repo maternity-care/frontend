@@ -2,7 +2,6 @@ import { apiClient, unwrapApiData, unwrapApiResponse } from "@/lib/axios";
 import type {
   BackendFacility,
   BackendFacilityListResponse,
-  BackendFacilityLookupItem,
   BackendFacilityAdminOption,
   BackendFacilityAdminOptionsResponse,
   BackendOperatingHour,
@@ -14,16 +13,12 @@ import type {
   FacilityAdminOptionsResult,
   FacilityOperatingHoursApplyResult,
   FacilityListResult,
-  FacilityLookupItem,
   FacilityOperatingHoursPreview,
   FacilityOperatingHoursResult,
-  FacilityRoomType,
   FacilityScheduleInput,
   FacilityStatus,
   GetFacilitiesParams,
   GetFacilityAdminOptionsParams,
-  GetFacilityRoomTypesParams,
-  GetFacilityLookupParams,
   FacilityReactivateResult,
   FacilitySuspendResult,
   SuspendResourceInput,
@@ -127,25 +122,9 @@ function normalizeFacility(facility: BackendFacility): Facility {
       : null,
     operatingHours,
     operatingHourGroups,
-    closureDays: facility.closureDays ?? [],
     workingHours: buildWorkingHours(operatingHourGroups),
     createdAt: facility.createdAt,
     updatedAt: facility.updatedAt,
-  };
-}
-
-function normalizeLookupItem(
-  item: BackendFacilityLookupItem,
-): FacilityLookupItem {
-  return {
-    id: item.id,
-    name: item.name,
-    code: item.code,
-    address: item.address,
-    city: item.province,
-    ward: item.ward,
-    status: normalizeStatus(item.status),
-    ownerName: item.ownerName,
   };
 }
 
@@ -521,20 +500,6 @@ export async function getFacility(id: string) {
   return normalizeFacility(data);
 }
 
-export async function lookupFacilities(params?: GetFacilityLookupParams) {
-  const data = await unwrapApiData<BackendFacilityLookupItem[]>(
-    apiClient.get("/management/facilities/lookup", {
-      params: removeUndefined({
-        search: params?.search?.trim() || undefined,
-        status: params?.status,
-        limit: clampLimit(params?.limit ?? 20),
-      }),
-    }),
-  );
-
-  return data.map(normalizeLookupItem);
-}
-
 export async function getFacilityAdminOptions(
   params?: GetFacilityAdminOptionsParams,
 ): Promise<FacilityAdminOptionsResult> {
@@ -680,27 +645,6 @@ export async function reactivateFacility(id: string) {
   });
 }
 
-export async function getFacilityOperatingHours(id: string) {
-  const data = await unwrapApiData<BackendOperatingHoursResponse>(
-    apiClient.get(`/management/facilities/${id}/operating-hours`),
-  );
-
-  return normalizeOperatingHoursPayload(data);
-}
-
-export async function updateFacilityOperatingHours(
-  id: string,
-  input: UpdateFacilityOperatingHoursInput,
-) {
-  const data = await unwrapApiData<BackendOperatingHoursResponse>(
-    apiClient.patch(`/management/facilities/${id}/operating-hours`, {
-      schedules: normalizeSchedules(input.schedules),
-    }),
-  );
-
-  return normalizeOperatingHoursPayload(data);
-}
-
 export async function applyFacilityOperatingHours(
   id: string,
   input: ApplyFacilityOperatingHoursInput,
@@ -753,19 +697,4 @@ export function deleteFacility(id: string, reason: string) {
 
 export async function deleteFacilities(ids: string[], reason: string) {
   await Promise.all(ids.map((id) => deleteFacility(id, reason)));
-}
-
-export async function getFacilityRoomTypes(
-  facilityId: string,
-  params?: GetFacilityRoomTypesParams,
-) {
-  return unwrapApiData<FacilityRoomType[]>(
-    apiClient.get(`/management/facilities/${facilityId}/room-types`, {
-      params: removeUndefined({
-        search: params?.search?.trim() || undefined,
-        status: params?.status,
-        limit: clampLimit(params?.limit ?? 20),
-      }),
-    }),
-  );
 }

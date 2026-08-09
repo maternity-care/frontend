@@ -50,6 +50,7 @@ function ShiftSlotEditModalContent({
           startTime: input.startTime,
           endTime: input.endTime,
           isOvernight: input.isOvernight,
+          applicableDays: input.applicableDays,
           status: input.status,
         };
 

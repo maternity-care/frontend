@@ -46,14 +46,6 @@ export interface BackendOperatingHourGroup {
   displayTime: string;
 }
 
-export interface BackendFacilityClosureDay {
-  id: string;
-  facilityId: string;
-  closureDate: string;
-  reason: string | null;
-  status: string;
-}
-
 export interface GetFacilitiesParams {
   rawSearch?: string;
   search?: string;
@@ -119,7 +111,6 @@ export interface BackendFacility {
   todayOperatingHour?: BackendOperatingHour | null;
   operatingHours?: BackendOperatingHour[];
   operatingHourGroups?: BackendOperatingHourGroup[];
-  closureDays?: BackendFacilityClosureDay[];
 
   createdAt: string;
   updatedAt: string;
@@ -161,7 +152,6 @@ export interface Facility {
   todayOperatingHour: BackendOperatingHour | null;
   operatingHours: BackendOperatingHour[];
   operatingHourGroups: BackendOperatingHourGroup[];
-  closureDays: BackendFacilityClosureDay[];
 
   workingHours: string;
 

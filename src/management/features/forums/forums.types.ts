@@ -363,6 +363,7 @@ export interface BackendForumReport {
   contentType?: unknown;
   targetId?: unknown;
   contentId?: unknown;
+  targetContent?: BackendForumReportTargetContent | null;
   postId?: unknown;
   commentId?: unknown;
   reporterName?: unknown;
@@ -380,7 +381,6 @@ export interface BackendForumReport {
   resolvedBy?: unknown;
   resolvedAt?: unknown;
   resolution?: unknown;
-  targetContent?: BackendForumReportTargetContent | null;
 }
 
 export interface ForumReport {
@@ -390,6 +390,7 @@ export interface ForumReport {
   reporterRole: ForumAuthorRole;
   targetType: ForumReportTargetType;
   targetId: string;
+  targetContent: ForumReportTargetContent | null;
   reporterName: string;
   reporterEmail: string;
   reason: string;
@@ -401,7 +402,6 @@ export interface ForumReport {
   updatedAt: string;
   resolvedBy: string;
   resolvedAt: string;
-  targetContent: ForumReportTargetContent | null;
   handledAt: string;
   handledBy: string;
   resolution: string;

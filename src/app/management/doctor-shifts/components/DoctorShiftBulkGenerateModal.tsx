@@ -67,6 +67,33 @@ const WORKING_DAY_OPTIONS: Array<{
 const WEEKLY_DRAFT_STORAGE_PREFIX =
   "management-doctor-shifts-weekly-draft:v1";
 
+function getSlotWorkingDayOptions(
+  slot?: ShiftSlotLookupItem | null,
+) {
+  const applicableDays =
+    slot?.applicableDays?.length
+      ? new Set(slot.applicableDays)
+      : null;
+
+  return WORKING_DAY_OPTIONS.filter(
+    (option) =>
+      !applicableDays ||
+      applicableDays.has(option.value),
+  );
+}
+
+function getDefaultWorkingDays(
+  slot?: ShiftSlotLookupItem | null,
+): DoctorShiftWorkingDay[] {
+  const slotDays = getSlotWorkingDayOptions(slot).map(
+    (option) => option.value,
+  );
+
+  return slotDays.length > 0
+    ? slotDays
+    : ["MON", "TUE", "WED", "THU", "FRI"];
+}
+
 type BulkAssignmentFormValue = {
   staffId: string;
   roomId: string;
@@ -2164,9 +2191,9 @@ export function DoctorShiftBulkGenerateModal({
                                             ]}
                                           >
                                             <Checkbox.Group
-                                              options={
-                                                WORKING_DAY_OPTIONS
-                                              }
+                                              options={getSlotWorkingDayOptions(
+                                                slot,
+                                              )}
                                               className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7"
                                             />
                                           </Form.Item>
@@ -2187,14 +2214,9 @@ export function DoctorShiftBulkGenerateModal({
                                       staffId:
                                         "",
                                       roomId: "",
-                                      workingDays:
-                                        [
-                                          "MON",
-                                          "TUE",
-                                          "WED",
-                                          "THU",
-                                          "FRI",
-                                        ],
+                                      workingDays: getDefaultWorkingDays(
+                                        slot,
+                                      ),
                                       maxAppointments:
                                         8,
                                       status:
