@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useSyncExternalStore, useEffect, useState } from "react";
-import { HeartPulse, LogOut } from "lucide-react";
+import { HeartPulse, LogOut, Home } from "lucide-react";
 
 import { logout as logoutApi } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { Button } from "@/fe/components/ui/Button";
+import { CartButton } from "@/fe/components/layout/CartButton";
 import useSetting from "@/hooks/useSetting";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
@@ -34,21 +35,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const hasMounted = useSyncExternalStore(
     subscribeToHydration,
     getClientSnapshot,
-    getServerSnapshot
+    getServerSnapshot,
   );
   const { user, refreshToken, clearSession } = useAuthStore();
   const { getOrDefault } = useSetting();
 
   const siteName = getOrDefault(
     "site_name",
-    getOrDefault("app_name", RESPONSE_MESSAGES.COMMON.DEFAULT_NAME)
+    getOrDefault("app_name", RESPONSE_MESSAGES.COMMON.DEFAULT_NAME),
   );
 
   const isLoggedIn = hasMounted && Boolean(user || refreshToken);
 
   const [activeTab, setActiveTab] = useState<HomeTab>("gioi-thieu");
 
-  // Đồng bộ hash → state
   useEffect(() => {
     if (pathname !== "/") return;
 
@@ -113,11 +113,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             ))}
 
+            {/* Giỏ hàng – luôn hiện */}
+            <CartButton />
+
             {isLoggedIn ? (
-              <Button variant="light" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
-                {RESPONSE_MESSAGES.AUTH.LOGOUT}
-              </Button>
+              <>
+                {/* Nút về trang chủ sau login */}
+                <Button
+                  variant="light"
+                  onClick={() => router.push("/schedule")}
+                  className="!gap-1.5"
+                >
+                  <Home className="h-4 w-4" />
+                  <span className="hidden sm:inline">Trang chủ</span>
+                </Button>
+
+                {/* <Button variant="light" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                  {RESPONSE_MESSAGES.AUTH.LOGOUT}
+                </Button> */}
+              </>
             ) : (
               <Button variant="light" onClick={() => router.push("/login")}>
                 {RESPONSE_MESSAGES.AUTH.LOGIN} / Đăng ký
@@ -127,7 +142,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Truyền activeTab xuống children qua data attribute (để page đọc) */}
       <main
         className="mx-auto max-w-6xl px-4 py-8"
         data-active-tab={activeTab}

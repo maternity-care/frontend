@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   Button,
@@ -13,6 +13,7 @@ import {
   Spin,
   Tag,
   Typography,
+  message,
 } from "antd";
 import { CheckCircle2, Hospital, Package } from "lucide-react";
 
@@ -21,6 +22,8 @@ import { getPublicFacilities } from "@/management/features/facilities/facilities
 import type { Facility } from "@/management/features/facilities/facilities.types";
 import type { MaternityPackage } from "@/management/features/services/public-service-packages/maternity-packages.types";
 import { getPublicMaternityPackages } from "@/management/features/services/public-service-packages/maternity-packages.api";
+import { useAuthStore } from "@/features/auth/auth.store";
+import { useCartStore } from "@/features/cart/cart.store";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -35,47 +38,110 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export function PackagesTab() {
+  const router = useRouter();
+  const { user, refreshToken } = useAuthStore();
+  const isLoggedIn = Boolean(user || refreshToken);
+  const addItem = useCartStore((s) => s.addItem);
+
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [facilityId, setFacilityId] = useState<string>();
   const [packages, setPackages] = useState<MaternityPackage[]>([]);
-  const [loadingFacilities, setLoadingFacilities] = useState(false);
+  // Khởi tạo true → không setState(true) trong effect
+  const [loadingFacilities, setLoadingFacilities] = useState(true);
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load cơ sở
   useEffect(() => {
-    setLoadingFacilities(true);
-    getPublicFacilities({ status: "active", limit: 50 })
-      .then(setFacilities)
-      .catch((err) =>
-        setError(getErrorMessage(err, "Không tải được danh sách cơ sở.")),
-      )
-      .finally(() => setLoadingFacilities(false));
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const data = await getPublicFacilities({ status: "active", limit: 50 });
+        if (!cancelled) setFacilities(data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            getErrorMessage(err, "Không tải được danh sách cơ sở."),
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingFacilities(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Chọn cơ sở xong mới load gói
+  // Load gói theo cơ sở
   useEffect(() => {
-    setPackages([]);
-    setError(null);
-
     if (!facilityId) return;
 
-    setLoadingPackages(true);
-    getPublicMaternityPackages({
-      facilityId,
-      status: "active",
-      limit: 50,
-    })
-      .then(setPackages)
-      .catch((err) =>
-        setError(getErrorMessage(err, "Không tải được gói thai sản.")),
-      )
-      .finally(() => setLoadingPackages(false));
+    let cancelled = false;
+
+    (async () => {
+      // setState nằm trong async callback → không còn cascade sync
+      setLoadingPackages(true);
+      setError(null);
+
+      try {
+        const data = await getPublicMaternityPackages({
+          facilityId,
+          status: "active",
+          limit: 50,
+        });
+        if (!cancelled) setPackages(data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(getErrorMessage(err, "Không tải được gói thai sản."));
+          setPackages([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingPackages(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [facilityId]);
+
+  // Không clear packages bằng setState khi bỏ chọn cơ sở
+  const displayedPackages = facilityId ? packages : [];
+
+  const selectedFacility = facilities.find((f) => f.id === facilityId);
+
+  const handleRegisterPackage = (pkg: MaternityPackage) => {
+    if (!facilityId) {
+      message.warning("Vui lòng chọn cơ sở trước");
+      return;
+    }
+
+    addItem({
+      packageId: pkg.id,
+      packageName: pkg.name,
+      packageCode: pkg.code,
+      facilityId,
+      facilityName: selectedFacility?.name,
+      price: Number(pkg.price) || 0,
+      durationDays: pkg.durationDays,
+    });
+
+    message.success(`Đã thêm "${pkg.name}" vào giỏ hàng`);
+
+    if (!isLoggedIn) {
+      // Dùng redirect (Login đã hỗ trợ)
+      router.push("/login?redirect=/#dich-vu");
+      return;
+    }
+
+    router.push("/checkout");
+  };
 
   return (
     <div className="space-y-10">
-      {/* Header */}
       <div className="text-center">
         <Title level={2} className="!mb-3 !text-slate-950">
           Gói thai sản
@@ -86,7 +152,6 @@ export function PackagesTab() {
         </Paragraph>
       </div>
 
-      {/* Chọn cơ sở */}
       <Card
         className="!rounded-3xl !border-pink-100 !shadow-sm"
         styles={{ body: { padding: 20 } }}
@@ -104,7 +169,11 @@ export function PackagesTab() {
           placeholder="Chọn cơ sở để xem gói thai sản"
           optionFilterProp="label"
           value={facilityId}
-          onChange={setFacilityId}
+          onChange={(value) => {
+            setFacilityId(value);
+            // Optional: clear error khi đổi cơ sở (ngoài effect)
+            setError(null);
+          }}
           options={facilities.map((facility) => ({
             value: facility.id,
             label: `${facility.name}${
@@ -126,7 +195,6 @@ export function PackagesTab() {
         />
       ) : null}
 
-      {/* Danh sách gói */}
       <div className="pt-2">
         {!facilityId ? (
           <Card className="!rounded-3xl !border-dashed !border-pink-200 bg-white/60">
@@ -139,7 +207,7 @@ export function PackagesTab() {
           <div className="flex justify-center py-20">
             <Spin size="large" />
           </div>
-        ) : packages.length === 0 ? (
+        ) : displayedPackages.length === 0 ? (
           <Card className="!rounded-3xl !border-dashed !border-pink-200 bg-white/60">
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -148,7 +216,7 @@ export function PackagesTab() {
           </Card>
         ) : (
           <Row gutter={[24, 24]} className="items-stretch">
-            {packages.map((item, index) => {
+            {displayedPackages.map((item, index) => {
               const isHighlight = index === 0;
               const benefits =
                 item.services?.length > 0
@@ -180,7 +248,6 @@ export function PackagesTab() {
                       },
                     }}
                   >
-                    {/* Tên + tag */}
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <Title
@@ -206,7 +273,6 @@ export function PackagesTab() {
                       </Tag>
                     </div>
 
-                    {/* Giá */}
                     <div className="mb-3">
                       <Text className="!text-2xl !font-bold !text-pink-600">
                         {formatPrice(item.price)}
@@ -216,12 +282,11 @@ export function PackagesTab() {
                       </div>
                     </div>
 
-                    {/* Mô tả */}
                     <Paragraph className="!mb-4 !line-clamp-3 !min-h-[4.5rem] !text-sm !leading-6 !text-slate-600">
-                      {item.description || "Chưa có mô tả chi tiết cho gói này."}
+                      {item.description ||
+                        "Chưa có mô tả chi tiết cho gói này."}
                     </Paragraph>
 
-                    {/* Danh sách dịch vụ */}
                     <div className="mb-6 grid min-h-[6.5rem] content-start gap-2">
                       {benefits.length > 0 ? (
                         benefits.slice(0, 5).map((benefit) => (
@@ -241,23 +306,21 @@ export function PackagesTab() {
                       )}
                     </div>
 
-                    {/* CTA */}
                     <div className="mt-auto">
-                      <Link href="/login">
-                        <Button
-                          type={isHighlight ? "primary" : "default"}
-                          block
-                          className={[
-                            "!h-11 !rounded-xl !font-semibold",
-                            isHighlight
-                              ? "!bg-pink-500"
-                              : "!border-pink-200 !text-pink-600",
-                          ].join(" ")}
-                        >
-                          {RESPONSE_MESSAGES.HOME?.PACKAGES_SECTION
-                            ?.REGISTER_PACKAGE ?? "Đăng ký gói"}
-                        </Button>
-                      </Link>
+                      <Button
+                        type={isHighlight ? "primary" : "default"}
+                        block
+                        className={[
+                          "!h-11 !rounded-xl !font-semibold",
+                          isHighlight
+                            ? "!bg-pink-500"
+                            : "!border-pink-200 !text-pink-600",
+                        ].join(" ")}
+                        onClick={() => handleRegisterPackage(item)}
+                      >
+                        {RESPONSE_MESSAGES.HOME?.PACKAGES_SECTION
+                          ?.REGISTER_PACKAGE ?? "Đăng ký gói"}
+                      </Button>
                     </div>
                   </Card>
                 </Col>
