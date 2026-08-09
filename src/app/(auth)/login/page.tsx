@@ -26,6 +26,16 @@ type LoginFormValues = {
 
 const REMEMBER_EMAIL_KEY = "remembered_login_email";
 
+function resolveRedirect(raw: string | null): string {
+  if (!raw) return "/schedule";
+
+  // Hỗ trợ: /#dich-vu | #dich-vu | /schedule | schedule
+  if (raw.startsWith("/#")) return raw; // "/#dich-vu"
+  if (raw.startsWith("#")) return `/${raw}`; // "#dich-vu" → "/#dich-vu"
+  if (raw.startsWith("/")) return raw;
+  return `/${raw}`;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -71,13 +81,15 @@ function LoginForm() {
         duration: 2,
       });
 
+      // Ưu tiên: redirect → next → /schedule
+      const target = resolveRedirect(
+        searchParams.get("redirect") ?? searchParams.get("next"),
+      );
+
       setTimeout(() => {
-        router.replace(searchParams.get("next") ?? "/schedule");
+        router.replace(target);
       }, 700);
     } catch (error) {
-      // setFormError(
-      //   error instanceof Error ? error.message : "Đăng nhập thất bại"
-      // );
       const errorMessage =
         error instanceof Error ? error.message : "Đăng nhập thất bại";
       messageApi.error({
@@ -119,7 +131,7 @@ function LoginForm() {
           layout="vertical"
           initialValues={{
             email: "admin@example.com",
-            password: "password",
+            password: "Password@123",
             rememberMe: false,
           }}
           onFinish={onFinish}
@@ -132,14 +144,20 @@ function LoginForm() {
               { type: "email", message: RESPONSE_MESSAGES.AUTH.emailInvalid },
             ]}
           >
-            <Input autoComplete="email" placeholder={RESPONSE_MESSAGES.AUTH.ENTER_EMAIL} />
+            <Input
+              autoComplete="email"
+              placeholder={RESPONSE_MESSAGES.AUTH.ENTER_EMAIL}
+            />
           </Form.Item>
 
           <Form.Item
             label={RESPONSE_MESSAGES.COMMON.PASSWORD}
             name="password"
             rules={[
-              { required: true, message: RESPONSE_MESSAGES.AUTH.passwordRequired },
+              {
+                required: true,
+                message: RESPONSE_MESSAGES.AUTH.passwordRequired,
+              },
               { min: 6, message: RESPONSE_MESSAGES.AUTH.passwordMinLength },
             ]}
           >
