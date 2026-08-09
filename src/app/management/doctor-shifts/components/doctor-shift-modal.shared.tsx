@@ -28,6 +28,7 @@ import type {
   CreateDoctorShiftInput,
   DoctorShiftItem,
   DoctorShiftStatus,
+  DoctorShiftWorkingDay,
 } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import { getShiftSlotLookup } from "@/management/features/shift-slots/shift-slots.api";
 import type { ShiftSlotLookupItem } from "@/management/features/shift-slots/shift-slots.types";
@@ -274,6 +275,34 @@ export function formatLongDate(value: string) {
   }).format(date);
 
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+function getWorkingDay(
+  dateKey: string,
+): DoctorShiftWorkingDay | null {
+  if (!dateKey) return null;
+
+  const day = new Date(`${dateKey}T00:00:00`).getDay();
+  const dayMap: Record<number, DoctorShiftWorkingDay> = {
+    0: "SUN",
+    1: "MON",
+    2: "TUE",
+    3: "WED",
+    4: "THU",
+    5: "FRI",
+    6: "SAT",
+  };
+
+  return dayMap[day] ?? null;
+}
+
+function isSlotApplicableToDate(
+  slot: ShiftSlotLookupItem,
+  dateKey: string,
+) {
+  const workingDay = getWorkingDay(dateKey);
+  if (!workingDay || !slot.applicableDays.length) return true;
+  return slot.applicableDays.includes(workingDay);
 }
 
 export function getShiftLabel(
@@ -567,6 +596,7 @@ export function DoctorShiftFormModalBase({
               `Khung ca #${editingShift.slotId}`,
             startTime: editingShift.startTime,
             endTime: editingShift.endTime,
+            applicableDays: [],
             status: "active",
           });
         }
@@ -626,11 +656,15 @@ export function DoctorShiftFormModalBase({
 
   const slotOptions = useMemo(
     () =>
-      shiftSlots.map((slot) => ({
-        value: slot.id,
-        label: `${slot.name} (${slot.code}) · ${slot.startTime} - ${slot.endTime}`,
-      })),
-    [shiftSlots],
+      shiftSlots
+        .filter((slot) =>
+          isSlotApplicableToDate(slot, watchedDate),
+        )
+        .map((slot) => ({
+          value: slot.id,
+          label: `${slot.name} (${slot.code}) · ${slot.startTime} - ${slot.endTime}`,
+        })),
+    [shiftSlots, watchedDate],
   );
 
   function getActiveDoctorsForFacility() {

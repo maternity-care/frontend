@@ -5,7 +5,6 @@ import { Button, Card, Col, Modal, Row, Space, Tag, Typography } from "antd";
 import {
   Building2,
   CalendarClock,
-  CalendarDays,
   DoorOpen,
   ExternalLink,
   Hash,
@@ -40,15 +39,6 @@ function formatDateTime(value?: string) {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-function formatDate(value?: string) {
-  if (!value) return FACILITY_MESSAGES.NOT_UPDATED;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleDateString("vi-VN");
 }
 
 function getGoogleMapLocation(
@@ -427,36 +417,6 @@ export function FacilityDetailModal({
             </div>
           </Card>
 
-          <Card
-            size="small"
-            className="border-slate-200"
-            title="Ngày đóng cửa đặc biệt"
-          >
-            {facility.closureDays.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {facility.closureDays.map((closure) => (
-                  <div
-                    key={closure.id}
-                    className="rounded-lg border border-amber-200 bg-amber-50 p-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <CalendarDays className="mt-0.5 h-4 w-4 text-amber-700" />
-                      <div>
-                        <p className="mb-1 font-semibold text-amber-950">
-                          {formatDate(closure.closureDate)}
-                        </p>
-                        <p className="mb-0 text-sm text-amber-800">
-                          {closure.reason || "Không có lý do"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Text type="secondary">Không có ngày đóng cửa đặc biệt.</Text>
-            )}
-          </Card>
         </div>
       ) : null}
     </Modal>

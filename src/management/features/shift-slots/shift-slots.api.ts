@@ -7,6 +7,7 @@ import type {
   GetShiftSlotLookupParams,
   GetShiftSlotsParams,
   ShiftSlot,
+  ShiftSlotApplicableDay,
   ShiftSlotApiResponse,
   ShiftSlotListResult,
   ShiftSlotLookupItem,
@@ -17,6 +18,15 @@ import type {
 const ENDPOINT = "/management/shift-slots";
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
+const APPLICABLE_DAYS: ShiftSlotApplicableDay[] = [
+  "MON",
+  "TUE",
+  "WED",
+  "THU",
+  "FRI",
+  "SAT",
+  "SUN",
+];
 
 function compactObject(
   value: Record<string, unknown>,
@@ -100,6 +110,26 @@ function normalizeBoolean(value: unknown): boolean {
   );
 }
 
+function normalizeApplicableDays(
+  value: unknown,
+): ShiftSlotApplicableDay[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const selectedDays = new Set(
+    value.map((item) =>
+      String(item ?? "")
+        .trim()
+        .toUpperCase(),
+    ),
+  );
+
+  return APPLICABLE_DAYS.filter((day) =>
+    selectedDays.has(day),
+  );
+}
+
 function normalizeShiftSlot(
   slot: BackendShiftSlot,
 ): ShiftSlot {
@@ -122,6 +152,9 @@ function normalizeShiftSlot(
     endTime: normalizeTime(slot?.endTime),
     isOvernight: normalizeBoolean(
       slot?.isOvernight,
+    ),
+    applicableDays: normalizeApplicableDays(
+      slot?.applicableDays,
     ),
     status: normalizeStatus(slot?.status),
     createdAt: String(
@@ -147,6 +180,9 @@ function normalizeLookupItem(
       slot?.startTime,
     ),
     endTime: normalizeTime(slot?.endTime),
+    applicableDays: normalizeApplicableDays(
+      slot?.applicableDays,
+    ),
     status: normalizeStatus(slot?.status),
   };
 }
@@ -233,6 +269,11 @@ function toCreatePayload(
     startTime: normalizeTime(input.startTime),
     endTime: normalizeTime(input.endTime),
     isOvernight: input.isOvernight,
+    applicableDays:
+      input.applicableDays &&
+      input.applicableDays.length > 0
+        ? input.applicableDays
+        : undefined,
     status: input.status,
   };
 }
@@ -250,6 +291,10 @@ function toUpdatePayload(
       ? normalizeTime(input.endTime)
       : undefined,
     isOvernight: input.isOvernight,
+    applicableDays:
+      input.applicableDays !== undefined
+        ? input.applicableDays
+        : undefined,
     status: input.status,
   });
 }

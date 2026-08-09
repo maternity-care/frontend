@@ -18,9 +18,20 @@ import {
 } from "lucide-react";
 import type {
   ShiftSlot,
+  ShiftSlotApplicableDay,
 } from "@/management/features/shift-slots/shift-slots.types";
 
 const { Text, Title } = Typography;
+
+const DAY_LABELS: Record<ShiftSlotApplicableDay, string> = {
+  MON: "T2",
+  TUE: "T3",
+  WED: "T4",
+  THU: "T5",
+  FRI: "T6",
+  SAT: "T7",
+  SUN: "CN",
+};
 
 type ShiftSlotDetailModalProps = {
   open: boolean;
@@ -39,6 +50,22 @@ function renderStatus(
     <Tag color="green">Hoạt động</Tag>
   ) : (
     <Tag color="red">Ngừng hoạt động</Tag>
+  );
+}
+
+function renderApplicableDays(days: ShiftSlotApplicableDay[]) {
+  if (!days.length) {
+    return <Text type="secondary">Tự tính</Text>;
+  }
+
+  return (
+    <Space size={4} wrap>
+      {days.map((day) => (
+        <Tag key={day} color="blue">
+          {DAY_LABELS[day]}
+        </Tag>
+      ))}
+    </Space>
   );
 }
 
@@ -154,6 +181,20 @@ export function ShiftSlotDetailModal({
               </p>
             </div>
 
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-slate-500" />
+
+                <p className="mb-0 text-xs font-semibold uppercase text-slate-500">
+                  Ngày áp dụng
+                </p>
+              </div>
+
+              {renderApplicableDays(slot.applicableDays)}
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <Moon className="h-4 w-4 text-slate-500" />

@@ -46,6 +46,7 @@ import {
 } from "@/management/features/shift-slots/shift-slots.api";
 import type {
   ShiftSlot,
+  ShiftSlotApplicableDay,
   ShiftSlotStatus,
 } from "@/management/features/shift-slots/shift-slots.types";
 import { ShiftSlotCreateModal } from "./components/ShiftSlotCreateModal";
@@ -59,6 +60,16 @@ import type {
 } from "./components/shift-slot-modal.shared";
 
 const { Text } = Typography;
+
+const DAY_LABELS: Record<ShiftSlotApplicableDay, string> = {
+  MON: "T2",
+  TUE: "T3",
+  WED: "T4",
+  THU: "T5",
+  FRI: "T6",
+  SAT: "T7",
+  SUN: "CN",
+};
 
 type AuthRoleValue =
   | string
@@ -119,6 +130,23 @@ function renderStatus(
   );
 }
 
+function renderApplicableDays(
+  days: ShiftSlotApplicableDay[],
+) {
+  if (!days.length) {
+    return <Text type="secondary">Tự tính</Text>;
+  }
+
+  return (
+    <Space size={4} wrap>
+      {days.map((day) => (
+        <Tag key={day} color="blue">
+          {DAY_LABELS[day]}
+        </Tag>
+      ))}
+    </Space>
+  );
+}
 
 export default function ShiftSlotsPage() {
   const {
@@ -553,16 +581,12 @@ export default function ShiftSlotsPage() {
     );
   }
 
-  function handleCreated(
-    _slot: ShiftSlot,
-  ) {
+  function handleCreated() {
     setCurrentPage(1);
     refreshSlots();
   }
 
-  function handleUpdated(
-    _slot: ShiftSlot,
-  ) {
+  function handleUpdated() {
     refreshSlots();
   }
 
@@ -752,6 +776,12 @@ export default function ShiftSlotsPage() {
           )}
         </div>
       ),
+    },
+    {
+      title: "Ngày áp dụng",
+      width: 180,
+      render: (_value, slot) =>
+        renderApplicableDays(slot.applicableDays),
     },
     {
       title: "Trạng thái",
@@ -969,7 +999,7 @@ export default function ShiftSlotsPage() {
             columns={columns}
             dataSource={slots}
             scroll={{
-              x: 1030,
+              x: 1210,
             }}
             pagination={{
               current: currentPage,

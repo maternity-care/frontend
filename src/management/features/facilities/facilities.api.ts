@@ -122,7 +122,6 @@ function normalizeFacility(facility: BackendFacility): Facility {
       : null,
     operatingHours,
     operatingHourGroups,
-    closureDays: facility.closureDays ?? [],
     workingHours: buildWorkingHours(operatingHourGroups),
     createdAt: facility.createdAt,
     updatedAt: facility.updatedAt,
