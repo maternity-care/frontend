@@ -118,7 +118,7 @@ export function PregnancyScheduleOverview({
 
   return (
     <div className="space-y-6">
-      <Spin spinning={loadingSchedules}>
+      {/* <Spin spinning={loadingSchedules}>
       <Card className="overflow-hidden border-0 shadow-sm">
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} lg={15}>
@@ -192,7 +192,7 @@ export function PregnancyScheduleOverview({
           </Col>
         </Row>
       </Card>
-      </Spin>
+      </Spin> */}
 
       <AppointmentDisruptionsPanel hideWhenEmpty />
 
