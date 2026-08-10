@@ -25,6 +25,7 @@ import {
   formatLongDate,
   getShiftLabel,
   renderDoctorShiftStatus,
+  shiftBlocksDoctorConflict,
   shiftsOverlap,
 } from "./doctor-shift-modal.shared";
 import type {
@@ -285,6 +286,7 @@ export function DoctorShiftDetailModal({
                   .map((doctor) => {
                     const busy = shifts.some(
                       (item) =>
+                        shiftBlocksDoctorConflict(item) &&
                         item.id !== shift.id &&
                         item.doctorId ===
                           doctor.id &&

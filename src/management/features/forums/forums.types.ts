@@ -41,6 +41,8 @@ export type ForumCommentModerationAction =
 export type ForumReportResolveAction =
   | "hide"
   | "delete"
+  | "approve"
+  | "reject"
   | "dismiss";
 
 export interface BackendForumTopic {
@@ -414,6 +416,46 @@ export interface GetForumReportsParams {
 
 export interface ForumReportListResult {
   items: ForumReport[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface BackendForumReportGroup {
+  groupId?: unknown;
+  targetType?: unknown;
+  targetId?: unknown;
+  targetContent?: BackendForumReportTargetContent | null;
+  reports?: unknown;
+  latestReport?: BackendForumReport | null;
+  reportCount?: unknown;
+  pendingCount?: unknown;
+  resolvedCount?: unknown;
+  rejectedCount?: unknown;
+  status?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface ForumReportGroup {
+  groupId: string;
+  targetType: ForumReportTargetType;
+  targetId: string;
+  targetContent: ForumReportTargetContent | null;
+  reports: ForumReport[];
+  latestReport: ForumReport | null;
+  reportCount: number;
+  pendingCount: number;
+  resolvedCount: number;
+  rejectedCount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ForumReportGroupListResult {
+  items: ForumReportGroup[];
   total: number;
   page: number;
   limit: number;

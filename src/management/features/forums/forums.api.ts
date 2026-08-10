@@ -9,6 +9,7 @@ import type {
   BackendForumPostDetailData,
   BackendForumModerationLog,
   BackendForumReport,
+  BackendForumReportGroup,
   BackendForumTopic,
   CreateForumPostInput,
   CreateForumTopicInput,
@@ -22,6 +23,8 @@ import type {
   ForumPostListResult,
   ForumPostStatus,
   ForumReport,
+  ForumReportGroup,
+  ForumReportGroupListResult,
   ForumReportListResult,
   ForumReportTargetType,
   ForumTopic,
@@ -591,6 +594,8 @@ function normalizeReportResolveAction(
   ).toLowerCase();
 
   if (
+    action === "approve" ||
+    action === "reject" ||
     action === "hide" ||
     action === "delete" ||
     action === "dismiss"
@@ -750,6 +755,86 @@ function normalizeReport(
     handledBy: resolvedBy,
     resolution:
       resolutionAction,
+  };
+}
+
+function normalizeReportGroup(
+  item: BackendForumReportGroup,
+): ForumReportGroup {
+  const targetType = normalizeReportTargetType(
+    item.targetType,
+  );
+  const targetId = normalizeText(
+    item.targetId,
+  );
+  const reports = Array.isArray(
+    item.reports,
+  )
+    ? item.reports
+        .filter(isRecord)
+        .map((report) =>
+          normalizeReport(report),
+        )
+    : [];
+  const latestReport = isRecord(
+    item.latestReport,
+  )
+    ? normalizeReport(
+        item.latestReport,
+      )
+    : reports[0] ?? null;
+
+  return {
+    groupId:
+      normalizeText(item.groupId) ||
+      `${targetType}:${targetId}`,
+    targetType,
+    targetId,
+    targetContent:
+      normalizeReportTargetContent(
+        item.targetContent,
+      ) ??
+      latestReport?.targetContent ??
+      null,
+    reports,
+    latestReport,
+    reportCount: Math.max(
+      reports.length,
+      normalizeNumber(
+        item.reportCount,
+      ),
+    ),
+    pendingCount: Math.max(
+      0,
+      normalizeNumber(
+        item.pendingCount,
+      ),
+    ),
+    resolvedCount: Math.max(
+      0,
+      normalizeNumber(
+        item.resolvedCount,
+      ),
+    ),
+    rejectedCount: Math.max(
+      0,
+      normalizeNumber(
+        item.rejectedCount,
+      ),
+    ),
+    status:
+      normalizeText(item.status) ||
+      latestReport?.status ||
+      "pending",
+    createdAt:
+      normalizeText(item.createdAt) ||
+      reports[reports.length - 1]
+        ?.createdAt ||
+      "",
+    updatedAt:
+      normalizeText(item.updatedAt) ||
+      latestReport?.createdAt ||
+      "",
   };
 }
 
@@ -1279,6 +1364,48 @@ export async function getForumReports(
   };
 }
 
+export async function getForumReportGroups(
+  params?: GetForumReportsParams,
+): Promise<ForumReportGroupListResult> {
+  const page = normalizePage(
+    params?.page,
+  );
+  const limit = normalizeLimit(
+    params?.limit,
+  );
+
+  const data =
+    await unwrapApiData<unknown>(
+      apiClient.get(
+        `${ENDPOINT}/reports/groups`,
+        {
+          params: {
+            page,
+            limit,
+          },
+        },
+      ),
+    );
+
+  const extracted = extractPage(
+    data,
+    page,
+    limit,
+  );
+
+  return {
+    items: extracted.items.map(
+      (item) =>
+        normalizeReportGroup(item),
+    ),
+    total: extracted.total,
+    page: extracted.page,
+    limit: extracted.limit,
+    totalPages:
+      extracted.totalPages,
+  };
+}
+
 export async function resolveForumReport(
   id: string,
   input: ResolveForumReportInput,
@@ -1304,6 +1431,22 @@ export async function resolveForumReport(
   };
 }
 
+export async function resolveForumReportGroup(
+  targetType: ForumReportTargetType,
+  targetId: string,
+  input: ResolveForumReportInput,
+) {
+  return unwrapApiResponse<unknown>(
+    apiClient.patch(
+      `${ENDPOINT}/reports/groups/${targetType}/${targetId}/resolve`,
+      {
+        action: input.action,
+        note: input.note.trim(),
+      },
+    ),
+  );
+}
+
 export const forumApi = {
   getTopics: getForumTopics,
   createTopic: createForumTopic,
@@ -1321,5 +1464,7 @@ export const forumApi = {
   moderateComment:
     moderateForumComment,
   getReports: getForumReports,
+  getReportGroups: getForumReportGroups,
   resolveReport: resolveForumReport,
+  resolveReportGroup: resolveForumReportGroup,
 };
