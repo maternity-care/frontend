@@ -127,6 +127,7 @@ export interface UpdateDoctorShiftInput {
   slotId?: string;
   shiftDate?: string;
   maxAppointments?: number;
+  status?: DoctorShiftStatus;
   note?: string;
 }
 

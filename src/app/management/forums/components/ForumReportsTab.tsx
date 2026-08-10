@@ -23,12 +23,14 @@ import {
 } from "lucide-react";
 
 import {
-  getForumReports,
-  resolveForumReport,
+  getForumReportGroups,
+  resolveForumReportGroup,
 } from "@/management/features/forums/forums.api";
 import type {
   ForumReport,
+  ForumReportGroup,
   ForumReportResolveAction,
+  ForumReportTargetContent,
 } from "@/management/features/forums/forums.types";
 
 const { Paragraph, Text } = Typography;
@@ -39,7 +41,7 @@ type ForumReportsTabProps = {
 };
 
 type ReportResolveRequest = {
-  report: ForumReport;
+  group: ForumReportGroup;
   action: ForumReportResolveAction;
 };
 
@@ -74,62 +76,38 @@ function formatDateTime(value?: string) {
 }
 
 function isResolvedStatus(status: string) {
-  return ["resolved", "dismissed"].includes(status.toLowerCase());
-}
-
-function getReportStatusLabel(
-  status: string,
-) {
-  const normalized =
-    status.trim().toLowerCase();
-
-  const labels: Record<string, string> = {
-    open: "Chưa xử lý",
-    pending: "Chờ xử lý",
-    processing: "Đang xử lý",
-    in_progress: "Đang xử lý",
-    resolved: "Đã xử lý",
-    dismissed: "Đã bỏ qua",
-    closed: "Đã đóng",
-  };
-
-  return (
-    labels[normalized] ||
-    status ||
-    "Chưa xử lý"
+  return ["resolved", "rejected", "dismissed", "closed"].includes(
+    status.toLowerCase(),
   );
 }
 
-function getContentStatusLabel(
-  status: string,
-) {
-  const normalized =
-    status.trim().toLowerCase();
+function getReportStatusLabel(status: string) {
+  const normalized = status.trim().toLowerCase();
+  const labels: Record<string, string> = {
+    pending: "Chờ xử lý",
+    resolved: "Đã xử lý",
+    rejected: "Đã bỏ qua",
+    dismissed: "Đã bỏ qua",
+  };
 
+  return labels[normalized] || status || "Chờ xử lý";
+}
+
+function getContentStatusLabel(status: string) {
+  const normalized = status.trim().toLowerCase();
   const labels: Record<string, string> = {
     pending: "Chờ duyệt",
     published: "Đã xuất bản",
     hidden: "Đã ẩn",
     rejected: "Đã từ chối",
     deleted: "Đã xóa",
-    active: "Hoạt động",
-    inactive: "Ngừng hoạt động",
   };
 
-  return (
-    labels[normalized] ||
-    status ||
-    "Chưa cập nhật"
-  );
+  return labels[normalized] || status || "Chưa cập nhật";
 }
 
-function getReporterRoleLabel(
-  role: ForumReport["reporterRole"],
-) {
-  const labels: Record<
-    ForumReport["reporterRole"],
-    string
-  > = {
+function getReporterRoleLabel(role: ForumReport["reporterRole"]) {
+  const labels: Record<ForumReport["reporterRole"], string> = {
     user: "Người dùng",
     staff: "Nhân viên",
     doctor: "Bác sĩ",
@@ -140,9 +118,7 @@ function getReporterRoleLabel(
   return labels[role] ?? role;
 }
 
-function stripReportHtml(
-  value: string,
-) {
+function stripReportHtml(value: string) {
   return value
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/gi, " ")
@@ -151,20 +127,25 @@ function stripReportHtml(
     .trim();
 }
 
-function getTargetContentSummary(
-  report: ForumReport,
-) {
-  const target =
-    report.targetContent;
+function getTargetLabel(targetType: ForumReportGroup["targetType"]) {
+  if (targetType === "post") return "Bài viết";
+  if (targetType === "comment") return "Bình luận";
+  return "Không xác định";
+}
 
+function getTargetColor(targetType: ForumReportGroup["targetType"]) {
+  if (targetType === "post") return "blue";
+  if (targetType === "comment") return "purple";
+  return "default";
+}
+
+function summarizeTargetContent(
+  target: ForumReportTargetContent | null,
+  group: ForumReportGroup,
+) {
   if (!target) {
     return {
-      title:
-        report.targetType === "post"
-          ? "Bài viết không còn tồn tại"
-          : report.targetType === "comment"
-            ? "Bình luận không còn tồn tại"
-            : "Nội dung không còn tồn tại",
+      title: `${getTargetLabel(group.targetType)} không còn tồn tại`,
       content: "",
     };
   }
@@ -173,63 +154,29 @@ function getTargetContentSummary(
     title:
       target.title ||
       target.postTitle ||
-      (
-        target.type === "comment"
-          ? "Bình luận"
-          : "Bài viết"
-      ),
-    content:
-      stripReportHtml(
-        target.content,
-      ),
+      getTargetLabel(group.targetType),
+    content: stripReportHtml(target.content),
   };
 }
 
-function getReportDisplayContent(
-  report: ForumReport,
-) {
-  const reason =
-    report.reason.trim();
-  const description =
-    report.description.trim();
+function getReportDisplayContent(report: ForumReport) {
+  const reason = report.reason.trim();
+  const description = report.description.trim();
 
-  if (
-    description ||
-    !reason.includes(":")
-  ) {
+  if (description || !reason.includes(":")) {
     return {
-      reason:
-        reason ||
-        "Không rõ lý do",
-      description:
-        description ||
-        "Không có mô tả.",
+      reason: reason || "Không rõ lý do",
+      description: description || "Không có mô tả.",
     };
   }
 
-  const separatorIndex =
-    reason.indexOf(":");
-  const reasonTitle =
-    reason
-      .slice(
-        0,
-        separatorIndex,
-      )
-      .trim();
-  const reasonDescription =
-    reason
-      .slice(
-        separatorIndex + 1,
-      )
-      .trim();
+  const separatorIndex = reason.indexOf(":");
+  const reasonTitle = reason.slice(0, separatorIndex).trim();
+  const reasonDescription = reason.slice(separatorIndex + 1).trim();
 
   return {
-    reason:
-      reasonTitle ||
-      "Không rõ lý do",
-    description:
-      reasonDescription ||
-      "Không có mô tả.",
+    reason: reasonTitle || "Không rõ lý do",
+    description: reasonDescription || "Không có mô tả.",
   };
 }
 
@@ -242,115 +189,60 @@ function ReportResolveModal({
   request: ReportResolveRequest | null;
   submitting: boolean;
   onClose: () => void;
-  onConfirm: (
-    action: ForumReportResolveAction,
-    note: string,
-  ) => Promise<void>;
+  onConfirm: (action: ForumReportResolveAction, note: string) => Promise<void>;
 }) {
   const [note, setNote] = useState("");
 
   useEffect(() => {
-    if (!request) return;
-
-    const timer = window.setTimeout(() => {
-      setNote("");
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+    if (request) setNote("");
   }, [request]);
 
   if (!request) return null;
+
+  const target = summarizeTargetContent(
+    request.group.targetContent,
+    request.group,
+  );
 
   return (
     <Modal
       open
       centered
-      width={580}
-      title="Xử lý báo cáo"
+      width={620}
+      title="Xử lý nhóm báo cáo"
       okText="Xác nhận xử lý"
       cancelText="Hủy"
       confirmLoading={submitting}
       okButtonProps={{ disabled: !note.trim() }}
+      maskClosable={!submitting}
       onCancel={onClose}
-      onOk={() =>
-        void onConfirm(
-          request.action,
-          note.trim(),
-        )
-      }
-      mask={{ closable: !submitting }}
+      onOk={() => void onConfirm(request.action, note.trim())}
     >
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <Text type="secondary" className="block text-xs">
-          Mã báo cáo
+          Nội dung bị báo cáo
         </Text>
-        <Text strong>{request.report.id}</Text>
-        {(() => {
-          const display =
-            getReportDisplayContent(
-              request.report,
-            );
-          const target =
-            getTargetContentSummary(
-              request.report,
-            );
-
-          return (
-            <>
-              <Tag
-                color="red"
-                className="!mt-3"
-              >
-                {display.reason}
-              </Tag>
-
-              <Paragraph className="!mb-0 !mt-3">
-                {display.description}
-              </Paragraph>
-
-              <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-                <Text
-                  type="secondary"
-                  className="block text-xs"
-                >
-                  Nội dung bị báo cáo
-                </Text>
-
-                <Text
-                  strong
-                  className="mt-1 block"
-                >
-                  {target.title}
-                </Text>
-
-                {target.content ? (
-                  <Paragraph
-                    ellipsis={{ rows: 3 }}
-                    className="!mb-0 !mt-2"
-                  >
-                    {target.content}
-                  </Paragraph>
-                ) : null}
-              </div>
-            </>
-          );
-        })()}
+        <Text strong className="mt-1 block">
+          {target.title}
+        </Text>
+        {target.content ? (
+          <Paragraph ellipsis={{ rows: 3 }} className="!mb-0 !mt-2">
+            {target.content}
+          </Paragraph>
+        ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Tag color="red">{request.group.pendingCount} báo cáo chờ xử lý</Tag>
+          <Tag>{request.group.reportCount} báo cáo tổng</Tag>
+        </div>
       </div>
 
       <div className="mt-4">
         <Tag
-          color={
-            request.action === "dismiss"
-              ? "default"
-              : "red"
-          }
+          color={request.action === "dismiss" ? "default" : "red"}
           className="!mr-0"
         >
-          {REPORT_ACTION_OPTIONS.find(
-            (item) =>
-              item.value ===
-              request.action,
-          )?.label ?? request.action}
+          {REPORT_ACTION_OPTIONS.find((item) => item.value === request.action)
+            ?.label ?? request.action}
         </Tag>
       </div>
 
@@ -371,86 +263,50 @@ function ReportResolveModal({
 }
 
 function ReportTargetContentModal({
-  report,
+  group,
   onClose,
   onResolve,
 }: {
-  report: ForumReport | null;
+  group: ForumReportGroup | null;
   onClose: () => void;
   onResolve: (
-    report: ForumReport,
+    group: ForumReportGroup,
     action: ForumReportResolveAction,
   ) => void;
 }) {
-  if (!report) return null;
+  if (!group) return null;
 
-  const target =
-    getTargetContentSummary(
-      report,
-    );
-  const rawTarget =
-    report.targetContent;
-  const disabled =
-    isResolvedStatus(
-      report.status,
-    );
+  const target = summarizeTargetContent(group.targetContent, group);
+  const disabled = group.pendingCount === 0 || isResolvedStatus(group.status);
 
   return (
     <Modal
       open
       centered
-      width={760}
-      title="Nội dung bị báo cáo"
+      width={820}
+      title="Chi tiết nội dung bị báo cáo"
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            onClick={onClose}
-          >
-            Đóng
-          </Button>
-
+          <Button onClick={onClose}>Đóng</Button>
           <Button
             disabled={disabled}
-            icon={
-              <EyeOff className="h-4 w-4" />
-            }
-            onClick={() =>
-              onResolve(
-                report,
-                "hide",
-              )
-            }
+            icon={<EyeOff className="h-4 w-4" />}
+            onClick={() => onResolve(group, "hide")}
           >
             Ẩn nội dung
           </Button>
-
           <Button
             danger
             disabled={disabled}
-            icon={
-              <Trash2 className="h-4 w-4" />
-            }
-            onClick={() =>
-              onResolve(
-                report,
-                "delete",
-              )
-            }
+            icon={<Trash2 className="h-4 w-4" />}
+            onClick={() => onResolve(group, "delete")}
           >
             Xóa nội dung
           </Button>
-
           <Button
             disabled={disabled}
-            icon={
-              <XCircle className="h-4 w-4" />
-            }
-            onClick={() =>
-              onResolve(
-                report,
-                "dismiss",
-              )
-            }
+            icon={<XCircle className="h-4 w-4" />}
+            onClick={() => onResolve(group, "dismiss")}
           >
             Bỏ qua báo cáo
           </Button>
@@ -459,94 +315,107 @@ function ReportTargetContentModal({
       onCancel={onClose}
       styles={{
         body: {
-          maxHeight: "70vh",
+          maxHeight: "72vh",
           overflowY: "auto",
         },
       }}
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Tag
-            color={
-              report.targetType === "post"
-                ? "blue"
-                : report.targetType === "comment"
-                  ? "purple"
-                  : "default"
-            }
-          >
-            {report.targetType === "post"
-              ? "Bài viết"
-              : report.targetType === "comment"
-                ? "Bình luận"
-                : "Không xác định"}
+          <Tag color={getTargetColor(group.targetType)}>
+            {getTargetLabel(group.targetType)}
           </Tag>
-
-          <Text type="secondary">
-            Mã nội dung: #{report.targetId}
-          </Text>
+          <Text type="secondary">Mã nội dung: #{group.targetId}</Text>
+          <Tag color="red">{group.reportCount} báo cáo</Tag>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <Text
-            type="secondary"
-            className="block text-xs"
-          >
+          <Text type="secondary" className="block text-xs">
             Tiêu đề
           </Text>
-
-          <Text
-            strong
-            className="mt-1 block break-words"
-          >
+          <Text strong className="mt-1 block break-words">
             {target.title}
           </Text>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <Text
-            type="secondary"
-            className="block text-xs"
-          >
+          <Text type="secondary" className="block text-xs">
             Nội dung đầy đủ
           </Text>
-
           <Paragraph className="!mb-0 !mt-2 !whitespace-pre-wrap !break-words !leading-7">
             {target.content ||
               "Nội dung không còn tồn tại hoặc không có dữ liệu."}
           </Paragraph>
         </div>
 
-        {rawTarget ? (
+        {group.targetContent ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-slate-200 p-3">
-              <Text
-                type="secondary"
-                className="block text-xs"
-              >
+              <Text type="secondary" className="block text-xs">
                 Tác giả
               </Text>
-              <Text strong>
-                {rawTarget.author ||
-                  "Chưa cập nhật"}
-              </Text>
+              <Text strong>{group.targetContent.author || "Chưa cập nhật"}</Text>
             </div>
-
             <div className="rounded-xl border border-slate-200 p-3">
-              <Text
-                type="secondary"
-                className="block text-xs"
-              >
+              <Text type="secondary" className="block text-xs">
                 Trạng thái nội dung
               </Text>
-              <Text>
-                {getContentStatusLabel(
-                  rawTarget.status,
-                )}
-              </Text>
+              <Text>{getContentStatusLabel(group.targetContent.status)}</Text>
             </div>
           </div>
         ) : null}
+
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <Text strong>Danh sách người báo cáo</Text>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {group.reports.map((report) => {
+              const display = getReportDisplayContent(report);
+
+              return (
+                <div key={report.id} className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <Text strong>{report.reporterName}</Text>
+                      <Text type="secondary" className="ml-2 text-xs">
+                        {getReporterRoleLabel(report.reporterRole)}
+                      </Text>
+                      {report.reporterEmail ? (
+                        <Text type="secondary" className="block text-xs">
+                          {report.reporterEmail}
+                        </Text>
+                      ) : null}
+                    </div>
+                    <div className="text-right">
+                      <Tag
+                        color={
+                          isResolvedStatus(report.status) ? "green" : "red"
+                        }
+                      >
+                        {getReportStatusLabel(report.status)}
+                      </Tag>
+                      <Text type="secondary" className="block text-xs">
+                        {formatDateTime(report.createdAt)}
+                      </Text>
+                    </div>
+                  </div>
+                  <Tag color="red" className="!mt-3">
+                    {display.reason}
+                  </Tag>
+                  <Paragraph className="!mb-0 !mt-2">
+                    {display.description}
+                  </Paragraph>
+                  {report.resolutionNote ? (
+                    <Paragraph className="!mb-0 !mt-2 !text-slate-500">
+                      Ghi chú xử lý: {report.resolutionNote}
+                    </Paragraph>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </Modal>
   );
@@ -557,7 +426,7 @@ export function ForumReportsTab({
 }: ForumReportsTabProps) {
   const { message } = App.useApp();
 
-  const [reports, setReports] = useState<ForumReport[]>([]);
+  const [groups, setGroups] = useState<ForumReportGroup[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -566,10 +435,7 @@ export function ForumReportsTab({
   const [error, setError] = useState<string | null>(null);
   const [resolveRequest, setResolveRequest] =
     useState<ReportResolveRequest | null>(null);
-  const [
-    viewingContentReport,
-    setViewingContentReport,
-  ] = useState<ForumReport | null>(
+  const [viewingGroup, setViewingGroup] = useState<ForumReportGroup | null>(
     null,
   );
 
@@ -578,9 +444,8 @@ export function ForumReportsTab({
     setError(null);
 
     try {
-      const result = await getForumReports({ page, limit: pageSize });
-
-      setReports(result.items);
+      const result = await getForumReportGroups({ page, limit: pageSize });
+      setGroups(result.items);
       setTotal(result.total);
       setPage(result.page);
       setPageSize(result.limit);
@@ -606,8 +471,12 @@ export function ForumReportsTab({
     setSubmitting(true);
 
     try {
-      await resolveForumReport(request.report.id, { action, note });
-      message.success("Xử lý báo cáo thành công.");
+      await resolveForumReportGroup(
+        request.group.targetType,
+        request.group.targetId,
+        { action, note },
+      );
+      message.success("Xử lý nhóm báo cáo thành công.");
       setResolveRequest(null);
       await loadReports();
     } catch (resolveError) {
@@ -617,81 +486,36 @@ export function ForumReportsTab({
     }
   }
 
-  const columns: ColumnsType<ForumReport> = [
+  const columns: ColumnsType<ForumReportGroup> = [
     {
       title: "STT",
-      width: "5%",
+      width: 70,
       align: "center",
-      render: (
-        _value,
-        _record,
-        index,
-      ) =>
-        (page - 1) *
-          pageSize +
-        index +
-        1,
-    },
-    {
-      title: "Mã báo cáo",
-      dataIndex: "id",
-      width: "7%",
-      render: (value: string) => (
-        <Text
-          strong
-          ellipsis
-          className="block font-mono"
-        >
-          {value}
-        </Text>
-      ),
+      render: (_value, _record, index) => (page - 1) * pageSize + index + 1,
     },
     {
       title: "Nội dung bị báo cáo",
-      width: "17%",
-      render: (_value, report) => {
-        const target =
-          getTargetContentSummary(
-            report,
-          );
+      width: 280,
+      render: (_value, group) => {
+        const target = summarizeTargetContent(group.targetContent, group);
 
         return (
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1">
-              <Tag
-                color={
-                  report.targetType === "post"
-                    ? "blue"
-                    : report.targetType === "comment"
-                      ? "purple"
-                      : "default"
-                }
-              >
-                {report.targetType === "post"
-                  ? "Bài viết"
-                  : report.targetType === "comment"
-                    ? "Bình luận"
-                    : "Không xác định"}
+              <Tag color={getTargetColor(group.targetType)}>
+                {getTargetLabel(group.targetType)}
               </Tag>
-
-              <Text
-                type="secondary"
-                className="text-xs"
-              >
-                #{report.targetId}
+              <Text type="secondary" className="text-xs">
+                #{group.targetId}
               </Text>
             </div>
-
             <Text
               strong
-              ellipsis={{
-                tooltip: target.title,
-              }}
+              ellipsis={{ tooltip: target.title }}
               className="mt-1 block"
             >
               {target.title}
             </Text>
-
             {target.content ? (
               <Paragraph
                 ellipsis={{ rows: 2 }}
@@ -700,10 +524,7 @@ export function ForumReportsTab({
                 {target.content}
               </Paragraph>
             ) : (
-              <Text
-                type="secondary"
-                className="mt-1 block text-xs"
-              >
+              <Text type="secondary" className="mt-1 block text-xs">
                 Không có nội dung xem trước
               </Text>
             )}
@@ -712,182 +533,116 @@ export function ForumReportsTab({
       },
     },
     {
-      title: "Lý do",
-      width: "18%",
-      render: (_value, report) => {
-        const display =
-          getReportDisplayContent(
-            report,
-          );
-
-        return (
-          <div>
-            <Tag color="red">
-              {display.reason}
-            </Tag>
-
-            <Paragraph
-              ellipsis={{ rows: 2 }}
-              className="!mb-0 !mt-2"
-            >
-              {display.description}
-            </Paragraph>
-          </div>
-        );
-      },
-    },
-    {
-      title: "Người báo cáo",
-      width: "14%",
-      render: (_value, report) => (
+      title: "Báo cáo",
+      width: 220,
+      render: (_value, group) => (
         <div>
-          <Text
-            strong
-            ellipsis
-            className="block"
-          >
-            {report.reporterName}
-          </Text>
-          <Text
-            type="secondary"
-            ellipsis
-            className="block text-xs"
-          >
-            {report.reporterEmail}
-          </Text>
-
-          <Text
-            type="secondary"
-            className="mt-1 block text-xs"
-          >
-            {getReporterRoleLabel(
-              report.reporterRole,
-            )}
-          </Text>
+          <div className="flex flex-wrap gap-1">
+            <Tag color={group.pendingCount > 0 ? "red" : "green"}>
+              {group.pendingCount} chờ xử lý
+            </Tag>
+            <Tag>{group.reportCount} tổng</Tag>
+          </div>
+          <Paragraph ellipsis={{ rows: 2 }} className="!mb-0 !mt-2">
+            {group.reports
+              .slice(0, 2)
+              .map((report) => getReportDisplayContent(report).reason)
+              .join(", ") || "Không rõ lý do"}
+          </Paragraph>
         </div>
       ),
     },
     {
-      title: "Trạng thái",
-      dataIndex: "status",
-      width: "11%",
-      align: "center",
-      render: (
-        value: string,
-        report,
-      ) => (
+      title: "Người báo cáo",
+      width: 220,
+      render: (_value, group) => (
         <div>
-          <Tag
-            color={
-              isResolvedStatus(
-                value,
-              )
-                ? "green"
-                : "red"
-            }
-          >
-            {getReportStatusLabel(
-              value,
-            )}
-          </Tag>
-
-          {report.resolutionAction ? (
-            <Text
-              type="secondary"
-              className="mt-1 block text-xs"
-            >
-              {
-                REPORT_ACTION_OPTIONS.find(
-                  (item) =>
-                    item.value ===
-                    report.resolutionAction,
-                )?.label
-              }
+          {group.reports.slice(0, 2).map((report) => (
+            <div key={report.id} className="mb-1 last:mb-0">
+              <Text strong ellipsis className="block">
+                {report.reporterName}
+              </Text>
+              <Text type="secondary" ellipsis className="block text-xs">
+                {report.reporterEmail ||
+                  getReporterRoleLabel(report.reporterRole)}
+              </Text>
+            </div>
+          ))}
+          {group.reportCount > 2 ? (
+            <Text type="secondary" className="text-xs">
+              +{group.reportCount - 2} người khác
             </Text>
           ) : null}
         </div>
       ),
     },
     {
-      title: "Ngày gửi",
-      dataIndex: "createdAt",
-      width: "9%",
+      title: "Trạng thái",
+      width: 150,
+      align: "center",
+      render: (_value, group) => (
+        <div>
+          <Tag color={isResolvedStatus(group.status) ? "green" : "red"}>
+            {getReportStatusLabel(group.status)}
+          </Tag>
+          <Text type="secondary" className="mt-1 block text-xs">
+            {group.resolvedCount} xử lý, {group.rejectedCount} bỏ qua
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: "Ngày gửi gần nhất",
+      dataIndex: "updatedAt",
+      width: 160,
       render: (value: string) => formatDateTime(value),
     },
     {
       title: "Hành động",
-      width: "16%",
+      width: 170,
       align: "center",
-      render: (_value, report) => {
-        const disabled =
-          isResolvedStatus(
-            report.status,
-          );
+      render: (_value, group) => {
+        const disabled = group.pendingCount === 0 || isResolvedStatus(group.status);
 
         return (
-          <Space
-            size={6}
-            className="!flex !justify-center"
-          >
+          <Space size={6} className="!flex !justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
-                icon={
-                  <Eye className="h-4 w-4" />
-                }
+                icon={<Eye className="h-4 w-4" />}
                 onClick={(event) => {
                   event.stopPropagation();
-                  setViewingContentReport(
-                    report,
-                  );
+                  setViewingGroup(group);
                 }}
               />
             </Tooltip>
-
             <Tooltip title="Ẩn nội dung">
               <Button
                 disabled={disabled}
-                icon={
-                  <EyeOff className="h-4 w-4" />
-                }
+                icon={<EyeOff className="h-4 w-4" />}
                 onClick={(event) => {
                   event.stopPropagation();
-                  setResolveRequest({
-                    report,
-                    action: "hide",
-                  });
+                  setResolveRequest({ group, action: "hide" });
                 }}
               />
             </Tooltip>
-
             <Tooltip title="Xóa nội dung">
               <Button
                 danger
                 disabled={disabled}
-                icon={
-                  <Trash2 className="h-4 w-4" />
-                }
+                icon={<Trash2 className="h-4 w-4" />}
                 onClick={(event) => {
                   event.stopPropagation();
-                  setResolveRequest({
-                    report,
-                    action: "delete",
-                  });
+                  setResolveRequest({ group, action: "delete" });
                 }}
               />
             </Tooltip>
-
             <Tooltip title="Bỏ qua báo cáo">
               <Button
                 disabled={disabled}
-                icon={
-                  <XCircle className="h-4 w-4" />
-                }
+                icon={<XCircle className="h-4 w-4" />}
                 onClick={(event) => {
                   event.stopPropagation();
-                  setResolveRequest({
-                    report,
-                    action: "dismiss",
-                  });
+                  setResolveRequest({ group, action: "dismiss" });
                 }}
               />
             </Tooltip>
@@ -916,12 +671,12 @@ export function ForumReportsTab({
           title="Danh sách báo cáo"
         >
           <Table
-            rowKey="id"
+            rowKey="groupId"
             size="middle"
             tableLayout="fixed"
             loading={loading}
             columns={columns}
-            dataSource={reports}
+            dataSource={groups}
             pagination={{
               current: page,
               pageSize,
@@ -929,7 +684,7 @@ export function ForumReportsTab({
               showSizeChanger: true,
               pageSizeOptions: [10, 20, 50, 100],
               showTotal: (nextTotal, range) =>
-                `${range[0]}-${range[1]} / ${nextTotal} báo cáo`,
+                `${range[0]}-${range[1]} / ${nextTotal} nội dung bị báo cáo`,
               onChange: (nextPage, nextSize) => {
                 if (nextSize !== pageSize) {
                   setPageSize(nextSize);
@@ -946,23 +701,11 @@ export function ForumReportsTab({
       </div>
 
       <ReportTargetContentModal
-        report={viewingContentReport}
-        onClose={() =>
-          setViewingContentReport(
-            null,
-          )
-        }
-        onResolve={(
-          report,
-          action,
-        ) => {
-          setViewingContentReport(
-            null,
-          );
-          setResolveRequest({
-            report,
-            action,
-          });
+        group={viewingGroup}
+        onClose={() => setViewingGroup(null)}
+        onResolve={(group, action) => {
+          setViewingGroup(null);
+          setResolveRequest({ group, action });
         }}
       />
 

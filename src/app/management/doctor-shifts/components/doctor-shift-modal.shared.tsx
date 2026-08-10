@@ -200,6 +200,25 @@ export function shiftsOverlap(
   );
 }
 
+export function isShiftInPast(
+  shift: Pick<DoctorShiftItem, "shiftDate" | "startTime" | "endTime">,
+) {
+  const startMinutes = timeToMinutes(shift.startTime);
+  const endMinutes = timeToMinutes(shift.endTime);
+  const endDate = new Date(`${shift.shiftDate}T${shift.endTime}`);
+
+  if (endMinutes <= startMinutes) {
+    endDate.setDate(endDate.getDate() + 1);
+  }
+
+  return endDate.getTime() <= Date.now();
+}
+
+function describeRoomConflict(shift: DoctorShiftItem) {
+  const staff = shift.staffName || shift.doctorName || "nhân sự khác";
+  return `Phòng đang được ca #${shift.id} sử dụng (${shift.shiftDate}, ${shift.startTime} - ${shift.endTime}, ${staff}).`;
+}
+
 export function readConflictResponse(raw: unknown) {
   if (typeof raw === "boolean") {
     return {
@@ -320,6 +339,18 @@ export function getShiftLabel(
   }
 
   return `Ca tối (${startTime} - ${endTime})`;
+}
+
+export function shiftBlocksDoctorConflict(shift: DoctorShiftItem) {
+  return (
+    shift.status === "available" ||
+    shift.status === "full" ||
+    shift.status === "off"
+  );
+}
+
+export function shiftBlocksRoomConflict(shift: DoctorShiftItem) {
+  return shift.status === "available" || shift.status === "full";
 }
 
 export function renderDoctorShiftStatus(
@@ -693,6 +724,7 @@ export function DoctorShiftFormModalBase({
         const busyInSavedSchedule = selectedSlot
           ? shifts.some(
               (shift) =>
+                shiftBlocksDoctorConflict(shift) &&
                 shift.doctorId === doctor.id &&
                 shift.shiftDate === watchedDate &&
                 shiftsOverlap(
@@ -770,6 +802,7 @@ export function DoctorShiftFormModalBase({
         const busyInSavedSchedule = selectedSlot
           ? shifts.some(
               (shift) =>
+                shiftBlocksDoctorConflict(shift) &&
                 shift.id !== editingShift?.id &&
                 shift.doctorId === doctor.id &&
                 shift.shiftDate === watchedDate &&
@@ -954,6 +987,7 @@ export function DoctorShiftFormModalBase({
 
             const existingDoctorConflict = shifts.some(
               (shift) =>
+                shiftBlocksDoctorConflict(shift) &&
                 shift.doctorId === assignment.doctorId &&
                 shift.shiftDate === values.shiftDate &&
                 shiftsOverlap(
@@ -982,8 +1016,9 @@ export function DoctorShiftFormModalBase({
               return;
             }
 
-            const existingRoomConflict = shifts.some(
+            const existingRoomConflict = shifts.find(
               (shift) =>
+                shiftBlocksRoomConflict(shift) &&
                 shift.roomId === assignment.roomId &&
                 shift.shiftDate === values.shiftDate &&
                 shiftsOverlap(
@@ -1092,8 +1127,12 @@ export function DoctorShiftFormModalBase({
           return;
         }
 
-        const existingDoctorConflict = shifts.some(
+        const shouldCheckEditConflicts =
+          (values.status ?? "available") !== "cancelled";
+
+        const existingDoctorConflict = shouldCheckEditConflicts && shifts.some(
           (shift) =>
+            shiftBlocksDoctorConflict(shift) &&
             shift.id !== editingShift?.id &&
             shift.doctorId === assignment.doctorId &&
             shift.shiftDate === values.shiftDate &&
@@ -1117,18 +1156,21 @@ export function DoctorShiftFormModalBase({
           return;
         }
 
-        const existingRoomConflict = shifts.some(
-          (shift) =>
-            shift.id !== editingShift?.id &&
-            shift.roomId === assignment.roomId &&
-            shift.shiftDate === values.shiftDate &&
-            shiftsOverlap(
-              shift.startTime,
-              shift.endTime,
-              selectedSlot.startTime,
-              selectedSlot.endTime,
-            ),
-        );
+        const existingRoomConflict = shouldCheckEditConflicts
+          ? shifts.find(
+              (shift) =>
+                shiftBlocksRoomConflict(shift) &&
+                shift.id !== editingShift?.id &&
+                shift.roomId === assignment.roomId &&
+                shift.shiftDate === values.shiftDate &&
+                shiftsOverlap(
+                  shift.startTime,
+                  shift.endTime,
+                  selectedSlot.startTime,
+                  selectedSlot.endTime,
+                ),
+            )
+          : undefined;
 
         if (existingRoomConflict) {
           form.setFields([
@@ -1137,6 +1179,12 @@ export function DoctorShiftFormModalBase({
               errors: [
                 "Phòng đã được sử dụng trong thời gian này.",
               ],
+            },
+          ]);
+          form.setFields([
+            {
+              name: ["assignments", 0, "roomId"],
+              errors: [describeRoomConflict(existingRoomConflict)],
             },
           ]);
           return;
@@ -1170,8 +1218,7 @@ export function DoctorShiftFormModalBase({
           maxAppointments: Number(
             assignment.maxAppointments,
           ),
-          status:
-            editingShift?.status ?? "available",
+          status: values.status ?? "available",
           note: values.note?.trim() ?? "",
         });
         payloadFieldPaths.push({
@@ -1206,6 +1253,8 @@ export function DoctorShiftFormModalBase({
             editingShift.shiftDate ||
           Number(firstPayload.maxAppointments) !==
             Number(editingShift.maxAppointments) ||
+          firstPayload.status !==
+            editingShift.status ||
           firstPayload.note.trim() !==
             editingShift.note.trim();
 
@@ -1254,17 +1303,19 @@ export function DoctorShiftFormModalBase({
 
       const conflictResponses = await Promise.all(
         payloads.map((payload) =>
-          checkDoctorShiftConflicts({
-            doctorId: payload.doctorId,
-            staffId: payload.staffId,
-            roleId: payload.roleId,
-            facilityId: payload.facilityId,
-            roomId: payload.roomId,
-            slotId: payload.slotId,
-            shiftDate: payload.shiftDate,
-            note: payload.note,
-            excludeShiftId: editingShift?.id,
-          }),
+          payload.status === "cancelled"
+            ? Promise.resolve({ hasConflict: false })
+            : checkDoctorShiftConflicts({
+                doctorId: payload.doctorId,
+                staffId: payload.staffId,
+                roleId: payload.roleId,
+                facilityId: payload.facilityId,
+                roomId: payload.roomId,
+                slotId: payload.slotId,
+                shiftDate: payload.shiftDate,
+                note: payload.note,
+                excludeShiftId: editingShift?.id,
+              }),
         ),
       );
 
@@ -1473,6 +1524,32 @@ export function DoctorShiftFormModalBase({
             </Form.Item>
           </Col>
         </Row>
+
+        {mode === "edit" ? (
+          <Row gutter={[16, 0]}>
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="status"
+                label="Trạng thái"
+                rules={[
+                  {
+                    required: true,
+                    message: "Chọn trạng thái ca trực.",
+                  },
+                ]}
+              >
+                <Select
+                  options={[
+                    { value: "available", label: "Có thể đặt lịch" },
+                    { value: "full", label: "Đã đầy" },
+                    { value: "off", label: "Nghỉ" },
+                    { value: "cancelled", label: "Đã hủy" },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        ) : null}
 
         <Row gutter={[16, 0]}>
           <Col xs={24}>

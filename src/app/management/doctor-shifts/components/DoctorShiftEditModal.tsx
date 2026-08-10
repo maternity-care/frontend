@@ -71,6 +71,7 @@ function DoctorShiftEditModalContent({
       shiftDate: firstPayload.shiftDate,
       maxAppointments:
         firstPayload.maxAppointments,
+      status: firstPayload.status,
       note: firstPayload.note,
     };
 

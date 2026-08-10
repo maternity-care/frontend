@@ -70,7 +70,9 @@ export function PregnancyScheduleOverview({
   const nextSchedule = upcomingSchedules[0];
 
   const completedCount = schedules.filter((item) => item.status === "done").length;
-  const totalCount = schedules.length;
+  // Lịch đã hủy vẫn giữ trong database để làm lịch sử, nhưng không tính là
+  // lịch đang theo dõi của thai phụ.
+  const totalCount = schedules.filter((item) => item.status !== "cancelled").length;
   const progressPercent = totalCount
     ? Math.round((completedCount / totalCount) * 100)
     : 0;
@@ -173,7 +175,7 @@ export function PregnancyScheduleOverview({
 
               <Col span={12}>
                 <Card className="!bg-pink-50">
-                  <Statistic title={RESPONSE_MESSAGES.SCHEDULE.UPCOMING_APPOINTMENTS} value={totalCount} suffix="mục" />
+                  <Statistic title={RESPONSE_MESSAGES.SCHEDULE.UPCOMING_APPOINTMENTS} value={visibleUpcomingSchedules.length} suffix="mục" />
                 </Card>
               </Col>
 
@@ -238,7 +240,7 @@ export function PregnancyScheduleOverview({
 
         <Col xs={24} xl={16}>
           <ScheduleCalendar
-            schedules={sortedSchedules}
+            schedules={visibleUpcomingSchedules}
             onCreateSchedule={handleOpenCreateModal}
             onOpenGoogleCalendar={handleOpenGoogleCalendar}
           />

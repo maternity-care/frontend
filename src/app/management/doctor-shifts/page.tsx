@@ -54,6 +54,7 @@ import { DoctorShiftEditModal } from "./components/DoctorShiftEditModal";
 import { DoctorShiftDetailModal } from "./components/DoctorShiftDetailModal";
 import {
   getErrorMessage,
+  isShiftInPast,
   readConflictResponse,
   shiftsOverlap,
 } from "./components/doctor-shift-modal.shared";
@@ -499,7 +500,8 @@ export default function DoctorShiftPage() {
     return Boolean(
       canManageShifts &&
       managedFacilityId &&
-      String(shift.facilityId) === managedFacilityId,
+      String(shift.facilityId) === managedFacilityId &&
+      !isShiftInPast(shift),
     );
   }
 

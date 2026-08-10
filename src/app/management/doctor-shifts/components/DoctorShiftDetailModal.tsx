@@ -24,7 +24,9 @@ import type {
 import {
   formatLongDate,
   getShiftLabel,
+  isShiftInPast,
   renderDoctorShiftStatus,
+  shiftBlocksDoctorConflict,
   shiftsOverlap,
 } from "./doctor-shift-modal.shared";
 import type {
@@ -145,7 +147,7 @@ export function DoctorShiftDetailModal({
               </div>
             </div>
 
-            {canManage ? (
+            {canManage && !isShiftInPast(shift) ? (
               <Space size={8} wrap>
                 <Button
                   icon={
@@ -285,6 +287,7 @@ export function DoctorShiftDetailModal({
                   .map((doctor) => {
                     const busy = shifts.some(
                       (item) =>
+                        shiftBlocksDoctorConflict(item) &&
                         item.id !== shift.id &&
                         item.doctorId ===
                           doctor.id &&

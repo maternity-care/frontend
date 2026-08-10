@@ -39,6 +39,9 @@ export function AppointmentDisruptionsPanel({
   const [refundItem, setRefundItem] = useState<AppointmentDisruption | null>(null);
   const [refundReason, setRefundReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const visibleItems = items.filter((item) =>
+    item.resolutionStatus === 'pending' || item.resolutionStatus === 'refund_pending',
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,7 +113,7 @@ export function AppointmentDisruptionsPanel({
     }
   };
 
-  if (hideWhenEmpty && !loading && items.length === 0) {
+  if (hideWhenEmpty && !loading && visibleItems.length === 0) {
     return null;
   }
 
@@ -139,10 +142,10 @@ export function AppointmentDisruptionsPanel({
       />
 
       <Spin spinning={loading}>
-        {items.length ? (
+        {visibleItems.length ? (
           <List
             grid={{ gutter: 16, xs: 1, lg: standalone ? 2 : 1, xl: 2 }}
-            dataSource={items}
+            dataSource={visibleItems}
             renderItem={(item) => {
               const meta = statusMeta[item.resolutionStatus] ?? { label: item.resolutionStatus, color: 'default' };
               return (
