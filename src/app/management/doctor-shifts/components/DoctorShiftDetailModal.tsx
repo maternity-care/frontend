@@ -24,6 +24,7 @@ import type {
 import {
   formatLongDate,
   getShiftLabel,
+  isShiftInPast,
   renderDoctorShiftStatus,
   shiftBlocksDoctorConflict,
   shiftsOverlap,
@@ -146,7 +147,7 @@ export function DoctorShiftDetailModal({
               </div>
             </div>
 
-            {canManage ? (
+            {canManage && !isShiftInPast(shift) ? (
               <Space size={8} wrap>
                 <Button
                   icon={

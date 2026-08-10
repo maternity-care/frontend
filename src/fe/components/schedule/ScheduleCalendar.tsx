@@ -52,7 +52,11 @@ export function ScheduleCalendar({
   onOpenGoogleCalendar,
 }: ScheduleCalendarProps) {
   const getSchedulesByDate = (value: Dayjs) => {
-    return schedules.filter((item) => dayjs(item.date).isSame(value, "day"));
+    return schedules.filter(
+      (item) =>
+        (item.status === "upcoming" || item.status === "action_required") &&
+        dayjs(item.date).isSame(value, "day"),
+    );
   };
 
   const handleSelect: CalendarProps<Dayjs>["onSelect"] = (date, selectInfo) => {

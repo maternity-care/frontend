@@ -200,6 +200,25 @@ export function shiftsOverlap(
   );
 }
 
+export function isShiftInPast(
+  shift: Pick<DoctorShiftItem, "shiftDate" | "startTime" | "endTime">,
+) {
+  const startMinutes = timeToMinutes(shift.startTime);
+  const endMinutes = timeToMinutes(shift.endTime);
+  const endDate = new Date(`${shift.shiftDate}T${shift.endTime}`);
+
+  if (endMinutes <= startMinutes) {
+    endDate.setDate(endDate.getDate() + 1);
+  }
+
+  return endDate.getTime() <= Date.now();
+}
+
+function describeRoomConflict(shift: DoctorShiftItem) {
+  const staff = shift.staffName || shift.doctorName || "nhân sự khác";
+  return `Phòng đang được ca #${shift.id} sử dụng (${shift.shiftDate}, ${shift.startTime} - ${shift.endTime}, ${staff}).`;
+}
+
 export function readConflictResponse(raw: unknown) {
   if (typeof raw === "boolean") {
     return {
@@ -997,7 +1016,7 @@ export function DoctorShiftFormModalBase({
               return;
             }
 
-            const existingRoomConflict = shifts.some(
+            const existingRoomConflict = shifts.find(
               (shift) =>
                 shiftBlocksRoomConflict(shift) &&
                 shift.roomId === assignment.roomId &&
@@ -1137,19 +1156,21 @@ export function DoctorShiftFormModalBase({
           return;
         }
 
-        const existingRoomConflict = shouldCheckEditConflicts && shifts.some(
-          (shift) =>
-            shiftBlocksRoomConflict(shift) &&
-            shift.id !== editingShift?.id &&
-            shift.roomId === assignment.roomId &&
-            shift.shiftDate === values.shiftDate &&
-            shiftsOverlap(
-              shift.startTime,
-              shift.endTime,
-              selectedSlot.startTime,
-              selectedSlot.endTime,
-            ),
-        );
+        const existingRoomConflict = shouldCheckEditConflicts
+          ? shifts.find(
+              (shift) =>
+                shiftBlocksRoomConflict(shift) &&
+                shift.id !== editingShift?.id &&
+                shift.roomId === assignment.roomId &&
+                shift.shiftDate === values.shiftDate &&
+                shiftsOverlap(
+                  shift.startTime,
+                  shift.endTime,
+                  selectedSlot.startTime,
+                  selectedSlot.endTime,
+                ),
+            )
+          : undefined;
 
         if (existingRoomConflict) {
           form.setFields([
@@ -1158,6 +1179,12 @@ export function DoctorShiftFormModalBase({
               errors: [
                 "Phòng đã được sử dụng trong thời gian này.",
               ],
+            },
+          ]);
+          form.setFields([
+            {
+              name: ["assignments", 0, "roomId"],
+              errors: [describeRoomConflict(existingRoomConflict)],
             },
           ]);
           return;
