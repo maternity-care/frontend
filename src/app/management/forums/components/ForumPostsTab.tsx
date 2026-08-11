@@ -24,6 +24,7 @@ import {
   EyeOff,
   Lock,
   Pin,
+  Reply,
   Search,
   Star,
   X,
@@ -36,6 +37,9 @@ import {
   moderateForumComment,
   moderateForumPost,
 } from "@/management/features/forums/forums.api";
+import {
+  createForumComment,
+} from "@/features/forum/forum.api";
 import type {
   ForumAuthorRole,
   ForumCategory,
@@ -322,6 +326,7 @@ function CommentItem({
   comment,
   nested = false,
   onModerateComment,
+  onReplyComment,
 }: {
   comment: ForumComment;
   nested?: boolean;
@@ -329,13 +334,58 @@ function CommentItem({
     comment: ForumComment,
     action: ForumCommentModerationAction,
   ) => void;
+  onReplyComment: (
+    comment: ForumComment,
+    content: string,
+  ) => Promise<boolean>;
 }) {
   const [
     showModerationReason,
     setShowModerationReason,
   ] = useState(false);
+  const [
+    replyOpen,
+    setReplyOpen,
+  ] = useState(false);
+  const [
+    replyContent,
+    setReplyContent,
+  ] = useState("");
+  const [
+    replySubmitting,
+    setReplySubmitting,
+  ] = useState(false);
+
   const canModerate =
     comment.status !== "deleted";
+  const canReplyToComment =
+    comment.status !== "deleted";
+
+  async function submitReply() {
+    const content =
+      replyContent.trim();
+
+    if (!content) {
+      return;
+    }
+
+    setReplySubmitting(true);
+
+    try {
+      const success =
+        await onReplyComment(
+          comment,
+          content,
+        );
+
+      if (success) {
+        setReplyContent("");
+        setReplyOpen(false);
+      }
+    } finally {
+      setReplySubmitting(false);
+    }
+  }
 
   return (
     <div
@@ -384,9 +434,30 @@ function CommentItem({
           </Text>
         </div>
 
-        {canModerate ? (
+        {canModerate ||
+        canReplyToComment ? (
           <Space wrap>
-            {comment.status !==
+            {canReplyToComment ? (
+              <Button
+                type="primary"
+                size="small"
+                icon={
+                  <Reply className="h-4 w-4" />
+                }
+                onClick={() => {
+                  setReplyOpen(
+                    (current) =>
+                      !current,
+                  );
+                  setReplyContent("");
+                }}
+              >
+                Trả lời
+              </Button>
+            ) : null}
+
+            {canModerate &&
+            comment.status !==
             "published" ? (
               <Button
                 size="small"
@@ -400,7 +471,7 @@ function CommentItem({
               >
                 Duyệt
               </Button>
-            ) : (
+            ) : canModerate ? (
               <Button
                 size="small"
                 onClick={() =>
@@ -412,20 +483,22 @@ function CommentItem({
               >
                 Ẩn
               </Button>
-            )}
+            ) : null}
 
-            <Button
-              size="small"
-              danger
-              onClick={() =>
-                onModerateComment(
-                  comment,
-                  "delete",
-                )
-              }
-            >
-              Xóa
-            </Button>
+            {canModerate ? (
+              <Button
+                size="small"
+                danger
+                onClick={() =>
+                  onModerateComment(
+                    comment,
+                    "delete",
+                  )
+                }
+              >
+                Xóa
+              </Button>
+            ) : null}
           </Space>
         ) : null}
       </div>
@@ -434,6 +507,62 @@ function CommentItem({
         {comment.content ||
           "Bình luận không có nội dung."}
       </Paragraph>
+
+      {replyOpen &&
+      canReplyToComment ? (
+        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+          <Text
+            type="secondary"
+            className="mb-2 block text-xs"
+          >
+            Đang trả lời{" "}
+            <Text strong>
+              {comment.authorName}
+            </Text>
+          </Text>
+
+          <TextArea
+            value={replyContent}
+            rows={3}
+            maxLength={1000}
+            showCount
+            disabled={replySubmitting}
+            placeholder={`Nhập câu trả lời cho ${comment.authorName}...`}
+            onChange={(event) =>
+              setReplyContent(
+                event.target.value,
+              )
+            }
+          />
+
+          <div className="mt-3 flex justify-end gap-2">
+            <Button
+              size="small"
+              disabled={replySubmitting}
+              onClick={() => {
+                setReplyOpen(false);
+                setReplyContent("");
+              }}
+            >
+              Hủy
+            </Button>
+
+            <Button
+              type="primary"
+              size="small"
+              loading={replySubmitting}
+              disabled={
+                !replyContent.trim()
+              }
+              onClick={() =>
+                void submitReply()
+              }
+            >
+              Gửi trả lời
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {comment.moderationReason ? (
         <div className="mt-3">
@@ -484,6 +613,9 @@ function CommentItem({
                 onModerateComment={
                   onModerateComment
                 }
+                onReplyComment={
+                  onReplyComment
+                }
               />
             ),
           )}
@@ -499,6 +631,7 @@ function PostDetailModal({
   onClose,
   onModeratePost,
   onModerateComment,
+  onReplyComment,
 }: {
   post: ForumPost | null;
   loading: boolean;
@@ -511,6 +644,10 @@ function PostDetailModal({
     comment: ForumComment,
     action: ForumCommentModerationAction,
   ) => void;
+  onReplyComment: (
+    comment: ForumComment,
+    content: string,
+  ) => Promise<boolean>;
 }) {
   const [
     expandedModerationPostId,
@@ -872,6 +1009,9 @@ function PostDetailModal({
                       onModerateComment={
                         onModerateComment
                       }
+                      onReplyComment={
+                        onReplyComment
+                      }
                     />
                   ),
                 )}
@@ -992,7 +1132,6 @@ export function ForumPostsTab({
   realtimeVersion = 0,
 }: ForumPostsTabProps) {
   const { message } = App.useApp();
-
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1149,6 +1288,58 @@ export function ForumPostsTab({
       message.error(getErrorMessage(moderationError));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleReplyComment(
+    comment: ForumComment,
+    content: string,
+  ) {
+    const postId =
+      selectedPost?.id ||
+      comment.postId;
+
+    if (!postId) {
+      message.error(
+        "Không xác định được bài viết cần trả lời.",
+      );
+      return false;
+    }
+
+    try {
+      await createForumComment(
+        postId,
+        {
+          content,
+          parentId: comment.id,
+          messageType: "text",
+        },
+      );
+
+      message.success(
+        "Đã gửi câu trả lời.",
+      );
+
+      if (
+        selectedPost?.id ===
+        postId
+      ) {
+        setSelectedPost(
+          await getForumPost(
+            postId,
+          ),
+        );
+      }
+
+      await loadPosts();
+      return true;
+    } catch (replyError) {
+      message.error(
+        getErrorMessage(
+          replyError,
+        ),
+      );
+      return false;
     }
   }
 
@@ -1447,6 +1638,9 @@ export function ForumPostsTab({
         }
         onModerateComment={(comment, action) =>
           setModerationRequest({ kind: "comment", target: comment, action })
+        }
+        onReplyComment={
+          handleReplyComment
         }
       />
 
