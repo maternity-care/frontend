@@ -1053,8 +1053,29 @@ function CommentCard({
   onSubmitReply: () => void;
   onReport: () => void;
 }) {
+  const INITIAL_REPLY_COUNT = 2;
+  const [
+    showAllReplies,
+    setShowAllReplies,
+  ] = useState(false);
+
+  const visibleReplies =
+    showAllReplies
+      ? comment.replies
+      : comment.replies.slice(
+          0,
+          INITIAL_REPLY_COUNT,
+        );
+
+  const hiddenReplyCount =
+    Math.max(
+      0,
+      comment.replies.length -
+        INITIAL_REPLY_COUNT,
+    );
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <Card
         className="!rounded-2xl !border-slate-200"
         styles={{
@@ -1073,13 +1094,20 @@ function CommentCard({
 
           <div className="min-w-0 p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <Space>
+              <Space wrap>
                 <Text
                   type="secondary"
                   className="text-xs"
                 >
                   #{index + 1}
                 </Text>
+
+                <Tag
+                  color="default"
+                  className="!m-0"
+                >
+                  Bình luận gốc
+                </Tag>
 
                 {comment.status ===
                 "pending" ? (
@@ -1130,6 +1158,16 @@ function CommentCard({
             {replyingTo ===
             comment.id ? (
               <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <Text
+                  type="secondary"
+                  className="mb-2 block text-xs"
+                >
+                  Đang trả lời{" "}
+                  <strong className="text-slate-700">
+                    {comment.author.name}
+                  </strong>
+                </Text>
+
                 <TextArea
                   value={
                     replyContent
@@ -1173,64 +1211,119 @@ function CommentCard({
         </div>
       </Card>
 
-      {comment.replies.map(
-        (reply) => (
-          <Card
-            key={reply.id}
-            className="!ml-6 !rounded-2xl !border-slate-200"
-            styles={{
-              body: {
-                padding: 0,
-              },
-            }}
-          >
-            <div className="grid md:grid-cols-[180px_minmax(0,1fr)]">
-              <aside className="border-b border-slate-200 bg-slate-50/70 p-4 md:border-b-0 md:border-r">
-                <AuthorPanel
-                  author={
-                    reply.author
-                  }
-                  compact
-                />
-              </aside>
+      {comment.replies.length > 0 ? (
+        <div className="ml-5 border-l-2 border-slate-200 pl-4 sm:ml-10 sm:pl-5">
+          <div className="flex flex-col gap-3">
+            {visibleReplies.map(
+              (reply) => (
+                <div
+                  key={reply.id}
+                  className="relative"
+                >
+                  <span className="absolute -left-4 top-7 h-px w-4 bg-slate-200 sm:-left-5 sm:w-5" />
 
-              <div className="min-w-0 p-5">
-                <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
-                  <Space>
-                    <Text
-                      type="secondary"
-                      className="text-xs"
-                    >
-                      Trả lời
-                    </Text>
-
-                    {reply.author
-                      .verified ? (
-                      <Tag color="blue">
-                        <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />
-                        Phản hồi xác thực
-                      </Tag>
-                    ) : null}
-                  </Space>
-
-                  <Text
-                    type="secondary"
-                    className="text-xs"
+                  <Card
+                    className="!rounded-2xl !border-slate-200 !bg-slate-50/50"
+                    styles={{
+                      body: {
+                        padding: 0,
+                      },
+                    }}
                   >
-                    {formatDateTime(
-                      reply.createdAt,
-                    )}
-                  </Text>
-                </div>
+                    <div className="grid md:grid-cols-[150px_minmax(0,1fr)]">
+                      <aside className="border-b border-slate-200 bg-slate-50 p-4 md:border-b-0 md:border-r">
+                        <AuthorPanel
+                          author={
+                            reply.author
+                          }
+                          compact
+                        />
+                      </aside>
 
-                <Paragraph className="!mb-0 !whitespace-pre-wrap !leading-7 !text-slate-700">
-                  {reply.content}
-                </Paragraph>
-              </div>
+                      <div className="min-w-0 p-4">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Tag
+                              color="blue"
+                              className="!m-0"
+                            >
+                              <Reply className="mr-1 inline h-3.5 w-3.5" />
+                              Phản hồi
+                            </Tag>
+
+                            <Text
+                              type="secondary"
+                              className="text-xs"
+                            >
+                              Phản hồi cho{" "}
+                              <strong className="font-medium text-slate-700">
+                                {
+                                  comment
+                                    .author
+                                    .name
+                                }
+                              </strong>
+                            </Text>
+
+                            {reply.status ===
+                            "pending" ? (
+                              <Tag color="gold">
+                                Chờ duyệt
+                              </Tag>
+                            ) : null}
+
+                            {reply.author
+                              .verified ? (
+                              <Tag color="blue">
+                                <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />
+                                Phản hồi xác thực
+                              </Tag>
+                            ) : null}
+                          </div>
+
+                          <Text
+                            type="secondary"
+                            className="text-xs"
+                          >
+                            {formatDateTime(
+                              reply.createdAt,
+                            )}
+                          </Text>
+                        </div>
+
+                        <Paragraph className="!mb-0 !whitespace-pre-wrap !leading-7 !text-slate-700">
+                          {reply.content}
+                        </Paragraph>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              ),
+            )}
+          </div>
+
+          {hiddenReplyCount > 0 ||
+          showAllReplies ? (
+            <div className="mt-3">
+              <Button
+                type="link"
+                size="small"
+                className="!h-auto !px-0 !font-medium"
+                onClick={() =>
+                  setShowAllReplies(
+                    (current) =>
+                      !current,
+                  )
+                }
+              >
+                {showAllReplies
+                  ? "Thu gọn phản hồi"
+                  : `Xem thêm phản hồi (${hiddenReplyCount})`}
+              </Button>
             </div>
-          </Card>
-        ),
-      )}
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

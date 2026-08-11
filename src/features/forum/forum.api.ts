@@ -314,22 +314,21 @@ function normalizeTopic(
 function normalizeComment(
   item: BackendForumComment,
   fallbackPostId = "",
+  fallbackParentId = "",
 ): ForumComment {
   const record = item as Record<
     string,
     unknown
   >;
-  const repliesRaw =
-    item.replies ?? item.children;
 
   return {
     id: readText(item.id),
     postId:
       readText(item.postId) ||
       fallbackPostId,
-    parentId: readText(
-      item.parentId,
-    ),
+    parentId:
+      readText(item.parentId) ||
+      fallbackParentId,
     content: readText(
       item.content,
     ),
@@ -356,19 +355,107 @@ function normalizeComment(
         item.reportCount,
       ),
     ),
-    replies: Array.isArray(
-      repliesRaw,
-    )
-      ? repliesRaw
-          .filter(isRecord)
-          .map((reply) =>
-            normalizeComment(
-              reply,
-              fallbackPostId,
-            ),
-          )
-      : [],
+    replies: [],
   };
+}
+
+function readCommentTree(
+  value: unknown,
+  fallbackPostId = "",
+) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const comments: ForumComment[] = [];
+  const seenIds = new Set<string>();
+
+  function collectComment(
+    raw: Record<string, unknown>,
+    fallbackParentId = "",
+  ) {
+    const comment =
+      normalizeComment(
+        raw,
+        fallbackPostId,
+        fallbackParentId,
+      );
+
+    if (
+      comment.id &&
+      !seenIds.has(comment.id)
+    ) {
+      seenIds.add(comment.id);
+      comments.push(comment);
+    }
+
+    const nestedReplies =
+      raw.replies ??
+      raw.children;
+
+    if (
+      Array.isArray(nestedReplies)
+    ) {
+      nestedReplies
+        .filter(isRecord)
+        .forEach((reply) => {
+          collectComment(
+            reply,
+            comment.id,
+          );
+        });
+    }
+  }
+
+  value
+    .filter(isRecord)
+    .forEach((item) => {
+      collectComment(item);
+    });
+
+  const commentById =
+    new Map(
+      comments.map((comment) => [
+        comment.id,
+        comment,
+      ]),
+    );
+
+  const rootComments:
+    ForumComment[] = [];
+
+  comments.forEach((comment) => {
+    if (
+      comment.parentId &&
+      commentById.has(
+        comment.parentId,
+      )
+    ) {
+      commentById
+        .get(comment.parentId)!
+        .replies.push(comment);
+
+      return;
+    }
+
+    rootComments.push(comment);
+  });
+
+  return rootComments;
+}
+
+function countCommentTree(
+  comments: ForumComment[],
+): number {
+  return comments.reduce(
+    (total, comment) =>
+      total +
+      1 +
+      countCommentTree(
+        comment.replies,
+      ),
+    0,
+  );
 }
 
 function normalizePost(
@@ -390,16 +477,10 @@ function normalizePost(
         topic.category,
     );
   const comments =
-    Array.isArray(item.comments)
-      ? item.comments
-          .filter(isRecord)
-          .map((comment) =>
-            normalizeComment(
-              comment,
-              id,
-            ),
-          )
-      : [];
+    readCommentTree(
+      item.comments,
+      id,
+    );
 
   return {
     id,
@@ -452,7 +533,9 @@ function normalizePost(
       ),
     ),
     commentCount: Math.max(
-      comments.length,
+      countCommentTree(
+        comments,
+      ),
       readNumber(
         item.commentCount ??
           item.commentsCount,
