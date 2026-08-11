@@ -21,7 +21,6 @@ import {
   Input,
   Modal,
   Pagination,
-  Segmented,
   Select,
   Space,
   Tag,
@@ -73,11 +72,6 @@ const {
 type CategoryFilter =
   | "all"
   | ForumCategoryCode;
-
-type FeedMode =
-  | "latest"
-  | "questions"
-  | "unanswered";
 
 type CreatePostValues = {
   topicId: string;
@@ -259,8 +253,6 @@ export default function ForumPage() {
     );
   const [topicId, setTopicId] =
     useState<string>();
-  const [feedMode, setFeedMode] =
-    useState<FeedMode>("latest");
   const [page, setPage] =
     useState(1);
   const [total, setTotal] =
@@ -409,36 +401,16 @@ export default function ForumPage() {
             page,
             limit: PAGE_SIZE,
             category:
-              feedMode ===
-              "questions"
-                ? "ask_doctor"
-                : category ===
-                    "all"
-                  ? undefined
-                  : category,
+              category === "all"
+                ? undefined
+                : category,
             topicId,
             search,
-            status:
-              "published",
+            status: "published",
           });
 
-        const items =
-          feedMode ===
-          "unanswered"
-            ? result.items.filter(
-                (post) =>
-                  post.commentCount ===
-                  0,
-              )
-            : result.items;
-
-        setPosts(items);
-        setTotal(
-          feedMode ===
-          "unanswered"
-            ? items.length
-            : result.total,
-        );
+        setPosts(result.items);
+        setTotal(result.total);
 
       } catch (loadError) {
         setError(
@@ -449,7 +421,6 @@ export default function ForumPage() {
       }
     }, [
       category,
-      feedMode,
       page,
       search,
       topicId,
@@ -632,9 +603,6 @@ export default function ForumPage() {
                           setCategory(
                             value,
                           );
-                          setFeedMode(
-                            "latest",
-                          );
                           setPage(1);
                         }}
                         className={[
@@ -698,34 +666,6 @@ export default function ForumPage() {
               >
                 <div className="border-b border-slate-200 p-4">
                   <div className="flex flex-col gap-3">
-                    <Segmented<FeedMode>
-                      block
-                      value={feedMode}
-                      options={[
-                        {
-                          value: "latest",
-                          label:
-                            "Mới cập nhật",
-                        },
-                        {
-                          value:
-                            "questions",
-                          label:
-                            "Hỏi bác sĩ",
-                        },
-                        {
-                          value:
-                            "unanswered",
-                          label:
-                            "Chưa có trả lời",
-                        },
-                      ]}
-                      onChange={(value) => {
-                        setFeedMode(value);
-                        setPage(1);
-                      }}
-                    />
-
                     <Input
                       allowClear
                       value={search}
@@ -986,9 +926,6 @@ export default function ForumPage() {
                     onClick={() => {
                       setCategory(
                         "ask_doctor",
-                      );
-                      setFeedMode(
-                        "questions",
                       );
                       setPage(1);
                     }}

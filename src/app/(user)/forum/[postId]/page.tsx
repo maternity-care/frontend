@@ -788,9 +788,9 @@ export default function ForumPostDetailPage() {
                           submitting={
                             commentSubmitting
                           }
-                          onReply={() => {
+                          onReply={(commentId) => {
                             setReplyingTo(
-                              comment.id,
+                              commentId,
                             );
                             setReplyContent(
                               "",
@@ -807,16 +807,16 @@ export default function ForumPostDetailPage() {
                           onReplyContentChange={
                             setReplyContent
                           }
-                          onSubmitReply={() =>
+                          onSubmitReply={(parentId) =>
                             void submitComment(
-                              comment.id,
+                              parentId,
                             )
                           }
-                          onReport={() =>
+                          onReport={(commentId) =>
                             openReport({
                               type:
                                 "comment",
-                              id: comment.id,
+                              id: commentId,
                               label:
                                 "bình luận",
                             })
@@ -1045,192 +1045,390 @@ function CommentCard({
   replyingTo: string | null;
   replyContent: string;
   submitting: boolean;
-  onReply: () => void;
+  onReply: (
+    commentId: string,
+  ) => void;
   onCancelReply: () => void;
   onReplyContentChange: (
     value: string,
   ) => void;
-  onSubmitReply: () => void;
-  onReport: () => void;
+  onSubmitReply: (
+    parentId: string,
+  ) => void;
+  onReport: (
+    commentId: string,
+  ) => void;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      <Card
-        className="!rounded-2xl !border-slate-200"
-        styles={{
-          body: {
-            padding: 0,
-          },
-        }}
+    <CommentThreadNode
+      comment={comment}
+      index={index}
+      depth={0}
+      parentAuthorName={null}
+      replyingTo={replyingTo}
+      replyContent={replyContent}
+      submitting={submitting}
+      onReply={onReply}
+      onCancelReply={
+        onCancelReply
+      }
+      onReplyContentChange={
+        onReplyContentChange
+      }
+      onSubmitReply={
+        onSubmitReply
+      }
+      onReport={onReport}
+    />
+  );
+}
+
+function CommentThreadNode({
+  comment,
+  index,
+  depth,
+  parentAuthorName,
+  replyingTo,
+  replyContent,
+  submitting,
+  onReply,
+  onCancelReply,
+  onReplyContentChange,
+  onSubmitReply,
+  onReport,
+}: {
+  comment: ForumComment;
+  index: number;
+  depth: number;
+  parentAuthorName: string | null;
+  replyingTo: string | null;
+  replyContent: string;
+  submitting: boolean;
+  onReply: (
+    commentId: string,
+  ) => void;
+  onCancelReply: () => void;
+  onReplyContentChange: (
+    value: string,
+  ) => void;
+  onSubmitReply: (
+    parentId: string,
+  ) => void;
+  onReport: (
+    commentId: string,
+  ) => void;
+}) {
+  const INITIAL_REPLY_COUNT = 2;
+  const [
+    showAllReplies,
+    setShowAllReplies,
+  ] = useState(false);
+
+  const visibleReplies =
+    showAllReplies
+      ? comment.replies
+      : comment.replies.slice(
+          0,
+          INITIAL_REPLY_COUNT,
+        );
+
+  const hiddenReplyCount =
+    Math.max(
+      0,
+      comment.replies.length -
+        INITIAL_REPLY_COUNT,
+    );
+
+  const isRoot = depth === 0;
+
+  const contentCard = (
+    <Card
+      className={[
+        "!rounded-2xl !border-slate-200",
+        isRoot
+          ? ""
+          : "!bg-slate-50/50",
+      ].join(" ")}
+      styles={{
+        body: {
+          padding: 0,
+        },
+      }}
+    >
+      <div
+        className={
+          isRoot
+            ? "grid md:grid-cols-[180px_minmax(0,1fr)]"
+            : "grid md:grid-cols-[150px_minmax(0,1fr)]"
+        }
       >
-        <div className="grid md:grid-cols-[180px_minmax(0,1fr)]">
-          <aside className="border-b border-slate-200 bg-slate-50/70 p-4 md:border-b-0 md:border-r">
-            <AuthorPanel
-              author={comment.author}
-              compact
-            />
-          </aside>
+        <aside
+          className={[
+            "border-b border-slate-200 p-4 md:border-b-0 md:border-r",
+            isRoot
+              ? "bg-slate-50/70"
+              : "bg-slate-50",
+          ].join(" ")}
+        >
+          <AuthorPanel
+            author={comment.author}
+            compact
+          />
+        </aside>
 
-          <div className="min-w-0 p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <Space>
-                <Text
-                  type="secondary"
-                  className="text-xs"
-                >
-                  #{index + 1}
-                </Text>
-
-                {comment.status ===
-                "pending" ? (
-                  <Tag color="gold">
-                    Chờ duyệt
-                  </Tag>
-                ) : null}
-              </Space>
-
-              <Text
-                type="secondary"
-                className="text-xs"
-              >
-                {formatDateTime(
-                  comment.createdAt,
-                )}
-              </Text>
-            </div>
-
-            <Paragraph className="!mb-4 !whitespace-pre-wrap !leading-7 !text-slate-700">
-              {comment.content}
-            </Paragraph>
-
-            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  <Flag className="h-3.5 w-3.5" />
-                }
-                onClick={onReport}
-              >
-                Báo cáo
-              </Button>
-
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  <Reply className="h-3.5 w-3.5" />
-                }
-                onClick={onReply}
-              >
-                Trả lời
-              </Button>
-            </div>
-
-            {replyingTo ===
-            comment.id ? (
-              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <TextArea
-                  value={
-                    replyContent
-                  }
-                  rows={3}
-                  maxLength={500}
-                  placeholder={`Trả lời ${comment.author.name}...`}
-                  onChange={(event) =>
-                    onReplyContentChange(
-                      event.target.value,
-                    )
-                  }
-                />
-
-                <div className="mt-2 flex justify-end gap-2">
-                  <Button
-                    size="small"
-                    disabled={submitting}
-                    onClick={
-                      onCancelReply
-                    }
-                  >
-                    Hủy
-                  </Button>
-
-                  <Button
-                    type="primary"
-                    size="small"
-                    className="!bg-pink-500"
-                    loading={submitting}
-                    onClick={
-                      onSubmitReply
-                    }
-                  >
-                    Gửi trả lời
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </Card>
-
-      {comment.replies.map(
-        (reply) => (
-          <Card
-            key={reply.id}
-            className="!ml-6 !rounded-2xl !border-slate-200"
-            styles={{
-              body: {
-                padding: 0,
-              },
-            }}
-          >
-            <div className="grid md:grid-cols-[180px_minmax(0,1fr)]">
-              <aside className="border-b border-slate-200 bg-slate-50/70 p-4 md:border-b-0 md:border-r">
-                <AuthorPanel
-                  author={
-                    reply.author
-                  }
-                  compact
-                />
-              </aside>
-
-              <div className="min-w-0 p-5">
-                <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
-                  <Space>
-                    <Text
-                      type="secondary"
-                      className="text-xs"
-                    >
-                      Trả lời
-                    </Text>
-
-                    {reply.author
-                      .verified ? (
-                      <Tag color="blue">
-                        <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />
-                        Phản hồi xác thực
-                      </Tag>
-                    ) : null}
-                  </Space>
-
+        <div
+          className={
+            isRoot
+              ? "min-w-0 p-5"
+              : "min-w-0 p-4"
+          }
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {isRoot ? (
+                <>
                   <Text
                     type="secondary"
                     className="text-xs"
                   >
-                    {formatDateTime(
-                      reply.createdAt,
-                    )}
+                    #{index + 1}
                   </Text>
-                </div>
 
-                <Paragraph className="!mb-0 !whitespace-pre-wrap !leading-7 !text-slate-700">
-                  {reply.content}
-                </Paragraph>
+                  <Tag
+                    color="default"
+                    className="!m-0"
+                  >
+                    Bình luận gốc
+                  </Tag>
+                </>
+              ) : (
+                <>
+                  <Tag
+                    color="blue"
+                    className="!m-0"
+                  >
+                    <Reply className="mr-1 inline h-3.5 w-3.5" />
+                    Phản hồi
+                  </Tag>
+
+                  {parentAuthorName ? (
+                    <Text
+                      type="secondary"
+                      className="text-xs"
+                    >
+                      Phản hồi cho{" "}
+                      <strong className="font-medium text-slate-700">
+                        {parentAuthorName}
+                      </strong>
+                    </Text>
+                  ) : null}
+                </>
+              )}
+
+              {comment.status ===
+              "pending" ? (
+                <Tag color="gold">
+                  Chờ duyệt
+                </Tag>
+              ) : null}
+
+              {comment.author
+                .verified &&
+              !isRoot ? (
+                <Tag color="blue">
+                  <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />
+                  Phản hồi xác thực
+                </Tag>
+              ) : null}
+            </div>
+
+            <Text
+              type="secondary"
+              className="text-xs"
+            >
+              {formatDateTime(
+                comment.createdAt,
+              )}
+            </Text>
+          </div>
+
+          <Paragraph className="!mb-4 !whitespace-pre-wrap !leading-7 !text-slate-700">
+            {comment.content}
+          </Paragraph>
+
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+            <Button
+              type="text"
+              size="small"
+              icon={
+                <Flag className="h-3.5 w-3.5" />
+              }
+              onClick={() =>
+                onReport(
+                  comment.id,
+                )
+              }
+            >
+              Báo cáo
+            </Button>
+
+            <Button
+              type="text"
+              size="small"
+              icon={
+                <Reply className="h-3.5 w-3.5" />
+              }
+              onClick={() =>
+                onReply(
+                  comment.id,
+                )
+              }
+            >
+              Trả lời
+            </Button>
+          </div>
+
+          {replyingTo ===
+          comment.id ? (
+            <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+              <Text
+                type="secondary"
+                className="mb-2 block text-xs"
+              >
+                Đang trả lời{" "}
+                <strong className="text-slate-700">
+                  {comment.author.name}
+                </strong>
+              </Text>
+
+              <TextArea
+                value={
+                  replyContent
+                }
+                rows={3}
+                maxLength={500}
+                placeholder={`Trả lời ${comment.author.name}...`}
+                onChange={(event) =>
+                  onReplyContentChange(
+                    event.target.value,
+                  )
+                }
+              />
+
+              <div className="mt-2 flex justify-end gap-2">
+                <Button
+                  size="small"
+                  disabled={submitting}
+                  onClick={
+                    onCancelReply
+                  }
+                >
+                  Hủy
+                </Button>
+
+                <Button
+                  type="primary"
+                  size="small"
+                  className="!bg-pink-500"
+                  loading={submitting}
+                  onClick={() =>
+                    onSubmitReply(
+                      comment.id,
+                    )
+                  }
+                >
+                  Gửi trả lời
+                </Button>
               </div>
             </div>
-          </Card>
-        ),
+          ) : null}
+        </div>
+      </div>
+    </Card>
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      {isRoot ? (
+        contentCard
+      ) : (
+        <div className="relative">
+          <span className="absolute -left-4 top-7 h-px w-4 bg-slate-200 sm:-left-5 sm:w-5" />
+          {contentCard}
+        </div>
       )}
+
+      {comment.replies.length > 0 ? (
+        <div
+          className={[
+            "border-l-2 border-slate-200",
+            isRoot
+              ? "ml-5 pl-4 sm:ml-10 sm:pl-5"
+              : "ml-4 pl-4 sm:ml-7 sm:pl-5",
+          ].join(" ")}
+        >
+          <div className="flex flex-col gap-3">
+            {visibleReplies.map(
+              (reply) => (
+                <CommentThreadNode
+                  key={reply.id}
+                  comment={reply}
+                  index={index}
+                  depth={depth + 1}
+                  parentAuthorName={
+                    comment.author.name
+                  }
+                  replyingTo={
+                    replyingTo
+                  }
+                  replyContent={
+                    replyContent
+                  }
+                  submitting={
+                    submitting
+                  }
+                  onReply={
+                    onReply
+                  }
+                  onCancelReply={
+                    onCancelReply
+                  }
+                  onReplyContentChange={
+                    onReplyContentChange
+                  }
+                  onSubmitReply={
+                    onSubmitReply
+                  }
+                  onReport={
+                    onReport
+                  }
+                />
+              ),
+            )}
+          </div>
+
+          {hiddenReplyCount > 0 ||
+          showAllReplies ? (
+            <div className="mt-3">
+              <Button
+                type="link"
+                size="small"
+                className="!h-auto !px-0 !font-medium"
+                onClick={() =>
+                  setShowAllReplies(
+                    (current) =>
+                      !current,
+                  )
+                }
+              >
+                {showAllReplies
+                  ? "Thu gọn phản hồi"
+                  : `Xem thêm phản hồi (${hiddenReplyCount})`}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

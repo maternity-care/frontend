@@ -1,22 +1,40 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { Card, Segmented } from "antd";
-import { FilePenLine, Flag, MessagesSquare, Tags } from "lucide-react";
+import {
+  Card,
+  Result,
+  Segmented,
+} from "antd";
+import {
+  FilePenLine,
+  Flag,
+  MessagesSquare,
+  Tags,
+} from "lucide-react";
 
 import { useAuthStore } from "@/features/auth/auth.store";
 import { useForumRealtime } from "@/features/forum/useForumRealtime";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
-import { PageHeader } from "@/management/components/ui/PageHeader";
 import type { ForumTopic } from "@/management/features/forums/forums.types";
 import { ForumPostAdminTab } from "./components/ForumPostAdminTab";
 import { ForumPostsTab } from "./components/ForumPostsTab";
 import { ForumReportsTab } from "./components/ForumReportsTab";
 import { ForumTopicsTab } from "./components/ForumTopicsTab";
 
-type ForumView = "posts" | "post-admin" | "reports" | "topics";
+type ForumView =
+  | "posts"
+  | "post-admin"
+  | "reports"
+  | "topics";
 
 type ForumNavigationOption = {
   value: ForumView;
@@ -24,96 +42,268 @@ type ForumNavigationOption = {
 };
 
 function ForumManagementContent() {
-  const searchParams = useSearchParams();
-  const roles = useAuthStore((state) => state.roles);
+  const searchParams =
+    useSearchParams();
 
-  const isForumAdmin = roles.includes("admin") || roles.includes("super_admin");
+  const roles =
+    useAuthStore(
+      (state) => state.roles,
+    );
+  const user =
+    useAuthStore(
+      (state) => state.user,
+    );
+  const activeFacilityId =
+    useAuthStore(
+      (state) =>
+        state.activeFacilityId,
+    );
 
-  const isSuperAdmin = roles.includes("super_admin");
+  const effectiveRoles =
+    useMemo(() => {
+      const activeFacility =
+        user?.facilities?.find(
+          (facility) =>
+            String(
+              facility.id,
+            ) ===
+            String(
+              activeFacilityId ??
+                "",
+            ),
+        ) ??
+        user?.facilities?.find(
+          (facility) =>
+            facility.status ===
+            "active",
+        );
 
-  const [view, setView] = useState<ForumView>("posts");
-  const [realtimeVersion, setRealtimeVersion] = useState(0);
-  const [topics, setTopics] = useState<ForumTopic[]>([]);
+      const facilityRoles =
+        activeFacility?.roles
+          ?.length
+          ? activeFacility.roles
+          : activeFacility?.role
+            ? [
+                activeFacility.role,
+              ]
+            : [];
 
-  const activeView = !isForumAdmin && view === "post-admin" ? "posts" : view;
+      const roleName = (
+        role:
+          | string
+          | {
+              name?: string;
+            }
+          | null
+          | undefined,
+      ) =>
+        typeof role === "string"
+          ? role
+          : role?.name;
+
+      return new Set(
+        [
+          ...roles,
+          ...(user?.roles?.map(
+            roleName,
+          ) ?? []),
+          ...facilityRoles.map(
+            roleName,
+          ),
+        ]
+          .filter(
+            (
+              role,
+            ): role is string =>
+              Boolean(role),
+          )
+          .map((role) =>
+            role.toLowerCase(),
+          ),
+      );
+    }, [
+      activeFacilityId,
+      roles,
+      user,
+    ]);
+
+  const canFullManageForum =
+    effectiveRoles.has("staff") ||
+    effectiveRoles.has("admin") ||
+    effectiveRoles.has(
+      "super_admin",
+    );
+
+  const isDoctor =
+    effectiveRoles.has("doctor");
+
+  const canAccessForum =
+    canFullManageForum ||
+    isDoctor;
+
+  const [view, setView] =
+    useState<ForumView>(
+      "posts",
+    );
+  const [
+    realtimeVersion,
+    setRealtimeVersion,
+  ] = useState(0);
+  const [topics, setTopics] =
+    useState<ForumTopic[]>([]);
+
+  const activeView =
+    canFullManageForum
+      ? view
+      : "posts";
 
   useEffect(() => {
-    const requestedView = searchParams.get("view");
+    const requestedView =
+      searchParams.get("view");
 
     if (
-      requestedView === "posts" ||
-      requestedView === "post-admin" ||
-      requestedView === "reports" ||
-      requestedView === "topics"
+      requestedView !==
+        "posts" &&
+      requestedView !==
+        "post-admin" &&
+      requestedView !==
+        "reports" &&
+      requestedView !==
+        "topics"
     ) {
-      const timer = window.setTimeout(() => setView(requestedView), 0);
-
-      return () => window.clearTimeout(timer);
+      return;
     }
-  }, [searchParams]);
+
+    const nextView =
+      canFullManageForum ||
+      requestedView ===
+        "posts"
+        ? requestedView
+        : "posts";
+
+    const timer =
+      window.setTimeout(
+        () =>
+          setView(nextView),
+        0,
+      );
+
+    return () =>
+      window.clearTimeout(
+        timer,
+      );
+  }, [
+    canFullManageForum,
+    searchParams,
+  ]);
 
   useForumRealtime({
     management: true,
-    onEvent: () => setRealtimeVersion((current) => current + 1),
+    onEvent: () =>
+      setRealtimeVersion(
+        (current) =>
+          current + 1,
+      ),
   });
 
-  const navigationOptions = useMemo<ForumNavigationOption[]>(
-    () => [
-      {
-        value: "posts",
-        label: (
-          <span className="flex items-center gap-2">
-            <MessagesSquare className="h-4 w-4" />
-            Bài viết
-          </span>
-        ),
-      },
-      ...(isForumAdmin
-        ? [
-            {
-              value: "post-admin" as const,
-              label: (
-                <span className="flex items-center gap-2">
-                  <FilePenLine className="h-4 w-4" />
-                  Quản trị bài viết
-                </span>
-              ),
-            },
-          ]
-        : []),
-      {
-        value: "reports",
-        label: (
-          <span className="flex items-center gap-2">
-            <Flag className="h-4 w-4" />
-            Báo cáo
-          </span>
-        ),
-      },
-      {
-        value: "topics",
-        label: (
-          <span className="flex items-center gap-2">
-            <Tags className="h-4 w-4" />
-            Chủ đề
-          </span>
-        ),
-      },
-    ],
-    [isForumAdmin],
-  );
+  const navigationOptions =
+    useMemo<
+      ForumNavigationOption[]
+    >(
+      () => [
+        {
+          value: "posts",
+          label: (
+            <span className="flex items-center gap-2">
+              <MessagesSquare className="h-4 w-4" />
+              Bài viết
+            </span>
+          ),
+        },
+        ...(canFullManageForum
+          ? [
+              {
+                value:
+                  "post-admin" as const,
+                label: (
+                  <span className="flex items-center gap-2">
+                    <FilePenLine className="h-4 w-4" />
+                    Quản trị bài viết
+                  </span>
+                ),
+              },
+              {
+                value:
+                  "reports" as const,
+                label: (
+                  <span className="flex items-center gap-2">
+                    <Flag className="h-4 w-4" />
+                    Báo cáo
+                  </span>
+                ),
+              },
+              {
+                value:
+                  "topics" as const,
+                label: (
+                  <span className="flex items-center gap-2">
+                    <Tags className="h-4 w-4" />
+                    Chủ đề
+                  </span>
+                ),
+              },
+            ]
+          : []),
+      ],
+      [
+        canFullManageForum,
+      ],
+    );
 
-  const handleTopicsChange = useCallback((nextTopics: ForumTopic[]) => {
-    setTopics(nextTopics);
-  }, []);
+  const handleTopicsChange =
+    useCallback(
+      (
+        nextTopics:
+          ForumTopic[],
+      ) => {
+        setTopics(
+          nextTopics,
+        );
+      },
+      [],
+    );
 
   const navigation = (
     <Segmented<ForumView>
       value={activeView}
-      options={navigationOptions}
-      onChange={setView}
+      options={
+        navigationOptions
+      }
+      onChange={(nextView) => {
+        if (
+          !canFullManageForum &&
+          nextView !== "posts"
+        ) {
+          setView("posts");
+          return;
+        }
+
+        setView(nextView);
+      }}
     />
   );
+
+  if (!canAccessForum) {
+    return (
+      <AdminLayout>
+        <Result
+          status="403"
+          title="Không có quyền truy cập"
+          subTitle="Tài khoản hiện tại không có quyền sử dụng Quản lý diễn đàn."
+        />
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -128,36 +318,91 @@ function ForumManagementContent() {
       </div>
 
       <div className="mt-6 flex flex-col gap-5">
-        {activeView !== "posts" ? (
-          <Card className="border-slate-200 bg-white">{navigation}</Card>
+        {activeView !==
+        "posts" ? (
+          <Card className="border-slate-200 bg-white">
+            {navigation}
+          </Card>
         ) : null}
 
-        <div className={activeView === "posts" ? "block" : "hidden"}>
+        <div
+          className={
+            activeView ===
+            "posts"
+              ? "block"
+              : "hidden"
+          }
+        >
           <ForumPostsTab
             topics={topics}
-            navigation={navigation}
-            focusPostId={searchParams.get("postId") ?? undefined}
-            realtimeVersion={realtimeVersion}
+            navigation={
+              navigation
+            }
+            focusPostId={
+              searchParams.get(
+                "postId",
+              ) ??
+              undefined
+            }
+            realtimeVersion={
+              realtimeVersion
+            }
+            canModerateContent={
+              canFullManageForum
+            }
           />
         </div>
 
-        {isForumAdmin ? (
-          <div className={activeView === "post-admin" ? "block" : "hidden"}>
-            <ForumPostAdminTab
-              topics={topics}
-              realtimeVersion={realtimeVersion}
-              canHardDelete={isSuperAdmin}
-            />
-          </div>
+        {canFullManageForum ? (
+          <>
+            <div
+              className={
+                activeView ===
+                "post-admin"
+                  ? "block"
+                  : "hidden"
+              }
+            >
+              <ForumPostAdminTab
+                topics={topics}
+                realtimeVersion={
+                  realtimeVersion
+                }
+                canHardDelete
+              />
+            </div>
+
+            <div
+              className={
+                activeView ===
+                "reports"
+                  ? "block"
+                  : "hidden"
+              }
+            >
+              <ForumReportsTab
+                realtimeVersion={
+                  realtimeVersion
+                }
+              />
+            </div>
+
+            <div
+              className={
+                activeView ===
+                "topics"
+                  ? "block"
+                  : "hidden"
+              }
+            >
+              <ForumTopicsTab
+                onTopicsChange={
+                  handleTopicsChange
+                }
+              />
+            </div>
+          </>
         ) : null}
-
-        <div className={activeView === "reports" ? "block" : "hidden"}>
-          <ForumReportsTab realtimeVersion={realtimeVersion} />
-        </div>
-
-        <div className={activeView === "topics" ? "block" : "hidden"}>
-          <ForumTopicsTab onTopicsChange={handleTopicsChange} />
-        </div>
       </div>
     </AdminLayout>
   );

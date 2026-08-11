@@ -22,8 +22,10 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Flag,
   Lock,
   Pin,
+  Reply,
   Search,
   Star,
   X,
@@ -36,6 +38,10 @@ import {
   moderateForumComment,
   moderateForumPost,
 } from "@/management/features/forums/forums.api";
+import {
+  createForumComment,
+  createForumReport,
+} from "@/features/forum/forum.api";
 import type {
   ForumAuthorRole,
   ForumCategory,
@@ -55,6 +61,7 @@ type ForumPostsTabProps = {
   navigation: ReactNode;
   focusPostId?: string;
   realtimeVersion?: number;
+  canModerateContent: boolean;
 };
 
 type ModerationRequest =
@@ -68,6 +75,45 @@ type ModerationRequest =
       target: ForumComment;
       action: ForumCommentModerationAction;
     };
+
+type ReportTarget =
+  | {
+      type: "post";
+      id: string;
+      label: string;
+    }
+  | {
+      type: "comment";
+      id: string;
+      label: string;
+    };
+
+const REPORT_REASON_OPTIONS = [
+  {
+    value: "Spam",
+    label: "Spam",
+  },
+  {
+    value: "Sai chủ đề",
+    label: "Sai chủ đề",
+  },
+  {
+    value: "Thông tin y tế sai lệch",
+    label: "Thông tin y tế sai lệch",
+  },
+  {
+    value: "Quảng cáo thuốc hoặc dịch vụ",
+    label: "Quảng cáo thuốc/dịch vụ",
+  },
+  {
+    value: "Nội dung gây hại hoặc kích động",
+    label: "Nội dung gây hại/kích động",
+  },
+  {
+    value: "Khác",
+    label: "Lý do khác",
+  },
+];
 
 const CATEGORY_OPTIONS: Array<{
   value: ForumCategory;
@@ -312,6 +358,103 @@ function ModerationModal({
   );
 }
 
+function ReportContentModal({
+  target,
+  submitting,
+  reasonPreset,
+  detail,
+  onReasonChange,
+  onDetailChange,
+  onClose,
+  onSubmit,
+}: {
+  target: ReportTarget | null;
+  submitting: boolean;
+  reasonPreset: string;
+  detail: string;
+  onReasonChange: (
+    value: string,
+  ) => void;
+  onDetailChange: (
+    value: string,
+  ) => void;
+  onClose: () => void;
+  onSubmit: () => Promise<void>;
+}) {
+  return (
+    <Modal
+      open={Boolean(target)}
+      centered
+      width={520}
+      title={
+        target
+          ? `Báo cáo ${target.label}`
+          : "Báo cáo nội dung"
+      }
+      okText="Gửi báo cáo"
+      cancelText="Hủy"
+      confirmLoading={submitting}
+      okButtonProps={{
+        disabled:
+          !reasonPreset.trim(),
+      }}
+      onCancel={onClose}
+      onOk={() =>
+        void onSubmit()
+      }
+      mask={{
+        closable:
+          !submitting,
+      }}
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-800">
+            Lý do báo cáo{" "}
+            <span className="text-red-500">
+              *
+            </span>
+          </label>
+
+          <Select
+            value={
+              reasonPreset ||
+              undefined
+            }
+            className="w-full"
+            placeholder="Chọn lý do"
+            options={
+              REPORT_REASON_OPTIONS
+            }
+            onChange={
+              onReasonChange
+            }
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-800">
+            Mô tả thêm
+          </label>
+
+          <TextArea
+            rows={4}
+            maxLength={500}
+            showCount
+            value={detail}
+            placeholder="Mô tả nội dung cần kiểm duyệt..."
+            onChange={(event) =>
+              onDetailChange(
+                event.target.value,
+              )
+            }
+          />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function commentStatusTag(
   status: ForumPostStatus,
 ) {
@@ -321,21 +464,74 @@ function commentStatusTag(
 function CommentItem({
   comment,
   nested = false,
+  canModerateContent,
   onModerateComment,
+  onReplyComment,
+  onReportComment,
 }: {
   comment: ForumComment;
   nested?: boolean;
+  canModerateContent: boolean;
   onModerateComment: (
     comment: ForumComment,
     action: ForumCommentModerationAction,
+  ) => void;
+  onReplyComment: (
+    comment: ForumComment,
+    content: string,
+  ) => Promise<boolean>;
+  onReportComment: (
+    comment: ForumComment,
   ) => void;
 }) {
   const [
     showModerationReason,
     setShowModerationReason,
   ] = useState(false);
+  const [
+    replyOpen,
+    setReplyOpen,
+  ] = useState(false);
+  const [
+    replyContent,
+    setReplyContent,
+  ] = useState("");
+  const [
+    replySubmitting,
+    setReplySubmitting,
+  ] = useState(false);
+
   const canModerate =
+    canModerateContent &&
     comment.status !== "deleted";
+  const canReplyToComment =
+    comment.status !== "deleted";
+
+  async function submitReply() {
+    const content =
+      replyContent.trim();
+
+    if (!content) {
+      return;
+    }
+
+    setReplySubmitting(true);
+
+    try {
+      const success =
+        await onReplyComment(
+          comment,
+          content,
+        );
+
+      if (success) {
+        setReplyContent("");
+        setReplyOpen(false);
+      }
+    } finally {
+      setReplySubmitting(false);
+    }
+  }
 
   return (
     <div
@@ -384,9 +580,44 @@ function CommentItem({
           </Text>
         </div>
 
-        {canModerate ? (
+        {comment.status !==
+        "deleted" ? (
           <Space wrap>
-            {comment.status !==
+            {canReplyToComment ? (
+              <Button
+                type="primary"
+                size="small"
+                icon={
+                  <Reply className="h-4 w-4" />
+                }
+                onClick={() => {
+                  setReplyOpen(
+                    (current) =>
+                      !current,
+                  );
+                  setReplyContent("");
+                }}
+              >
+                Trả lời
+              </Button>
+            ) : null}
+
+            <Button
+              size="small"
+              icon={
+                <Flag className="h-4 w-4" />
+              }
+              onClick={() =>
+                onReportComment(
+                  comment,
+                )
+              }
+            >
+              Báo cáo
+            </Button>
+
+            {canModerate &&
+            comment.status !==
             "published" ? (
               <Button
                 size="small"
@@ -400,7 +631,7 @@ function CommentItem({
               >
                 Duyệt
               </Button>
-            ) : (
+            ) : canModerate ? (
               <Button
                 size="small"
                 onClick={() =>
@@ -412,20 +643,22 @@ function CommentItem({
               >
                 Ẩn
               </Button>
-            )}
+            ) : null}
 
-            <Button
-              size="small"
-              danger
-              onClick={() =>
-                onModerateComment(
-                  comment,
-                  "delete",
-                )
-              }
-            >
-              Xóa
-            </Button>
+            {canModerate ? (
+              <Button
+                size="small"
+                danger
+                onClick={() =>
+                  onModerateComment(
+                    comment,
+                    "delete",
+                  )
+                }
+              >
+                Xóa
+              </Button>
+            ) : null}
           </Space>
         ) : null}
       </div>
@@ -434,6 +667,62 @@ function CommentItem({
         {comment.content ||
           "Bình luận không có nội dung."}
       </Paragraph>
+
+      {replyOpen &&
+      canReplyToComment ? (
+        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+          <Text
+            type="secondary"
+            className="mb-2 block text-xs"
+          >
+            Đang trả lời{" "}
+            <Text strong>
+              {comment.authorName}
+            </Text>
+          </Text>
+
+          <TextArea
+            value={replyContent}
+            rows={3}
+            maxLength={1000}
+            showCount
+            disabled={replySubmitting}
+            placeholder={`Nhập câu trả lời cho ${comment.authorName}...`}
+            onChange={(event) =>
+              setReplyContent(
+                event.target.value,
+              )
+            }
+          />
+
+          <div className="mt-3 flex justify-end gap-2">
+            <Button
+              size="small"
+              disabled={replySubmitting}
+              onClick={() => {
+                setReplyOpen(false);
+                setReplyContent("");
+              }}
+            >
+              Hủy
+            </Button>
+
+            <Button
+              type="primary"
+              size="small"
+              loading={replySubmitting}
+              disabled={
+                !replyContent.trim()
+              }
+              onClick={() =>
+                void submitReply()
+              }
+            >
+              Gửi trả lời
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {comment.moderationReason ? (
         <div className="mt-3">
@@ -481,8 +770,17 @@ function CommentItem({
                 key={reply.id}
                 comment={reply}
                 nested
+                canModerateContent={
+                  canModerateContent
+                }
                 onModerateComment={
                   onModerateComment
+                }
+                onReplyComment={
+                  onReplyComment
+                }
+                onReportComment={
+                  onReportComment
                 }
               />
             ),
@@ -496,12 +794,17 @@ function CommentItem({
 function PostDetailModal({
   post,
   loading,
+  canModerateContent,
   onClose,
   onModeratePost,
   onModerateComment,
+  onReplyComment,
+  onReportPost,
+  onReportComment,
 }: {
   post: ForumPost | null;
   loading: boolean;
+  canModerateContent: boolean;
   onClose: () => void;
   onModeratePost: (
     post: ForumPost,
@@ -510,6 +813,16 @@ function PostDetailModal({
   onModerateComment: (
     comment: ForumComment,
     action: ForumCommentModerationAction,
+  ) => void;
+  onReplyComment: (
+    comment: ForumComment,
+    content: string,
+  ) => Promise<boolean>;
+  onReportPost: (
+    post: ForumPost,
+  ) => void;
+  onReportComment: (
+    comment: ForumComment,
   ) => void;
 }) {
   const [
@@ -651,65 +964,80 @@ function PostDetailModal({
             </div>
 
             <Space wrap>
-              {post.status !==
-              "published" ? (
+              <Button
+                icon={
+                  <Flag className="h-4 w-4" />
+                }
+                onClick={() =>
+                  onReportPost(post)
+                }
+              >
+                Báo cáo
+              </Button>
+
+              {canModerateContent ? (
+                <>
+                {post.status !==
+                "published" ? (
+                  <Button
+                    type="primary"
+                    icon={
+                      <CheckCircle2 className="h-4 w-4" />
+                    }
+                    onClick={() =>
+                      onModeratePost(
+                        post,
+                        "approve",
+                      )
+                    }
+                  >
+                    Duyệt bài
+                  </Button>
+                ) : (
+                  <Button
+                    icon={
+                      <EyeOff className="h-4 w-4" />
+                    }
+                    onClick={() =>
+                      onModeratePost(
+                        post,
+                        "hide",
+                      )
+                    }
+                  >
+                    Ẩn bài
+                  </Button>
+                )}
+
                 <Button
-                  type="primary"
                   icon={
-                    <CheckCircle2 className="h-4 w-4" />
+                    <Lock className="h-4 w-4" />
                   }
                   onClick={() =>
                     onModeratePost(
                       post,
-                      "approve",
+                      "lock",
                     )
                   }
                 >
-                  Duyệt bài
+                  Khóa
                 </Button>
-              ) : (
+
                 <Button
                   icon={
-                    <EyeOff className="h-4 w-4" />
+                    <Pin className="h-4 w-4" />
                   }
                   onClick={() =>
                     onModeratePost(
                       post,
-                      "hide",
+                      "pin",
                     )
                   }
                 >
-                  Ẩn bài
+                  Ghim
                 </Button>
-              )}
-
-              <Button
-                icon={
-                  <Lock className="h-4 w-4" />
-                }
-                onClick={() =>
-                  onModeratePost(
-                    post,
-                    "lock",
-                  )
-                }
-              >
-                Khóa
-              </Button>
-
-              <Button
-                icon={
-                  <Pin className="h-4 w-4" />
-                }
-                onClick={() =>
-                  onModeratePost(
-                    post,
-                    "pin",
-                  )
-                }
-              >
-                Ghim
-              </Button>
+                </>
+              ) : null}
             </Space>
           </div>
 
@@ -869,8 +1197,17 @@ function PostDetailModal({
                     <CommentItem
                       key={comment.id}
                       comment={comment}
+                      canModerateContent={
+                        canModerateContent
+                      }
                       onModerateComment={
                         onModerateComment
+                      }
+                      onReplyComment={
+                        onReplyComment
+                      }
+                      onReportComment={
+                        onReportComment
                       }
                     />
                   ),
@@ -990,9 +1327,9 @@ export function ForumPostsTab({
   navigation,
   focusPostId,
   realtimeVersion = 0,
+  canModerateContent,
 }: ForumPostsTabProps) {
   const { message } = App.useApp();
-
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1014,6 +1351,24 @@ export function ForumPostsTab({
   const [selectedPost, setSelectedPost] = useState<ForumPost | null>(null);
   const [moderationRequest, setModerationRequest] =
     useState<ModerationRequest | null>(null);
+  const [
+    reportTarget,
+    setReportTarget,
+  ] = useState<ReportTarget | null>(
+    null,
+  );
+  const [
+    reportReasonPreset,
+    setReportReasonPreset,
+  ] = useState("");
+  const [
+    reportDetail,
+    setReportDetail,
+  ] = useState("");
+  const [
+    reportSubmitting,
+    setReportSubmitting,
+  ] = useState(false);
 
   const topicById = useMemo(
     () => new Map(topics.map((topic) => [topic.id, topic])),
@@ -1115,6 +1470,10 @@ export function ForumPostsTab({
   }
 
   async function handleModeration(reason: string) {
+    if (!canModerateContent) {
+      return;
+    }
+
     const request = moderationRequest;
     if (!request) return;
 
@@ -1149,6 +1508,130 @@ export function ForumPostsTab({
       message.error(getErrorMessage(moderationError));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function openReport(
+    target: ReportTarget,
+  ) {
+    setReportTarget(target);
+    setReportReasonPreset("");
+    setReportDetail("");
+  }
+
+  function closeReport() {
+    if (reportSubmitting) {
+      return;
+    }
+
+    setReportTarget(null);
+    setReportReasonPreset("");
+    setReportDetail("");
+  }
+
+  async function handleSubmitReport() {
+    if (
+      !reportTarget ||
+      !reportReasonPreset.trim()
+    ) {
+      return;
+    }
+
+    setReportSubmitting(true);
+
+    try {
+      const reason = [
+        reportReasonPreset.trim(),
+        reportDetail.trim(),
+      ]
+        .filter(Boolean)
+        .join(": ");
+
+      await createForumReport({
+        targetType:
+          reportTarget.type,
+        targetId:
+          reportTarget.id,
+        reason,
+      });
+
+      message.success(
+        "Đã gửi báo cáo.",
+      );
+
+      setReportTarget(null);
+      setReportReasonPreset("");
+      setReportDetail("");
+
+      if (selectedPost) {
+        setSelectedPost(
+          await getForumPost(
+            selectedPost.id,
+          ),
+        );
+      }
+
+      await loadPosts();
+    } catch (reportError) {
+      message.error(
+        getErrorMessage(
+          reportError,
+        ),
+      );
+    } finally {
+      setReportSubmitting(false);
+    }
+  }
+
+  async function handleReplyComment(
+    comment: ForumComment,
+    content: string,
+  ) {
+    const postId =
+      selectedPost?.id ||
+      comment.postId;
+
+    if (!postId) {
+      message.error(
+        "Không xác định được bài viết cần trả lời.",
+      );
+      return false;
+    }
+
+    try {
+      await createForumComment(
+        postId,
+        {
+          content,
+          parentId: comment.id,
+          messageType: "text",
+        },
+      );
+
+      message.success(
+        "Đã gửi câu trả lời.",
+      );
+
+      if (
+        selectedPost?.id ===
+        postId
+      ) {
+        setSelectedPost(
+          await getForumPost(
+            postId,
+          ),
+        );
+      }
+
+      await loadPosts();
+      return true;
+    } catch (replyError) {
+      message.error(
+        getErrorMessage(
+          replyError,
+        ),
+      );
+      return false;
     }
   }
 
@@ -1216,7 +1699,9 @@ export function ForumPostsTab({
     },
     {
       title: "Thao tác",
-      width: 170,
+      width: canModerateContent
+        ? 170
+        : 88,
       align: "center",
       render: (_value, post) => (
         <Space size={6}>
@@ -1230,51 +1715,62 @@ export function ForumPostsTab({
             />
           </Tooltip>
 
-          {post.status !== "published" ? (
-            <Tooltip title="Duyệt bài">
-              <Button
-                type="primary"
-                icon={<CheckCircle2 className="h-4 w-4" />}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setModerationRequest({
-                    kind: "post",
-                    target: post,
-                    action: "approve",
-                  });
-                }}
-              />
-            </Tooltip>
-          ) : (
-            <Tooltip title="Ẩn bài">
-              <Button
-                icon={<EyeOff className="h-4 w-4" />}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setModerationRequest({
-                    kind: "post",
-                    target: post,
-                    action: "hide",
-                  });
-                }}
-              />
-            </Tooltip>
-          )}
+          {canModerateContent ? (
+            <>
+              {post.status !==
+              "published" ? (
+                <Tooltip title="Duyệt bài">
+                  <Button
+                    type="primary"
+                    icon={
+                      <CheckCircle2 className="h-4 w-4" />
+                    }
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setModerationRequest({
+                        kind: "post",
+                        target: post,
+                        action: "approve",
+                      });
+                    }}
+                  />
+                </Tooltip>
+              ) : (
+                <Tooltip title="Ẩn bài">
+                  <Button
+                    icon={
+                      <EyeOff className="h-4 w-4" />
+                    }
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setModerationRequest({
+                        kind: "post",
+                        target: post,
+                        action: "hide",
+                      });
+                    }}
+                  />
+                </Tooltip>
+              )}
 
-          <Tooltip title="Từ chối">
-            <Button
-              danger
-              icon={<XCircle className="h-4 w-4" />}
-              onClick={(event) => {
-                event.stopPropagation();
-                setModerationRequest({
-                  kind: "post",
-                  target: post,
-                  action: "reject",
-                });
-              }}
-            />
-          </Tooltip>
+              <Tooltip title="Từ chối">
+                <Button
+                  danger
+                  icon={
+                    <XCircle className="h-4 w-4" />
+                  }
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setModerationRequest({
+                      kind: "post",
+                      target: post,
+                      action: "reject",
+                    });
+                  }}
+                />
+              </Tooltip>
+            </>
+          ) : null}
         </Space>
       ),
     },
@@ -1441,12 +1937,53 @@ export function ForumPostsTab({
       <PostDetailModal
         post={selectedPost}
         loading={detailLoading}
+        canModerateContent={
+          canModerateContent
+        }
         onClose={() => setSelectedPost(null)}
         onModeratePost={(post, action) =>
           setModerationRequest({ kind: "post", target: post, action })
         }
         onModerateComment={(comment, action) =>
           setModerationRequest({ kind: "comment", target: comment, action })
+        }
+        onReplyComment={
+          handleReplyComment
+        }
+        onReportPost={(post) =>
+          openReport({
+            type: "post",
+            id: post.id,
+            label: "bài viết",
+          })
+        }
+        onReportComment={(comment) =>
+          openReport({
+            type: "comment",
+            id: comment.id,
+            label: "bình luận",
+          })
+        }
+      />
+
+      <ReportContentModal
+        target={reportTarget}
+        submitting={
+          reportSubmitting
+        }
+        reasonPreset={
+          reportReasonPreset
+        }
+        detail={reportDetail}
+        onReasonChange={
+          setReportReasonPreset
+        }
+        onDetailChange={
+          setReportDetail
+        }
+        onClose={closeReport}
+        onSubmit={
+          handleSubmitReport
         }
       />
 
