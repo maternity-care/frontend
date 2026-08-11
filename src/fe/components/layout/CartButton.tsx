@@ -32,19 +32,14 @@ export function CartButton() {
 
   return (
     <>
-      <Badge
-        count={count}
-        size="small"
-        offset={[-4, 4]}
-        className="[&_.ant-badge-count]:!min-w-[18px] [&_.ant-badge-count]:!h-[18px] [&_.ant-badge-count]:!leading-[18px] [&_.ant-badge-count]:!text-[11px]"
-      >
+      <Badge count={count} size="small" overflowCount={99}>
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Giỏ hàng"
-          className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-pink-50 hover:text-pink-700"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-slate-500 transition"
         >
-          <ShoppingCart className="h-6 w-6" strokeWidth={2} />
+          <ShoppingCart className="h-[18px] w-[18px]" />
         </button>
       </Badge>
 
