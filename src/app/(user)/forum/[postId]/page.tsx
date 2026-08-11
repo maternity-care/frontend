@@ -788,9 +788,9 @@ export default function ForumPostDetailPage() {
                           submitting={
                             commentSubmitting
                           }
-                          onReply={() => {
+                          onReply={(commentId) => {
                             setReplyingTo(
-                              comment.id,
+                              commentId,
                             );
                             setReplyContent(
                               "",
@@ -807,16 +807,16 @@ export default function ForumPostDetailPage() {
                           onReplyContentChange={
                             setReplyContent
                           }
-                          onSubmitReply={() =>
+                          onSubmitReply={(parentId) =>
                             void submitComment(
-                              comment.id,
+                              parentId,
                             )
                           }
-                          onReport={() =>
+                          onReport={(commentId) =>
                             openReport({
                               type:
                                 "comment",
-                              id: comment.id,
+                              id: commentId,
                               label:
                                 "bình luận",
                             })
@@ -1045,13 +1045,78 @@ function CommentCard({
   replyingTo: string | null;
   replyContent: string;
   submitting: boolean;
-  onReply: () => void;
+  onReply: (
+    commentId: string,
+  ) => void;
   onCancelReply: () => void;
   onReplyContentChange: (
     value: string,
   ) => void;
-  onSubmitReply: () => void;
-  onReport: () => void;
+  onSubmitReply: (
+    parentId: string,
+  ) => void;
+  onReport: (
+    commentId: string,
+  ) => void;
+}) {
+  return (
+    <CommentThreadNode
+      comment={comment}
+      index={index}
+      depth={0}
+      parentAuthorName={null}
+      replyingTo={replyingTo}
+      replyContent={replyContent}
+      submitting={submitting}
+      onReply={onReply}
+      onCancelReply={
+        onCancelReply
+      }
+      onReplyContentChange={
+        onReplyContentChange
+      }
+      onSubmitReply={
+        onSubmitReply
+      }
+      onReport={onReport}
+    />
+  );
+}
+
+function CommentThreadNode({
+  comment,
+  index,
+  depth,
+  parentAuthorName,
+  replyingTo,
+  replyContent,
+  submitting,
+  onReply,
+  onCancelReply,
+  onReplyContentChange,
+  onSubmitReply,
+  onReport,
+}: {
+  comment: ForumComment;
+  index: number;
+  depth: number;
+  parentAuthorName: string | null;
+  replyingTo: string | null;
+  replyContent: string;
+  submitting: boolean;
+  onReply: (
+    commentId: string,
+  ) => void;
+  onCancelReply: () => void;
+  onReplyContentChange: (
+    value: string,
+  ) => void;
+  onSubmitReply: (
+    parentId: string,
+  ) => void;
+  onReport: (
+    commentId: string,
+  ) => void;
 }) {
   const INITIAL_REPLY_COUNT = 2;
   const [
@@ -1074,230 +1139,270 @@ function CommentCard({
         INITIAL_REPLY_COUNT,
     );
 
-  return (
-    <div className="flex flex-col gap-3">
-      <Card
-        className="!rounded-2xl !border-slate-200"
-        styles={{
-          body: {
-            padding: 0,
-          },
-        }}
+  const isRoot = depth === 0;
+
+  const contentCard = (
+    <Card
+      className={[
+        "!rounded-2xl !border-slate-200",
+        isRoot
+          ? ""
+          : "!bg-slate-50/50",
+      ].join(" ")}
+      styles={{
+        body: {
+          padding: 0,
+        },
+      }}
+    >
+      <div
+        className={
+          isRoot
+            ? "grid md:grid-cols-[180px_minmax(0,1fr)]"
+            : "grid md:grid-cols-[150px_minmax(0,1fr)]"
+        }
       >
-        <div className="grid md:grid-cols-[180px_minmax(0,1fr)]">
-          <aside className="border-b border-slate-200 bg-slate-50/70 p-4 md:border-b-0 md:border-r">
-            <AuthorPanel
-              author={comment.author}
-              compact
-            />
-          </aside>
+        <aside
+          className={[
+            "border-b border-slate-200 p-4 md:border-b-0 md:border-r",
+            isRoot
+              ? "bg-slate-50/70"
+              : "bg-slate-50",
+          ].join(" ")}
+        >
+          <AuthorPanel
+            author={comment.author}
+            compact
+          />
+        </aside>
 
-          <div className="min-w-0 p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <Space wrap>
-                <Text
-                  type="secondary"
-                  className="text-xs"
-                >
-                  #{index + 1}
-                </Text>
+        <div
+          className={
+            isRoot
+              ? "min-w-0 p-5"
+              : "min-w-0 p-4"
+          }
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {isRoot ? (
+                <>
+                  <Text
+                    type="secondary"
+                    className="text-xs"
+                  >
+                    #{index + 1}
+                  </Text>
 
-                <Tag
-                  color="default"
-                  className="!m-0"
-                >
-                  Bình luận gốc
-                </Tag>
-
-                {comment.status ===
-                "pending" ? (
-                  <Tag color="gold">
-                    Chờ duyệt
+                  <Tag
+                    color="default"
+                    className="!m-0"
+                  >
+                    Bình luận gốc
                   </Tag>
-                ) : null}
-              </Space>
+                </>
+              ) : (
+                <>
+                  <Tag
+                    color="blue"
+                    className="!m-0"
+                  >
+                    <Reply className="mr-1 inline h-3.5 w-3.5" />
+                    Phản hồi
+                  </Tag>
 
+                  {parentAuthorName ? (
+                    <Text
+                      type="secondary"
+                      className="text-xs"
+                    >
+                      Phản hồi cho{" "}
+                      <strong className="font-medium text-slate-700">
+                        {parentAuthorName}
+                      </strong>
+                    </Text>
+                  ) : null}
+                </>
+              )}
+
+              {comment.status ===
+              "pending" ? (
+                <Tag color="gold">
+                  Chờ duyệt
+                </Tag>
+              ) : null}
+
+              {comment.author
+                .verified &&
+              !isRoot ? (
+                <Tag color="blue">
+                  <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />
+                  Phản hồi xác thực
+                </Tag>
+              ) : null}
+            </div>
+
+            <Text
+              type="secondary"
+              className="text-xs"
+            >
+              {formatDateTime(
+                comment.createdAt,
+              )}
+            </Text>
+          </div>
+
+          <Paragraph className="!mb-4 !whitespace-pre-wrap !leading-7 !text-slate-700">
+            {comment.content}
+          </Paragraph>
+
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+            <Button
+              type="text"
+              size="small"
+              icon={
+                <Flag className="h-3.5 w-3.5" />
+              }
+              onClick={() =>
+                onReport(
+                  comment.id,
+                )
+              }
+            >
+              Báo cáo
+            </Button>
+
+            <Button
+              type="text"
+              size="small"
+              icon={
+                <Reply className="h-3.5 w-3.5" />
+              }
+              onClick={() =>
+                onReply(
+                  comment.id,
+                )
+              }
+            >
+              Trả lời
+            </Button>
+          </div>
+
+          {replyingTo ===
+          comment.id ? (
+            <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
               <Text
                 type="secondary"
-                className="text-xs"
+                className="mb-2 block text-xs"
               >
-                {formatDateTime(
-                  comment.createdAt,
-                )}
+                Đang trả lời{" "}
+                <strong className="text-slate-700">
+                  {comment.author.name}
+                </strong>
               </Text>
-            </div>
 
-            <Paragraph className="!mb-4 !whitespace-pre-wrap !leading-7 !text-slate-700">
-              {comment.content}
-            </Paragraph>
-
-            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  <Flag className="h-3.5 w-3.5" />
+              <TextArea
+                value={
+                  replyContent
                 }
-                onClick={onReport}
-              >
-                Báo cáo
-              </Button>
-
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  <Reply className="h-3.5 w-3.5" />
+                rows={3}
+                maxLength={500}
+                placeholder={`Trả lời ${comment.author.name}...`}
+                onChange={(event) =>
+                  onReplyContentChange(
+                    event.target.value,
+                  )
                 }
-                onClick={onReply}
-              >
-                Trả lời
-              </Button>
-            </div>
+              />
 
-            {replyingTo ===
-            comment.id ? (
-              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <Text
-                  type="secondary"
-                  className="mb-2 block text-xs"
-                >
-                  Đang trả lời{" "}
-                  <strong className="text-slate-700">
-                    {comment.author.name}
-                  </strong>
-                </Text>
-
-                <TextArea
-                  value={
-                    replyContent
+              <div className="mt-2 flex justify-end gap-2">
+                <Button
+                  size="small"
+                  disabled={submitting}
+                  onClick={
+                    onCancelReply
                   }
-                  rows={3}
-                  maxLength={500}
-                  placeholder={`Trả lời ${comment.author.name}...`}
-                  onChange={(event) =>
-                    onReplyContentChange(
-                      event.target.value,
+                >
+                  Hủy
+                </Button>
+
+                <Button
+                  type="primary"
+                  size="small"
+                  className="!bg-pink-500"
+                  loading={submitting}
+                  onClick={() =>
+                    onSubmitReply(
+                      comment.id,
                     )
                   }
-                />
-
-                <div className="mt-2 flex justify-end gap-2">
-                  <Button
-                    size="small"
-                    disabled={submitting}
-                    onClick={
-                      onCancelReply
-                    }
-                  >
-                    Hủy
-                  </Button>
-
-                  <Button
-                    type="primary"
-                    size="small"
-                    className="!bg-pink-500"
-                    loading={submitting}
-                    onClick={
-                      onSubmitReply
-                    }
-                  >
-                    Gửi trả lời
-                  </Button>
-                </div>
+                >
+                  Gửi trả lời
+                </Button>
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
-      </Card>
+      </div>
+    </Card>
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      {isRoot ? (
+        contentCard
+      ) : (
+        <div className="relative">
+          <span className="absolute -left-4 top-7 h-px w-4 bg-slate-200 sm:-left-5 sm:w-5" />
+          {contentCard}
+        </div>
+      )}
 
       {comment.replies.length > 0 ? (
-        <div className="ml-5 border-l-2 border-slate-200 pl-4 sm:ml-10 sm:pl-5">
+        <div
+          className={[
+            "border-l-2 border-slate-200",
+            isRoot
+              ? "ml-5 pl-4 sm:ml-10 sm:pl-5"
+              : "ml-4 pl-4 sm:ml-7 sm:pl-5",
+          ].join(" ")}
+        >
           <div className="flex flex-col gap-3">
             {visibleReplies.map(
               (reply) => (
-                <div
+                <CommentThreadNode
                   key={reply.id}
-                  className="relative"
-                >
-                  <span className="absolute -left-4 top-7 h-px w-4 bg-slate-200 sm:-left-5 sm:w-5" />
-
-                  <Card
-                    className="!rounded-2xl !border-slate-200 !bg-slate-50/50"
-                    styles={{
-                      body: {
-                        padding: 0,
-                      },
-                    }}
-                  >
-                    <div className="grid md:grid-cols-[150px_minmax(0,1fr)]">
-                      <aside className="border-b border-slate-200 bg-slate-50 p-4 md:border-b-0 md:border-r">
-                        <AuthorPanel
-                          author={
-                            reply.author
-                          }
-                          compact
-                        />
-                      </aside>
-
-                      <div className="min-w-0 p-4">
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Tag
-                              color="blue"
-                              className="!m-0"
-                            >
-                              <Reply className="mr-1 inline h-3.5 w-3.5" />
-                              Phản hồi
-                            </Tag>
-
-                            <Text
-                              type="secondary"
-                              className="text-xs"
-                            >
-                              Phản hồi cho{" "}
-                              <strong className="font-medium text-slate-700">
-                                {
-                                  comment
-                                    .author
-                                    .name
-                                }
-                              </strong>
-                            </Text>
-
-                            {reply.status ===
-                            "pending" ? (
-                              <Tag color="gold">
-                                Chờ duyệt
-                              </Tag>
-                            ) : null}
-
-                            {reply.author
-                              .verified ? (
-                              <Tag color="blue">
-                                <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />
-                                Phản hồi xác thực
-                              </Tag>
-                            ) : null}
-                          </div>
-
-                          <Text
-                            type="secondary"
-                            className="text-xs"
-                          >
-                            {formatDateTime(
-                              reply.createdAt,
-                            )}
-                          </Text>
-                        </div>
-
-                        <Paragraph className="!mb-0 !whitespace-pre-wrap !leading-7 !text-slate-700">
-                          {reply.content}
-                        </Paragraph>
-                      </div>
-                    </div>
-                  </Card>
-                </div>
+                  comment={reply}
+                  index={index}
+                  depth={depth + 1}
+                  parentAuthorName={
+                    comment.author.name
+                  }
+                  replyingTo={
+                    replyingTo
+                  }
+                  replyContent={
+                    replyContent
+                  }
+                  submitting={
+                    submitting
+                  }
+                  onReply={
+                    onReply
+                  }
+                  onCancelReply={
+                    onCancelReply
+                  }
+                  onReplyContentChange={
+                    onReplyContentChange
+                  }
+                  onSubmitReply={
+                    onSubmitReply
+                  }
+                  onReport={
+                    onReport
+                  }
+                />
               ),
             )}
           </div>
