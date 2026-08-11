@@ -543,7 +543,7 @@ export function PregnancyProfileDetailModal({
                         )}
                       </Space>
 
-                      {onEditMedicalRecord && consultation.id && (
+                      {/* {onEditMedicalRecord && consultation.id && (
                         <Button
                           type="link"
                           size="small"
@@ -555,7 +555,7 @@ export function PregnancyProfileDetailModal({
                         >
                           Sửa
                         </Button>
-                      )}
+                      )} */}
                     </Flex>
                   ),
                   children: (
