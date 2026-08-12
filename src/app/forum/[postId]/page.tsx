@@ -855,7 +855,13 @@ export default function ForumPostDetailPage() {
                     title="Bài viết đang khóa bình luận."
                   />
                 ) : (
-                  <div>
+                  <div
+                    className={
+                      !isLoggedIn
+                        ? "mt-4"
+                        : ""
+                    }
+                  >
                     <TextArea
                       value={
                         commentContent
