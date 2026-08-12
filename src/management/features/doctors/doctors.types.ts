@@ -1,26 +1,8 @@
-export type DoctorStatus =
-  | "active"
-  | "inactive";
-
-export type DoctorPermissionEffect =
-  | "allow"
-  | "deny";
-
-export type DoctorFacilityRole =
-  | "admin"
-  | "doctor"
-  | "nurse"
-  | "staff";
-
-export type DoctorExperienceSort =
-  | "asc"
-  | "desc";
-
-export type DoctorExperienceLevel =
-  | 1
-  | 2
-  | 3
-  | 4;
+export type DoctorStatus = "active" | "inactive";
+export type DoctorPermissionEffect = "allow" | "deny";
+export type DoctorFacilityRole = "admin" | "doctor" | "nurse" | "staff";
+export type DoctorExperienceSort = "asc" | "desc";
+export type DoctorExperienceLevel = 1 | 2 | 3 | 4;
 
 export interface BackendDoctorStaff {
   id?: string | null;
@@ -54,7 +36,6 @@ export interface BackendDoctor {
   status: string;
   createdAt: string;
   updatedAt: string;
-
   staff?: BackendDoctorStaff | null;
   name?: string | null;
   personalEmail?: string | null;
@@ -89,29 +70,24 @@ export type BackendDoctorListPayload =
 export interface Doctor {
   id: string;
   staffId: string;
-
   name: string;
   employeeCode: string;
   personalEmail: string;
   email: string;
   phone: string;
   address: string;
-
   facilityId: string;
   facilityIds: string[];
   roleId: string;
   roleName: string;
-
   licenseNo: string;
   title: string;
   specialty: string;
-  yearsOfExperience: number;
+  yearsOfExperience: DoctorExperienceLevel;
   workingRoomTypeId: string;
   bio: string;
-
   status: DoctorStatus;
   staffStatus: DoctorStatus;
-
   createdAt: string;
   updatedAt: string;
 }
@@ -126,8 +102,7 @@ export interface GetDoctorsParams {
   specialty?: string;
   facilityId?: string;
   status?: DoctorStatus;
-  filterYearsOfExperienceLevel?:
-    DoctorExperienceLevel;
+  filterYearsOfExperienceLevel?: DoctorExperienceLevel;
   sortYearsOfExperience?: DoctorExperienceSort;
   page?: number;
   limit?: number;
@@ -159,16 +134,14 @@ export interface CreateDoctorInput {
   phone?: string;
   address?: string;
   roleIds?: string[];
-  facilityAssignments?:
-    DoctorFacilityAssignment[];
+  facilityAssignments?: DoctorFacilityAssignment[];
   licenseNo: string;
   title: string;
   specialty: string;
-  yearsOfExperience: number;
+  yearsOfExperience: DoctorExperienceLevel;
   workingRoomTypeId: string;
   bio?: string;
-  permissionOverrides?:
-    DoctorPermissionOverrideInput[];
+  permissionOverrides?: DoctorPermissionOverrideInput[];
   status?: DoctorStatus;
 }
 
@@ -181,7 +154,7 @@ export interface UpdateDoctorInput {
   licenseNo?: string;
   title?: string;
   specialty?: string;
-  yearsOfExperience?: number;
+  yearsOfExperience?: DoctorExperienceLevel;
   workingRoomTypeId?: string;
   bio?: string;
   status?: DoctorStatus;

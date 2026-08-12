@@ -9,7 +9,6 @@ import {
   Col,
   Form,
   Input,
-  InputNumber,
   Modal,
   Row,
   Select,
@@ -43,6 +42,7 @@ import {
 import type {
   CreateDoctorInput,
   Doctor,
+  DoctorExperienceLevel,
   DoctorStatus,
   UpdateDoctorInput,
 } from "@/management/features/doctors/doctors.types";
@@ -56,6 +56,16 @@ export const doctorStatusOptions = [
   { value: "inactive", label: "Ngừng hoạt động" },
 ];
 
+export const doctorExperienceOptions: Array<{
+  value: DoctorExperienceLevel;
+  label: string;
+}> = [
+  { value: 1, label: "1 - 5 năm" },
+  { value: 2, label: "6 - 10 năm" },
+  { value: 3, label: "11 - 20 năm" },
+  { value: 4, label: "Trên 20 năm" },
+];
+
 type DoctorFormValues = {
   name?: string;
   personalEmail?: string;
@@ -66,7 +76,7 @@ type DoctorFormValues = {
   licenseNo: string;
   title: string;
   specialty: string;
-  yearsOfExperience: number;
+  yearsOfExperience: DoctorExperienceLevel;
   workingRoomTypeId: string;
   bio?: string;
   status?: DoctorStatus;
@@ -92,7 +102,7 @@ const createInitialValues: Partial<DoctorFormValues> = {
   licenseNo: "",
   title: "",
   specialty: "",
-  yearsOfExperience: 0,
+  yearsOfExperience: 1,
   workingRoomTypeId: "",
   bio: "",
   status: "active",
@@ -1169,20 +1179,18 @@ export function DoctorFormModalBase({
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="yearsOfExperience"
-                    label="Số năm kinh nghiệm"
+                    label="Mức kinh nghiệm"
                     rules={[
                       {
                         required: true,
                         message:
-                          "Vui lòng nhập số năm kinh nghiệm.",
+                          "Vui lòng chọn mức kinh nghiệm.",
                       },
                     ]}
                   >
-                    <InputNumber
-                      min={0}
-                      max={80}
-                      precision={0}
-                      className="w-full"
+                    <Select
+                      options={doctorExperienceOptions}
+                      placeholder="Chọn mức kinh nghiệm"
                     />
                   </Form.Item>
                 </Col>
@@ -1399,9 +1407,11 @@ export function DoctorFormModalBase({
                 }
                 label="Kinh nghiệm"
                 value={
-                  yearsOfExperience !==
-                    undefined
-                    ? `${yearsOfExperience} năm`
+                  yearsOfExperience
+                    ? doctorExperienceOptions.find(
+                        (option) =>
+                          option.value === yearsOfExperience,
+                      )?.label
                     : undefined
                 }
               />

@@ -31,6 +31,7 @@ import {
 } from "@/management/features/doctors/doctors.api";
 import type {
   Doctor,
+  DoctorExperienceLevel,
   DoctorStatus,
 } from "@/management/features/doctors/doctors.types";
 
@@ -60,6 +61,19 @@ type DoctorDetailModalProps = {
     message: string,
   ) => void;
 };
+
+function getExperienceLabel(
+  value: DoctorExperienceLevel,
+) {
+  const labels: Record<DoctorExperienceLevel, string> = {
+    1: "1 - 5 năm",
+    2: "6 - 10 năm",
+    3: "11 - 20 năm",
+    4: "Trên 20 năm",
+  };
+
+  return labels[value];
+}
 
 function getErrorMessage(
   error: unknown,
@@ -644,13 +658,11 @@ export function DoctorDetailModal({
               </Descriptions.Item>
 
               <Descriptions.Item
-                label="Số năm kinh nghiệm"
+                label="Mức kinh nghiệm"
               >
-                {
-                  detailDoctor
-                    .yearsOfExperience
-                }{" "}
-                năm
+                {getExperienceLabel(
+                  detailDoctor.yearsOfExperience,
+                )}
               </Descriptions.Item>
 
               <Descriptions.Item
