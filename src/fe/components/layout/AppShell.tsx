@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useSyncExternalStore, useEffect, useState } from "react";
-import { HeartPulse, LogOut, Home } from "lucide-react";
+import { HeartPulse, Home } from "lucide-react";
 
 import { logout as logoutApi } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
@@ -37,6 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     getClientSnapshot,
     getServerSnapshot,
   );
+
   const { user, refreshToken, clearSession } = useAuthStore();
   const { getOrDefault } = useSetting();
 
@@ -48,6 +49,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isLoggedIn = hasMounted && Boolean(user || refreshToken);
 
   const [activeTab, setActiveTab] = useState<HomeTab>("gioi-thieu");
+
+  const isForumActive =
+    pathname === "/forum" || pathname.startsWith("/forum/");
 
   useEffect(() => {
     if (pathname !== "/") return;
@@ -68,6 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       router.push(`/#${tab}`);
       return;
     }
+
     window.location.hash = tab;
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -113,12 +118,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             ))}
 
-            {/* Giỏ hàng – luôn hiện */}
+            <Link
+              href="/forum"
+              className={[
+                "hidden rounded-full px-3 py-2 text-sm font-medium transition sm:block",
+                isForumActive
+                  ? "bg-pink-100 !text-pink-700"
+                  : "!text-slate-700 hover:bg-pink-50 hover:!text-pink-700",
+              ].join(" ")}
+            >
+              Diễn đàn
+            </Link>
+
             <CartButton />
 
             {isLoggedIn ? (
               <>
-                {/* Nút về trang chủ sau login */}
                 <Button
                   variant="light"
                   onClick={() => router.push("/schedule")}
@@ -129,7 +144,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </Button>
 
                 {/* <Button variant="light" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4" />
                   {RESPONSE_MESSAGES.AUTH.LOGOUT}
                 </Button> */}
               </>

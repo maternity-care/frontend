@@ -22,6 +22,7 @@ function sanitizeForumHtml(
 ) {
   const parser =
     new DOMParser();
+
   const documentValue =
     parser.parseFromString(
       html,

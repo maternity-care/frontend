@@ -22,7 +22,6 @@ import {
   Modal,
   Pagination,
   Select,
-  Space,
   Tag,
   Typography,
 } from "antd";
@@ -47,7 +46,7 @@ import {
 } from "@/features/auth/auth.store";
 import {
   RichTextEditor,
-} from "@/app/(user)/forum/RichTextEditor";
+} from "@/app/forum/RichTextEditor";
 import {
   SiteFooter,
 } from "@/fe/components/layout/SiteFooter";

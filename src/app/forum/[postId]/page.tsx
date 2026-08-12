@@ -45,7 +45,7 @@ import {
 } from "@/features/auth/auth.store";
 import {
   ForumRichContent,
-} from "@/app/(user)/forum/ForumRichContent";
+} from "@/app/forum/ForumRichContent";
 import {
   SiteFooter,
 } from "@/fe/components/layout/SiteFooter";
@@ -855,7 +855,13 @@ export default function ForumPostDetailPage() {
                     title="Bài viết đang khóa bình luận."
                   />
                 ) : (
-                  <div>
+                  <div
+                    className={
+                      !isLoggedIn
+                        ? "mt-4"
+                        : ""
+                    }
+                  >
                     <TextArea
                       value={
                         commentContent
