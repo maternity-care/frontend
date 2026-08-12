@@ -15,6 +15,7 @@ export interface DoctorStaff {
   personalEmail: string;
   employeeCode: string;
   facilityId: string;
+  avatar: string;
   email: string;
   phone: string;
   address: string;

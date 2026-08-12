@@ -18,12 +18,14 @@ const getServerSnapshot = () => false;
 
 export type HomeTab =
   | "gioi-thieu"
+  | "co-so"
   | "dich-vu"
   | "bac-si"
   | "lien-he";
 
 const navItems: { label: string; tab: HomeTab }[] = [
   { label: "Giới thiệu", tab: "gioi-thieu" },
+  { label: "Cơ sở", tab: "co-so" },
   { label: "Dịch vụ", tab: "dich-vu" },
   { label: "Bác sĩ", tab: "bac-si" },
   { label: "Liên hệ", tab: "lien-he" },
