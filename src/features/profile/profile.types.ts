@@ -50,6 +50,13 @@ export interface Facility {
 export interface UpdateProfileInput {
   name?: string;
   password?: string;
+  dateOfBirth?: string | null;
+  address?: string | null;
+  gestationalWeek?: string | number | null;
+  expectedDueDate?: string | null;
+  bloodType?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
 }
 
 export interface UpdateManagementProfileInput {
@@ -67,6 +74,13 @@ export type ProfileFormValues = {
   name: string;
   password?: string;
   confirmPassword?: string;
+  dateOfBirth?: string | null;
+  address?: string | null;
+  gestationalWeek?: string | number | null;
+  expectedDueDate?: string | null;
+  bloodType?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
 };
 
 export type PregnantProfile = UserProfile & {
