@@ -80,6 +80,10 @@ export function DoctorsTab() {
   const selectedFacilityName =
     facilities.find((f) => f.id === selectedFacilityId)?.name ?? null;
 
+  const getDoctorFacility = (id: string) => {
+    return facilities.find((f) => f.id === id)?.name ?? null;
+  }
+
   return (
     <div className="space-y-10">
       <div className="text-center">
@@ -118,11 +122,16 @@ export function DoctorsTab() {
       ) : (
         <Row gutter={[20, 20]}>
           {doctors.map((doctor) => (
-            <Col xs={24} md={8} key={doctor.id}>
+            <Col xs={24} md={12} lg={8} key={doctor.id}>
               <Card className="h-full !rounded-3xl !border-pink-100 hover:!shadow-md hover:!shadow-pink-100 transition-shadow">
                 <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-pink-100 text-pink-600">
-                    <UserRound className="h-7 w-7" />
+                  <div className="flex h-auto w-24 shrink-0 items-start justify-center rounded-2xl bg-pink-100 text-pink-600">
+                    {/* <UserRound className="h-7 w-7" /> */}
+                    <img
+                      className="h-full w-auto rounded-2xl"
+                      src={doctor.staff?.avatar || 'https://hthaostudio.com/wp-content/uploads/2022/03/Anh-bac-si-nam-7-min.jpg.webp'}
+                      alt={doctor.staff?.name || doctor.title}
+                    />
                   </div>
                   <div>
                     <Title level={4} className="!mb-1 !text-slate-950">
@@ -137,7 +146,7 @@ export function DoctorsTab() {
                       </p>
                     )}
                     <p className="mt-1 text-sm text-slate-500">
-                      {selectedFacilityName ?? "Tất cả cơ sở"}
+                      {selectedFacilityName ?? getDoctorFacility(doctor?.staff?.facilityId) ?? "Tất cả cơ sở"}
                     </p>
                     {doctor.yearsOfExperience > 0 && (
                       <p className="mt-1 text-xs text-slate-400">

@@ -5,8 +5,9 @@ import type { KeyedMutator } from "swr";
 import useSWR from "swr";
 import { getCurrentUser, logout as logoutApi } from "@/features/auth/auth.api";
 import { useAuthStore } from "@/features/auth/auth.store";
-import type { UserProfile } from "@/features/profile/profile.types";
+import type { User, UserProfile } from "@/features/profile/profile.types";
 import useLocalStorage from "./useLocalStorage";
+import { apiClient, ApiResponse, unwrapApiData } from "@/lib/axios";
 
 const USER_CACHE_KEY = "fe:user";
 
@@ -185,6 +186,12 @@ export function useAuth() {
   }
 
   return context;
+}
+
+export async function getUserData(): Promise<User> {
+  const response = await unwrapApiData(apiClient.get<ApiResponse<User>>("/users/me"));
+  console.log('response', response)
+  return response;
 }
 
 export default useAuth;

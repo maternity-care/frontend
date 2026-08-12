@@ -50,6 +50,33 @@ export interface Facility {
 export interface UpdateProfileInput {
   name?: string;
   password?: string;
+  confirmPassword?: string;
+  phone?: string;
+  cccd?: string;
+  dateOfBirth?: string;
+  address?: string;
+  province?: string;
+  ward?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+}
+
+export interface User {
+  id: string,
+  cccd: string | null,
+  name: string,
+  phone: string,
+  email: string,
+  dateOfBirth: string | null,
+  address: string | null,
+  priorityLevel: number | null,
+  province: string | null,
+  ward: string | null,
+  status: string,
+  emergencyContactName: string | null,
+  emergencyContactPhone: string | null,
+  createdAt: Date,
+  updatedAt: Date
   dateOfBirth?: string | null;
   address?: string | null;
   gestationalWeek?: string | number | null;
@@ -74,6 +101,14 @@ export type ProfileFormValues = {
   name: string;
   password?: string;
   confirmPassword?: string;
+  phone?: string;
+  cccd?: string;
+  dateOfBirth?: string;
+  address?: string;
+  province?: string;
+  ward?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   dateOfBirth?: string | null;
   address?: string | null;
   gestationalWeek?: string | number | null;
