@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Col, Row } from "antd";
 
 import { useAuthStore } from "@/features/auth/auth.store";
 import type {
   FeedbackState,
+  User,
   UserProfile,
 } from "@/features/profile/profile.types";
-import useAuth from "@/hooks/useAuth";
+import useAuth, { getUserData } from "@/hooks/useAuth";
 
 import { ProfileEditCard } from "./ProfileEditCard";
 import { ProfileLoading } from "./ProfileLoading";
@@ -18,6 +19,7 @@ import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 export function ProfileContent() {
   const { currentUser, mutate } = useAuth();
   const setStoreUser = useAuthStore((state) => state.setUser);
+  const [userData, setUserData] = useState<User | null>(null);
 
   const [updatedProfile, setUpdatedProfile] = useState<UserProfile | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>({
@@ -47,6 +49,20 @@ export function ProfileContent() {
       error: null,
     });
   };
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        // todo: lấy thông tin người dùng
+        const userData = await getUserData();
+        setUserData(userData);
+        console.log("userData", userData);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const handleProfileError = (message: string) => {
     setFeedback({

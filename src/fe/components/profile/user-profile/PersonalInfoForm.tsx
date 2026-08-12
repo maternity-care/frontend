@@ -39,6 +39,9 @@ export function PersonalInfoForm({
     try {
       const response = await updateMyProfile({
         name: values.name.trim(),
+        // todo: thêm trường để update hoặc gọi hàm khác để update nha
+        phone: values.phone?.trim() || profile.phone || undefined,
+        
       });
 
       await onUpdated(response.data, response.message);
