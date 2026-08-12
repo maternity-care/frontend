@@ -28,7 +28,6 @@ import {
 
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
-import { PageHeader } from "@/management/components/ui/PageHeader";
 import {
   deleteDoctor,
   getDoctors,
@@ -136,6 +135,16 @@ const EXPERIENCE_SORT_OPTIONS: Array<{
     label: "Kinh nghiệm: thấp đến cao",
   },
 ];
+
+function getExperienceLabel(
+  value: DoctorExperienceLevel,
+) {
+  return (
+    EXPERIENCE_LEVEL_OPTIONS.find(
+      (item) => item.value === value,
+    )?.label ?? "Chưa cập nhật"
+  );
+}
 
 function getErrorMessage(error: unknown) {
   if (typeof error === "object" && error && "response" in error) {
@@ -711,10 +720,11 @@ export default function DoctorManagementPage() {
     {
       title: "Kinh nghiệm",
       dataIndex: "yearsOfExperience",
-      width: 105,
+      width: 135,
       align: "center",
       responsive: ["lg"],
-      render: (value: number) => `${value} năm`,
+      render: (value: DoctorExperienceLevel) =>
+        getExperienceLabel(value),
     },
     {
       title: "Trạng thái",
