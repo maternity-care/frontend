@@ -8,6 +8,7 @@ import { ServicesTab } from "@/fe/components/home/ServicesTab";
 import { PackagesTab } from "@/fe/components/home/PackagesTab";
 import { DoctorsTab } from "@/fe/components/home/DoctorsTab";
 import { ContactTab } from "@/fe/components/home/ContactTab";
+import { FacilityTab } from "@/fe/components/home/FacilityTab";
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<HomeTab>("gioi-thieu");
@@ -17,6 +18,7 @@ export default function HomePage() {
       const hash = window.location.hash.replace("#", "") as HomeTab;
       const validTabs: HomeTab[] = [
         "gioi-thieu",
+        "co-so",
         "dich-vu",
         "bac-si",
         "lien-he",
@@ -30,9 +32,12 @@ export default function HomePage() {
   }, []);
 
   const renderTab = () => {
+    console.log('active', activeTab)
     switch (activeTab) {
       case "dich-vu":
         return <PackagesTab />;
+      case "co-so":
+        return <FacilityTab />;
       case "bac-si":
         return <DoctorsTab />;
       case "lien-he":
