@@ -11,6 +11,7 @@ import type {
   CreateDoctorInput,
   Doctor,
   DoctorApiResponse,
+  DoctorExperienceLevel,
   DoctorListResult,
   DoctorStatus,
   GetDoctorsParams,
@@ -39,6 +40,18 @@ function normalizeStatus(
     .toLowerCase() === "active"
     ? "active"
     : "inactive";
+}
+
+function normalizeExperienceLevel(
+  value: unknown,
+): DoctorExperienceLevel {
+  const level = Number(value);
+
+  if (level === 2 || level === 3 || level === 4) {
+    return level;
+  }
+
+  return 1;
 }
 
 function normalizePage(
@@ -96,11 +109,6 @@ function normalizeDoctor(
     normalizeText(
       staff?.facilityId ??
         doctor.facilityId,
-    );
-
-  const yearsOfExperience =
-    Number(
-      doctor.yearsOfExperience,
     );
 
   return {
@@ -172,12 +180,9 @@ function normalizeDoctor(
       ),
 
     yearsOfExperience:
-      Number.isFinite(
-        yearsOfExperience,
-      ) &&
-      yearsOfExperience >= 0
-        ? yearsOfExperience
-        : 0,
+      normalizeExperienceLevel(
+        doctor.yearsOfExperience,
+      ),
 
     bio: normalizeText(
       doctor.bio,
