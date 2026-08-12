@@ -77,6 +77,9 @@ export interface User {
   emergencyContactPhone: string | null,
   createdAt: Date,
   updatedAt: Date
+  gestationalWeek?: string | number | null;
+  expectedDueDate?: string | null;
+  bloodType?: string | null;
 }
 
 export interface UpdateManagementProfileInput {
@@ -100,8 +103,11 @@ export type ProfileFormValues = {
   address?: string;
   province?: string;
   ward?: string;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
+  gestationalWeek?: string | number | null;
+  expectedDueDate?: string | null;
+  bloodType?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
 };
 
 export type PregnantProfile = UserProfile & {
