@@ -124,11 +124,18 @@ export function useDoctors({
   );
 
   useEffect(() => {
-    void loadDoctors(
-      { sortYearsOfExperience: "desc" },
-      1,
-      DOCTOR_DEFAULT_PAGE_SIZE,
-    );
+
+    const timer = window.setTimeout(() => {
+      void loadDoctors(
+        { sortYearsOfExperience: "desc" },
+        1,
+        DOCTOR_DEFAULT_PAGE_SIZE,
+      );
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [loadDoctors]);
 
   function buildFilters(overrides: Partial<DoctorFilters> = {}): DoctorFilters {
