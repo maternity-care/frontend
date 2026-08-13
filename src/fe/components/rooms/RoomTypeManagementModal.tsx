@@ -25,11 +25,9 @@ import {
   Eye,
   Pencil,
   Plus,
-  Trash2,
 } from "lucide-react";
 import {
   createRoomType,
-  deleteRoomType,
   getRoomTypeById,
   getRoomTypes,
   updateRoomType,
@@ -40,6 +38,9 @@ import type {
   RoomType,
   UpdateRoomTypeInput,
 } from "@/management/features/rooms/rooms.types";
+import {
+  getRoomErrorMessage,
+} from "@/management/features/rooms/rooms.utils";
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -55,38 +56,6 @@ type RoomTypeFormValues = {
   description: string;
   status: RoomStatus;
 };
-
-function getErrorMessage(error: unknown) {
-  if (
-    typeof error === "object" &&
-    error &&
-    "response" in error
-  ) {
-    const message = (
-      error as {
-        response?: {
-          data?: {
-            message?:
-              | string
-              | string[];
-          };
-        };
-      }
-    ).response?.data?.message;
-
-    if (Array.isArray(message)) {
-      return message.join(", ");
-    }
-
-    if (message) return message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Đã có lỗi xảy ra.";
-}
 
 function hasChanges(
   values: RoomTypeFormValues,
@@ -179,7 +148,7 @@ export function RoomTypeManagementModal({
           if (cancelled) return;
 
           setError(
-            getErrorMessage(loadError),
+            getRoomErrorMessage(loadError),
           );
         })
         .finally(() => {
@@ -254,7 +223,7 @@ export function RoomTypeManagementModal({
       setFormOpen(true);
     } catch (loadError) {
       messageApi.error(
-        getErrorMessage(loadError),
+        getRoomErrorMessage(loadError),
       );
     }
   }
@@ -363,52 +332,11 @@ export function RoomTypeManagementModal({
       refresh();
     } catch (submitError) {
       messageApi.error(
-        getErrorMessage(submitError),
+        getRoomErrorMessage(submitError),
       );
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function confirmDelete(
-    roomType: RoomType,
-  ) {
-    modalApi.confirm({
-      centered: true,
-      title:
-        "Xóa hoặc ngừng hoạt động loại phòng?",
-      content:
-        "Hệ thống sẽ xóa nếu loại phòng chưa được sử dụng; nếu đang được sử dụng, Hệ thống sẽ chuyển về ngừng hoạt động.",
-      okText: "Xác nhận",
-      cancelText: "Hủy",
-      okButtonProps: {
-        danger: true,
-      },
-      mask: {
-        closable: false,
-      },
-      onOk: async () => {
-        try {
-          const response =
-            await deleteRoomType(
-              roomType.id,
-            );
-
-          messageApi.success(
-            response.message ||
-              "Đã xử lý loại phòng.",
-          );
-          refresh();
-        } catch (deleteError) {
-          messageApi.error(
-            getErrorMessage(
-              deleteError,
-            ),
-          );
-          throw deleteError;
-        }
-      },
-    });
   }
 
   const columns: ColumnsType<RoomType> = [
@@ -472,7 +400,7 @@ export function RoomTypeManagementModal({
     },
     {
       title: "Thao tác",
-      width: 130,
+      width: 95,
       align: "center",
       render: (_value, roomType) => (
         <Space size={6}>
@@ -498,17 +426,6 @@ export function RoomTypeManagementModal({
             />
           </Tooltip>
 
-          <Tooltip title="Xóa hoặc ngừng hoạt động">
-            <Button
-              danger
-              icon={
-                <Trash2 className="h-4 w-4" />
-              }
-              onClick={() =>
-                confirmDelete(roomType)
-              }
-            />
-          </Tooltip>
         </Space>
       ),
     },
@@ -531,6 +448,26 @@ export function RoomTypeManagementModal({
         onCancel={onClose}
         mask={{
           closable: !loading,
+        }}
+        className="[&_.ant-modal-content]:max-h-[82vh] [&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:p-0"
+        styles={{
+          header: {
+            marginBottom: 0,
+            padding: "20px 56px 14px 24px",
+            borderBottom: "1px solid #e2e8f0",
+          },
+          body: {
+            maxHeight: "64vh",
+            overflowY: "auto",
+            overflowX: "hidden",
+            padding: "18px 18px 20px 24px",
+            scrollbarGutter: "stable",
+          },
+          footer: {
+            marginTop: 0,
+            padding: "12px 24px 18px",
+            borderTop: "1px solid #e2e8f0",
+          },
         }}
       >
         {error ? (

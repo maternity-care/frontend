@@ -710,6 +710,8 @@ export const roomsApi = {
   updateRoom,
   deleteRoom,
   deleteRooms,
+  suspendRoom,
+  reactivateRoom,
   getRoomTypeLookup,
   getRoomTypes,
   getRoomTypeById,

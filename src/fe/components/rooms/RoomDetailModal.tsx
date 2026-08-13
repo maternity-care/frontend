@@ -18,7 +18,6 @@ import {
   MapPin,
   Pencil,
   Shapes,
-  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -27,6 +26,10 @@ import {
 import type {
   ClinicRoom,
 } from "@/management/features/rooms/rooms.types";
+import {
+  formatRoomDateTime,
+  getRoomFacilityAddress,
+} from "@/management/features/rooms/rooms.utils";
 
 const { Text, Title } = Typography;
 
@@ -40,28 +43,7 @@ type RoomDetailModalProps = {
   onEdit: (
     room: ClinicRoom,
   ) => void;
-  onDelete: (
-    room: ClinicRoom,
-  ) => void;
 };
-
-function formatDateTime(value?: string) {
-  if (!value) return "Chưa cập nhật";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(date);
-}
 
 export function RoomDetailModal({
   open,
@@ -71,7 +53,6 @@ export function RoomDetailModal({
   allowedFacilityId,
   onClose,
   onEdit,
-  onDelete,
 }: RoomDetailModalProps) {
   const [room, setRoom] =
     useState<ClinicRoom | null>(
@@ -208,17 +189,6 @@ export function RoomDetailModal({
                   Cập nhật
                 </Button>
 
-                <Button
-                  danger
-                  icon={
-                    <Trash2 className="h-4 w-4" />
-                  }
-                  onClick={() =>
-                    onDelete(room)
-                  }
-                >
-                  Xóa
-                </Button>
               </Space>
             ) : null}
           </div>
@@ -342,13 +312,7 @@ export function RoomDetailModal({
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
 
                   <Text>
-                    {[
-                      room.facilityAddress,
-                      room.facilityWard,
-                      room.facilityProvince,
-                    ]
-                      .filter(Boolean)
-                      .join(", ") ||
+                    {getRoomFacilityAddress(room) ||
                       "Chưa cập nhật địa chỉ"}
                   </Text>
                 </div>
@@ -363,7 +327,7 @@ export function RoomDetailModal({
               </p>
 
               <p className="mb-0 text-sm font-medium text-slate-800">
-                {formatDateTime(
+                {formatRoomDateTime(
                   room.createdAt,
                 )}
               </p>
@@ -375,7 +339,7 @@ export function RoomDetailModal({
               </p>
 
               <p className="mb-0 text-sm font-medium text-slate-800">
-                {formatDateTime(
+                {formatRoomDateTime(
                   room.updatedAt,
                 )}
               </p>
