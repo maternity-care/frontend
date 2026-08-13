@@ -80,15 +80,15 @@ export function PersonalInfoForm({
         name: values.name?.trim(),
         dateOfBirth: values.dateOfBirth
           ? values.dateOfBirth.format("YYYY-MM-DD")
-          : null,
-        address: values.address?.trim() || null,
-        gestationalWeek: values.gestationalWeek ?? null,
+          : undefined,                   
+        address: values.address?.trim() || undefined,
+        gestationalWeek: values.gestationalWeek ?? undefined,
         expectedDueDate: values.expectedDueDate
           ? values.expectedDueDate.format("YYYY-MM-DD")
-          : null,
-        bloodType: values.bloodType || null,
-        emergencyContactName: values.emergencyContactName?.trim() || null,
-        emergencyContactPhone: values.emergencyContactPhone?.trim() || null,
+          : undefined,                    
+        bloodType: values.bloodType || undefined,
+        emergencyContactName: values.emergencyContactName?.trim() || undefined,
+        emergencyContactPhone: values.emergencyContactPhone?.trim() || undefined,
       };
 
       const response = await updateMyProfile(payload);
