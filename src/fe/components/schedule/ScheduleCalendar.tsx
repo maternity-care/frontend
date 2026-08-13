@@ -159,7 +159,6 @@ export function ScheduleCalendar({
   return (
     <Card
       title={RESPONSE_MESSAGES.SCHEDULE.CALENDAR_VIEW}
-      extra={<Text type="secondary">Click vào ngày để thêm lịch</Text>}
       className="schedule-calendar-card shadow-sm [&_.ant-picker-calendar-date-content]:!h-[82px] [&_.ant-picker-calendar-date]:!m-0 [&_.ant-picker-cell-inner]:!rounded-md"
     >
       <Calendar cellRender={cellRender} onSelect={handleSelect} />

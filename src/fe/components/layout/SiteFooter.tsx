@@ -116,12 +116,12 @@ export function SiteFooter() {
             </Title>
 
             <div className="grid gap-4 text-sm text-slate-600">
-              <div className="flex gap-3">
+              {/* <div className="flex gap-3">
                 <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-pink-500" />
                 <span>
                   Số 01, đường Maternity Care, Quận Ninh Kiều, TP. Cần Thơ
                 </span>
-              </div>
+              </div> */}
 
               <div className="flex gap-3">
                 <Phone className="mt-0.5 h-5 w-5 shrink-0 text-pink-500" />
