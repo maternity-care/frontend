@@ -177,7 +177,7 @@ export function NotificationCenter() {
         <Drawer
           title="Thông báo"
           placement="bottom"
-          height="min(78dvh, 640px)"
+          size="min(78dvh, 640px)"
           open={open}
           onClose={() => handleOpenChange(false)}
           extra={

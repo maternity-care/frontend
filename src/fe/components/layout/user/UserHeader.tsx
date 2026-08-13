@@ -157,7 +157,7 @@ export function UserHeader() {
           >
             <Home className="h-5 w-5" />
             <span className="hidden sm:inline text-sm font-medium">
-              Trang chủ
+              Ra trang chủ
             </span>
           </Button>
 
