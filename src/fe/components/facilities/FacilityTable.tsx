@@ -32,12 +32,9 @@ type Props = {
   pageSize: number;
   total: number;
   isSuperAdmin: boolean;
-  selectedIds: string[];
-  onSelectedIdsChange: (ids: string[]) => void;
   onView: (facility: Facility) => void;
   onEdit: (facility: Facility) => void;
   onDelete: (facility: Facility) => void;
-  onDeleteSelected: () => void;
   onCreate: () => void;
   onPageChange: (page: number, pageSize: number) => void;
 };
@@ -49,12 +46,9 @@ export function FacilityTable({
   pageSize,
   total,
   isSuperAdmin,
-  selectedIds,
-  onSelectedIdsChange,
   onView,
   onEdit,
   onDelete,
-  onDeleteSelected,
   onCreate,
   onPageChange,
 }: Props) {
@@ -202,23 +196,13 @@ export function FacilityTable({
       }
       extra={
         isSuperAdmin ? (
-          <Space wrap>
-            <Button
-              danger
-              disabled={!selectedIds.length}
-              icon={<Trash2 className="h-4 w-4" />}
-              onClick={onDeleteSelected}
-            >
-              Xóa đã chọn{selectedIds.length ? ` (${selectedIds.length})` : ""}
-            </Button>
-            <Button
-              type="primary"
-              icon={<Plus className="h-4 w-4" />}
-              onClick={onCreate}
-            >
-              Thêm cơ sở
-            </Button>
-          </Space>
+          <Button
+            type="primary"
+            icon={<Plus className="h-4 w-4" />}
+            onClick={onCreate}
+          >
+            Thêm cơ sở
+          </Button>
         ) : null
       }
     >
@@ -247,23 +231,13 @@ export function FacilityTable({
             const target = event.target as HTMLElement;
             if (
               target.closest("button") ||
-              target.closest("a") ||
-              target.closest(".ant-checkbox") ||
-              target.closest(".ant-checkbox-wrapper")
+              target.closest("a")
             ) {
               return;
             }
             onView(record);
           },
         })}
-        rowSelection={
-          isSuperAdmin
-            ? {
-                selectedRowKeys: selectedIds,
-                onChange: (keys) => onSelectedIdsChange(keys.map(String)),
-              }
-            : undefined
-        }
       />
     </Card>
   );

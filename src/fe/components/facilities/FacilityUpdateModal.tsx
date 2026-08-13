@@ -262,7 +262,7 @@ export function FacilityUpdateModal({
           <div>
             <Text strong>Mở lại cơ sở</Text>
             <Text type="secondary" className="mt-1 block">
-              Khi lưu, cơ sở sẽ được mở lại qua API reactivate hiện tại.
+              Khi lưu, cơ sở sẽ được mở lại.
             </Text>
           </div>
         )}

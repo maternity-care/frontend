@@ -24,8 +24,6 @@ export function useFacilities() {
   const [statusFilter, setStatusFilter] = useState<
     FacilityStatus | undefined
   >();
-  const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,11 +46,6 @@ export function useFacilities() {
         setTotalFacilities(result.total);
         setCurrentPage(result.page);
         setPageSize(result.limit);
-        setSelectedFacilityIds((current) =>
-          current.filter((id) =>
-            result.items.some((facility) => facility.id === id),
-          ),
-        );
       } catch (loadError) {
         setError(getFacilityErrorMessage(loadError));
       } finally {
@@ -84,14 +77,12 @@ export function useFacilities() {
     status?: unknown;
   }) {
     setCurrentPage(1);
-    setSelectedFacilityIds([]);
     setQuery(String(values.name ?? ""));
     setCityFilter(values.province ? String(values.province) : undefined);
     setStatusFilter(values.status as FacilityStatus | undefined);
   }
 
   function changePage(page: number, nextPageSize: number) {
-    setSelectedFacilityIds([]);
 
     if (nextPageSize !== pageSize) {
       setPageSize(nextPageSize);
@@ -120,8 +111,6 @@ export function useFacilities() {
     cityFilter,
     statusFilter,
     cityOptions,
-    selectedFacilityIds,
-    setSelectedFacilityIds,
     loading,
     tableLoading,
     setTableLoading,

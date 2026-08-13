@@ -5,7 +5,6 @@ import { Alert, Modal } from "antd";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import {
   createFacility,
-  deleteFacilities,
   deleteFacility,
 } from "@/management/features/facilities/facilities.api";
 import type { Facility } from "@/management/features/facilities/facilities.types";
@@ -24,7 +23,6 @@ import { FacilityFilters } from "@/fe/components/facilities/FacilityFilters";
 import { FacilityTable } from "@/fe/components/facilities/FacilityTable";
 import { FacilityUpdateModal } from "@/fe/components/facilities/FacilityUpdateModal";
 import { getFacilityErrorMessage } from "@/fe/components/facilities/facility-form.shared";
-
 
 export default function FacilityManagementPage() {
   const [modal, modalContextHolder] = Modal.useModal();
@@ -67,18 +65,6 @@ export default function FacilityManagementPage() {
     });
   }
 
-  function openDeleteSelected() {
-    if (!facilityState.selectedFacilityIds.length) return;
-
-    setDeleteReason("");
-    setDeleteTouched(false);
-    setDeleteTarget({
-      mode: "selected",
-      ids: facilityState.selectedFacilityIds,
-      count: facilityState.selectedFacilityIds.length,
-    });
-  }
-
   function closeDelete() {
     if (deleteLoading) return;
     setDeleteTarget(null);
@@ -100,29 +86,25 @@ export default function FacilityManagementPage() {
     facilityState.setError(null);
 
     try {
-      const deletedIds =
-        deleteTarget.mode === "single"
-          ? [deleteTarget.id]
-          : deleteTarget.ids;
+      if (deleteTarget.mode !== "single") return;
 
-      if (deleteTarget.mode === "single") {
-        await deleteFacility(deleteTarget.id, reason);
-      } else {
-        await deleteFacilities(deleteTarget.ids, reason);
-      }
+      const deletedId = deleteTarget.id;
+
+      await deleteFacility(
+        deletedId,
+        reason,
+      );
 
       setDetailFacility((current) =>
-        current && deletedIds.includes(current.id) ? null : current,
+        current?.id === deletedId ? null : current,
       );
       setUpdateFacilityTarget((current) =>
-        current && deletedIds.includes(current.id) ? null : current,
+        current?.id === deletedId ? null : current,
       );
-
-      facilityState.setSelectedFacilityIds([]);
 
       const remaining = Math.max(
         0,
-        facilityState.totalFacilities - deletedIds.length,
+        facilityState.totalFacilities - 1,
       );
       const lastPage = Math.max(
         1,
@@ -139,10 +121,7 @@ export default function FacilityManagementPage() {
 
       modal.success({
         title: "Xóa cơ sở thành công",
-        content:
-          deletedIds.length > 1
-            ? "Các cơ sở đã chọn đã được xóa."
-            : "Cơ sở đã được xóa.",
+        content: "Cơ sở đã được xóa.",
         centered: true,
       });
     } catch (error) {
@@ -198,12 +177,9 @@ export default function FacilityManagementPage() {
           pageSize={facilityState.pageSize}
           total={facilityState.totalFacilities}
           isSuperAdmin={isSuperAdmin}
-          selectedIds={facilityState.selectedFacilityIds}
-          onSelectedIdsChange={facilityState.setSelectedFacilityIds}
           onView={setDetailFacility}
           onEdit={setUpdateFacilityTarget}
           onDelete={openDelete}
-          onDeleteSelected={openDeleteSelected}
           onCreate={() => setCreateOpen(true)}
           onPageChange={facilityState.changePage}
         />
