@@ -18,7 +18,6 @@ import {
   MapPin,
   Pencil,
   Shapes,
-  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -44,9 +43,6 @@ type RoomDetailModalProps = {
   onEdit: (
     room: ClinicRoom,
   ) => void;
-  onDelete: (
-    room: ClinicRoom,
-  ) => void;
 };
 
 export function RoomDetailModal({
@@ -57,7 +53,6 @@ export function RoomDetailModal({
   allowedFacilityId,
   onClose,
   onEdit,
-  onDelete,
 }: RoomDetailModalProps) {
   const [room, setRoom] =
     useState<ClinicRoom | null>(
@@ -194,17 +189,6 @@ export function RoomDetailModal({
                   Cập nhật
                 </Button>
 
-                <Button
-                  danger
-                  icon={
-                    <Trash2 className="h-4 w-4" />
-                  }
-                  onClick={() =>
-                    onDelete(room)
-                  }
-                >
-                  Xóa
-                </Button>
               </Space>
             ) : null}
           </div>

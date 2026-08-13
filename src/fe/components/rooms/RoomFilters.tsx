@@ -46,7 +46,6 @@ type Props = {
   onReset: () => void;
 };
 
-/** Thanh filter của Room Management, tách khỏi page. */
 export function RoomFilters({
   canViewAllFacilities,
   facilities,

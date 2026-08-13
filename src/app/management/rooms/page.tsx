@@ -29,9 +29,6 @@ import {
   RoomBulkCreateModal,
 } from "@/fe/components/rooms/RoomBulkCreateModal";
 import {
-  RoomDeleteModal,
-} from "@/fe/components/rooms/RoomDeleteModal";
-import {
   RoomDetailModal,
 } from "@/fe/components/rooms/RoomDetailModal";
 import {
@@ -47,10 +44,6 @@ import {
   RoomTypeManagementModal,
 } from "@/fe/components/rooms/RoomTypeManagementModal";
 
-/**
- * Page Room chỉ điều phối component và modal.
- * List/filter/pagination và RBAC đã được tách sang hooks.
- */
 function ClinicRoomManagementContent() {
   const searchParams =
     useSearchParams();
@@ -98,12 +91,6 @@ function ClinicRoomManagementContent() {
   const [
     detailInitialRoom,
     setDetailInitialRoom,
-  ] = useState<
-    ClinicRoom | null
-  >(null);
-  const [
-    deleteRoomTarget,
-    setDeleteRoomTarget,
   ] = useState<
     ClinicRoom | null
   >(null);
@@ -157,35 +144,6 @@ function ClinicRoomManagementContent() {
       room,
     );
     roomState.refreshRooms();
-  }
-
-  function handleDeleted(
-    roomId: string,
-  ) {
-    setDetailRoomId(
-      (current) =>
-        current === roomId
-          ? null
-          : current,
-    );
-    setDetailInitialRoom(
-      (current) =>
-        current?.id ===
-        roomId
-          ? null
-          : current,
-    );
-    setEditingRoom(
-      (current) =>
-        current?.id ===
-        roomId
-          ? null
-          : current,
-    );
-
-    roomState.handleDeleted(
-      roomId,
-    );
   }
 
   return (
@@ -323,9 +281,6 @@ function ClinicRoomManagementContent() {
           onEdit={
             setEditingRoom
           }
-          onDelete={
-            setDeleteRoomTarget
-          }
           onOpenRoomTypes={() =>
             setRoomTypesOpen(
               true,
@@ -414,52 +369,7 @@ function ClinicRoomManagementContent() {
             room,
           );
         }}
-        onDelete={(room) => {
-          if (
-            !access.canManageRoom(
-              room,
-            )
-          ) {
-            return;
-          }
-
-          setDetailRoomId(
-            null,
-          );
-          setDetailInitialRoom(
-            null,
-          );
-          setDeleteRoomTarget(
-            room,
-          );
-        }}
       />
-
-      {access.canManageRooms ? (
-        <RoomDeleteModal
-          open={Boolean(
-            deleteRoomTarget,
-          )}
-          room={
-            deleteRoomTarget
-          }
-          onClose={() =>
-            setDeleteRoomTarget(
-              null,
-            )
-          }
-          onDeleted={(
-            roomId,
-          ) => {
-            setDeleteRoomTarget(
-              null,
-            );
-            handleDeleted(
-              roomId,
-            );
-          }}
-        />
-      ) : null}
 
       {access.canManageRooms ? (
         <RoomBulkCreateModal

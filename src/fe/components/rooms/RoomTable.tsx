@@ -19,7 +19,6 @@ import {
   Pencil,
   Plus,
   Shapes,
-  Trash2,
 } from "lucide-react";
 import type {
   ClinicRoom,
@@ -47,9 +46,6 @@ type Props = {
   onEdit: (
     room: ClinicRoom,
   ) => void;
-  onDelete: (
-    room: ClinicRoom,
-  ) => void;
   onOpenRoomTypes: () => void;
   onCreate: () => void;
   onPageChange: (
@@ -68,7 +64,6 @@ export function RoomTable({
   canManageRoom,
   onView,
   onEdit,
-  onDelete,
   onOpenRoomTypes,
   onCreate,
   onPageChange,
@@ -195,7 +190,7 @@ export function RoomTable({
       title: "Thao tác",
       width:
         canManageRooms
-          ? 145
+          ? 105
           : 80,
       align: "center",
       render: (
@@ -237,20 +232,6 @@ export function RoomTable({
                   />
                 </Tooltip>
 
-                <Tooltip title="Xóa">
-                  <Button
-                    danger
-                    icon={
-                      <Trash2 className="h-4 w-4" />
-                    }
-                    onClick={(
-                      event,
-                    ) => {
-                      event.stopPropagation();
-                      onDelete(room);
-                    }}
-                  />
-                </Tooltip>
               </>
             ) : null}
           </Space>
