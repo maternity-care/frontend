@@ -214,7 +214,10 @@ export interface FacilitySuspendResult {
 
 export interface FacilityReactivateResult {
   facility: BackendFacility;
-  impact?: Pick<FacilitySuspendImpact, "reactivatedRooms">;
+  impact?: Pick<
+    FacilitySuspendImpact,
+    "reactivatedRooms"
+  >;
 }
 
 export interface UpdateFacilityOperatingHoursInput {
@@ -298,9 +301,6 @@ export interface FacilityRoomType {
   roomCount: number;
 }
 
-/**
- * GET /management/facilities/admin-options
- */
 export type FacilityAdminOptionStatus =
   | "active"
   | "inactive"
