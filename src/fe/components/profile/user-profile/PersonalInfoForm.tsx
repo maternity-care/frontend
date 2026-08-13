@@ -21,6 +21,7 @@ import {
   ProfileUpdateHandler,
 } from "@/features/profile/profile.types";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
+import { useGestationalCalc } from "@/hooks/useGestationalCalc";
 
 type PersonalInfoFormProps = {
   profile: PregnantProfile;
@@ -53,6 +54,10 @@ export function PersonalInfoForm({
 }: PersonalInfoFormProps) {
   const [form] = Form.useForm<FormValues>();
   const [saving, setSaving] = useState(false);
+  const { handleGestationalWeekChange, handleDueDateChange } =
+    useGestationalCalc({
+      form,
+    });
 
   useEffect(() => {
     form.setFieldsValue({
@@ -200,6 +205,7 @@ export function PersonalInfoForm({
                   className="w-full"
                   placeholder="VD: 28"
                   style={{ width: "100%" }}
+                  onChange={handleGestationalWeekChange}
                 />
                 <Input
                   size="large"
@@ -217,12 +223,31 @@ export function PersonalInfoForm({
           </Col>
 
           <Col xs={24} md={8}>
-            <Form.Item name="expectedDueDate" label="Ngày dự sinh">
+            <Form.Item
+              name="expectedDueDate"
+              label="Ngày dự sinh"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
+                    if (value.isBefore(dayjs(), "day")) {
+                      return Promise.reject(
+                        "Ngày dự sinh phải là ngày trong tương lai",
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
               <DatePicker
                 size="large"
                 className="w-full"
                 format="DD/MM/YYYY"
                 placeholder="Chọn ngày dự sinh"
+                disabledDate={(current) =>
+                  current && current < dayjs().startOf("day")
+                }
               />
             </Form.Item>
           </Col>
