@@ -31,9 +31,15 @@ import {
 } from "@/management/features/doctors/doctors.api";
 import type {
   Doctor,
-  DoctorExperienceLevel,
   DoctorStatus,
 } from "@/management/features/doctors/doctors.types";
+import {
+  doctorBelongsToFacility,
+  formatDoctorDateTime,
+  getDoctorErrorMessage,
+  getDoctorExperienceLabel,
+  mergeDoctorDetail,
+} from "@/management/features/doctors/doctors.utils";
 
 const {
   Text,
@@ -62,186 +68,12 @@ type DoctorDetailModalProps = {
   ) => void;
 };
 
-function getExperienceLabel(
-  value: DoctorExperienceLevel,
-) {
-  const labels: Record<DoctorExperienceLevel, string> = {
-    1: "1 - 5 năm",
-    2: "6 - 10 năm",
-    3: "11 - 20 năm",
-    4: "Trên 20 năm",
-  };
-
-  return labels[value];
-}
-
-function getErrorMessage(
-  error: unknown,
-) {
-  if (
-    typeof error === "object" &&
-    error &&
-    "response" in error
-  ) {
-    const response = (
-      error as {
-        response?: {
-          data?: {
-            message?:
-              | string
-              | string[];
-            errors?: {
-              fields?: string[];
-            };
-          };
-        };
-      }
-    ).response;
-
-    const fields =
-      response?.data?.errors
-        ?.fields;
-
-    if (
-      Array.isArray(fields) &&
-      fields.length > 0
-    ) {
-      return fields.join(", ");
-    }
-
-    const message =
-      response?.data?.message;
-
-    if (
-      Array.isArray(message)
-    ) {
-      return message.join(", ");
-    }
-
-    if (message) {
-      return message;
-    }
-  }
-
-  if (
-    error instanceof Error
-  ) {
-    return error.message;
-  }
-
-  return "Không tải được thông tin bác sĩ.";
-}
-
-function formatDateTime(
-  value?: string,
-) {
-  if (!value) {
-    return "Chưa cập nhật";
-  }
-
-  const date = new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return value;
-  }
-
-  return date.toLocaleString(
-    "vi-VN",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    },
-  );
-}
-
-function renderStatus(
-  status: DoctorStatus,
-) {
+function renderStatus(status: DoctorStatus) {
   return status === "active" ? (
-    <Tag color="green">
-      Hoạt động
-    </Tag>
+    <Tag color="green">Hoạt động</Tag>
   ) : (
-    <Tag>
-      Ngừng hoạt động
-    </Tag>
+    <Tag>Ngừng hoạt động</Tag>
   );
-}
-
-function doctorBelongsToFacility(
-  doctor: Doctor,
-  facilityId: string,
-) {
-  if (!facilityId) {
-    return false;
-  }
-
-  if (
-    doctor.facilityIds.length >
-    0
-  ) {
-    return doctor.facilityIds.some(
-      (item) =>
-        String(item) ===
-        facilityId,
-    );
-  }
-
-  return (
-    String(
-      doctor.facilityId ?? "",
-    ) === facilityId
-  );
-}
-
-function mergeDoctorDetail(
-  current: Doctor,
-  detail: Doctor,
-): Doctor {
-  const fallbackName =
-    `Bác sĩ #${detail.id}`;
-
-  return {
-    ...current,
-    ...detail,
-    name:
-      detail.name &&
-      detail.name !== fallbackName
-        ? detail.name
-        : current.name,
-    employeeCode:
-      detail.employeeCode ||
-      current.employeeCode,
-    personalEmail:
-      detail.personalEmail ||
-      current.personalEmail,
-    email:
-      detail.email ||
-      current.email,
-    phone:
-      detail.phone ||
-      current.phone,
-    address:
-      detail.address ||
-      current.address,
-    facilityId:
-      detail.facilityId ||
-      current.facilityId,
-    facilityIds:
-      detail.facilityIds.length > 0
-        ? detail.facilityIds
-        : current.facilityIds,
-    workingRoomTypeId:
-      detail.workingRoomTypeId ||
-      current.workingRoomTypeId,
-  };
 }
 
 export function DoctorDetailModal({
@@ -341,7 +173,7 @@ export function DoctorDetailModal({
         }
 
         const message =
-          getErrorMessage(
+          getDoctorErrorMessage(
             loadError,
           );
 
@@ -660,7 +492,7 @@ export function DoctorDetailModal({
               <Descriptions.Item
                 label="Mức kinh nghiệm"
               >
-                {getExperienceLabel(
+                {getDoctorExperienceLabel(
                   detailDoctor.yearsOfExperience,
                 )}
               </Descriptions.Item>
@@ -715,7 +547,7 @@ export function DoctorDetailModal({
               >
                 <Space size={6}>
                   <CalendarClock className="h-4 w-4 text-slate-400" />
-                  {formatDateTime(
+                  {formatDoctorDateTime(
                     detailDoctor.createdAt,
                   )}
                 </Space>
@@ -726,7 +558,7 @@ export function DoctorDetailModal({
               >
                 <Space size={6}>
                   <CalendarClock className="h-4 w-4 text-slate-400" />
-                  {formatDateTime(
+                  {formatDoctorDateTime(
                     detailDoctor.updatedAt,
                   )}
                 </Space>
