@@ -1,93 +1,164 @@
 "use client";
 
-import { useMemo } from "react";
-import { useAuthStore } from "@/features/auth/auth.store";
+import { useEffect, useMemo, useState } from "react";
+import { getFacility, getFacilities } from "@/management/features/facilities/facilities.api";
+import { getRoomTypeLookup } from "@/management/features/rooms/rooms.api";
+import type { RoomType } from "@/management/features/rooms/rooms.types";
+import { getStaffsPage } from "@/management/features/staffs/staffs.api";
+import type { Staff } from "@/management/features/staffs/staffs.types";
+import { readStaffFacilityIds } from "@/management/features/doctors/doctors.utils";
 
-type AuthRoleValue =
-  | string
-  | { name?: string | null }
-  | null
-  | undefined;
+export function useDoctorDisplayLookups({
+  canViewAllFacilities,
+  scopedFacilityId,
+}: {
+  canViewAllFacilities: boolean;
+  scopedFacilityId: string;
+}) {
+  const [facilityNameById, setFacilityNameById] = useState<Record<string, string>>({});
+  const [roomTypeNameById, setRoomTypeNameById] = useState<Record<string, string>>({});
 
-type AuthFacilityAssignment = {
-  facilityId?: string | number | null;
-  roles?: AuthRoleValue[] | null;
-};
+  useEffect(() => {
+    let cancelled = false;
 
-type DoctorAccessUser = {
-  facilityId?: string | number | null;
-  homeFacilityId?: string | number | null;
-  roles?: AuthRoleValue[] | null;
-  staffProfile?: {
-    facilityId?: string | number | null;
-    homeFacilityId?: string | number | null;
-    facilityAssignments?: AuthFacilityAssignment[] | null;
-  } | null;
-};
+    if (!canViewAllFacilities && !scopedFacilityId) return;
 
-function readRoleName(role: AuthRoleValue) {
-  return typeof role === "string" ? role : role?.name;
-}
+    async function load() {
+      const facilityRequest = canViewAllFacilities
+        ? getFacilities({ page: 1, limit: 100 })
+        : getFacility(scopedFacilityId).then((facility) => [facility]);
 
-function normalizeRoles(values: AuthRoleValue[]) {
-  return new Set(
-    values
-      .map(readRoleName)
-      .filter((role): role is string => Boolean(role))
-      .map((role) => role.trim().toLowerCase()),
-  );
-}
+      const [facilityResult, roomTypeResult] = await Promise.allSettled([
+        facilityRequest,
+        getRoomTypeLookup({ status: "active", limit: 50 }),
+      ]);
 
+      if (cancelled) return;
 
-export function useDoctorAccess() {
-  const roles = useAuthStore((state) => state.roles);
-  const user = useAuthStore((state) => state.user);
-  const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
+      if (facilityResult.status === "fulfilled") {
+        setFacilityNameById(
+          Object.fromEntries(
+            facilityResult.value.map((facility) => [facility.id, facility.name]),
+          ),
+        );
+      }
 
-  const authUser = user as unknown as DoctorAccessUser | null;
-
-  return useMemo(() => {
-    const globalRoles = normalizeRoles([
-      ...(roles ?? []),
-      ...(authUser?.roles ?? []),
-    ]);
-
-    if (globalRoles.has("super_admin")) {
-      return {
-        canViewAllFacilities: true,
-        canManageDoctors: false,
-        scopedFacilityId: "",
-      };
+      if (roomTypeResult.status === "fulfilled") {
+        setRoomTypeNameById(
+          Object.fromEntries(
+            roomTypeResult.value.map((roomType) => [roomType.id, roomType.name]),
+          ),
+        );
+      }
     }
 
-    const assignments = authUser?.staffProfile?.facilityAssignments ?? [];
-    const firstAdminAssignment = assignments.find((assignment) =>
-      normalizeRoles(assignment.roles ?? []).has("admin"),
-    );
-
-    const resolvedFacilityId = String(
-      activeFacilityId ??
-        authUser?.staffProfile?.facilityId ??
-        authUser?.staffProfile?.homeFacilityId ??
-        authUser?.facilityId ??
-        authUser?.homeFacilityId ??
-        firstAdminAssignment?.facilityId ??
-        "",
-    ).trim();
-
-    const matchedAssignment = assignments.find(
-      (assignment) =>
-        String(assignment.facilityId ?? "").trim() === resolvedFacilityId,
-    );
-
-    const facilityRoles = normalizeRoles(matchedAssignment?.roles ?? []);
-    const hasAdminRole =
-      globalRoles.has("admin") || facilityRoles.has("admin");
-
-    return {
-      canViewAllFacilities: false,
-      canManageDoctors: Boolean(resolvedFacilityId) && hasAdminRole,
-      scopedFacilityId: hasAdminRole ? resolvedFacilityId : "",
+    void load();
+    return () => {
+      cancelled = true;
     };
-  }, [activeFacilityId, authUser, roles]);
+  }, [canViewAllFacilities, scopedFacilityId]);
+
+  return { facilityNameById, roomTypeNameById };
+}
+
+export function useDoctorFormLookups({
+  open,
+  isEditing,
+  allowedFacilityId,
+  onError,
+}: {
+  open: boolean;
+  isEditing: boolean;
+  allowedFacilityId: string;
+  onError: (message: string) => void;
+}) {
+  const [staffOptions, setStaffOptions] = useState<Staff[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+  const [roomTypesLoading, setRoomTypesLoading] = useState(true);
+
+  useEffect(() => {
+    if (!open || isEditing) return;
+
+    let cancelled = false;
+    setStaffLoading(true);
+
+    void getStaffsPage({ status: "active", limit: 50 })
+      .then((data) => {
+        if (cancelled) return;
+        setStaffOptions(
+          data.users.filter(
+            (user) =>
+              !user.staffProfile?.doctor &&
+              readStaffFacilityIds(user).includes(allowedFacilityId),
+          ),
+        );
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setStaffOptions([]);
+        onError(
+          error instanceof Error
+            ? error.message
+            : "Không tải được danh sách tài khoản staff.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setStaffLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [allowedFacilityId, isEditing, onError, open]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setRoomTypesLoading(true);
+
+    void getRoomTypeLookup({ status: "active", limit: 50 })
+      .then((data) => {
+        if (!cancelled) setRoomTypes(data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setRoomTypes([]);
+        onError(
+          error instanceof Error
+            ? error.message
+            : "Không tải được danh sách loại phòng.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setRoomTypesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onError]);
+
+  const staffSelectOptions = useMemo(
+    () =>
+      staffOptions.map((user) => {
+        const profile = user.staffProfile;
+        const value = String(profile?.staffId ?? user.id);
+        const employeeCode = profile?.employeeCode;
+        const personalEmail = profile?.personalEmail ?? user.email;
+
+        return {
+          value,
+          label: `${employeeCode ? `${employeeCode} - ` : ""}${user.name} (${personalEmail})`,
+        };
+      }),
+    [staffOptions],
+  );
+
+  return {
+    staffOptions,
+    staffLoading,
+    staffSelectOptions,
+    roomTypes,
+    roomTypesLoading,
+  };
 }

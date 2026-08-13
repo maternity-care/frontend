@@ -54,10 +54,6 @@ function toApiParams(
   };
 }
 
-/**
- * Quản lý state của danh sách Doctor: filter, pagination, loading và reload.
- * Page chỉ còn nhiệm vụ điều phối modal và render component.
- */
 export function useDoctors({
   canViewAllFacilities,
   scopedFacilityId,
