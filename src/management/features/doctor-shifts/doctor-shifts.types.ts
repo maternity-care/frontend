@@ -25,6 +25,7 @@ export interface BackendDoctorShift {
   startTime: string;
   endTime: string;
   maxAppointments: unknown;
+  bookedAppointments?: unknown;
   status: string;
   note?: string | null;
   createdAt: string;
@@ -72,6 +73,7 @@ export interface DoctorShiftItem {
   startTime: string;
   endTime: string;
   maxAppointments: number;
+  bookedAppointments: number;
   status: DoctorShiftStatus;
   note: string;
   createdAt: string;
@@ -123,8 +125,8 @@ export interface UpdateDoctorShiftInput {
   staffId?: string;
   roleId?: string;
   facilityId?: string;
-  roomId?: string;
-  slotId?: string;
+  roomId?: string | null;
+  slotId?: string | null;
   shiftDate?: string;
   maxAppointments?: number;
   status?: DoctorShiftStatus;
@@ -172,6 +174,48 @@ export interface BulkGenerateDoctorShiftsInput {
   toDate: string;
   slotAssignments: AutoGenerateSlotAssignment[];
   saveOnlyValid: boolean;
+}
+
+export interface WeeklyUpdateShiftInput {
+  shiftId?: string;
+  staffId: string;
+  roleId?: string | null;
+  roomId?: string | null;
+  slotId: string;
+  shiftDate: string;
+  maxAppointments?: number | null;
+  status: Extract<DoctorShiftStatus, "available" | "off">;
+  note?: string;
+}
+
+export interface WeeklyUpdateDoctorShiftsInput {
+  facilityId: string;
+  weekStart: string;
+  shifts: WeeklyUpdateShiftInput[];
+  removedShiftIds: string[];
+}
+
+export interface WeeklyUpdateBlockedItem {
+  index: number;
+  action: "create" | "update" | "remove";
+  shiftId?: string;
+  shiftDate?: string;
+  reason: string;
+}
+
+export interface WeeklyUpdateDoctorShiftsResponse {
+  created: BackendDoctorShift[];
+  updated: BackendDoctorShift[];
+  unchanged: BackendDoctorShift[];
+  removedShiftIds: string[];
+  blocked: WeeklyUpdateBlockedItem[];
+  summary: {
+    created: number;
+    updated: number;
+    unchanged: number;
+    removed: number;
+    blocked: number;
+  };
 }
 
 export interface GetDoctorAvailabilityParams {

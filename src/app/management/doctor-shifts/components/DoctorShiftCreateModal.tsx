@@ -46,6 +46,7 @@ export function DoctorShiftCreateModal({
     const createPayloads =
       payloads.map((payload) => ({
         ...payload,
+        roomId: payload.roomId ?? "",
         status: "available" as const,
       }));
 

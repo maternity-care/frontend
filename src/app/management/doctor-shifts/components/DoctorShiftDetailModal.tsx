@@ -97,7 +97,6 @@ export function DoctorShiftDetailModal({
       ),
     [doctors],
   );
-
   return (
     <Modal
       open={open}
@@ -195,6 +194,7 @@ export function DoctorShiftDetailModal({
               </p>
 
               <p className="mb-0 font-semibold text-slate-950">
+                {shift.bookedAppointments}/{shift.maxAppointments} đã đặt ·{" "}
                 {shift.maxAppointments} lịch
               </p>
             </div>

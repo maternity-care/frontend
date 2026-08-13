@@ -22,6 +22,8 @@ import type {
   GetGroupedDoctorShiftsParams,
   GetWeeklyDoctorShiftsParams,
   UpdateDoctorShiftInput,
+  WeeklyUpdateDoctorShiftsInput,
+  WeeklyUpdateDoctorShiftsResponse,
 } from "./doctor-shifts.types";
 
 const ENDPOINT = "/management/shifts";
@@ -107,6 +109,9 @@ function normalizeDoctorShift(
     endTime: normalizeTime(shift.endTime),
     maxAppointments: toNumberValue(
       shift.maxAppointments,
+    ),
+    bookedAppointments: toNumberValue(
+      shift.bookedAppointments,
     ),
     status: normalizeStatus(shift.status),
     note: toStringValue(shift.note),
@@ -252,7 +257,7 @@ function toCreatePayload(
 function toUpdatePayload(
   input: UpdateDoctorShiftInput,
 ): Record<string, unknown> {
-  return compactObject({
+  const payload = compactObject({
     doctorId: input.doctorId?.trim(),
     staffId: input.staffId?.trim(),
     roleId:
@@ -260,13 +265,27 @@ function toUpdatePayload(
         ? undefined
         : toIdRequestValue(input.roleId),
     facilityId: input.facilityId?.trim(),
-    roomId: input.roomId?.trim(),
-    slotId: input.slotId?.trim(),
     shiftDate: input.shiftDate,
     maxAppointments: input.maxAppointments,
     status: input.status,
     note: input.note?.trim(),
   });
+
+  if ("roomId" in input) {
+    payload.roomId =
+      input.roomId === null
+        ? null
+        : input.roomId?.trim();
+  }
+
+  if ("slotId" in input) {
+    payload.slotId =
+      input.slotId === null
+        ? null
+        : input.slotId?.trim();
+  }
+
+  return payload;
 }
 
 function toConflictPayload(
@@ -510,6 +529,30 @@ export function getGroupedDoctorShifts(
   );
 }
 
+export function updateWeeklyDoctorShifts(
+  input: WeeklyUpdateDoctorShiftsInput,
+) {
+  return unwrapApiData<WeeklyUpdateDoctorShiftsResponse>(
+    apiClient.patch(`${ENDPOINT}/week`, {
+      facilityId: input.facilityId.trim(),
+      weekStart: input.weekStart,
+      shifts: input.shifts.map((shift) => ({
+        ...shift,
+        shiftId: shift.shiftId?.trim() || undefined,
+        staffId: shift.staffId.trim(),
+        roleId: shift.roleId?.trim() || undefined,
+        roomId:
+          shift.status === "off"
+            ? null
+            : shift.roomId?.trim() || undefined,
+        slotId: shift.slotId.trim(),
+        note: shift.note?.trim() || undefined,
+      })),
+      removedShiftIds: input.removedShiftIds,
+    }),
+  );
+}
+
 export const doctorShiftsApi = {
   getDoctorShifts,
   getAllDoctorShifts,
@@ -524,4 +567,5 @@ export const doctorShiftsApi = {
   getDoctorAvailability,
   getWeeklyDoctorShifts,
   getGroupedDoctorShifts,
+  updateWeeklyDoctorShifts,
 };
