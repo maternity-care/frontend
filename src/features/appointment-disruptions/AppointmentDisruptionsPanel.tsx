@@ -1,14 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Empty, Input, List, Modal, Space, Spin, Tag, Typography, message } from 'antd';
-import { CalendarClock, CircleDollarSign, Clock3, MapPin, RefreshCw, Stethoscope } from 'lucide-react';
+import { Alert, Button, Card, Empty, Input, Modal, Space, Spin, Tag, Typography, message } from 'antd';
+import { CalendarClock, CalendarX2, Clock3, MapPin, RefreshCw, Stethoscope } from 'lucide-react';
 import {
   AppointmentDisruption,
+  cancelMyDisruptedAppointment,
   DisruptionRescheduleOption,
   getDisruptionOptions,
   getMyAppointmentDisruptions,
-  requestDisruptionRefund,
   rescheduleMyDisruption,
 } from './appointment-disruptions.api';
 
@@ -17,7 +17,8 @@ const { Title, Text } = Typography;
 const statusMeta: Record<string, { label: string; color: string }> = {
   pending: { label: 'Chờ bạn xử lý', color: 'warning' },
   rescheduled: { label: 'Đã đổi lịch', color: 'success' },
-  refund_pending: { label: 'Chờ hoàn tiền', color: 'processing' },
+  refund_pending: { label: 'Chờ hủy lịch', color: 'processing' },
+  cancelled: { label: 'Đã hủy', color: 'default' },
   resolved: { label: 'Đã xử lý', color: 'success' },
 };
 
@@ -35,23 +36,17 @@ const formatDateLabel = (date: string) =>
 const formatTimeRange = (option: DisruptionRescheduleOption) =>
   `${option.startTime.slice(0, 5)} - ${option.endTime.slice(0, 5)}`;
 
-type AppointmentDisruptionsPanelProps = {
-  standalone?: boolean;
-  hideWhenEmpty?: boolean;
-};
-
 export function AppointmentDisruptionsPanel({
-  standalone = false,
   hideWhenEmpty = false,
-}: AppointmentDisruptionsPanelProps) {
+}: { hideWhenEmpty?: boolean }) {
   const [items, setItems] = useState<AppointmentDisruption[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AppointmentDisruption | null>(null);
   const [options, setOptions] = useState<DisruptionRescheduleOption[]>([]);
   const [optionKey, setOptionKey] = useState<string>();
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const [refundItem, setRefundItem] = useState<AppointmentDisruption | null>(null);
-  const [refundReason, setRefundReason] = useState('');
+  const [cancelItem, setCancelItem] = useState<AppointmentDisruption | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const visibleItems = items.filter((item) =>
     item.resolutionStatus === 'pending' || item.resolutionStatus === 'refund_pending',
@@ -117,17 +112,17 @@ export function AppointmentDisruptionsPanel({
     }
   };
 
-  const submitRefund = async () => {
-    if (!refundItem) return;
+  const submitCancellation = async () => {
+    if (!cancelItem) return;
     setSubmitting(true);
     try {
-      await requestDisruptionRefund(refundItem.id, refundReason.trim() || undefined);
-      message.success('Đã gửi yêu cầu hoàn tiền tới cơ sở.');
-      setRefundItem(null);
-      setRefundReason('');
+      await cancelMyDisruptedAppointment(cancelItem.id, cancelReason.trim() || undefined);
+      message.success('Đã hủy lịch khám.');
+      setCancelItem(null);
+      setCancelReason('');
       await load();
     } catch {
-      message.error('Không thể gửi yêu cầu hoàn tiền.');
+      message.error('Không thể hủy lịch khám.');
     } finally {
       setSubmitting(false);
     }
@@ -138,39 +133,27 @@ export function AppointmentDisruptionsPanel({
   }
 
   return (
-    <section id="appointment-disruptions" className="space-y-4 scroll-mt-24">
-      {standalone ? (
+    <section id="appointment-disruptions" className="mx-auto w-full max-w-4xl space-y-4 scroll-mt-24">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Title level={2} className="!mb-1">Lịch khám cần xử lý</Title>
-          <Text type="secondary">Chọn một ca khác hoặc gửi yêu cầu hoàn tiền cho lịch bị ảnh hưởng.</Text>
+          <Title level={3} className="!mb-1">Lịch khám cần xử lý</Title>
+          <Text type="secondary">Chọn lịch khám khác hoặc hủy lịch bị ảnh hưởng.</Text>
         </div>
-      ) : (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Title level={3} className="!mb-1">Lịch khám cần xử lý</Title>
-            <Text type="secondary">Các lịch bị ảnh hưởng bởi cơ sở, phòng hoặc ca trực tạm ngưng.</Text>
-          </div>
-          <Button icon={<RefreshCw className="h-4 w-4" />} onClick={() => void load()}>Tải lại</Button>
-        </div>
-      )}
-
-      <Alert
-        showIcon
-        type="info"
-        title="Cơ sở sẽ xác nhận trước khi hoàn tiền"
-        description="Yêu cầu hoàn tiền không đồng nghĩa tiền đã được chuyển ngay. Bạn sẽ nhận thông báo khi quản lý xử lý xong."
-      />
+        <Button icon={<RefreshCw className="h-4 w-4" />} onClick={() => void load()}>Tải lại</Button>
+      </div>
 
       <Spin spinning={loading}>
         {visibleItems.length ? (
-          <List
-            grid={{ gutter: 16, xs: 1, lg: standalone ? 2 : 1, xl: 2 }}
-            dataSource={visibleItems}
-            renderItem={(item) => {
+          <div className="space-y-4">
+            {visibleItems.map((item) => {
               const meta = statusMeta[item.resolutionStatus] ?? { label: item.resolutionStatus, color: 'default' };
               return (
-                <List.Item>
-                  <Card className="h-full" title={<span>Lịch #{item.appointmentId}</span>} extra={<Tag color={meta.color}>{meta.label}</Tag>}>
+                <Card
+                  key={item.id}
+                  className="mx-auto w-full"
+                  title={<span>Lịch #{item.appointmentId}</span>}
+                  extra={<Tag color={meta.color}>{meta.label}</Tag>}
+                >
                     <div className="space-y-2 text-sm text-slate-700">
                       <p><strong>Cơ sở:</strong> {item.facilityName}</p>
                       <p><strong>Dịch vụ:</strong> {item.serviceName}</p>
@@ -181,27 +164,22 @@ export function AppointmentDisruptionsPanel({
                       </p>
                       <p><strong>Lý do:</strong> {item.reason || 'Cơ sở hoặc phòng khám tạm ngưng hoạt động'}</p>
                     </div>
-                    {item.resolutionStatus === 'pending' ? (
+                    {['pending', 'refund_pending'].includes(item.resolutionStatus) ? (
                       <Space wrap className="mt-4">
                         <Button type="primary" icon={<CalendarClock className="h-4 w-4" />} onClick={() => void openReschedule(item)}>
                           Chọn lịch khác
                         </Button>
-                        <Button icon={<CircleDollarSign className="h-4 w-4" />} onClick={() => setRefundItem(item)}>
-                          Yêu cầu hoàn tiền
+                        <Button danger icon={<CalendarX2 className="h-4 w-4" />} onClick={() => setCancelItem(item)}>
+                          Hủy lịch
                         </Button>
                       </Space>
                     ) : null}
-                  </Card>
-                </List.Item>
+                </Card>
               );
-            }}
-          />
+            })}
+          </div>
         ) : loading ? <div className="h-32" /> : <Empty description="Không có lịch khám nào cần xử lý" />}
       </Spin>
-
-      {standalone ? (
-        <Button icon={<RefreshCw className="h-4 w-4" />} onClick={() => void load()}>Tải lại</Button>
-      ) : null}
 
       <Modal
         title="Chọn ca khám thay thế"
@@ -276,15 +254,25 @@ export function AppointmentDisruptionsPanel({
       </Modal>
 
       <Modal
-        title="Yêu cầu hoàn tiền"
-        open={Boolean(refundItem)}
-        onCancel={() => setRefundItem(null)}
-        onOk={() => void submitRefund()}
-        okText="Gửi yêu cầu"
-        okButtonProps={{ loading: submitting }}
+        title="Hủy lịch khám"
+        centered
+        open={Boolean(cancelItem)}
+        onCancel={() => setCancelItem(null)}
+        onOk={() => void submitCancellation()}
+        okText="Xác nhận hủy"
+        okButtonProps={{ danger: true, loading: submitting }}
       >
-        <p className="mb-3 text-sm text-slate-600">Sau khi gửi, lịch khám sẽ được hủy và cơ sở tiếp nhận yêu cầu hoàn tiền.</p>
-        <Input.TextArea rows={4} maxLength={500} showCount value={refundReason} onChange={(event) => setRefundReason(event.target.value)} placeholder="Ghi chú thêm (không bắt buộc)" />
+        <p className="mb-3 text-sm text-slate-600">
+          Lịch khám sẽ được hủy và không thể khôi phục bằng thao tác này. Bạn vẫn có thể đặt một lịch mới sau đó.
+        </p>
+        <Input.TextArea
+          rows={4}
+          maxLength={500}
+          showCount
+          value={cancelReason}
+          onChange={(event) => setCancelReason(event.target.value)}
+          placeholder="Lý do hủy (không bắt buộc)"
+        />
       </Modal>
     </section>
   );

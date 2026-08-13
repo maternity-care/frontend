@@ -1,7 +1,5 @@
-'use client';
-
-import { AppointmentDisruptionsPanel } from '@/features/appointment-disruptions/AppointmentDisruptionsPanel';
+import { redirect } from 'next/navigation';
 
 export default function AppointmentDisruptionsPage() {
-  return <AppointmentDisruptionsPanel standalone />;
+  redirect('/schedule#appointment-disruptions');
 }
