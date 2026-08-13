@@ -78,63 +78,102 @@ export function useDoctorFormLookups({
   const [roomTypesLoading, setRoomTypesLoading] = useState(true);
 
   useEffect(() => {
-    if (!open || isEditing) return;
+    if (!open || isEditing) {
+      return;
+    }
 
     let cancelled = false;
-    setStaffLoading(true);
 
-    void getStaffsPage({ status: "active", limit: 50 })
-      .then((data) => {
-        if (cancelled) return;
-        setStaffOptions(
-          data.users.filter(
-            (user) =>
-              !user.staffProfile?.doctor &&
-              readStaffFacilityIds(user).includes(allowedFacilityId),
-          ),
-        );
+    const timer = window.setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
+
+      setStaffLoading(true);
+
+      void getStaffsPage({
+        status: "active",
+        limit: 50,
       })
-      .catch((error) => {
-        if (cancelled) return;
-        setStaffOptions([]);
-        onError(
-          error instanceof Error
-            ? error.message
-            : "Không tải được danh sách tài khoản staff.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setStaffLoading(false);
-      });
+        .then((data) => {
+          if (cancelled) {
+            return;
+          }
+
+          setStaffOptions(
+            data.users.filter(
+              (user) =>
+                !user.staffProfile?.doctor &&
+                readStaffFacilityIds(user).includes(allowedFacilityId),
+            ),
+          );
+        })
+        .catch((error) => {
+          if (cancelled) {
+            return;
+          }
+
+          setStaffOptions([]);
+          onError(
+            error instanceof Error
+              ? error.message
+              : "Không tải được danh sách tài khoản staff.",
+          );
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setStaffLoading(false);
+          }
+        });
+    }, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [allowedFacilityId, isEditing, onError, open]);
 
   useEffect(() => {
     let cancelled = false;
-    setRoomTypesLoading(true);
 
-    void getRoomTypeLookup({ status: "active", limit: 50 })
-      .then((data) => {
-        if (!cancelled) setRoomTypes(data);
+    const timer = window.setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
+
+      setRoomTypesLoading(true);
+
+      void getRoomTypeLookup({
+        status: "active",
+        limit: 50,
       })
-      .catch((error) => {
-        if (cancelled) return;
-        setRoomTypes([]);
-        onError(
-          error instanceof Error
-            ? error.message
-            : "Không tải được danh sách loại phòng.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setRoomTypesLoading(false);
-      });
+        .then((data) => {
+          if (!cancelled) {
+            setRoomTypes(data);
+          }
+        })
+        .catch((error) => {
+          if (cancelled) {
+            return;
+          }
+
+          setRoomTypes([]);
+          onError(
+            error instanceof Error
+              ? error.message
+              : "Không tải được danh sách loại phòng.",
+          );
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setRoomTypesLoading(false);
+          }
+        });
+    }, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [onError]);
 
