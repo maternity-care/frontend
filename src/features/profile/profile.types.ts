@@ -27,6 +27,7 @@ export interface UserProfile {
   name: string;
   email: string;
   phone?: string | null;
+  address?: string | null;
   personalEmail?: string;
   employeeCode?: string;
   status: "active" | "inactive" | "locked";
