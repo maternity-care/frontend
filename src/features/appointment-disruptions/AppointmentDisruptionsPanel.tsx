@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Card, Empty, Input, List, Modal, Select, Space, Spin, Tag, Typography, message } from 'antd';
-import { CalendarClock, CircleDollarSign, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Button, Card, Empty, Input, List, Modal, Space, Spin, Tag, Typography, message } from 'antd';
+import { CalendarClock, CircleDollarSign, Clock3, MapPin, RefreshCw, Stethoscope } from 'lucide-react';
 import {
   AppointmentDisruption,
   DisruptionRescheduleOption,
@@ -20,6 +20,20 @@ const statusMeta: Record<string, { label: string; color: string }> = {
   refund_pending: { label: 'Chờ hoàn tiền', color: 'processing' },
   resolved: { label: 'Đã xử lý', color: 'success' },
 };
+
+const optionKeyOf = (option: DisruptionRescheduleOption) =>
+  `${option.shiftId}-${option.startTime}-${option.endTime}`;
+
+const formatDateLabel = (date: string) =>
+  new Date(`${date}T00:00:00`).toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+const formatTimeRange = (option: DisruptionRescheduleOption) =>
+  `${option.startTime.slice(0, 5)} - ${option.endTime.slice(0, 5)}`;
 
 type AppointmentDisruptionsPanelProps = {
   standalone?: boolean;
@@ -42,6 +56,12 @@ export function AppointmentDisruptionsPanel({
   const visibleItems = items.filter((item) =>
     item.resolutionStatus === 'pending' || item.resolutionStatus === 'refund_pending',
   );
+  const groupedOptions = useMemo(() => {
+    return options.reduce<Record<string, DisruptionRescheduleOption[]>>((groups, option) => {
+      groups[option.date] = [...(groups[option.date] ?? []), option];
+      return groups;
+    }, {});
+  }, [options]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,7 +95,7 @@ export function AppointmentDisruptionsPanel({
 
   const submitReschedule = async () => {
     if (!selected || !optionKey) return;
-    const option = options.find((current) => `${current.shiftId}-${current.startTime}` === optionKey);
+    const option = options.find((current) => optionKeyOf(current) === optionKey);
     if (!option) return;
     setSubmitting(true);
     try {
@@ -190,21 +210,65 @@ export function AppointmentDisruptionsPanel({
         onOk={() => void submitReschedule()}
         okText="Xác nhận đổi lịch"
         okButtonProps={{ disabled: !optionKey, loading: submitting }}
+        width={760}
       >
         <Spin spinning={loadingOptions}>
           {options.length ? (
-            <Select
-              className="w-full"
-              showSearch
-              value={optionKey}
-              onChange={setOptionKey}
-              optionFilterProp="label"
-              placeholder="Chọn ngày, bác sĩ và giờ khám"
-              options={options.map((option) => ({
-                value: `${option.shiftId}-${option.startTime}`,
-                label: `${new Date(`${option.date}T00:00:00`).toLocaleDateString('vi-VN')} - ${option.startTime.slice(0, 5)} - ${option.endTime.slice(0, 5)} - ${option.doctorName} - ${option.roomName}`,
-              }))}
-            />
+            <div className="space-y-4">
+              <Alert
+                showIcon
+                type="info"
+                message="Chọn một ca còn trống để đổi lịch khám bị ảnh hưởng."
+                description="Ca mới sẽ giữ dịch vụ cũ; hệ thống chỉ đổi bác sĩ, phòng và thời gian theo lựa chọn bên dưới."
+              />
+              <div className="max-h-[56vh] space-y-4 overflow-y-auto pr-1">
+                {Object.entries(groupedOptions).map(([date, dateOptions]) => (
+                  <div key={date} className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                      <CalendarClock className="h-4 w-4 text-teal-600" />
+                      {formatDateLabel(date)}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {dateOptions.map((option) => {
+                        const currentKey = optionKeyOf(option);
+                        const active = currentKey === optionKey;
+                        return (
+                          <button
+                            key={currentKey}
+                            type="button"
+                            onClick={() => setOptionKey(currentKey)}
+                            className={[
+                              'rounded-lg border p-3 text-left transition',
+                              active
+                                ? 'border-teal-600 bg-teal-50 shadow-sm'
+                                : 'border-slate-200 bg-slate-50 hover:border-teal-300 hover:bg-white',
+                            ].join(' ')}
+                          >
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900">
+                                <Clock3 className="h-4 w-4 text-teal-600" />
+                                {formatTimeRange(option)}
+                              </span>
+                              {active ? <Tag color="success">Đang chọn</Tag> : null}
+                            </div>
+                            <div className="space-y-1 text-xs text-slate-600">
+                              <div className="flex items-center gap-1">
+                                <Stethoscope className="h-3.5 w-3.5" />
+                                <span>{option.doctorName}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5" />
+                                <span>{option.roomName || 'Phòng sẽ được cơ sở sắp xếp'}</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : loadingOptions ? <div className="h-16" /> : (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có ca thay thế trong 30 ngày tới" />
           )}

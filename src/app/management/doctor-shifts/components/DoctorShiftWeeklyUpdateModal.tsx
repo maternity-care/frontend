@@ -31,12 +31,16 @@ import {
   X,
 } from "lucide-react";
 import {
+  getAllDoctorShifts,
   getGroupedDoctorShifts,
+  updateWeeklyDoctorShifts,
 } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type {
   DoctorShiftItem,
   DoctorShiftStatus,
   DoctorShiftWorkingDay,
+  WeeklyUpdateDoctorShiftsInput,
+  WeeklyUpdateDoctorShiftsResponse,
 } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import {
   getShiftSlotLookup,
@@ -105,8 +109,10 @@ type WeeklyUpdateStatus = Extract<
 
 type WeeklyUpdateAssignment = {
   staffId: string;
+  roleId?: string | null;
   roomId: string;
   workingDays: DoctorShiftWorkingDay[];
+  shiftIdsByDay?: Partial<Record<DoctorShiftWorkingDay, string>>;
   maxAppointments: number;
   status: WeeklyUpdateStatus;
 };
@@ -130,15 +136,11 @@ type WeeklyUpdateDraft = {
 
 type DoctorShiftWeeklyUpdateModalProps = {
   open: boolean;
-  shifts: DoctorShiftItem[];
   facilities: FacilityOption[];
   rooms: RoomOption[];
   doctors: DoctorOption[];
   onClose: () => void;
-};
-
-type LockedWeekDateInputProps = {
-  value?: string;
+  onApplied: (range: { fromDate: string; toDate: string }) => Promise<void> | void;
 };
 
 function toDateKey(date: Date) {
@@ -205,46 +207,6 @@ function formatIssueDate(
   }
 
   return `${day}/${month}/${year}`;
-}
-
-function formatLockedWeekDate(
-  value?: string,
-) {
-  if (!value) {
-    return "";
-  }
-
-  const [year, month, day] =
-    value.split("-");
-
-  if (!year || !month || !day) {
-    return value;
-  }
-
-  return `${day}-${month}-${year}`;
-}
-
-function LockedWeekDateInput({
-  value,
-}: LockedWeekDateInputProps) {
-  return (
-    <Input
-      value={
-        value
-          ? `${formatLockedWeekDate(
-              value,
-            )} - ${formatLockedWeekDate(
-              addDaysToDateKey(
-                value,
-                6,
-              ),
-            )}`
-          : ""
-      }
-      readOnly
-      disabled
-    />
-  );
 }
 
 function isRecord(
@@ -383,6 +345,88 @@ function getWorkingDay(
   return dayMap[day] ?? "MON";
 }
 
+const WORKING_DAY_OFFSET: Record<DoctorShiftWorkingDay, number> = {
+  MON: 0,
+  TUE: 1,
+  WED: 2,
+  THU: 3,
+  FRI: 4,
+  SAT: 5,
+  SUN: 6,
+};
+
+/** Chuyen form nhom theo khung ca thanh danh sach ca that ma API co the cap nhat theo id. */
+function buildWeeklyUpdateInput(
+  values: WeeklyUpdateFormValues,
+  targetShifts: DoctorShiftItem[],
+  doctors: DoctorOption[],
+): WeeklyUpdateDoctorShiftsInput {
+  const activeTargetShifts = targetShifts.filter(
+    (shift) => shift.status !== "cancelled",
+  );
+  const matchedShiftIds = new Set<string>();
+  const shifts: WeeklyUpdateDoctorShiftsInput["shifts"] = [];
+
+  for (const group of values.slotGroups ?? []) {
+    for (const assignment of group.assignments ?? []) {
+      const doctor = doctors.find(
+        (item) => item.staffId === assignment.staffId,
+      );
+
+      for (const workingDay of assignment.workingDays ?? []) {
+        const shiftDate = addDaysToDateKey(
+          values.fromDate,
+          WORKING_DAY_OFFSET[workingDay],
+        );
+        const availableTargets = activeTargetShifts.filter(
+          (shift) => !matchedShiftIds.has(shift.id),
+        );
+        const existing =
+          assignment.shiftIdsByDay?.[workingDay]
+            ? availableTargets.find(
+                (shift) => shift.id === assignment.shiftIdsByDay?.[workingDay],
+              )
+            : availableTargets.find(
+            (shift) =>
+              shift.staffId === assignment.staffId &&
+              shift.slotId === group.slotId &&
+              shift.shiftDate === shiftDate,
+          ) ?? availableTargets.find(
+            (shift) =>
+              shift.slotId === group.slotId &&
+              shift.shiftDate === shiftDate &&
+              shift.roomId === assignment.roomId,
+          );
+
+        if (existing) {
+          matchedShiftIds.add(existing.id);
+        }
+
+        shifts.push({
+          shiftId: existing?.id,
+          staffId: assignment.staffId,
+          roleId: doctor?.roleId ?? assignment.roleId ?? undefined,
+          roomId: assignment.status === "off" ? null : assignment.roomId,
+          slotId: group.slotId,
+          shiftDate,
+          maxAppointments: assignment.maxAppointments,
+          status: assignment.status,
+          note: existing?.note || undefined,
+        });
+      }
+    }
+  }
+
+  return {
+    facilityId: values.facilityId,
+    weekStart: values.fromDate,
+    shifts,
+    removedShiftIds: activeTargetShifts
+      .filter((shift) => !matchedShiftIds.has(shift.id))
+      .map((shift) => shift.id),
+  };
+}
+
 function buildGroupsFromShifts(
   slots: ShiftSlotLookupItem[],
   shifts: DoctorShiftItem[],
@@ -442,15 +486,14 @@ function buildGroupsFromShifts(
     const roomId = String(
       shift.roomId ?? "",
     );
-
-    if (!staffId || !roomId) {
-      continue;
-    }
-
     const status: WeeklyUpdateStatus =
       shift.status === "off"
         ? "off"
         : "available";
+
+    if (!staffId || (!roomId && status !== "off")) {
+      continue;
+    }
     const maxAppointments =
       Math.max(
         1,
@@ -485,9 +528,14 @@ function buildGroupsFromShifts(
       assignmentKey,
       {
         staffId,
+        roleId: doctor?.roleId ?? shift.roleId ?? null,
         roomId,
         status,
         maxAppointments,
+        shiftIdsByDay: {
+          ...(existing?.shiftIdsByDay ?? {}),
+          [workingDay]: shift.id,
+        },
         workingDays:
           Array.from(
             new Set([
@@ -557,11 +605,11 @@ function mergeDraftGroups(
 
 export function DoctorShiftWeeklyUpdateModal({
   open,
-  shifts,
   facilities,
   rooms,
   doctors,
   onClose,
+  onApplied,
 }: DoctorShiftWeeklyUpdateModalProps) {
   const {
     message: messageApi,
@@ -576,6 +624,12 @@ export function DoctorShiftWeeklyUpdateModal({
     useState(false);
   const [savingDraft, setSavingDraft] =
     useState(false);
+  const [applying, setApplying] =
+    useState(false);
+  const [targetShifts, setTargetShifts] =
+    useState<DoctorShiftItem[]>([]);
+  const [applyResult, setApplyResult] =
+    useState<WeeklyUpdateDoctorShiftsResponse | null>(null);
   const [error, setError] =
     useState<string | null>(null);
   const pendingDraftRef =
@@ -663,6 +717,7 @@ export function DoctorShiftWeeklyUpdateModal({
 
     const { dateFrom } =
       getCurrentWeekDateRange();
+    const nextWeekStart = addDaysToDateKey(dateFrom, 7);
     const defaultFacilityId =
       facilities.length === 1
         ? facilities[0]?.id
@@ -671,7 +726,7 @@ export function DoctorShiftWeeklyUpdateModal({
       defaultFacilityId
         ? readDraft(
             defaultFacilityId,
-            dateFrom,
+            nextWeekStart,
           )
         : null;
 
@@ -683,10 +738,12 @@ export function DoctorShiftWeeklyUpdateModal({
         form.setFieldsValue({
           facilityId:
             defaultFacilityId,
-          fromDate: dateFrom,
+          fromDate: nextWeekStart,
           slotGroups: [],
         });
         setShiftSlots([]);
+        setTargetShifts([]);
+        setApplyResult(null);
         setError(null);
       }, 0);
 
@@ -716,14 +773,22 @@ export function DoctorShiftWeeklyUpdateModal({
           setSlotsLoading(true);
         }
 
-        return getShiftSlotLookup({
-          facilityId:
-            watchedFacilityId,
-          status: "active",
-          limit: 40,
-        });
+        const dateTo = addDaysToDateKey(watchedFromDate, 6);
+        return Promise.all([
+          getShiftSlotLookup({
+            facilityId: watchedFacilityId,
+            status: "active",
+            limit: 40,
+          }),
+          getAllDoctorShifts({
+            facilityId: watchedFacilityId,
+            dateFrom: watchedFromDate,
+            dateTo,
+            limit: 200,
+          }),
+        ]);
       })
-      .then((slots) => {
+      .then(([slots, loadedTargetShifts]) => {
         if (cancelled) {
           return;
         }
@@ -736,7 +801,7 @@ export function DoctorShiftWeeklyUpdateModal({
         const currentGroups =
           buildGroupsFromShifts(
             slots,
-            shifts,
+            loadedTargetShifts,
             doctors,
             watchedFacilityId,
             watchedFromDate,
@@ -750,6 +815,7 @@ export function DoctorShiftWeeklyUpdateModal({
           );
 
         setShiftSlots(slots);
+        setTargetShifts(loadedTargetShifts);
         form.setFieldsValue({
           slotGroups,
         });
@@ -762,6 +828,7 @@ export function DoctorShiftWeeklyUpdateModal({
         }
 
         setShiftSlots([]);
+        setTargetShifts([]);
         pendingDraftRef.current =
           null;
         form.setFieldsValue({
@@ -786,7 +853,6 @@ export function DoctorShiftWeeklyUpdateModal({
     doctors,
     form,
     open,
-    shifts,
     watchedFacilityId,
     watchedFromDate,
   ]);
@@ -946,6 +1012,7 @@ export function DoctorShiftWeeklyUpdateModal({
           assignmentKey,
           {
             staffId,
+            roleId: doctor.roleId,
             roomId,
             status,
             maxAppointments,
@@ -999,7 +1066,7 @@ export function DoctorShiftWeeklyUpdateModal({
         WeeklyUpdateFormValues = {
         facilityId:
           watchedFacilityId,
-        fromDate: dateFrom,
+        fromDate: watchedFromDate,
         slotGroups,
       };
 
@@ -1034,7 +1101,8 @@ export function DoctorShiftWeeklyUpdateModal({
     if (
       slotsLoading ||
       importWeekLoading ||
-      savingDraft
+      savingDraft ||
+      applying
     ) {
       return;
     }
@@ -1080,6 +1148,48 @@ export function DoctorShiftWeeklyUpdateModal({
     }
   }
 
+  async function handleApplyWeeklyUpdate() {
+    setError(null);
+    setApplyResult(null);
+    setApplying(true);
+
+    try {
+      const values = await form.validateFields();
+      const input = buildWeeklyUpdateInput(values, targetShifts, doctors);
+      const result = await updateWeeklyDoctorShifts(input);
+
+      setApplyResult(result);
+      await onApplied({
+        fromDate: values.fromDate,
+        toDate: addDaysToDateKey(values.fromDate, 6),
+      });
+
+      if (result.blocked.length > 0) {
+        saveDraft(values);
+        messageApi.warning(
+          `Đã lưu các ca hợp lệ, còn ${result.blocked.length} ca cần xử lý riêng.`,
+        );
+        return;
+      }
+
+      window.localStorage.removeItem(
+        getDraftStorageKey(values.facilityId, values.fromDate),
+      );
+      messageApi.success(
+        `Đã cập nhật tuần: tạo ${result.summary.created}, sửa ${result.summary.updated}, xóa ${result.summary.removed}.`,
+      );
+      onClose();
+    } catch (applyError) {
+      if (!(isRecord(applyError) && "errorFields" in applyError)) {
+        const applyMessage = getErrorMessage(applyError);
+        setError(applyMessage);
+        messageApi.error(applyMessage);
+      }
+    } finally {
+      setApplying(false);
+    }
+  }
+
   return (
     <Modal
       open={open}
@@ -1093,7 +1203,8 @@ export function DoctorShiftWeeklyUpdateModal({
         closable:
           !slotsLoading &&
           !importWeekLoading &&
-          !savingDraft,
+          !savingDraft &&
+          !applying,
       }}
       destroyOnHidden
       styles={{
@@ -1110,7 +1221,8 @@ export function DoctorShiftWeeklyUpdateModal({
           disabled={
             slotsLoading ||
             importWeekLoading ||
-            savingDraft
+            savingDraft ||
+            applying
           }
           onClick={handleCancel}
           className="absolute right-0 top-0 z-10 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1168,6 +1280,21 @@ export function DoctorShiftWeeklyUpdateModal({
           />
         ) : null}
 
+        {applyResult?.blocked.length ? (
+          <Alert
+            type="warning"
+            showIcon
+            className="mb-4"
+            title={`${applyResult.blocked.length} ca chưa được cập nhật`}
+            description={applyResult.blocked.slice(0, 8).map((item) => (
+              <div key={`${item.action}-${item.shiftId ?? item.index}`}>
+                {item.shiftDate ? `${formatIssueDate(item.shiftDate)}: ` : ""}
+                {item.reason}
+              </div>
+            ))}
+          />
+        ) : null}
+
         <Form<WeeklyUpdateFormValues>
           form={form}
           layout="vertical"
@@ -1177,6 +1304,7 @@ export function DoctorShiftWeeklyUpdateModal({
             allValues,
           ) => {
             setError(null);
+            setApplyResult(null);
 
             if (
               "facilityId" in
@@ -1252,7 +1380,7 @@ export function DoctorShiftWeeklyUpdateModal({
                   },
                 ]}
               >
-                <LockedWeekDateInput />
+                <Input type="date" />
               </Form.Item>
             </Col>
           </Row>
@@ -1528,7 +1656,13 @@ export function DoctorShiftWeeklyUpdateModal({
                                               rules={[
                                                 {
                                                   required:
-                                                    true,
+                                                    form.getFieldValue([
+                                                      "slotGroups",
+                                                      groupField.name,
+                                                      "assignments",
+                                                      assignmentField.name,
+                                                      "status",
+                                                    ]) !== "off",
                                                   message:
                                                     "Chọn phòng.",
                                                 },
@@ -1593,6 +1727,20 @@ export function DoctorShiftWeeklyUpdateModal({
                                               ]}
                                             >
                                               <Select
+                                                onChange={(value) => {
+                                                  if (value === "off") {
+                                                    form.setFieldValue(
+                                                      [
+                                                        "slotGroups",
+                                                        groupField.name,
+                                                        "assignments",
+                                                        assignmentField.name,
+                                                        "roomId",
+                                                      ],
+                                                      "",
+                                                    );
+                                                  }
+                                                }}
                                                 options={[
                                                   {
                                                     value:
@@ -1687,7 +1835,8 @@ export function DoctorShiftWeeklyUpdateModal({
           disabled={
             slotsLoading ||
             importWeekLoading ||
-            savingDraft
+            savingDraft ||
+            applying
           }
           onClick={handleCancel}
         >
@@ -1699,7 +1848,8 @@ export function DoctorShiftWeeklyUpdateModal({
           loading={savingDraft}
           disabled={
             slotsLoading ||
-            importWeekLoading
+            importWeekLoading ||
+            applying
           }
           icon={
             <Save className="h-4 w-4" />
@@ -1709,6 +1859,14 @@ export function DoctorShiftWeeklyUpdateModal({
           }
         >
           Lưu bản nháp
+        </Button>
+        <Button
+          type="primary"
+          loading={applying}
+          disabled={slotsLoading || importWeekLoading || savingDraft}
+          onClick={() => void handleApplyWeeklyUpdate()}
+        >
+          Áp dụng cập nhật
         </Button>
       </div>
     </Modal>

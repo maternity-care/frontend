@@ -104,8 +104,9 @@ type RoomFieldPath =
 
 export type ShiftFormPayload = Omit<
   CreateDoctorShiftInput,
-  "status"
+  "roomId" | "status"
 > & {
+  roomId: string | null;
   status: DoctorShiftStatus;
 };
 
@@ -396,8 +397,9 @@ export function mergeShiftDisplayData({
   const facility = facilities.find(
     (item) => item.id === payload.facilityId,
   );
+  const payloadRoomId = payload.roomId ?? "";
   const room = rooms.find(
-    (item) => item.id === payload.roomId,
+    (item) => item.id === payloadRoomId,
   );
   const slot = slotById.get(payload.slotId);
   const merged = {
@@ -413,7 +415,7 @@ export function mergeShiftDisplayData({
     staffId: payload.staffId,
     roleId: payload.roleId,
     facilityId: payload.facilityId,
-    roomId: payload.roomId,
+    roomId: payloadRoomId,
     slotId: payload.slotId,
     shiftDate: payload.shiftDate,
     maxAppointments: payload.maxAppointments,
@@ -524,6 +526,9 @@ export function DoctorShiftFormModalBase({
     Form.useWatch("assignments", form) ?? [];
   const watchedSlotGroups =
     Form.useWatch("slotGroups", form) ?? [];
+  const watchedStatus =
+    Form.useWatch("status", form) ?? "available";
+  const isOffStatus = watchedStatus === "off";
 
   const slotById = useMemo(
     () =>
@@ -1127,8 +1132,12 @@ export function DoctorShiftFormModalBase({
           return;
         }
 
+        const selectedStatus =
+          values.status ?? "available";
+        const isEditingOffShift =
+          selectedStatus === "off";
         const shouldCheckEditConflicts =
-          (values.status ?? "available") !== "cancelled";
+          selectedStatus !== "cancelled";
 
         const existingDoctorConflict = shouldCheckEditConflicts && shifts.some(
           (shift) =>
@@ -1156,7 +1165,7 @@ export function DoctorShiftFormModalBase({
           return;
         }
 
-        const existingRoomConflict = shouldCheckEditConflicts
+        const existingRoomConflict = shouldCheckEditConflicts && !isEditingOffShift
           ? shifts.find(
               (shift) =>
                 shiftBlocksRoomConflict(shift) &&
@@ -1212,13 +1221,15 @@ export function DoctorShiftFormModalBase({
           staffId: selectedDoctor.staffId.trim(),
           roleId: selectedDoctor.roleId,
           facilityId: values.facilityId.trim(),
-          roomId: assignment.roomId.trim(),
+          roomId: isEditingOffShift
+            ? null
+            : assignment.roomId.trim(),
           slotId: assignment.slotId.trim(),
           shiftDate: values.shiftDate,
           maxAppointments: Number(
             assignment.maxAppointments,
           ),
-          status: values.status ?? "available",
+          status: selectedStatus,
           note: values.note?.trim() ?? "",
         });
         payloadFieldPaths.push({
@@ -1303,14 +1314,15 @@ export function DoctorShiftFormModalBase({
 
       const conflictResponses = await Promise.all(
         payloads.map((payload) =>
-          payload.status === "cancelled"
+          payload.status === "cancelled" ||
+          payload.status === "off"
             ? Promise.resolve({ hasConflict: false })
             : checkDoctorShiftConflicts({
                 doctorId: payload.doctorId,
                 staffId: payload.staffId,
                 roleId: payload.roleId,
                 facilityId: payload.facilityId,
-                roomId: payload.roomId,
+                roomId: payload.roomId ?? "",
                 slotId: payload.slotId,
                 shiftDate: payload.shiftDate,
                 note: payload.note,
@@ -1476,6 +1488,22 @@ export function DoctorShiftFormModalBase({
                 ),
               });
             }
+          }
+
+          if (mode === "edit" && changedValues.status === "off") {
+            const assignments =
+              form.getFieldValue("assignments") ?? [];
+
+            form.setFieldsValue({
+              assignments: assignments.map(
+                (
+                  assignment: ShiftAssignmentFormValue,
+                ) => ({
+                  ...assignment,
+                  roomId: "",
+                }),
+              ),
+            });
           }
         }}
       >
@@ -1887,7 +1915,7 @@ export function DoctorShiftFormModalBase({
                             label="Phòng"
                             rules={[
                               {
-                                required: true,
+                                required: !isOffStatus,
                                 message: "Chọn phòng.",
                               },
                             ]}
@@ -1895,7 +1923,12 @@ export function DoctorShiftFormModalBase({
                             <Select
                               showSearch
                               optionFilterProp="label"
-                              placeholder="Chọn phòng"
+                              disabled={isOffStatus}
+                              placeholder={
+                                isOffStatus
+                                  ? "Ca nghỉ không gán phòng"
+                                  : "Chọn phòng"
+                              }
                               options={roomOptions}
                             />
                           </Form.Item>

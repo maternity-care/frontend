@@ -1523,7 +1523,15 @@ export default function DoctorShiftPage() {
       dataIndex: "status",
       width: "11%",
       align: "center",
-      render: (status: DoctorShiftStatus) => renderStatus(status),
+      render: (_status: DoctorShiftStatus, shift) => (
+        <div className="space-y-1">
+          {renderStatus(shift.status)}
+
+          <Text type="secondary" className="block text-xs">
+            {shift.bookedAppointments}/{shift.maxAppointments} đã đặt
+          </Text>
+        </div>
+      ),
     },
     {
       title: "Thao tác",
@@ -2070,6 +2078,7 @@ export default function DoctorShiftPage() {
                                     </span>
 
                                     <span className="mt-1 block truncate text-[9px] font-medium opacity-75 lg:text-[10px]">
+                                      {shift.bookedAppointments}/{shift.maxAppointments} đã đặt ·{" "}
                                       Tối đa {shift.maxAppointments} lịch
                                     </span>
                                   </button>
@@ -2187,11 +2196,11 @@ export default function DoctorShiftPage() {
 
           <DoctorShiftWeeklyUpdateModal
             open={weeklyUpdateModalOpen}
-            shifts={shifts}
             facilities={managedFacilities}
             rooms={managedRooms}
             doctors={managedDoctors}
             onClose={() => setWeeklyUpdateModalOpen(false)}
+            onApplied={handleBulkGenerated}
           />
 
           <DoctorShiftEditModal
