@@ -197,6 +197,12 @@ function ManagementProfileContent() {
               </p>
             </div>
             <div>
+              <p className="text-slate-500">Cơ sở làm việc</p>
+              <p className="mt-1 font-medium text-slate-950">
+                {currentUser.address ?? "-"}
+              </p>
+            </div>
+            <div>
               <p className="text-slate-500">Trạng thái</p>
               <Badge tone={currentUser.status === "active" ? "green" : "neutral"}>
                 {currentUser.status === "active" ? "Hoạt động" : "Tạm khóa"}

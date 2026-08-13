@@ -313,7 +313,7 @@ export default function StaffsManagementPage() {
   const [facilityFilter, setFacilityFilter] = useState<string | undefined>();
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(5);
   const [selectedStaffIds, setSelectedUserIds] = useState<string[]>([]);
 
   const [detailStaff, setDetailStaff] = useState<StaffAccount | null>(null);
@@ -601,9 +601,9 @@ export default function StaffsManagementPage() {
       title: "Email",
       dataIndex: "email",
       ellipsis: true,
-      render: (email: string) => (
-        <CopyText value={email} copiedMessage="Đã sao chép email" className="max-w-full" />
-      ),
+      // render: (email: string) => (
+      //   <CopyText value={email} copiedMessage="Đã sao chép email" className="max-w-full" />
+      // ),
     },
     {
       title: "Số điện thoại",
@@ -611,13 +611,13 @@ export default function StaffsManagementPage() {
       width: 128,
       align: "center",
       responsive: ["xl"],
-      render: (phone: string) => (
-        <CopyText
-          value={phone}
-          emptyText="Chưa cập nhật"
-          copiedMessage="Đã sao chép số điện thoại"
-        />
-      ),
+      // render: (phone: string) => (
+      //   <CopyText
+      //     value={phone}
+      //     emptyText="Chưa cập nhật"
+      //     copiedMessage="Đã sao chép số điện thoại"
+      //   />
+      // ),
     },
     {
       title: "Vai trò",
@@ -690,7 +690,7 @@ export default function StaffsManagementPage() {
   return (
     <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
       <PageHeader
-        title="Staff Management"
+        title="Quản lý nhân viên"
         description="Quản lý tài khoản nhân viên nội bộ theo cơ sở."
       />
 
@@ -705,7 +705,7 @@ export default function StaffsManagementPage() {
           />
         ) : null}
 
-        <Card className="management-filter">
+        {/* <Card className="management-filter">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="mb-1 text-sm font-semibold uppercase text-sky-700">
@@ -729,7 +729,7 @@ export default function StaffsManagementPage() {
               Xuất danh sách
             </Button>
           </div>
-        </Card>
+        </Card> */}
 
         <div className="order-2">
         <TableFilter
@@ -751,7 +751,7 @@ export default function StaffsManagementPage() {
         />
         </div>
 
-        <div className="order-1 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {/* <div className="order-1 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="border-slate-200 bg-white">
             <Statistic
               title={<span className="text-slate-500">Tổng tài khoản</span>}
@@ -791,7 +791,7 @@ export default function StaffsManagementPage() {
               )}
             />
           </Card>
-        </div>
+        </div> */}
 
         <Card
           className="order-3 overflow-hidden border-slate-200 bg-white"
@@ -808,7 +808,7 @@ export default function StaffsManagementPage() {
           }
           extra={
             <Space wrap>
-              <Button
+              {/* <Button
                 danger
                 disabled={selectedStaffIds.length === 0}
                 icon={<Trash2 className="h-4 w-4" />}
@@ -818,7 +818,7 @@ export default function StaffsManagementPage() {
                 {selectedStaffIds.length > 0
                   ? ` (${selectedStaffIds.length})`
                   : ""}
-              </Button>
+              </Button> */}
 
               <Button
                 type="primary"
@@ -838,36 +838,39 @@ export default function StaffsManagementPage() {
             columns={columns}
             dataSource={filteredStaffs}
             className="management-table [&_.ant-table-cell]:px-3"
-            scroll={{ x: 980 }}
-            rowSelection={{
-              selectedRowKeys: selectedStaffIds,
-              onChange: (selectedRowKeys) => {
-                setSelectedUserIds(selectedRowKeys.map(String));
-              },
+            scroll={{
+              x: 900,
+              y: 380, // cố định chiều cao body → có scroll dọc, không bị tràn
             }}
-            onRow={(record) => ({
-              className: "cursor-pointer",
-              onClick: (event) => {
-                const target = event.target as HTMLElement;
+            // rowSelection={{
+            //   selectedRowKeys: selectedStaffIds,
+            //   onChange: (selectedRowKeys) => {
+            //     setSelectedUserIds(selectedRowKeys.map(String));
+            //   },
+            // }}
+            // onRow={(record) => ({
+            //   className: "cursor-pointer",
+            //   onClick: (event) => {
+            //     const target = event.target as HTMLElement;
 
-                if (
-                  target.closest("button") ||
-                  target.closest("a") ||
-                  target.closest(".ant-checkbox") ||
-                  target.closest(".ant-checkbox-wrapper")
-                ) {
-                  return;
-                }
+            //     if (
+            //       target.closest("button") ||
+            //       target.closest("a") ||
+            //       target.closest(".ant-checkbox") ||
+            //       target.closest(".ant-checkbox-wrapper")
+            //     ) {
+            //       return;
+            //     }
 
-                void openDetailStaff(record);
-              },
-            })}
+            //     void openDetailStaff(record);
+            //   },
+            // })}
             pagination={{
               current: currentPage,
               pageSize,
               total: totalStaffs,
               showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50, 100],
+              pageSizeOptions: [5, 10, 20, 50, 100],
               showQuickJumper: true,
               showTotal: (total, range) =>
                 `Hiển thị ${range[0]} - ${range[1]} trong tổng ${total} tài khoản`,

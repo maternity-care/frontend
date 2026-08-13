@@ -25,13 +25,7 @@ interface Props {
   onSave: (values: CreateUserDto | UpdateUserDto) => void;
 }
 
-export function UserFormModal({
-  open,
-  user,
-  loading,
-  onClose,
-  onSave,
-}: Props) {
+export function UserFormModal({ open, user, loading, onClose, onSave }: Props) {
   const [form] = Form.useForm<CreateUserDto & UpdateUserDto>();
 
   useEffect(() => {
@@ -61,7 +55,7 @@ export function UserFormModal({
     <Modal
       open={open}
       centered
-      width={720}
+      width={780}
       forceRender
       destroyOnHidden={false}
       title={user ? "Cập nhật người dùng" : "Thêm người dùng"}
@@ -73,9 +67,11 @@ export function UserFormModal({
       mask={{ closable: true }}
       styles={{
         body: {
-          maxHeight: "72vh",
+          maxHeight: "68vh",
           overflowY: "auto",
-          paddingRight: 8,
+          paddingTop: 12,
+          paddingBottom: 8,
+          paddingRight: 4,
         },
       }}
     >
@@ -84,11 +80,15 @@ export function UserFormModal({
         layout="vertical"
         requiredMark="optional"
         onFinish={onSave}
+        className="[&_.ant-form-item]:mb-3"
       >
         <Card
           size="small"
-          className="mb-5 border-slate-200"
-          title="Thông tin cơ bản"
+          className="mb-3 border-slate-200"
+          styles={{ body: { padding: "12px 16px 4px" } }}
+          title={
+            <span className="text-sm font-semibold">Thông tin cơ bản</span>
+          }
         >
           <Row gutter={[16, 0]}>
             <Col xs={24} md={12}>
@@ -103,7 +103,7 @@ export function UserFormModal({
                   },
                 ]}
               >
-                <Input size="large" placeholder="Nhập họ và tên" />
+                <Input placeholder="Nhập họ và tên" />
               </Form.Item>
             </Col>
 
@@ -121,7 +121,7 @@ export function UserFormModal({
                       },
                     ]}
                   >
-                    <Input size="large" placeholder="name@example.com" />
+                    <Input placeholder="name@example.com" />
                   </Form.Item>
                 </Col>
 
@@ -137,11 +137,7 @@ export function UserFormModal({
                       },
                     ]}
                   >
-                    <Input
-                      size="large"
-                      maxLength={12}
-                      placeholder="Nhập 12 chữ số"
-                    />
+                    <Input maxLength={12} placeholder="Nhập 12 chữ số" />
                   </Form.Item>
                 </Col>
 
@@ -160,7 +156,7 @@ export function UserFormModal({
                       },
                     ]}
                   >
-                    <Input size="large" placeholder="0901234567" />
+                    <Input placeholder="0901234567" />
                   </Form.Item>
                 </Col>
 
@@ -173,10 +169,7 @@ export function UserFormModal({
                       { min: 6, message: "Mật khẩu tối thiểu 6 ký tự." },
                     ]}
                   >
-                    <Input.Password
-                      size="large"
-                      placeholder="Nhập mật khẩu"
-                    />
+                    <Input.Password placeholder="Nhập mật khẩu" />
                   </Form.Item>
                 </Col>
               </>
@@ -184,11 +177,13 @@ export function UserFormModal({
 
             <Col xs={24} md={12}>
               <Form.Item name="dateOfBirth" label="Ngày sinh">
-                <Input size="large" type="date" />
+                <Input
+                  type="date"
+                  max={new Date().toISOString().split("T")[0]} 
+                />
               </Form.Item>
             </Col>
 
-            {/* Đổi status khi cập nhật */}
             {user && (
               <Col xs={24} md={12}>
                 <Form.Item
@@ -198,14 +193,19 @@ export function UserFormModal({
                     { required: true, message: "Vui lòng chọn trạng thái." },
                   ]}
                 >
-                  <Select size="large" options={STATUS_OPTIONS} />
+                  <Select options={STATUS_OPTIONS} />
                 </Form.Item>
               </Col>
             )}
           </Row>
         </Card>
 
-        <Card size="small" className="mb-5 border-slate-200" title="Địa chỉ">
+        <Card
+          size="small"
+          className="mb-3 border-slate-200"
+          styles={{ body: { padding: "12px 16px 4px" } }}
+          title={<span className="text-sm font-semibold">Địa chỉ</span>}
+        >
           <Row gutter={[16, 0]}>
             <Col xs={24}>
               <Form.Item name="address" label="Địa chỉ">
@@ -219,12 +219,12 @@ export function UserFormModal({
             </Col>
             <Col xs={24} md={12}>
               <Form.Item name="province" label="Tỉnh / Thành phố">
-                <Input size="large" placeholder="Ví dụ: Hà Nội" />
+                <Input placeholder="Ví dụ: Hà Nội" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
               <Form.Item name="ward" label="Phường / Xã">
-                <Input size="large" placeholder="Ví dụ: Thanh Xuân" />
+                <Input placeholder="Ví dụ: Thanh Xuân" />
               </Form.Item>
             </Col>
           </Row>
@@ -232,8 +232,11 @@ export function UserFormModal({
 
         <Card
           size="small"
-          className="mb-5 border-slate-200"
-          title="Liên hệ khẩn cấp"
+          className="mb-1 border-slate-200"
+          styles={{ body: { padding: "12px 16px 4px" } }}
+          title={
+            <span className="text-sm font-semibold">Liên hệ khẩn cấp</span>
+          }
         >
           <Row gutter={[16, 0]}>
             <Col xs={24} md={12}>
@@ -241,7 +244,7 @@ export function UserFormModal({
                 name="emergencyContactName"
                 label="Người liên hệ khẩn cấp"
               >
-                <Input size="large" placeholder="Họ và tên" />
+                <Input placeholder="Họ và tên" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
@@ -255,7 +258,7 @@ export function UserFormModal({
                   },
                 ]}
               >
-                <Input size="large" placeholder="0912345678" />
+                <Input placeholder="0912345678" />
               </Form.Item>
             </Col>
           </Row>
