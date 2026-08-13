@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useState,
+} from "react";
 import {
   App,
   Button,
@@ -13,90 +15,57 @@ import {
 } from "lucide-react";
 import {
   deleteRoom,
-  deleteRooms,
 } from "@/management/features/rooms/rooms.api";
 import type {
   ClinicRoom,
 } from "@/management/features/rooms/rooms.types";
+import {
+  getRoomErrorMessage,
+} from "@/management/features/rooms/rooms.utils";
 
 const { TextArea } = Input;
 
-export type RoomDeleteTarget =
-  | {
-      mode: "single";
-      room: ClinicRoom;
-    }
-  | {
-      mode: "selected";
-      ids: string[];
-      count: number;
-    };
-
-type RoomDeleteModalProps = {
+type Props = {
   open: boolean;
-  target: RoomDeleteTarget | null;
+  room: ClinicRoom | null;
   onClose: () => void;
   onDeleted: (
-    deletedIds: string[],
+    roomId: string,
   ) => void;
 };
 
-function getErrorMessage(error: unknown) {
-  if (
-    typeof error === "object" &&
-    error &&
-    "response" in error
-  ) {
-    const message = (
-      error as {
-        response?: {
-          data?: {
-            message?:
-              | string
-              | string[];
-          };
-        };
-      }
-    ).response?.data?.message;
-
-    if (Array.isArray(message)) {
-      return message.join(", ");
-    }
-
-    if (message) return message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Không thể xóa phòng.";
-}
-
 export function RoomDeleteModal({
   open,
-  target,
+  room,
   onClose,
   onDeleted,
-}: RoomDeleteModalProps) {
-  const { message: messageApi } =
-    App.useApp();
+}: Props) {
+  const {
+    message: messageApi,
+  } = App.useApp();
   const [reason, setReason] =
     useState("");
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [
+    submitting,
+    setSubmitting,
+  ] = useState(false);
 
   function handleClose() {
-    if (submitting) return;
+    if (submitting) {
+      return;
+    }
 
     setReason("");
     onClose();
   }
 
   async function handleDelete() {
-    if (!target) return;
+    if (!room) {
+      return;
+    }
 
-    const trimmedReason = reason.trim();
+    const trimmedReason =
+      reason.trim();
 
     if (!trimmedReason) {
       messageApi.warning(
@@ -108,34 +77,24 @@ export function RoomDeleteModal({
     setSubmitting(true);
 
     try {
-      let deletedIds: string[];
+      await deleteRoom(
+        room.id,
+        trimmedReason,
+      );
 
-      if (target.mode === "single") {
-        await deleteRoom(
-          target.room.id,
-          trimmedReason,
-        );
-        deletedIds = [target.room.id];
-      } else {
-        await deleteRooms(
-          target.ids,
-          trimmedReason,
-        );
-        deletedIds = target.ids;
-      }
-
-      onDeleted(deletedIds);
+      onDeleted(room.id);
       setReason("");
       onClose();
 
       messageApi.success(
-        deletedIds.length > 1
-          ? `Đã xóa ${deletedIds.length} phòng.`
-          : "Xóa phòng thành công.",
+        "Xóa phòng thành công.",
       );
     } catch (error) {
       messageApi.error(
-        getErrorMessage(error),
+        getRoomErrorMessage(
+          error,
+          "Không thể xóa phòng.",
+        ),
       );
     } finally {
       setSubmitting(false);
@@ -150,9 +109,12 @@ export function RoomDeleteModal({
       title={null}
       footer={null}
       closable={false}
-      onCancel={handleClose}
+      onCancel={
+        handleClose
+      }
       mask={{
-        closable: !submitting,
+        closable:
+          !submitting,
       }}
       className="[&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-[14px] [&_.ant-modal-content]:p-0"
       styles={{
@@ -165,8 +127,12 @@ export function RoomDeleteModal({
         <button
           type="button"
           aria-label="Đóng"
-          onClick={handleClose}
-          disabled={submitting}
+          onClick={
+            handleClose
+          }
+          disabled={
+            submitting
+          }
           className="absolute right-3 top-3 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <X className="h-5 w-5" />
@@ -177,21 +143,21 @@ export function RoomDeleteModal({
         </div>
 
         <h3 className="mt-5 text-lg font-bold text-slate-950">
-          {target?.mode === "selected"
-            ? "Xóa các phòng đã chọn?"
-            : "Xóa phòng?"}
+          Xóa phòng?
         </h3>
 
         <p className="mt-2 text-sm text-slate-500">
-          {target?.mode === "selected"
-            ? `Bạn đang xóa ${target.count} phòng.`
-            : "Phòng bị xóa sẽ không còn xuất hiện trong danh sách hoạt động."}
+          Phòng bị xóa sẽ không còn
+          xuất hiện trong danh sách
+          hoạt động.
         </p>
 
-        {target?.mode === "single" ? (
+        {room ? (
           <p className="mx-auto mt-2 max-w-[360px] truncate text-sm font-semibold text-slate-800">
-            {target.room.roomName} -{" "}
-            {target.room.roomTypeName}
+            {room.roomName} -{" "}
+            {
+              room.roomTypeName
+            }
           </p>
         ) : null}
 
@@ -209,10 +175,16 @@ export function RoomDeleteModal({
             rows={3}
             maxLength={500}
             showCount
-            disabled={submitting}
+            disabled={
+              submitting
+            }
             placeholder="Nhập lý do xóa phòng..."
-            onChange={(event) =>
-              setReason(event.target.value)
+            onChange={(
+              event,
+            ) =>
+              setReason(
+                event.target.value,
+              )
             }
           />
         </div>
@@ -220,8 +192,12 @@ export function RoomDeleteModal({
         <div className="mt-6 grid grid-cols-2 gap-3">
           <Button
             size="large"
-            onClick={handleClose}
-            disabled={submitting}
+            onClick={
+              handleClose
+            }
+            disabled={
+              submitting
+            }
             className="h-11 rounded-lg font-semibold"
           >
             Hủy
@@ -231,8 +207,12 @@ export function RoomDeleteModal({
             danger
             type="primary"
             size="large"
-            loading={submitting}
-            disabled={!reason.trim()}
+            loading={
+              submitting
+            }
+            disabled={
+              !reason.trim()
+            }
             onClick={() =>
               void handleDelete()
             }

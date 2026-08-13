@@ -40,6 +40,9 @@ import type {
   RoomType,
   UpdateRoomTypeInput,
 } from "@/management/features/rooms/rooms.types";
+import {
+  getRoomErrorMessage,
+} from "@/management/features/rooms/rooms.utils";
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -55,38 +58,6 @@ type RoomTypeFormValues = {
   description: string;
   status: RoomStatus;
 };
-
-function getErrorMessage(error: unknown) {
-  if (
-    typeof error === "object" &&
-    error &&
-    "response" in error
-  ) {
-    const message = (
-      error as {
-        response?: {
-          data?: {
-            message?:
-              | string
-              | string[];
-          };
-        };
-      }
-    ).response?.data?.message;
-
-    if (Array.isArray(message)) {
-      return message.join(", ");
-    }
-
-    if (message) return message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Đã có lỗi xảy ra.";
-}
 
 function hasChanges(
   values: RoomTypeFormValues,
@@ -179,7 +150,7 @@ export function RoomTypeManagementModal({
           if (cancelled) return;
 
           setError(
-            getErrorMessage(loadError),
+            getRoomErrorMessage(loadError),
           );
         })
         .finally(() => {
@@ -254,7 +225,7 @@ export function RoomTypeManagementModal({
       setFormOpen(true);
     } catch (loadError) {
       messageApi.error(
-        getErrorMessage(loadError),
+        getRoomErrorMessage(loadError),
       );
     }
   }
@@ -363,7 +334,7 @@ export function RoomTypeManagementModal({
       refresh();
     } catch (submitError) {
       messageApi.error(
-        getErrorMessage(submitError),
+        getRoomErrorMessage(submitError),
       );
     } finally {
       setSubmitting(false);
@@ -401,7 +372,7 @@ export function RoomTypeManagementModal({
           refresh();
         } catch (deleteError) {
           messageApi.error(
-            getErrorMessage(
+            getRoomErrorMessage(
               deleteError,
             ),
           );

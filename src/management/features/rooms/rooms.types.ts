@@ -72,8 +72,15 @@ export interface RoomFormValues {
   status: RoomStatus;
 }
 
+export interface RoomFacilityOption {
+  id: string;
+  name: string;
+  code: string;
+  address?: string;
+  status?: string;
+}
+
 export interface GetRoomsParams {
- 
   search?: string;
   floor?: string;
   status?: RoomStatus;
@@ -90,7 +97,6 @@ export interface CreateRoomInput {
   floor: string;
   status: RoomStatus;
 }
-
 export interface UpdateRoomInput {
   name?: string;
   roomTypeId?: string;

@@ -35,8 +35,8 @@ import type {
   RoomType,
 } from "@/management/features/rooms/rooms.types";
 import type {
-  FacilityOption,
-} from "./room-form.shared";
+  RoomFacilityOption,
+} from "@/management/features/rooms/rooms.types";
 
 const { Text, Title } = Typography;
 
@@ -119,7 +119,7 @@ type RoomCreateFailure = {
 
 type RoomBulkCreateModalProps = {
   open: boolean;
-  facilities: FacilityOption[];
+  facilities: RoomFacilityOption[];
   defaultFacilityId?: string;
   onClose: () => void;
   onCompleted: () => void;
