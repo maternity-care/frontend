@@ -142,7 +142,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="!gap-1.5"
                 >
                   <Home className="h-4 w-4" />
-                  <span className="hidden sm:inline">Trang chủ</span>
+                  <span className="hidden sm:inline">Trang cá nhân</span>
                 </Button>
 
                 {/* <Button variant="light" onClick={handleLogout}>

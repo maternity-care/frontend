@@ -1,20 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-
 import { App, Button, Card, Space, Typography } from "antd";
-
 import { Plus, RefreshCcw } from "lucide-react";
 
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
-
 import {
   createManagementPregnancyProfile,
   deleteManagementPregnancyProfile,
   getManagementPregnancyProfiles,
   updateManagementPregnancyProfile,
 } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.api";
-
 import type {
   CreateManagementPregnancyProfileInput,
   GetManagementPregnancyProfilesParams,
@@ -70,56 +66,46 @@ function getErrorMessage(error: unknown): string {
   return "Đã xảy ra lỗi không xác định.";
 }
 
+/** Filter khớp với query params của GET /management/pregnancy-profiles */
 const PREGNANCY_PROFILE_FILTER_COLUMNS: TableFilterColumn[] = [
   {
-    field: "search",
-    label: "Tìm kiếm hồ sơ",
+    field: "name",
+    label: "Tên thai phụ",
     type: "text",
-    width: 280,
+    width: 200,
     contains: true,
   },
   {
-    field: "riskLevel",
-    label: "Mức nguy cơ",
-    type: "select",
+    field: "code",
+    label: "Mã hồ sơ",
+    type: "text",
+    width: 160,
+    contains: true,
+  },
+  {
+    field: "phone",
+    label: "Số điện thoại",
+    type: "text",
+    width: 160,
+    contains: true,
+  },
+  {
+    field: "email",
+    label: "Email",
+    type: "text",
     width: 200,
-    options: [
-      {
-        value: "low",
-        label: "Nguy cơ thấp",
-      },
-      {
-        value: "medium",
-        label: "Nguy cơ trung bình",
-      },
-      {
-        value: "high",
-        label: "Nguy cơ cao",
-      },
-    ],
+    contains: true,
   },
   {
     field: "status",
     label: "Trạng thái",
     type: "select",
-    width: 200,
+    width: 180,
     options: [
-      {
-        value: "active",
-        label: "Đang theo dõi",
-      },
-      {
-        value: "completed",
-        label: "Đã hoàn thành",
-      },
-      {
-        value: "terminated",
-        label: "Đã kết thúc",
-      },
-      {
-        value: "deleted",
-        label: "Đã xóa",
-      },
+      { value: "active", label: "Đang theo dõi" },
+      { value: "completed", label: "Đã hoàn thành" },
+      { value: "terminated", label: "Đã kết thúc" },
+      { value: "deleted", label: "Đã xóa" },
     ],
   },
 ];
@@ -185,28 +171,26 @@ export default function ManagementPregnancyProfilesPage() {
     };
   }, [loadProfiles]);
 
-  // const handleSearch = (values: GetManagementPregnancyProfilesParams) => {
-  //   setPage(1);
-  //   setFilters(values);
-  // };
-
-  // const handleReset = () => {
-  //   setPage(1);
-  //   setFilters({});
-  // };
-
   const handleFilterChange = (values: TableFilterValues) => {
     const nextFilters: GetManagementPregnancyProfilesParams = {
-      search:
-        typeof values.search === "string"
-          ? values.search.trim() || undefined
+      name:
+        typeof values.name === "string"
+          ? values.name.trim() || undefined
           : undefined,
 
-      riskLevel:
-        values.riskLevel === "low" ||
-        values.riskLevel === "medium" ||
-        values.riskLevel === "high"
-          ? values.riskLevel
+      code:
+        typeof values.code === "string"
+          ? values.code.trim() || undefined
+          : undefined,
+
+      phone:
+        typeof values.phone === "string"
+          ? values.phone.trim() || undefined
+          : undefined,
+
+      email:
+        typeof values.email === "string"
+          ? values.email.trim() || undefined
           : undefined,
 
       status:
@@ -282,21 +266,17 @@ export default function ManagementPregnancyProfilesPage() {
   const handleDelete = (profile: ManagementPregnancyProfile) => {
     modal.confirm({
       title: "Xóa hồ sơ thai kỳ?",
-
       content: (
         <div>
           Hồ sơ <strong>{profile.code || profile.id}</strong> của thai phụ{" "}
           <strong>{profile.user?.name || "Chưa có tên"}</strong> sẽ bị xóa.
         </div>
       ),
-
       okText: "Xóa hồ sơ",
       cancelText: "Hủy",
-
       okButtonProps: {
         danger: true,
       },
-
       async onOk() {
         try {
           await deleteManagementPregnancyProfile(profile.id);
@@ -368,8 +348,10 @@ export default function ManagementPregnancyProfilesPage() {
         <TableFilter
           columns={PREGNANCY_PROFILE_FILTER_COLUMNS}
           values={{
-            search: filters.search,
-            riskLevel: filters.riskLevel,
+            name: filters.name,
+            code: filters.code,
+            phone: filters.phone,
+            email: filters.email,
             status: filters.status,
           }}
           clearLabel="Xóa bộ lọc"
@@ -432,7 +414,7 @@ export default function ManagementPregnancyProfilesPage() {
         onCancel={() => setCreatingMedicalRecordFor(null)}
         onSuccess={() => {
           setCreatingMedicalRecordFor(null);
-          void loadProfiles(); // reload danh sách để thấy medicalRecords mới
+          void loadProfiles();
         }}
       />
 
