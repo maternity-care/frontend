@@ -45,20 +45,15 @@ function getSidebarCollapsedServerSnapshot() {
 }
 
 const navItems = [
-  { href: "/management/dashboard", label: "Dashboard", icon: Gauge },
-  { href: "/management/users", label: "Users", icon: Users, roles: ["super_admin"] },
-  { href: "/management/staffs", label: "Staffs", icon: UserCog, roles: ["super_admin", "admin"] },
-  { href: "/management/doctors", label: "Doctors", icon: Stethoscope, roles: ["super_admin", "admin"] },
-  { href: "/management/facilities", label: "Cơ sở", icon: Building2, roles: ["super_admin"] },
-  { href: "/management/rooms", label: "Phòng khám", icon: DoorOpen, roles: ["super_admin", "admin"] },
-  // { href: "/management/roles", label: "Roles", icon: ShieldCheck, roles: ["super_admin"] },
-  // { href: "/management/records", label: "Records", icon: HardDrive, roles: ["super_admin", "doctor"] },
-  // { href: "/management/permissions", label: "Permissions", icon: KeyRound, roles: ["super_admin"] },
-  // { href: "/management/jobs", label: "Jobs", icon: BriefcaseBusiness, roles: ["super_admin"] },
-  // { href: "/management/uploads", label: "Uploads", icon: Upload, roles: ["super_admin"] },
-  { href: "/management/records", label: "Hồ sơ thai phụ", icon: HardDrive, roles: ["doctor"] },
-  { href: "/management/services/super", label: "Dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin"] },
-  { href: "/management/services/facility", label: "Dịch vụ cơ sở", icon: BriefcaseBusiness, roles: ["admin"] },
+  { href: "/management/dashboard", label: "Dashboard (Thống kê)", icon: Gauge },
+  { href: "/management/users", label: "Quản lý người dùng", icon: Users, roles: ["super_admin"] },
+  { href: "/management/staffs", label: "Quản lý nhân viên", icon: UserCog, roles: ["super_admin", "admin"] },
+  { href: "/management/doctors", label: "Quản lý bác sĩ", icon: Stethoscope, roles: ["super_admin", "admin"] },
+  { href: "/management/facilities", label: "Quản lý cơ sở", icon: Building2, roles: ["super_admin"] },
+  { href: "/management/rooms", label: "Quản lý phòng khám", icon: DoorOpen, roles: ["super_admin", "admin"] },
+  { href: "/management/records", label: "Quản lý hồ sơ thai phụ", icon: HardDrive, roles: ["doctor"] },
+  { href: "/management/services/super", label: "Quản lý dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin"] },
+  { href: "/management/services/facility", label: "Quản lý dịch vụ cơ sở", icon: BriefcaseBusiness, roles: ["admin"] },
   // { href: "/management/roles", label: "Roles", icon: ShieldCheck, roles: ["super_admin"] },
   // { href: "/management/records", label: "Records", icon: HardDrive, roles: ["super_admin", "doctor"] },
   // { href: "/management/permissions", label: "Permissions", icon: KeyRound, roles: ["super_admin"] },
@@ -66,10 +61,10 @@ const navItems = [
   // { href: "/management/uploads", label: "Uploads", icon: Upload, roles: ["super_admin"] },
   // { href: "/management/profile", label: "Hồ sơ cá nhân", icon: UserCog },
   { href: "/management/forums", label: "Quản lý diễn đàn", icon: MessageSquare, roles: ["super_admin", "admin", "staff", "doctor"] },
-  { href: "/management/doctor-shifts", label: "Ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
+  { href: "/management/doctor-shifts", label: "Quản lý ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
   { href: "/management/appointments", label: "Lịch đặt khám", icon: CalendarCheck, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
   { href: "/management/appointment-disruptions", label: "Lịch bị ảnh hưởng", icon: CalendarX2, roles: ["super_admin", "admin"] },
-  { href: "/management/shift-slots", label: "Khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
+  { href: "/management/shift-slots", label: "Quản lý khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
 ];
 
 export function Sidebar() {
@@ -82,6 +77,15 @@ export function Sidebar() {
     getSidebarCollapsedSnapshot,
     getSidebarCollapsedServerSnapshot,
   );
+
+  const getConsoleTitle = () => {
+    if (effectiveRoles.has("super_admin")) return "Super Admin Console";
+    if (effectiveRoles.has("admin")) return "Admin Console";
+    if (effectiveRoles.has("doctor")) return "Doctor Console";
+    if (effectiveRoles.has("staff")) return "Staff Console";
+    if (effectiveRoles.has("nurse")) return "Nurse Console";
+    return "Console";
+  };
 
   function toggleCollapsed() {
     window.localStorage.setItem(
@@ -147,7 +151,7 @@ export function Sidebar() {
           {!collapsed ? (
             <div className="ml-3 min-w-0">
               <p className="truncate text-sm font-semibold uppercase text-slate-400">Maternity Care</p>
-              <p className="truncate text-lg font-semibold text-white">Admin Console</p>
+              <p className="truncate text-lg font-semibold text-white">{getConsoleTitle()}</p>
             </div>
           ) : null}
         </div>

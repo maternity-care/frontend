@@ -17,11 +17,31 @@ import {
   updateUser,
 } from "@/management/features/management-users/management-user.api";
 import { ApiClientError } from "@/lib/axios";
-import { UserStats } from "@/fe/components/management-users/UserStats";
-import { UserFilters } from "@/fe/components/management-users/UserFilters";
 import { UserTable } from "@/fe/components/management-users/UserTable";
 import { UserFormModal } from "@/fe/components/management-users/UserFormModal";
 import { UserDetailModal } from "@/fe/components/management-users/UserDetailModal";
+import { TableFilter, TableFilterColumn, TableFilterValues } from "@/management/components/ui/TableFilter";
+
+const USER_FILTER_COLUMNS: TableFilterColumn[] = [
+  {
+    field: "search",
+    label: "Tìm kiếm",
+    type: "text",
+    width: 320,
+    contains: true,
+  },
+  {
+    field: "status",
+    label: "Trạng thái",
+    type: "select",
+    width: 200,
+    options: [
+      { value: "active", label: "Đang hoạt động" },
+      { value: "inactive", label: "Ngừng hoạt động" },
+      { value: "locked", label: "Đã khóa" },
+    ],
+  },
+];
 
 export default function UserManagementPage() {
   const { message: messageApi } = App.useApp();
@@ -32,10 +52,14 @@ export default function UserManagementPage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<UserStatus>();
+  // Filter state dùng chung với TableFilter
+  const [filterValues, setFilterValues] = useState<TableFilterValues>({
+    search: undefined,
+    status: undefined,
+  });
+
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(5);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -44,11 +68,15 @@ export default function UserManagementPage() {
   const [lockReason, setLockReason] = useState("");
   const lockReasonRef = useRef("");
 
+  // Lấy giá trị filter
+  const search = (filterValues.search as string) || undefined;
+  const status = filterValues.status as UserStatus | undefined;
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getUsers({
-        search: search || undefined,
+        search,
         status,
         page: currentPage,
         limit: pageSize,
@@ -72,7 +100,7 @@ export default function UserManagementPage() {
       setLoading(true);
       try {
         const res = await getUsers({
-          search: search || undefined,
+          search,
           status,
           page: currentPage,
           limit: pageSize,
@@ -99,16 +127,6 @@ export default function UserManagementPage() {
     };
   }, [search, status, currentPage, pageSize, messageApi]);
 
-  const activeCount = users.filter((u) => u.status === "active").length;
-  const lockedCount = users.filter((u) => u.status === "locked").length;
-  const inactiveCount = users.filter((u) => u.status === "inactive").length;
-
-  function resetFilters() {
-    setSearch("");
-    setStatus(undefined);
-    setCurrentPage(1);
-  }
-
   function openCreate() {
     setEditingUser(null);
     setFormModalOpen(true);
@@ -123,7 +141,6 @@ export default function UserManagementPage() {
     setSubmitting(true);
     try {
       if (editingUser) {
-        // Gửi name + status + các field khác theo schema PATCH
         await updateUser(editingUser.id, values as UpdateUserDto);
         messageApi.success("Cập nhật người dùng thành công.");
       } else {
@@ -217,25 +234,14 @@ export default function UserManagementPage() {
       />
 
       <div className="mt-6 flex flex-col gap-5">
-        <UserStats
-          total={total}
-          activeCount={activeCount}
-          lockedCount={lockedCount}
-          inactiveCount={inactiveCount}
-        />
-
-        <UserFilters
-          search={search}
-          status={status}
-          onSearchChange={(v) => {
-            setSearch(v);
+        <TableFilter
+          columns={USER_FILTER_COLUMNS}
+          values={filterValues}
+          clearLabel="Xóa bộ lọc"
+          onChange={(values) => {
+            setFilterValues(values);
             setCurrentPage(1);
           }}
-          onStatusChange={(v) => {
-            setStatus(v);
-            setCurrentPage(1);
-          }}
-          onReset={resetFilters}
         />
 
         <UserTable

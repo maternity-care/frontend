@@ -59,18 +59,17 @@ export function UserTable({
   const columns: ColumnsType<User> = [
     {
       title: "STT",
-      width: 64,
+      width: 56,
       align: "center",
-      fixed: "left",
       render: (_v, _r, index) => (currentPage - 1) * pageSize + index + 1,
     },
     {
       title: "Người dùng",
-      width: 260,
-      fixed: "left",
+      width: 220,
+      ellipsis: true,
       render: (_v, user) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <Avatar className="!shrink-0 !bg-pink-500 !font-semibold">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Avatar size={36} className="!shrink-0 !bg-pink-500 !font-semibold">
             {getInitials(user.name)}
           </Avatar>
           <div className="min-w-0">
@@ -87,41 +86,41 @@ export function UserTable({
     {
       title: "CCCD",
       dataIndex: "cccd",
-      width: 150,
+      width: 130,
       render: (value?: string | null) => (
-        <Text className="font-mono">{value || "—"}</Text>
+        <Text className="font-mono text-sm">{value || "—"}</Text>
       ),
     },
     {
       title: "Số điện thoại",
       dataIndex: "phone",
-      width: 140,
+      width: 120,
     },
     {
       title: "Ngày sinh",
       dataIndex: "dateOfBirth",
-      width: 130,
+      width: 110,
       render: (value?: string | null) =>
-        value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa cập nhật",
+        value ? new Date(value).toLocaleDateString("vi-VN") : "—",
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: 140,
+      width: 130,
       align: "center",
       render: (value: UserStatus) => renderStatus(value),
     },
     {
       title: "Thao tác",
       key: "actions",
-      width: 150,
-      fixed: "right",
+      width: 130,
       align: "center",
       render: (_v, user) => (
-        <Space size={6}>
+        <Space size={4}>
           <Tooltip title="Xem chi tiết">
             <Button
-              icon={<Eye className="h-4 w-4" />}
+              size="small"
+              icon={<Eye className="h-3.5 w-3.5" />}
               onClick={(e) => {
                 e.stopPropagation();
                 onView(user);
@@ -131,7 +130,8 @@ export function UserTable({
 
           <Tooltip title="Cập nhật">
             <Button
-              icon={<Pencil className="h-4 w-4" />}
+              size="small"
+              icon={<Pencil className="h-3.5 w-3.5" />}
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(user);
@@ -139,12 +139,12 @@ export function UserTable({
             />
           </Tooltip>
 
-          {/* Chỉ hiện Khóa khi đang active */}
           {user.status === "active" && (
             <Tooltip title="Khóa tài khoản">
               <Button
+                size="small"
                 danger
-                icon={<Lock className="h-4 w-4" />}
+                icon={<Lock className="h-3.5 w-3.5" />}
                 onClick={(e) => {
                   e.stopPropagation();
                   onLock(user);
@@ -188,14 +188,17 @@ export function UserTable({
         loading={loading}
         columns={columns}
         dataSource={data}
-        scroll={{ x: 1100 }}
+        scroll={{
+          x: 900,
+          y: 380, // cố định chiều cao body → có scroll dọc, không bị tràn
+        }}
         pagination={{
           current: currentPage,
           pageSize,
           total,
           showSizeChanger: true,
           showQuickJumper: true,
-          pageSizeOptions: [10, 20, 50, 100],
+          pageSizeOptions: [5, 10, 20, 50, 100],
           showTotal: (t, range) =>
             `${range[0]}-${range[1]} / ${t} người dùng`,
         }}

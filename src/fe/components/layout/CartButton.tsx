@@ -46,7 +46,7 @@ export function CartButton() {
       <Drawer
         title="Giỏ hàng"
         placement="right"
-        width={360}
+        size={360}
         open={open}
         onClose={() => setOpen(false)}
         extra={

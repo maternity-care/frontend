@@ -10,6 +10,7 @@ import {
   InputNumber,
   Row,
   Select,
+  Space,
 } from "antd";
 import { Mail, Phone, Save, UserRound } from "lucide-react";
 import dayjs, { Dayjs } from "dayjs";
@@ -20,6 +21,7 @@ import {
   ProfileUpdateHandler,
 } from "@/features/profile/profile.types";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
+import { useGestationalCalc } from "@/hooks/useGestationalCalc";
 
 type PersonalInfoFormProps = {
   profile: PregnantProfile;
@@ -52,6 +54,10 @@ export function PersonalInfoForm({
 }: PersonalInfoFormProps) {
   const [form] = Form.useForm<FormValues>();
   const [saving, setSaving] = useState(false);
+  const { handleGestationalWeekChange, handleDueDateChange } =
+    useGestationalCalc({
+      form,
+    });
 
   useEffect(() => {
     form.setFieldsValue({
@@ -80,23 +86,22 @@ export function PersonalInfoForm({
         name: values.name?.trim(),
         dateOfBirth: values.dateOfBirth
           ? values.dateOfBirth.format("YYYY-MM-DD")
-          : undefined,                   
+          : undefined,
         address: values.address?.trim() || undefined,
         gestationalWeek: values.gestationalWeek ?? undefined,
         expectedDueDate: values.expectedDueDate
           ? values.expectedDueDate.format("YYYY-MM-DD")
-          : undefined,                    
+          : undefined,
         bloodType: values.bloodType || undefined,
         emergencyContactName: values.emergencyContactName?.trim() || undefined,
-        emergencyContactPhone: values.emergencyContactPhone?.trim() || undefined,
+        emergencyContactPhone:
+          values.emergencyContactPhone?.trim() || undefined,
       };
 
       const response = await updateMyProfile(payload);
       await onUpdated(response.data, response.message);
     } catch (err) {
-      onError(
-        err instanceof Error ? err.message : "Không cập nhật được hồ sơ"
-      );
+      onError(err instanceof Error ? err.message : "Không cập nhật được hồ sơ");
     } finally {
       setSaving(false);
     }
@@ -192,24 +197,57 @@ export function PersonalInfoForm({
         <Row gutter={16}>
           <Col xs={24} md={8}>
             <Form.Item name="gestationalWeek" label="Tuần thai">
-              <InputNumber
-                size="large"
-                min={1}
-                max={42}
-                className="w-full"
-                placeholder="VD: 28"
-                addonAfter="tuần"
-              />
+              <Space.Compact className="w-full">
+                <InputNumber
+                  size="large"
+                  min={1}
+                  max={42}
+                  className="w-full"
+                  placeholder="VD: 28"
+                  style={{ width: "100%" }}
+                  onChange={handleGestationalWeekChange}
+                />
+                <Input
+                  size="large"
+                  value="tuần"
+                  disabled
+                  style={{
+                    width: 70,
+                    textAlign: "center",
+                    pointerEvents: "none",
+                    background: "#fafafa",
+                  }}
+                />
+              </Space.Compact>
             </Form.Item>
           </Col>
 
           <Col xs={24} md={8}>
-            <Form.Item name="expectedDueDate" label="Ngày dự sinh">
+            <Form.Item
+              name="expectedDueDate"
+              label="Ngày dự sinh"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
+                    if (value.isBefore(dayjs(), "day")) {
+                      return Promise.reject(
+                        "Ngày dự sinh phải là ngày trong tương lai",
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
               <DatePicker
                 size="large"
                 className="w-full"
                 format="DD/MM/YYYY"
                 placeholder="Chọn ngày dự sinh"
+                disabledDate={(current) =>
+                  current && current < dayjs().startOf("day")
+                }
               />
             </Form.Item>
           </Col>
