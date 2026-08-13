@@ -1,7 +1,11 @@
 export type DoctorStatus = "active" | "inactive";
+
 export type DoctorPermissionEffect = "allow" | "deny";
+
 export type DoctorFacilityRole = "admin" | "doctor" | "nurse" | "staff";
+
 export type DoctorExperienceSort = "asc" | "desc";
+
 export type DoctorExperienceLevel = 1 | 2 | 3 | 4;
 
 export interface BackendDoctorStaff {
@@ -66,7 +70,6 @@ export type BackendDoctorListPayload =
   | BackendDoctor[]
   | BackendDoctorPaginatedResponse
   | BackendDoctorDataCountResponse;
-
 export interface Doctor {
   id: string;
   staffId: string;
