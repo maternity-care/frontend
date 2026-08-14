@@ -35,7 +35,7 @@ export function buildImportedWeekSlotGroups({
   for (const group of schedule.groups ?? []) {
     const sourceShift = group.shifts?.[0];
 
-    if (!sourceShift || sourceShift.status === "cancelled") {
+    if (!sourceShift) {
       skippedGroups += 1;
       continue;
     }
@@ -44,6 +44,8 @@ export function buildImportedWeekSlotGroups({
     const staffId = String(sourceShift.staffId ?? "");
     const roleId = String(sourceShift.roleId ?? "");
     const roomId = String(sourceShift.roomId ?? "");
+    // BE trả roomId=null khi phòng cũ inactive/đã xóa; giữ phân công và để FE bắt chọn phòng mới.
+    const resolvedRoomId = roomId && availableRoomIds.has(roomId) ? roomId : "";
     const doctor = doctors.find(
       (item) =>
         item.staffId === staffId &&
@@ -59,8 +61,6 @@ export function buildImportedWeekSlotGroups({
       !slotId ||
       !activeSlotIds.has(slotId) ||
       !doctor ||
-      !roomId ||
-      !availableRoomIds.has(roomId) ||
       workingDays.length === 0
     ) {
       skippedGroups += 1;
@@ -72,14 +72,14 @@ export function buildImportedWeekSlotGroups({
       1,
       Number(sourceShift.maxAppointments) || 8,
     );
-    const assignmentKey = [staffId, roomId, status, maxAppointments].join(":");
+    const assignmentKey = [staffId, resolvedRoomId, status, maxAppointments].join(":");
     const assignments = assignmentMaps.get(slotId) ?? new Map();
     const existing = assignments.get(assignmentKey);
 
     assignments.set(assignmentKey, {
       staffId,
       roleId: doctor.roleId,
-      roomId,
+      roomId: resolvedRoomId,
       status,
       maxAppointments,
       workingDays: Array.from(

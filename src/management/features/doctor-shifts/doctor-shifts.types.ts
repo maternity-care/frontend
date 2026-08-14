@@ -113,7 +113,10 @@ export interface CreateDoctorShiftInput {
   slotId: string;
   shiftDate: string;
   maxAppointments: number;
-  status: Extract<DoctorShiftStatus, "available" | "off">;
+  status: Extract<
+    DoctorShiftStatus,
+    "available" | "off"
+  >;
   note: string;
 }
 
@@ -234,6 +237,7 @@ export interface GetGroupedDoctorShiftsParams {
   dateFrom: string;
   dateTo: string;
   status?: DoctorShiftStatus;
+  forTemplate?: boolean;
 }
 
 export interface BackendDoctorShiftGroup {

@@ -22,6 +22,9 @@ import { getShiftSlotLookup } from "@/management/features/shift-slots/shift-slot
 import type { ShiftSlotLookupItem } from "@/management/features/shift-slots/shift-slots.types";
 import { DoctorShiftFormAssignments } from "./DoctorShiftFormAssignments";
 import {
+  addDaysToDateKey,
+  getNextWeekMondayDateKey,
+  getTomorrowDateKey,
   isSlotApplicableToDate,
 } from "@/management/features/doctor-shifts/doctor-shifts.weekly-utils";
 import { useDoctorShiftFormSubmit } from "./useDoctorShiftFormSubmit";
@@ -73,19 +76,6 @@ export {
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
-
-function getCurrentDateKey() {
-  const currentDate = new Date();
-  const year = currentDate.getFullYear();
-  const month = String(
-    currentDate.getMonth() + 1,
-  ).padStart(2, "0");
-  const day = String(
-    currentDate.getDate(),
-  ).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
 
 export function mergeShiftDisplayData({
   original,
@@ -282,7 +272,7 @@ export function DoctorShiftFormModalBase({
       setShiftSlots([]);
       form.resetFields();
       form.setFieldsValue({
-        shiftDate: getCurrentDateKey(),
+        shiftDate: getTomorrowDateKey(),
         facilityId:
           facilities.length === 1
             ? facilities[0]?.id
@@ -706,7 +696,13 @@ export function DoctorShiftFormModalBase({
                 },
               ]}
             >
-              <Input type="date" />
+              <Input
+                type="date"
+                min={mode === "create" ? getTomorrowDateKey() : undefined}
+                max={mode === "create"
+                  ? addDaysToDateKey(getNextWeekMondayDateKey(), 6)
+                  : undefined}
+              />
             </Form.Item>
           </Col>
 
