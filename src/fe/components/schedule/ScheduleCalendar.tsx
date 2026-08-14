@@ -1,8 +1,9 @@
 "use client";
 
-import { Badge, Button, Calendar, Card, Popover, Tag, Typography } from "antd";
+import { useState } from "react";
+import { Badge, Button, Calendar, Card, Empty, Modal, Popover, Space, Tag, Typography } from "antd";
 import type { CalendarProps } from "antd";
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus, Clock, Hospital, Stethoscope } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
 
 import type {
@@ -51,6 +52,9 @@ export function ScheduleCalendar({
   onCreateSchedule,
   onOpenGoogleCalendar,
 }: ScheduleCalendarProps) {
+  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+  const [dayModalOpen, setDayModalOpen] = useState(false);
+
   const getSchedulesByDate = (value: Dayjs) => {
     return schedules.filter(
       (item) =>
@@ -60,9 +64,17 @@ export function ScheduleCalendar({
   };
 
   const handleSelect: CalendarProps<Dayjs>["onSelect"] = (date, selectInfo) => {
+    // Chỉ xử lý khi chọn ngày (không phải header tháng/năm)
     if (selectInfo?.source && selectInfo.source !== "date") return;
 
-    onCreateSchedule?.(date);
+    const daySchedules = getSchedulesByDate(date);
+
+    // Luôn mở modal xem lịch trong ngày
+    setSelectedDate(date);
+    setDayModalOpen(true);
+
+    // Nếu muốn vẫn cho tạo lịch khi ngày trống, có thể bỏ comment dòng dưới:
+    // if (!daySchedules.length) onCreateSchedule?.(date);
   };
 
   const cellRender: CalendarProps<Dayjs>["cellRender"] = (current, info) => {
@@ -156,12 +168,100 @@ export function ScheduleCalendar({
     );
   };
 
+  const selectedDaySchedules = selectedDate ? getSchedulesByDate(selectedDate) : [];
+
   return (
-    <Card
-      title={RESPONSE_MESSAGES.SCHEDULE.CALENDAR_VIEW}
-      className="schedule-calendar-card shadow-sm [&_.ant-picker-calendar-date-content]:!h-[82px] [&_.ant-picker-calendar-date]:!m-0 [&_.ant-picker-cell-inner]:!rounded-md"
-    >
-      <Calendar cellRender={cellRender} onSelect={handleSelect} />
-    </Card>
+    <>
+      <Card
+        title={RESPONSE_MESSAGES.SCHEDULE.CALENDAR_VIEW}
+        className="schedule-calendar-card shadow-sm [&_.ant-picker-calendar-date-content]:!h-[82px] [&_.ant-picker-calendar-date]:!m-0 [&_.ant-picker-cell-inner]:!rounded-md"
+      >
+        <Calendar cellRender={cellRender} onSelect={handleSelect} />
+      </Card>
+
+      {/* Modal xem tất cả lịch trong ngày */}
+      <Modal
+        title={
+          selectedDate
+            ? `Lịch ngày ${selectedDate.format("DD/MM/YYYY")}`
+            : "Lịch trong ngày"
+        }
+        open={dayModalOpen}
+        onCancel={() => setDayModalOpen(false)}
+        footer={
+          <Space>
+            <Button onClick={() => setDayModalOpen(false)}>Đóng</Button>
+            {selectedDate && (
+              <Button
+                type="primary"
+                icon={<CalendarPlus className="h-4 w-4" />}
+                onClick={() => {
+                  setDayModalOpen(false);
+                  onCreateSchedule?.(selectedDate);
+                }}
+              >
+                Thêm lịch mới
+              </Button>
+            )}
+          </Space>
+        }
+        width={520}
+      >
+        {selectedDaySchedules.length === 0 ? (
+          <Empty description="Không có lịch nào trong ngày này" />
+        ) : (
+          <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+            {selectedDaySchedules.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-lg border border-slate-100 bg-slate-50/60 p-3"
+              >
+                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                  <Text strong>{item.title}</Text>
+                  <Tag color={typeColor[item.type]} className="m-0">
+                    {typeText[item.type]}
+                  </Tag>
+                </div>
+
+                <div className="space-y-1 text-sm text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>{item.time}</span>
+                  </div>
+
+                  {item.location ? (
+                    <div className="flex items-center gap-2">
+                      <Hospital className="h-4 w-4" />
+                      <span>{item.location}</span>
+                    </div>
+                  ) : null}
+
+                  {item.doctor ? (
+                    <div className="flex items-center gap-2">
+                      <Stethoscope className="h-4 w-4" />
+                      <span>{item.doctor}</span>
+                    </div>
+                  ) : null}
+
+                  {item.note ? (
+                    <div className="text-slate-500">Ghi chú: {item.note}</div>
+                  ) : null}
+                </div>
+
+                <div className="mt-2">
+                  <Button
+                    size="small"
+                    icon={<CalendarPlus className="h-3.5 w-3.5" />}
+                    onClick={() => onOpenGoogleCalendar?.(item)}
+                  >
+                    Google Calendar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
+    </>
   );
 }
