@@ -113,10 +113,7 @@ export interface CreateDoctorShiftInput {
   slotId: string;
   shiftDate: string;
   maxAppointments: number;
-  status: Extract<
-    DoctorShiftStatus,
-    "available" | "off"
-  >;
+  status: Extract<DoctorShiftStatus, "available" | "off">;
   note: string;
 }
 
