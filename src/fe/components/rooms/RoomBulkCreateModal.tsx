@@ -29,6 +29,7 @@ import {
   createRoom,
   getRoomTypeLookup,
 } from "@/management/features/rooms/rooms.api";
+import { buildFloorOptions } from "@/management/features/rooms/rooms.utils";
 import type {
   CreateRoomInput,
   RoomStatus,
@@ -404,6 +405,7 @@ export function RoomBulkCreateModal({
     App.useApp();
   const [form] =
     Form.useForm<BulkRoomFormValues>();
+  const watchedRooms = Form.useWatch("rooms", form) ?? [];
   const [roomTypes, setRoomTypes] =
     useState<RoomType[]>([]);
   const [
@@ -463,7 +465,7 @@ export function RoomBulkCreateModal({
               "",
             name: "",
             roomTypeId: "",
-            floor: "",
+            floor: "1",
             status: "active",
           },
         ],
@@ -964,6 +966,12 @@ export function RoomBulkCreateModal({
                                 label: `${facility.name} (${facility.code})`,
                               }),
                             )}
+                            onChange={() =>
+                              form.setFieldValue(
+                                ["rooms", field.name, "floor"],
+                                "1",
+                              )
+                            }
                           />
                         </Form.Item>
                       </Col>
@@ -1048,19 +1056,19 @@ export function RoomBulkCreateModal({
                             {
                               required:
                                 true,
-                              whitespace:
-                                true,
                               message:
-                                "Vui lòng nhập tầng.",
-                            },
-                            {
-                              max: 50,
-                              message:
-                                "Tầng tối đa 50 ký tự.",
+                                "Vui lòng chọn tầng.",
                             },
                           ]}
                         >
-                          <Input placeholder="Tầng 2" />
+                          <Select
+                            placeholder="Chọn tầng"
+                            options={buildFloorOptions(
+                              facilityById.get(
+                                watchedRooms[index]?.facilityId,
+                              )?.floorCount,
+                            )}
+                          />
                         </Form.Item>
                       </Col>
 
@@ -1122,7 +1130,7 @@ export function RoomBulkCreateModal({
                       "",
                     name: "",
                     roomTypeId: "",
-                    floor: "",
+                    floor: "1",
                     status: "active",
                   })
                 }

@@ -99,6 +99,7 @@ export interface BackendFacility {
   address: string;
   province: string;
   ward: string;
+  floorCount?: number | null;
 
   latitude: string;
   longitude: string;
@@ -139,6 +140,7 @@ export interface Facility {
   address: string;
   city: string;
   ward: string;
+  floorCount: number;
 
   latitude?: string;
   longitude?: string;
@@ -176,6 +178,7 @@ export interface CreateFacilityInput {
   address: string;
   city: string;
   ward: string;
+  floorCount?: number | null;
   latitude?: string;
   longitude?: string;
   status: FacilityStatus;
@@ -189,6 +192,7 @@ export interface UpdateFacilityInput {
   address?: string;
   city?: string;
   ward?: string;
+  floorCount?: number | null;
   latitude?: string;
   longitude?: string;
 }

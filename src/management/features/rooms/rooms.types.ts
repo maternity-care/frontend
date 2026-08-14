@@ -78,6 +78,7 @@ export interface RoomFacilityOption {
   code: string;
   address?: string;
   status?: string;
+  floorCount: number;
 }
 
 export interface GetRoomsParams {

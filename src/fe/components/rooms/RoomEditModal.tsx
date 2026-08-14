@@ -40,6 +40,7 @@ import type {
   RoomType,
 } from "@/management/features/rooms/rooms.types";
 import {
+  buildFloorOptions,
   getRoomErrorMessage,
   mergeRoomFallback,
   toRoomIsoDateTime,
@@ -186,6 +187,17 @@ export function RoomEditModal({
         facility.id ===
         room?.facilityId,
     );
+
+  const floorOptions = useMemo(
+    () =>
+      buildFloorOptions(
+        Math.max(
+          selectedFacility?.floorCount ?? 1,
+          Number(room?.floor) || 1,
+        ),
+      ),
+    [room?.floor, selectedFacility?.floorCount],
+  );
 
   const statusChanged =
     Boolean(
@@ -638,19 +650,15 @@ export function RoomEditModal({
                       {
                         required:
                           true,
-                        whitespace:
-                          true,
                         message:
-                          "Vui lòng nhập tầng.",
-                      },
-                      {
-                        max: 50,
-                        message:
-                          "Tầng tối đa 50 ký tự.",
+                          "Vui lòng chọn tầng.",
                       },
                     ]}
                   >
-                    <Input placeholder="Ví dụ: Tầng 2" />
+                    <Select
+                      placeholder="Chọn tầng"
+                      options={floorOptions}
+                    />
                   </Form.Item>
                 </Col>
 
