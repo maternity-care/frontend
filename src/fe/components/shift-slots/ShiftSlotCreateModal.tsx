@@ -5,19 +5,19 @@ import {
 } from "@/management/features/shift-slots/shift-slots.api";
 import type {
   ShiftSlot,
+  ShiftSlotFacilityOption,
 } from "@/management/features/shift-slots/shift-slots.types";
 import {
-  ShiftSlotFormModalBase,
-} from "./shift-slot-modal.shared";
-import type {
-  FacilityOption,
-} from "./shift-slot-modal.shared";
+  ShiftSlotForm,
+} from "./ShiftSlotForm";
 
-type ShiftSlotCreateModalProps = {
+type Props = {
   open: boolean;
-  facilities: FacilityOption[];
+  facilities: ShiftSlotFacilityOption[];
   onClose: () => void;
-  onCreated: (slot: ShiftSlot) => void;
+  onCreated: (
+    slot: ShiftSlot,
+  ) => void;
 };
 
 export function ShiftSlotCreateModal({
@@ -25,18 +25,28 @@ export function ShiftSlotCreateModal({
   facilities,
   onClose,
   onCreated,
-}: ShiftSlotCreateModalProps) {
+}: Props) {
   return (
-    <ShiftSlotFormModalBase
+    <ShiftSlotForm
       mode="create"
       open={open}
-      facilities={facilities}
-      onClose={onClose}
-      onSubmitValidated={async (input) => {
+      facilities={
+        facilities
+      }
+      onClose={
+        onClose
+      }
+      onSubmitValidated={async (
+        input,
+      ) => {
         const response =
-          await createShiftSlot(input);
+          await createShiftSlot(
+            input,
+          );
 
-        onCreated(response.data);
+        onCreated(
+          response.data,
+        );
 
         return (
           response.message ||

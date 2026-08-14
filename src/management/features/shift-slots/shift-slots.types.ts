@@ -21,7 +21,10 @@ export interface BackendShiftSlot {
   startTime: string;
   endTime: string;
   isOvernight: boolean;
-  applicableDays?: ShiftSlotApplicableDay[] | string[] | null;
+  applicableDays?:
+    | ShiftSlotApplicableDay[]
+    | string[]
+    | null;
   status: ShiftSlotStatus | string;
   createdAt: string;
   updatedAt: string;
@@ -66,7 +69,10 @@ export interface BackendShiftSlotLookupItem {
   name: string;
   startTime: string;
   endTime: string;
-  applicableDays?: ShiftSlotApplicableDay[] | string[] | null;
+  applicableDays?:
+    | ShiftSlotApplicableDay[]
+    | string[]
+    | null;
   status: ShiftSlotStatus | string;
 }
 
@@ -79,6 +85,13 @@ export interface ShiftSlotLookupItem {
   endTime: string;
   applicableDays: ShiftSlotApplicableDay[];
   status: ShiftSlotStatus;
+}
+
+export interface ShiftSlotFacilityOption {
+  id: string;
+  name: string;
+  code: string;
+  address: string;
 }
 
 export interface GetShiftSlotsParams {

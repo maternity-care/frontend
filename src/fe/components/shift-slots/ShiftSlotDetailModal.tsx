@@ -16,76 +16,37 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import {
+  SHIFT_SLOT_DAY_LABELS,
+} from "@/management/features/shift-slots/shift-slots.constants";
 import type {
   ShiftSlot,
-  ShiftSlotApplicableDay,
 } from "@/management/features/shift-slots/shift-slots.types";
+import {
+  formatShiftSlotDateTime,
+  getShiftSlotStatusLabel,
+} from "@/management/features/shift-slots/shift-slots.utils";
 
-const { Text, Title } = Typography;
+const {
+  Text,
+  Title,
+} = Typography;
 
-const DAY_LABELS: Record<ShiftSlotApplicableDay, string> = {
-  MON: "T2",
-  TUE: "T3",
-  WED: "T4",
-  THU: "T5",
-  FRI: "T6",
-  SAT: "T7",
-  SUN: "CN",
-};
-
-type ShiftSlotDetailModalProps = {
+type Props = {
   open: boolean;
-  slot: ShiftSlot | null;
+  slot:
+    | ShiftSlot
+    | null;
   loading?: boolean;
   canManage: boolean;
   onClose: () => void;
-  onEdit: (slot: ShiftSlot) => void;
-  onDelete: (slot: ShiftSlot) => void;
+  onEdit: (
+    slot: ShiftSlot,
+  ) => void;
+  onDelete: (
+    slot: ShiftSlot,
+  ) => void;
 };
-
-function renderStatus(
-  status: ShiftSlot["status"],
-) {
-  return status === "active" ? (
-    <Tag color="green">Hoạt động</Tag>
-  ) : (
-    <Tag color="red">Ngừng hoạt động</Tag>
-  );
-}
-
-function renderApplicableDays(days: ShiftSlotApplicableDay[]) {
-  if (!days.length) {
-    return <Text type="secondary">Tự tính</Text>;
-  }
-
-  return (
-    <Space size={4} wrap>
-      {days.map((day) => (
-        <Tag key={day} color="blue">
-          {DAY_LABELS[day]}
-        </Tag>
-      ))}
-    </Space>
-  );
-}
-
-function formatDateTime(value: string) {
-  if (!value) return "Chưa cập nhật";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 export function ShiftSlotDetailModal({
   open,
@@ -95,7 +56,7 @@ export function ShiftSlotDetailModal({
   onClose,
   onEdit,
   onDelete,
-}: ShiftSlotDetailModalProps) {
+}: Props) {
   return (
     <Modal
       open={open}
@@ -103,9 +64,12 @@ export function ShiftSlotDetailModal({
       width={760}
       title={null}
       footer={null}
-      onCancel={onClose}
+      onCancel={
+        onClose
+      }
       mask={{
-        closable: !loading,
+        closable:
+          !loading,
       }}
     >
       {slot ? (
@@ -125,7 +89,18 @@ export function ShiftSlotDetailModal({
                     {slot.name}
                   </Title>
 
-                  {renderStatus(slot.status)}
+                  <Tag
+                    color={
+                      slot.status ===
+                      "active"
+                        ? "green"
+                        : "red"
+                    }
+                  >
+                    {getShiftSlotStatusLabel(
+                      slot.status,
+                    )}
+                  </Tag>
                 </div>
 
                 <Text
@@ -139,13 +114,18 @@ export function ShiftSlotDetailModal({
             </div>
 
             {canManage ? (
-              <Space size={8} wrap>
+              <Space
+                size={8}
+                wrap
+              >
                 <Button
                   icon={
                     <Pencil className="h-4 w-4" />
                   }
                   onClick={() =>
-                    onEdit(slot)
+                    onEdit(
+                      slot,
+                    )
                   }
                 >
                   Cập nhật
@@ -157,7 +137,9 @@ export function ShiftSlotDetailModal({
                     <Trash2 className="h-4 w-4" />
                   }
                   onClick={() =>
-                    onDelete(slot)
+                    onDelete(
+                      slot,
+                    )
                   }
                 >
                   Xóa
@@ -177,7 +159,8 @@ export function ShiftSlotDetailModal({
               </div>
 
               <p className="mb-0 text-lg font-semibold text-slate-950">
-                {slot.startTime} - {slot.endTime}
+                {slot.startTime} -{" "}
+                {slot.endTime}
               </p>
             </div>
 
@@ -190,7 +173,32 @@ export function ShiftSlotDetailModal({
                 </p>
               </div>
 
-              {renderApplicableDays(slot.applicableDays)}
+              {slot.applicableDays
+                .length > 0 ? (
+                <Space
+                  size={4}
+                  wrap
+                >
+                  {slot.applicableDays.map(
+                    (day) => (
+                      <Tag
+                        key={day}
+                        color="blue"
+                      >
+                        {
+                          SHIFT_SLOT_DAY_LABELS[
+                            day
+                          ]
+                        }
+                      </Tag>
+                    ),
+                  )}
+                </Space>
+              ) : (
+                <Text type="secondary">
+                  Tự tính
+                </Text>
+              )}
             </div>
           </div>
 
@@ -244,7 +252,9 @@ export function ShiftSlotDetailModal({
               </p>
 
               <p className="mb-0 text-sm font-medium text-slate-800">
-                {formatDateTime(slot.createdAt)}
+                {formatShiftSlotDateTime(
+                  slot.createdAt,
+                )}
               </p>
             </div>
 
@@ -254,7 +264,9 @@ export function ShiftSlotDetailModal({
               </p>
 
               <p className="mb-0 text-sm font-medium text-slate-800">
-                {formatDateTime(slot.updatedAt)}
+                {formatShiftSlotDateTime(
+                  slot.updatedAt,
+                )}
               </p>
             </div>
           </div>
@@ -262,8 +274,12 @@ export function ShiftSlotDetailModal({
           <div className="mt-5 flex justify-end">
             <Button
               type="primary"
-              icon={<X className="h-4 w-4" />}
-              onClick={onClose}
+              icon={
+                <X className="h-4 w-4" />
+              }
+              onClick={
+                onClose
+              }
             >
               Đóng
             </Button>
