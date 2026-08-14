@@ -110,6 +110,7 @@ function normalizeFacility(facility: BackendFacility): Facility {
     address: facility.address,
     city: facility.province,
     ward: facility.ward,
+    floorCount: Math.max(1, Math.trunc(Number(facility.floorCount ?? 1))),
     latitude: facility.latitude || undefined,
     longitude: facility.longitude || undefined,
     status: normalizeStatus(facility.status),
@@ -223,6 +224,7 @@ function toCreatePayload(input: CreateFacilityInput) {
     address: input.address.trim(),
     province: input.city.trim(),
     ward: input.ward.trim(),
+    floorCount: input.floorCount ?? 1,
     latitude: input.latitude?.trim() || "0",
     longitude: input.longitude?.trim() || "0",
     status: toBackendStatus(input.status),
@@ -238,6 +240,7 @@ function toUpdatePayload(input: UpdateFacilityInput) {
     address: input.address?.trim(),
     province: input.city?.trim(),
     ward: input.ward?.trim(),
+    floorCount: input.floorCount,
     latitude: input.latitude?.trim(),
     longitude: input.longitude?.trim(),
   });

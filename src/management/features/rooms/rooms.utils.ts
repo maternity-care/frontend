@@ -167,6 +167,15 @@ export function getRoomFacilityAddress(
     .join(", ");
 }
 
+export function buildFloorOptions(floorCount?: number | null) {
+  const count = Math.max(1, Math.trunc(Number(floorCount ?? 1)));
+
+  return Array.from({ length: count }, (_, index) => ({
+    value: String(index + 1),
+    label: `Tầng ${index + 1}`,
+  }));
+}
+
 export function mergeRoomFallback(
   room: ClinicRoom,
   values: {

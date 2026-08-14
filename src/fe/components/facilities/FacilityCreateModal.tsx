@@ -27,6 +27,7 @@ export type FacilityFormValues = {
   address: string;
   city: string;
   ward: string;
+  floorCount: number;
   latitude: string;
   longitude: string;
   schedules: FacilityScheduleInput[];
@@ -47,6 +48,7 @@ const initialValues: FacilityFormValues = {
   address: "",
   city: "",
   ward: "",
+  floorCount: 1,
   latitude: "",
   longitude: "",
   schedules: DEFAULT_FACILITY_SCHEDULES,
@@ -88,6 +90,7 @@ export function FacilityCreateModal({ open, onClose, onSubmit }: Props) {
         address: values.address.trim(),
         city: values.city.trim(),
         ward: values.ward.trim(),
+        floorCount: values.floorCount ?? 1,
         latitude: values.latitude?.trim() ?? "",
         longitude: values.longitude?.trim() ?? "",
         schedules: Array.isArray(values.schedules) ? values.schedules : [],
