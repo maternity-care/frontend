@@ -10,9 +10,19 @@ import {
   Tooltip,
   Typography,
 } from "antd";
-import type { ColumnsType } from "antd/es/table";
-import { Eye, Pencil, Stethoscope, Trash2 } from "lucide-react";
-import type { DoctorShiftItem, DoctorShiftStatus } from "@/management/features/doctor-shifts/doctor-shifts.types";
+import type {
+  ColumnsType,
+} from "antd/es/table";
+import {
+  Eye,
+  Pencil,
+  Stethoscope,
+  Trash2,
+} from "lucide-react";
+import type {
+  DoctorShiftItem,
+  DoctorShiftStatus,
+} from "@/management/features/doctor-shifts/doctor-shifts.types";
 import type {
   DayShiftGroupMeta,
   DoctorOption,
@@ -23,7 +33,6 @@ import {
   formatDoctorShiftShortDate,
   getDayShiftMergedCellClass,
   getDoctorShiftShortLabel,
-  parseDoctorShiftDateKey,
   renderDoctorShiftStatus,
 } from "@/management/features/doctor-shifts/doctor-shifts.utils";
 
@@ -36,16 +45,41 @@ type Props = {
   loading: boolean;
   total: number;
   canManage: boolean;
-  doctorById: Map<string, DoctorOption>;
-  facilityById: Map<string, FacilityOption>;
-  roomById: Map<string, RoomOption>;
-  canManageShift: (shift: DoctorShiftItem) => boolean;
-  onOpenDetail: (shift: DoctorShiftItem) => void;
-  onEdit: (shift: DoctorShiftItem) => void;
-  onDelete: (shift: DoctorShiftItem) => void;
+  doctorById: Map<
+    string,
+    DoctorOption
+  >;
+  facilityById: Map<
+    string,
+    FacilityOption
+  >;
+  roomById: Map<
+    string,
+    RoomOption
+  >;
+  canManageShift: (
+    shift: DoctorShiftItem,
+  ) => boolean;
+  onOpenDetail: (
+    shift: DoctorShiftItem,
+  ) => void;
+  onEdit: (
+    shift: DoctorShiftItem,
+  ) => void;
+  onDelete: (
+    shift: DoctorShiftItem,
+  ) => void;
   onCreate: () => void;
 };
 
+/**
+ * Day View được tối ưu cho danh sách lớn:
+ *
+ * - Bỏ cột "Ngày trực" vì tất cả bản ghi trong view đã cùng selectedDate.
+ * - Dùng table size="small" để giảm chiều cao mỗi row.
+ * - Bảng có scroll dọc 560px và header cố định.
+ * - Dùng chiều rộng số thay vì % để các cột không bị co giãn khó đọc.
+ */
 export function DoctorShiftDayView({
   selectedDate,
   shifts,
@@ -62,46 +96,113 @@ export function DoctorShiftDayView({
   onDelete,
   onCreate,
 }: Props) {
-  const columns: ColumnsType<DoctorShiftItem> = [
+  const columns:
+    ColumnsType<DoctorShiftItem> = [
     {
       title: "STT",
-      width: "5%",
+      width: 58,
       align: "center",
-      render: (_value, _record, index) => index + 1,
+      render: (
+        _value,
+        _record,
+        index,
+      ) => index + 1,
     },
     {
       title: "Ca trực",
-      width: "18%",
-      onCell: (shift, index) => {
-        const group = groupMeta[index ?? 0];
+      width: 190,
+      onCell: (
+        shift,
+        index,
+      ) => {
+        const group =
+          groupMeta[
+            index ?? 0
+          ];
+
         return {
-          rowSpan: group?.rowSpan ?? 1,
+          rowSpan:
+            group?.rowSpan ??
+            1,
           className:
-            group?.rowSpan === 0
+            group?.rowSpan ===
+            0
               ? undefined
-              : getDayShiftMergedCellClass(shift.startTime),
+              : getDayShiftMergedCellClass(
+                  shift.startTime,
+                ),
         };
       },
-      render: (_value, shift, index) => {
-        const group = groupMeta[index];
+      render: (
+        _value,
+        shift,
+        index,
+      ) => {
+        const group =
+          groupMeta[index];
+
         return (
-          <div className="min-w-0 py-1">
-            <Text strong className="block truncate text-sm text-slate-950">
-              {shift.slotName || shift.slotCode || getDoctorShiftShortLabel(shift.startTime)}
+          <div className="min-w-0 py-0.5">
+            <Text
+              strong
+              className="block truncate text-[13px] text-slate-950"
+              title={
+                shift.slotName ||
+                shift.slotCode ||
+                getDoctorShiftShortLabel(
+                  shift.startTime,
+                )
+              }
+            >
+              {shift.slotName ||
+                shift.slotCode ||
+                getDoctorShiftShortLabel(
+                  shift.startTime,
+                )}
             </Text>
-            <Text className="mt-1 block truncate text-xs font-semibold text-slate-700">
-              {shift.startTime} - {shift.endTime}
+
+            <Text className="mt-0.5 block text-[11px] font-semibold text-slate-700">
+              {shift.startTime} -{" "}
+              {shift.endTime}
             </Text>
-            {shift.slotCode && shift.slotName ? (
-              <Text type="secondary" className="mt-1 block truncate text-xs">
+
+            {shift.slotCode &&
+            shift.slotName ? (
+              <Text
+                type="secondary"
+                className="mt-0.5 block truncate text-[10px]"
+              >
                 {shift.slotCode}
               </Text>
             ) : null}
-            <Text type="secondary" className="mt-2 block truncate text-xs">
-              {shift.facilityName || facilityById.get(shift.facilityId)?.name || "Chưa cập nhật cơ sở"}
-            </Text>
-            {group?.rowSpan && group.rowSpan > 1 ? (
-              <Tag color="blue" className="mt-2 max-w-full truncate">
+
+            <Tooltip
+              title={
+                shift.facilityName ||
+                facilityById.get(
+                  shift.facilityId,
+                )?.name ||
+                "Chưa cập nhật cơ sở"
+              }
+            >
+              <Text
+                type="secondary"
+                className="mt-1 block truncate text-[10px]"
+              >
+                {shift.facilityName ||
+                  facilityById.get(
+                    shift.facilityId,
+                  )?.name ||
+                  "Chưa cập nhật cơ sở"}
+              </Text>
+            </Tooltip>
+
+            {group?.rowSpan &&
+            group.rowSpan > 1 ? (
+              <Tag
+                color="blue"
+                className="!mt-1 !mr-0 !text-[10px]"
+              >
                 {group.rowSpan} bác sĩ
               </Tag>
             ) : null}
@@ -110,68 +211,152 @@ export function DoctorShiftDayView({
       },
     },
     {
-      title: "Ngày trực",
-      dataIndex: "shiftDate",
-      width: "12%",
-      sorter: (first, second) => first.shiftDate.localeCompare(second.shiftDate),
-      render: (value: string) => (
-        <div>
-          <Text strong>{formatDoctorShiftShortDate(value)}</Text>
-          <Text type="secondary" className="block text-xs">
-            {new Intl.DateTimeFormat("vi-VN", { weekday: "long" }).format(
-              parseDoctorShiftDateKey(value),
-            )}
-          </Text>
-        </div>
-      ),
-    },
-    {
       title: "Bác sĩ",
-      width: "20%",
-      render: (_value, shift) => (
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-            <Stethoscope className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <Text strong className="block truncate">
-              {shift.doctorTitle || doctorById.get(shift.doctorId)?.title || "Bác sĩ"}{" "}
-              {shift.doctorName || doctorById.get(shift.doctorId)?.name || `#${shift.doctorId}`}
-            </Text>
-            <Text type="secondary" className="block truncate text-xs">
-              {shift.doctorSpecialty || doctorById.get(shift.doctorId)?.specialty || "Chưa cập nhật"}
-            </Text>
+      width: 245,
+      render: (
+        _value,
+        shift,
+      ) => {
+        const doctor =
+          doctorById.get(
+            shift.doctorId,
+          );
+
+        const doctorName =
+          shift.doctorName ||
+          doctor?.name ||
+          `#${shift.doctorId}`;
+
+        const doctorTitle =
+          shift.doctorTitle ||
+          doctor?.title ||
+          "Bác sĩ";
+
+        const specialty =
+          shift.doctorSpecialty ||
+          doctor?.specialty ||
+          "Chưa cập nhật";
+
+        return (
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
+              <Stethoscope className="h-3.5 w-3.5" />
+            </span>
+
+            <div className="min-w-0">
+              <Tooltip
+                title={`${doctorTitle} ${doctorName}`}
+              >
+                <Text
+                  strong
+                  className="block truncate text-[13px]"
+                >
+                  {doctorTitle}{" "}
+                  {doctorName}
+                </Text>
+              </Tooltip>
+
+              <Tooltip
+                title={specialty}
+              >
+                <Text
+                  type="secondary"
+                  className="block truncate text-[11px]"
+                >
+                  {specialty}
+                </Text>
+              </Tooltip>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: "Cơ sở / Phòng",
-      width: "20%",
-      render: (_value, shift) => (
-        <div className="min-w-0">
-          <Text strong className="block truncate">
-            {shift.facilityName || facilityById.get(shift.facilityId)?.name || "Chưa cập nhật"}
-          </Text>
-          <Text type="secondary" className="block truncate text-xs">
-            {shift.roomName || roomById.get(shift.roomId)?.name || "Chưa cập nhật"}
-            {roomById.get(shift.roomId)?.floor
-              ? ` · ${roomById.get(shift.roomId)?.floor}`
-              : ""}
-          </Text>
-        </div>
-      ),
+      width: 250,
+      render: (
+        _value,
+        shift,
+      ) => {
+        const facilityName =
+          shift.facilityName ||
+          facilityById.get(
+            shift.facilityId,
+          )?.name ||
+          "Chưa cập nhật";
+
+        const room =
+          roomById.get(
+            shift.roomId,
+          );
+
+        const roomName =
+          shift.roomName ||
+          room?.name ||
+          "Chưa cập nhật";
+
+        const roomText =
+          room?.floor
+            ? `${roomName} · ${room.floor}`
+            : roomName;
+
+        return (
+          <div className="min-w-0">
+            <Tooltip
+              title={
+                facilityName
+              }
+            >
+              <Text
+                strong
+                className="block truncate text-[13px]"
+              >
+                {facilityName}
+              </Text>
+            </Tooltip>
+
+            <Tooltip
+              title={roomText}
+            >
+              <Text
+                type="secondary"
+                className="block truncate text-[11px]"
+              >
+                {roomText}
+              </Text>
+            </Tooltip>
+          </div>
+        );
+      },
     },
     {
       title: "Trạng thái",
-      dataIndex: "status",
-      width: "11%",
+      dataIndex:
+        "status",
+      width: 145,
       align: "center",
-      render: (_status: DoctorShiftStatus, shift) => (
-        <div className="space-y-1">
-          {renderDoctorShiftStatus(shift.status)}
-          <Text type="secondary" className="block text-xs">
-            {shift.bookedAppointments}/{shift.maxAppointments} đã đặt
+      render: (
+        _status:
+          DoctorShiftStatus,
+        shift,
+      ) => (
+        <div>
+          {renderDoctorShiftStatus(
+            shift.status,
+          )}
+
+          <Text
+            type="secondary"
+            className="mt-0.5 block whitespace-nowrap text-[10px]"
+          >
+            {
+              shift.bookedAppointments
+            }
+            /
+            {
+              shift.maxAppointments
+            }{" "}
+            đã đặt
           </Text>
         </div>
       ),
@@ -179,19 +364,37 @@ export function DoctorShiftDayView({
     {
       title: "Thao tác",
       key: "actions",
-      width: canManage ? "14%" : "8%",
+      width:
+        canManage
+          ? 132
+          : 72,
+      fixed: "right",
       align: "center",
-      render: (_value, shift) => {
-        const manageable = canManageShift(shift);
+      render: (
+        _value,
+        shift,
+      ) => {
+        const manageable =
+          canManageShift(
+            shift,
+          );
+
         return (
           <Space size={4}>
             <Tooltip title="Xem chi tiết">
               <Button
                 size="small"
-                icon={<Eye className="h-4 w-4" />}
-                onClick={(event) => {
+                icon={
+                  <Eye className="h-4 w-4" />
+                }
+                onClick={(
+                  event,
+                ) => {
                   event.stopPropagation();
-                  onOpenDetail(shift);
+
+                  onOpenDetail(
+                    shift,
+                  );
                 }}
               />
             </Tooltip>
@@ -201,21 +404,36 @@ export function DoctorShiftDayView({
                 <Tooltip title="Cập nhật">
                   <Button
                     size="small"
-                    icon={<Pencil className="h-4 w-4" />}
-                    onClick={(event) => {
+                    icon={
+                      <Pencil className="h-4 w-4" />
+                    }
+                    onClick={(
+                      event,
+                    ) => {
                       event.stopPropagation();
-                      onEdit(shift);
+
+                      onEdit(
+                        shift,
+                      );
                     }}
                   />
                 </Tooltip>
+
                 <Tooltip title="Xóa ca trực">
                   <Button
                     danger
                     size="small"
-                    icon={<Trash2 className="h-4 w-4" />}
-                    onClick={(event) => {
+                    icon={
+                      <Trash2 className="h-4 w-4" />
+                    }
+                    onClick={(
+                      event,
+                    ) => {
                       event.stopPropagation();
-                      onDelete(shift);
+
+                      onDelete(
+                        shift,
+                      );
                     }}
                   />
                 </Tooltip>
@@ -230,61 +448,112 @@ export function DoctorShiftDayView({
   return (
     <Card
       className="overflow-hidden border-slate-200 bg-white"
-      styles={{ body: { padding: 0 } }}
+      styles={{
+        body: {
+          padding: 0,
+        },
+      }}
       title={
         <div>
           <p className="mb-0 text-base font-semibold text-slate-950">
-            Danh sách ca trực ngày {formatDoctorShiftShortDate(selectedDate)}
+            Danh sách ca trực ngày{" "}
+            {formatDoctorShiftShortDate(
+              selectedDate,
+            )}
           </p>
+
           <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-            Bấm vào một dòng để xem chi tiết.
+            Danh sách được cuộn bên trong để vẫn dễ theo dõi khi có nhiều ca trực.
           </p>
         </div>
       }
-      extra={<Text type="secondary">{total} ca trực phù hợp</Text>}
+      extra={
+        <Text type="secondary">
+          {shifts.length} ca trong ngày ·{" "}
+          {total} ca phù hợp
+        </Text>
+      }
     >
       <Table
         rowKey="id"
-        size="middle"
+        size="small"
         tableLayout="fixed"
+        sticky
         loading={loading}
         columns={columns}
         dataSource={shifts}
         pagination={false}
+        scroll={{
+          x: canManage
+            ? 1020
+            : 960,
+          y: 560,
+        }}
         locale={{
           emptyText: (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              image={
+                Empty.PRESENTED_IMAGE_SIMPLE
+              }
               description="Không có ca trực phù hợp trong ngày này."
             >
               {canManage ? (
-                <Button type="primary" onClick={onCreate}>
+                <Button
+                  type="primary"
+                  onClick={onCreate}
+                >
                   Thêm ca trực
                 </Button>
               ) : null}
             </Empty>
           ),
         }}
-        rowClassName={(_shift, index) => {
-          const group = groupMeta[index];
+        rowClassName={(
+          _shift,
+          index,
+        ) => {
+          const group =
+            groupMeta[index];
+
           return [
             "cursor-pointer",
-            group?.isFirstRow && index > 0
+            group?.isFirstRow &&
+            index > 0
               ? "[&>td]:border-t-2 [&>td]:border-t-slate-300"
               : "",
-            group?.groupIndex % 2 === 1 ? "[&>td]:bg-slate-50/35" : "",
+            group?.groupIndex %
+              2 ===
+            1
+              ? "[&>td]:bg-slate-50/35"
+              : "",
           ]
             .filter(Boolean)
             .join(" ");
         }}
         onRow={(shift) => ({
-          onClick: (event) => {
-            const target = event.target as HTMLElement;
-            if (target.closest("button") || target.closest("a")) return;
-            onOpenDetail(shift);
+          onClick: (
+            event,
+          ) => {
+            const target =
+              event.target as HTMLElement;
+
+            if (
+              target.closest(
+                "button",
+              ) ||
+              target.closest(
+                "a",
+              )
+            ) {
+              return;
+            }
+
+            onOpenDetail(
+              shift,
+            );
           },
         })}
-        className="management-table [&_.ant-table-cell]:px-3"
+        className="management-table [&_.ant-table-cell]:!px-2.5 [&_.ant-table-cell]:!py-2"
       />
     </Card>
   );
