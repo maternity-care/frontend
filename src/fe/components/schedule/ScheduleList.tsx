@@ -52,10 +52,21 @@ export function ScheduleList({
   return (
     <Card
       title={RESPONSE_MESSAGES.SCHEDULE.UPCOMING_APPOINTMENTS_CARE}
-      className="h-full shadow-sm"
+      className="h-full shadow-sm flex flex-col"
+      styles={{
+        body: {
+          flex: 1,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          paddingTop: 12,
+          paddingBottom: 12,
+          maxHeight: 800,
+        },
+      }}
     >
       {schedules.length ? (
-        <div className="divide-y divide-slate-100">
+        <div className="flex-1 overflow-y-auto pr-1 divide-y divide-slate-100">
           {schedules.map((item) => (
             <div key={item.id} className="py-4 first:pt-0 last:pb-0">
               <div className="mb-2 flex flex-wrap items-center gap-2">
