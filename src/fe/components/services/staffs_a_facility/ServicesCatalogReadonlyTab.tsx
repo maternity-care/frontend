@@ -4,32 +4,19 @@ import {
   Button,
   Card,
   Flex,
-  Form,
-  Input,
-  InputNumber,
   message,
-  Modal,
-  Select,
-  Space,
   Table,
   Tag,
   Tooltip,
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Edit, RefreshCw, Search } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useStaffFacilityId } from "@/hooks/useStaffFacilityId";
-import {
-  createManagementFacilityService,
-  getManagementFacilityServices,
-  updateManagementFacilityService,
-} from "@/management/features/services/facility-services/facility-services.api";
-import type {
-  ManagementFacilityService,
-  ServiceStatus as FacilityServiceStatus,
-} from "@/management/features/services/facility-services/facility-services.types";
+import { getManagementFacilityServices } from "@/management/features/services/facility-services/facility-services.api";
+import type { ManagementFacilityService } from "@/management/features/services/facility-services/facility-services.types";
 import { getManagementServiceTypesLookup } from "@/management/features/services/service-types/service-types.api";
 import type { ManagementServiceTypeLookupItem } from "@/management/features/services/service-types/service-types.types";
 import { getManagementServices } from "@/management/features/services/services/services.api";
@@ -38,6 +25,12 @@ import type {
   ServiceSaleMode,
   ServiceStatus,
 } from "@/management/features/services/services/services.types";
+import {
+  TableFilter,
+  TableFilterColumn,
+  TableFilterValues,
+} from "@/management/components/ui/TableFilter";
+import { ServiceDetailModal } from "../types_catalogs/ServiceDetailModal";
 
 const { Text, Title } = Typography;
 
@@ -52,12 +45,6 @@ const STATUS_LABELS: Record<ServiceStatus, string> = {
   inactive: "Ngừng hoạt động",
 };
 
-interface FacilityPriceFormValues {
-  price: number;
-  durationMinutes: number;
-  status: FacilityServiceStatus;
-}
-
 function formatCurrency(value: string | number) {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return "-";
@@ -69,13 +56,8 @@ function formatCurrency(value: string | number) {
   }).format(amount);
 }
 
-function isFormValidationError(error: unknown) {
-  return typeof error === "object" && error !== null && "errorFields" in error;
-}
-
 export function ServicesCatalogReadonlyTab() {
   const { facilityId, ready } = useStaffFacilityId();
-  const [form] = Form.useForm<FacilityPriceFormValues>();
   const [messageApi, contextHolder] = message.useMessage();
 
   const [services, setServices] = useState<ManagementService[]>([]);
@@ -86,18 +68,20 @@ export function ServicesCatalogReadonlyTab() {
     ManagementServiceTypeLookupItem[]
   >([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [serviceTypeId, setServiceTypeId] = useState<string>();
-  const [saleMode, setSaleMode] = useState<ServiceSaleMode>();
-  const [status, setStatus] = useState<ServiceStatus>();
+  const [filterValues, setFilterValues] = useState<TableFilterValues>({
+    search: undefined,
+    serviceTypeId: undefined,
+    saleMode: undefined,
+    status: undefined,
+  });
+  const [search, setSearch] = useState<string | undefined>();
+
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(5);
   const [total, setTotal] = useState(0);
 
-  const [priceModalOpen, setPriceModalOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [selectedService, setSelectedService] =
     useState<ManagementService | null>(null);
 
@@ -158,9 +142,9 @@ export function ServicesCatalogReadonlyTab() {
     try {
       const result = await getManagementServices({
         search: search || undefined,
-        serviceTypeId,
-        saleMode,
-        status,
+        serviceTypeId: filterValues.serviceTypeId as string | undefined,
+        saleMode: filterValues.saleMode as ServiceSaleMode | undefined,
+        status: filterValues.status as ServiceStatus | undefined,
         page,
         limit: pageSize,
       });
@@ -173,7 +157,7 @@ export function ServicesCatalogReadonlyTab() {
     } finally {
       setLoading(false);
     }
-  }, [messageApi, page, pageSize, saleMode, search, serviceTypeId, status]);
+  }, [messageApi, page, pageSize, search, filterValues]);
 
   useEffect(() => {
     queueMicrotask(() => void loadServiceTypes());
@@ -192,66 +176,63 @@ export function ServicesCatalogReadonlyTab() {
     [serviceTypes],
   );
 
-  const openPriceModal = (service: ManagementService) => {
-    const facilityService = facilityServiceMap.get(service.id);
+  const filterColumns: TableFilterColumn[] = useMemo(
+    () => [
+      {
+        field: "search",
+        label: "Tìm kiếm",
+        type: "text",
+        width: 300,
+        contains: true,
+        placeholder: "Tìm theo ID, mã hoặc tên",
+      },
+      {
+        field: "serviceTypeId",
+        label: "Loại dịch vụ",
+        type: "select",
+        width: 220,
+        options: serviceTypes.map((item) => ({
+          value: item.id,
+          label: `${item.code} - ${item.name}`,
+        })),
+      },
+      {
+        field: "saleMode",
+        label: "Hình thức bán",
+        type: "select",
+        width: 210,
+        options: [
+          { value: "standalone", label: "Bán lẻ" },
+          { value: "package_only", label: "Chỉ trong gói" },
+          { value: "both", label: "Bán lẻ và trong gói" },
+        ],
+      },
+      {
+        field: "status",
+        label: "Trạng thái",
+        type: "select",
+        width: 180,
+        options: [
+          { value: "active", label: "Hoạt động" },
+          { value: "inactive", label: "Ngừng hoạt động" },
+        ],
+      },
+    ],
+    [serviceTypes],
+  );
 
+  const handleFilterChange = (
+    nextValues: TableFilterValues,
+    nextSearch?: string,
+  ) => {
+    setFilterValues(nextValues);
+    setSearch(nextSearch || undefined);
+    setPage(1);
+  };
+
+  const openDetail = (service: ManagementService) => {
     setSelectedService(service);
-    form.setFieldsValue({
-      price: Number(facilityService?.price ?? service.basePrice),
-      durationMinutes:
-        facilityService?.durationMinutes ?? service.defaultDurationMinutes,
-      status: facilityService?.status ?? "active",
-    });
-    setPriceModalOpen(true);
-  };
-
-  const closePriceModal = () => {
-    setPriceModalOpen(false);
-    setSelectedService(null);
-    form.resetFields();
-  };
-
-  const handleSaveFacilityPrice = async () => {
-    if (!facilityId || !selectedService) return;
-
-    try {
-      const values = await form.validateFields();
-      const input = {
-        facilityId,
-        serviceId: selectedService.id,
-        price: Number(values.price).toFixed(2),
-        durationMinutes: values.durationMinutes,
-        status: values.status,
-      };
-
-      setSaving(true);
-
-      let facilityService = facilityServiceMap.get(selectedService.id);
-      if (!facilityService) {
-        const latest = await getManagementFacilityServices({
-          facilityId,
-          serviceId: selectedService.id,
-          page: 1,
-          limit: 1,
-        });
-        facilityService = latest.items[0];
-      }
-
-      if (facilityService) {
-        await updateManagementFacilityService(facilityService.id, input);
-      } else {
-        await createManagementFacilityService(input);
-      }
-
-      messageApi.success("Đã cập nhật cấu hình dịch vụ tại cơ sở.");
-      closePriceModal();
-      await loadFacilityServices();
-    } catch (error) {
-      if (isFormValidationError(error)) return;
-      messageApi.error("Không thể cập nhật cấu hình dịch vụ tại cơ sở.");
-    } finally {
-      setSaving(false);
-    }
+    setDetailOpen(true);
   };
 
   const columns: ColumnsType<ManagementService> = [
@@ -398,22 +379,15 @@ export function ServicesCatalogReadonlyTab() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 100,
+      width: 90,
       fixed: "right",
       align: "center",
       render: (_, record) => (
-        <Tooltip
-          title={
-            record.status === "active"
-              ? "Chỉnh giá tại cơ sở"
-              : "Dịch vụ hệ thống đang ngừng hoạt động"
-          }
-        >
+        <Tooltip title="Xem chi tiết">
           <Button
             type="text"
-            icon={<Edit size={17} />}
-            disabled={record.status !== "active"}
-            onClick={() => openPriceModal(record)}
+            icon={<Eye size={17} />}
+            onClick={() => openDetail(record)}
           />
         </Tooltip>
       ),
@@ -433,6 +407,16 @@ export function ServicesCatalogReadonlyTab() {
   return (
     <>
       {contextHolder}
+
+      <div style={{ marginBottom: 20 }}>
+        <TableFilter
+          columns={filterColumns}
+          values={filterValues}
+          clearLabel="Đặt lại"
+          onChange={handleFilterChange}
+        />
+      </div>
+
       <Card>
         <Flex
           justify="space-between"
@@ -446,91 +430,9 @@ export function ServicesCatalogReadonlyTab() {
               Danh mục dịch vụ hệ thống
             </Title>
             <Text type="secondary">
-              Xem dịch vụ do superadmin tạo và cấu hình giá riêng cho cơ sở.
+              Xem dịch vụ hệ thống và cấu hình giá / thời lượng tại cơ sở.
             </Text>
           </div>
-        </Flex>
-
-        <Flex wrap gap={12} style={{ marginBottom: 20 }}>
-          <Input
-            allowClear
-            value={searchInput}
-            prefix={<Search size={16} />}
-            placeholder="Tìm theo ID, mã hoặc tên"
-            style={{ width: 300 }}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onPressEnter={() => {
-              setPage(1);
-              setSearch(searchInput.trim());
-            }}
-          />
-          <Select
-            allowClear
-            showSearch
-            value={serviceTypeId}
-            placeholder="Loại dịch vụ"
-            optionFilterProp="label"
-            style={{ width: 220 }}
-            options={serviceTypes.map((item) => ({
-              value: item.id,
-              label: `${item.code} - ${item.name}`,
-            }))}
-            onChange={(value) => {
-              setServiceTypeId(value);
-              setPage(1);
-            }}
-          />
-          <Select
-            allowClear
-            value={saleMode}
-            placeholder="Hình thức bán"
-            style={{ width: 210 }}
-            options={[
-              { value: "standalone", label: "Bán lẻ" },
-              { value: "package_only", label: "Chỉ trong gói" },
-              { value: "both", label: "Bán lẻ và trong gói" },
-            ]}
-            onChange={(value) => {
-              setSaleMode(value);
-              setPage(1);
-            }}
-          />
-          <Select
-            allowClear
-            value={status}
-            placeholder="Trạng thái"
-            style={{ width: 180 }}
-            options={[
-              { value: "active", label: "Hoạt động" },
-              { value: "inactive", label: "Ngừng hoạt động" },
-            ]}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
-          />
-          <Button
-            type="primary"
-            onClick={() => {
-              setPage(1);
-              setSearch(searchInput.trim());
-            }}
-          >
-            Tìm kiếm
-          </Button>
-          <Button
-            icon={<RefreshCw size={16} />}
-            onClick={() => {
-              setSearchInput("");
-              setSearch("");
-              setServiceTypeId(undefined);
-              setSaleMode(undefined);
-              setStatus(undefined);
-              setPage(1);
-            }}
-          >
-            Đặt lại
-          </Button>
         </Flex>
 
         <Table<ManagementService>
@@ -538,13 +440,13 @@ export function ServicesCatalogReadonlyTab() {
           loading={loading || !ready}
           columns={columns}
           dataSource={services}
-          scroll={{ x: 1700 }}
+          scroll={{ x: 1700, y: 380 }}
           pagination={{
             current: page,
             pageSize,
             total,
             showSizeChanger: true,
-            pageSizeOptions: [10, 20, 50, 100],
+            pageSizeOptions: [5, 10, 20, 50, 100],
             showTotal: (value) => `Tổng ${value} dịch vụ`,
             onChange: (nextPage, nextPageSize) => {
               if (nextPageSize !== pageSize) {
@@ -558,129 +460,25 @@ export function ServicesCatalogReadonlyTab() {
         />
       </Card>
 
-      <Modal
-        open={priceModalOpen}
-        title="Cấu hình giá tại cơ sở"
-        okText="Lưu"
-        cancelText="Hủy"
-        width={560}
-        destroyOnHidden
-        confirmLoading={saving}
-        onCancel={closePriceModal}
-        onOk={() => void handleSaveFacilityPrice()}
-      >
-        {selectedService ? (
-          <Flex vertical gap={16}>
-            <Flex vertical gap={4}>
-              <Text strong>{selectedService.name}</Text>
-              <Text type="secondary">
-                Giá cơ bản: {formatCurrency(selectedService.basePrice)}
-              </Text>
-            </Flex>
-
-            <Form<FacilityPriceFormValues>
-              form={form}
-              layout="vertical"
-              requiredMark="optional"
-            >
-              <Form.Item label="Giá tại cơ sở" required>
-                <Space.Compact block>
-                  <Form.Item
-                    name="price"
-                    noStyle
-                    rules={[
-                      {
-                        required: true,
-                        message: "Vui lòng nhập giá tại cơ sở.",
-                      },
-                      {
-                        type: "number",
-                        min: 0,
-                        message: "Giá dịch vụ không được âm.",
-                      },
-                    ]}
-                  >
-                    <InputNumber<number>
-                      min={0}
-                      precision={0}
-                      placeholder="Nhập giá tại cơ sở"
-                      style={{ width: "100%" }}
-                      formatter={(value) =>
-                        `${value ?? ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
-                      }
-                      parser={(value) =>
-                        Number((value ?? "").replace(/\./g, ""))
-                      }
-                    />
-                  </Form.Item>
-
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                      minWidth: 70,
-                      padding: "0 12px",
-                      color: "rgba(0, 0, 0, 0.88)",
-                      backgroundColor: "rgba(0, 0, 0, 0.02)",
-                      border: "1px solid #d9d9d9",
-                      borderLeft: 0,
-                      borderRadius: "0 6px 6px 0",
-                      userSelect: "none",
-                    }}
-                  >
-                    VND
-                  </div>
-                </Space.Compact>
-              </Form.Item>
-
-              <Form.Item
-                name="durationMinutes"
-                label="Thời lượng tại cơ sở"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng nhập thời lượng.",
-                  },
-                  {
-                    type: "number",
-                    min: 1,
-                    message: "Thời lượng phải lớn hơn 0.",
-                  },
-                ]}
-              >
-                <InputNumber
-                  min={1}
-                  max={1440}
-                  precision={0}
-                  addonAfter="phút"
-                  style={{ width: "100%" }}
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="status"
-                label="Trạng thái tại cơ sở"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng chọn trạng thái.",
-                  },
-                ]}
-              >
-                <Select
-                  options={[
-                    { value: "active", label: "Hoạt động" },
-                    { value: "inactive", label: "Ngừng hoạt động" },
-                  ]}
-                />
-              </Form.Item>
-            </Form>
-          </Flex>
-        ) : null}
-      </Modal>
+      <ServiceDetailModal
+        open={detailOpen}
+        service={selectedService}
+        serviceTypeName={
+          selectedService
+            ? serviceTypeNameMap.get(selectedService.serviceTypeId)
+            : undefined
+        }
+        facilityService={
+          selectedService
+            ? facilityServiceMap.get(selectedService.id)
+            : undefined
+        }
+        showFacilityConfig
+        onCancel={() => {
+          setDetailOpen(false);
+          setSelectedService(null);
+        }}
+      />
     </>
   );
 }

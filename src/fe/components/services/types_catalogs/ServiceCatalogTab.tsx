@@ -15,11 +15,12 @@ import {
 
 import type { ColumnsType } from "antd/es/table";
 
-import { Edit, Plus, Trash2 } from "lucide-react";
+import { Edit, Eye, Plus, Trash2 } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ServiceFormModal } from "./ServiceFormModal";
+import { ServiceDetailModal } from "./ServiceDetailModal";
 import {
   ManagementService,
   ServiceSaleMode,
@@ -84,6 +85,7 @@ export function ServiceCatalogTab() {
   const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const [selectedService, setSelectedService] =
     useState<ManagementService | null>(null);
@@ -208,6 +210,11 @@ export function ServiceCatalogTab() {
     setFormOpen(true);
   };
 
+  const handleView = (service: ManagementService) => {
+    setSelectedService(service);
+    setDetailOpen(true);
+  };
+
   const handleDelete = async (service: ManagementService) => {
     setDeletingId(service.id);
 
@@ -323,11 +330,19 @@ export function ServiceCatalogTab() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 110,
+      width: 140,
       fixed: "right",
       align: "center",
       render: (_, record) => (
         <Space size={4}>
+          <Tooltip title="Xem chi tiết">
+            <Button
+              type="text"
+              icon={<Eye size={17} />}
+              onClick={() => handleView(record)}
+            />
+          </Tooltip>
+
           <Tooltip title="Chỉnh sửa">
             <Button
               type="text"
@@ -373,6 +388,7 @@ export function ServiceCatalogTab() {
           onChange={handleFilterChange}
         />
       </div>
+
       <Card>
         <Flex
           justify="space-between"
@@ -405,7 +421,7 @@ export function ServiceCatalogTab() {
           dataSource={services}
           scroll={{
             x: 900,
-            y: 380, // cố định chiều cao body → có scroll dọc, không bị tràn
+            y: 380,
           }}
           pagination={{
             current: page,
@@ -439,6 +455,21 @@ export function ServiceCatalogTab() {
           setFormOpen(false);
           setSelectedService(null);
           await loadServices();
+        }}
+      />
+
+      <ServiceDetailModal
+        open={detailOpen}
+        service={selectedService}
+        serviceTypeName={
+          selectedService
+            ? serviceTypeNameMap.get(selectedService.serviceTypeId)
+            : undefined
+        }
+        showFacilityConfig={false}
+        onCancel={() => {
+          setDetailOpen(false);
+          setSelectedService(null);
         }}
       />
     </>
