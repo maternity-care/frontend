@@ -58,7 +58,9 @@ const scheduleTypeOptions: Array<{
   },
 ];
 
-function getInitialScheduleFormValues(initialDate?: Dayjs): CreateScheduleFormValues {
+function getInitialScheduleFormValues(
+  initialDate?: Dayjs,
+): CreateScheduleFormValues {
   return {
     title: "",
     type: "reminder",
@@ -81,9 +83,19 @@ export function CreateScheduleModal({
     setFormKey((current) => current + 1);
   };
 
+  function generateId() {
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+    ) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  }
+
   const handleFinish = (values: CreateScheduleFormValues) => {
     const newSchedule: PregnancyScheduleItem = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       title: values.title.trim(),
       type: values.type,
       date: values.date.format("YYYY-MM-DD"),
@@ -140,11 +152,16 @@ export function CreateScheduleModal({
             {
               required: true,
               whitespace: true,
-              message: RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_TITLE_DESCRIPTION,
+              message:
+                RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_TITLE_DESCRIPTION,
             },
           ]}
         >
-          <Input placeholder={RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_TITLE_SCHEDULE_EXAMPLE} />
+          <Input
+            placeholder={
+              RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_TITLE_SCHEDULE_EXAMPLE
+            }
+          />
         </Form.Item>
 
         <Form.Item
@@ -167,7 +184,8 @@ export function CreateScheduleModal({
             rules={[
               {
                 required: true,
-                message: RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_DATE_DESCRIPTION,
+                message:
+                  RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_DATE_DESCRIPTION,
               },
             ]}
           >
@@ -180,7 +198,8 @@ export function CreateScheduleModal({
             rules={[
               {
                 required: true,
-                message: RESPONSE_MESSAGES.COMMON_DESCRIPTION.enterHourDescription,
+                message:
+                  RESPONSE_MESSAGES.COMMON_DESCRIPTION.enterHourDescription,
               },
             ]}
           >
@@ -189,13 +208,20 @@ export function CreateScheduleModal({
         </div>
 
         <Form.Item label={RESPONSE_MESSAGES.COMMON.LOCATION} name="location">
-          <Input placeholder={RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_LOCATION_SCHEDULE_EXAMPLE} />
+          <Input
+            placeholder={
+              RESPONSE_MESSAGES.COMMON_DESCRIPTION
+                .ENTER_LOCATION_SCHEDULE_EXAMPLE
+            }
+          />
         </Form.Item>
 
         <Form.Item label="Ghi chú" name="note">
           <Input.TextArea
             rows={3}
-            placeholder={RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_NOTE_DESCRIPTION}
+            placeholder={
+              RESPONSE_MESSAGES.COMMON_DESCRIPTION.ENTER_NOTE_DESCRIPTION
+            }
           />
         </Form.Item>
       </Form>
