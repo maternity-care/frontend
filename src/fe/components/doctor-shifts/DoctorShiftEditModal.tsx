@@ -27,15 +27,10 @@ type DoctorShiftEditModalProps = {
   rooms: RoomOption[];
   doctors: DoctorOption[];
   onClose: () => void;
-  onUpdated: (
-    updatedShift: DoctorShiftItem,
-  ) => void;
+  onUpdated: (updatedShift: DoctorShiftItem) => void;
 };
 
-type DoctorShiftEditModalContentProps = Omit<
-  DoctorShiftEditModalProps,
-  "shift"
-> & {
+type ContentProps = Omit<DoctorShiftEditModalProps, "shift"> & {
   shift: DoctorShiftItem;
 };
 
@@ -48,17 +43,11 @@ function DoctorShiftEditModalContent({
   doctors,
   onClose,
   onUpdated,
-}: DoctorShiftEditModalContentProps) {
-  async function handleUpdate({
-    payloads,
-    slotById,
-  }: ValidatedShiftForm) {
+}: ContentProps) {
+  async function handleUpdate({ payloads, slotById }: ValidatedShiftForm) {
     const firstPayload = payloads[0];
-
     if (!firstPayload) {
-      throw new Error(
-        "Không tìm thấy dữ liệu ca trực cần cập nhật.",
-      );
+      throw new Error("Không tìm thấy dữ liệu ca trực cần cập nhật.");
     }
 
     const updatePayload: UpdateDoctorShiftInput = {
@@ -69,24 +58,16 @@ function DoctorShiftEditModalContent({
       roomId: firstPayload.roomId,
       slotId: firstPayload.slotId,
       shiftDate: firstPayload.shiftDate,
-      maxAppointments:
-        firstPayload.maxAppointments,
+      maxAppointments: firstPayload.maxAppointments,
       status: firstPayload.status,
       note: firstPayload.note,
     };
 
-    const response = await updateDoctorShift(
-      shift.id,
-      updatePayload,
-    );
-
+    const response = await updateDoctorShift(shift.id, updatePayload);
     let updatedShift: DoctorShiftItem;
 
     try {
-      const detail = await getDoctorShift(
-        response.data.id || shift.id,
-      );
-
+      const detail = await getDoctorShift(response.data.id || shift.id);
       updatedShift = mergeShiftDisplayData({
         original: shift,
         response: response.data,
@@ -110,7 +91,6 @@ function DoctorShiftEditModalContent({
     }
 
     onUpdated(updatedShift);
-
     return "Cập nhật ca trực thành công.";
   }
 
@@ -129,17 +109,7 @@ function DoctorShiftEditModalContent({
   );
 }
 
-export function DoctorShiftEditModal(
-  props: DoctorShiftEditModalProps,
-) {
-  if (!props.shift) {
-    return null;
-  }
-
-  return (
-    <DoctorShiftEditModalContent
-      {...props}
-      shift={props.shift}
-    />
-  );
+export function DoctorShiftEditModal(props: DoctorShiftEditModalProps) {
+  if (!props.shift) return null;
+  return <DoctorShiftEditModalContent {...props} shift={props.shift} />;
 }

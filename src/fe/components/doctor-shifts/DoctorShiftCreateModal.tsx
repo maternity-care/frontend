@@ -25,9 +25,7 @@ type DoctorShiftCreateModalProps = {
   rooms: RoomOption[];
   doctors: DoctorOption[];
   onClose: () => void;
-  onCreated: (
-    createdShifts: DoctorShiftItem[],
-  ) => void;
+  onCreated: (createdShifts: DoctorShiftItem[]) => void;
 };
 
 export function DoctorShiftCreateModal({
@@ -39,39 +37,26 @@ export function DoctorShiftCreateModal({
   onClose,
   onCreated,
 }: DoctorShiftCreateModalProps) {
-  async function handleCreate({
-    payloads,
-    slotById,
-  }: ValidatedShiftForm) {
-    const createPayloads =
-      payloads.map((payload) => ({
-        ...payload,
-        roomId: payload.roomId ?? "",
-        status: "available" as const,
-      }));
+  async function handleCreate({ payloads, slotById }: ValidatedShiftForm) {
+    const createPayloads = payloads.map((payload) => ({
+      ...payload,
+      roomId: payload.roomId ?? "",
+      status: "available" as const,
+    }));
 
     const responses = await Promise.all(
-      createPayloads.map((payload) =>
-        createDoctorShift(payload),
-      ),
+      createPayloads.map((payload) => createDoctorShift(payload)),
     );
 
     const createdShifts = await Promise.all(
       responses.map(async (response, index) => {
-        const payload =
-          createPayloads[index];
-
+        const payload = createPayloads[index];
         if (!payload) {
-          throw new Error(
-            "Không tìm thấy dữ liệu ca trực vừa tạo.",
-          );
+          throw new Error("Không tìm thấy dữ liệu ca trực vừa tạo.");
         }
 
         try {
-          const detail = await getDoctorShift(
-            response.data.id,
-          );
-
+          const detail = await getDoctorShift(response.data.id);
           return mergeShiftDisplayData({
             response: response.data,
             detail,
@@ -95,7 +80,6 @@ export function DoctorShiftCreateModal({
     );
 
     onCreated(createdShifts);
-
     return createdShifts.length > 1
       ? `Tạo thành công ${createdShifts.length} ca trực.`
       : "Tạo ca trực thành công.";
