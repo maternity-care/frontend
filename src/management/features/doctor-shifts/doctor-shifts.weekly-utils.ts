@@ -60,6 +60,10 @@ export function getNextWeekMondayDateKey() {
   return addDaysToDoctorShiftDateKey(dateFrom, 7);
 }
 
+export function getTomorrowDateKey() {
+  return addDaysToDoctorShiftDateKey(toDoctorShiftDateKey(new Date()), 1);
+}
+
 export function isNextWeekMondayDateKey(value: string) {
   return Boolean(value) && value === getNextWeekMondayDateKey();
 }

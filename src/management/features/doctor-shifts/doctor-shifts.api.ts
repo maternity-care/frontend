@@ -524,6 +524,7 @@ export function getGroupedDoctorShifts(
         dateFrom: params.dateFrom,
         dateTo: params.dateTo,
         status: params.status,
+        forTemplate: params.forTemplate,
       }),
     }),
   );

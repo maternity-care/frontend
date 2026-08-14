@@ -365,6 +365,7 @@ export function DoctorShiftBulkGenerateModal({
         facilityId: watchedFacilityId,
         dateFrom,
         dateTo,
+        forTemplate: true,
       });
 
       const {
@@ -402,7 +403,7 @@ export function DoctorShiftBulkGenerateModal({
 
       const skippedMessage =
         skippedGroups > 0
-          ? ` Bỏ qua ${skippedGroups} nhóm đã hủy hoặc không còn hợp lệ.`
+          ? ` Bỏ qua ${skippedGroups} nhóm có bác sĩ hoặc khung ca không còn hợp lệ.`
           : "";
 
       messageApi.success(

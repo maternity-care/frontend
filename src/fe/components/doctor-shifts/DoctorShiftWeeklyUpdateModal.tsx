@@ -358,6 +358,7 @@ export function DoctorShiftWeeklyUpdateModal({
         facilityId: watchedFacilityId,
         dateFrom,
         dateTo,
+        forTemplate: true,
       });
 
       const {
