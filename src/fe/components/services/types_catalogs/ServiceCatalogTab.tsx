@@ -4,10 +4,8 @@ import {
   Button,
   Card,
   Flex,
-  Input,
   message,
   Popconfirm,
-  Select,
   Space,
   Table,
   Tag,
@@ -17,7 +15,7 @@ import {
 
 import type { ColumnsType } from "antd/es/table";
 
-import { Edit, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Edit, Plus, Trash2 } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -33,6 +31,11 @@ import {
   deleteManagementService,
   getManagementServices,
 } from "@/management/features/services/services/services.api";
+import {
+  TableFilter,
+  TableFilterColumn,
+  TableFilterValues,
+} from "@/management/components/ui/TableFilter";
 
 const { Text, Title } = Typography;
 
@@ -68,17 +71,16 @@ export function ServiceCatalogTab() {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-
-  const [serviceTypeId, setServiceTypeId] = useState<string>();
-
-  const [saleMode, setSaleMode] = useState<ServiceSaleMode>();
-
-  const [status, setStatus] = useState<ServiceStatus>();
+  const [filterValues, setFilterValues] = useState<TableFilterValues>({
+    search: undefined,
+    serviceTypeId: undefined,
+    saleMode: undefined,
+    status: undefined,
+  });
+  const [search, setSearch] = useState<string | undefined>();
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(5);
   const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -107,9 +109,9 @@ export function ServiceCatalogTab() {
     try {
       const result = await getManagementServices({
         search: search || undefined,
-        serviceTypeId,
-        saleMode,
-        status,
+        serviceTypeId: filterValues.serviceTypeId as string | undefined,
+        saleMode: filterValues.saleMode as ServiceSaleMode | undefined,
+        status: filterValues.status as ServiceStatus | undefined,
         page,
         limit: pageSize,
       });
@@ -123,7 +125,7 @@ export function ServiceCatalogTab() {
     } finally {
       setLoading(false);
     }
-  }, [messageApi, page, pageSize, saleMode, search, serviceTypeId, status]);
+  }, [messageApi, page, pageSize, search, filterValues]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -142,17 +144,57 @@ export function ServiceCatalogTab() {
     [serviceTypes],
   );
 
-  const handleSearch = () => {
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
+  const filterColumns: TableFilterColumn[] = useMemo(
+    () => [
+      {
+        field: "search",
+        label: "Tìm kiếm",
+        type: "text",
+        width: 300,
+        contains: true,
+        placeholder: "Tìm theo ID, mã hoặc tên",
+      },
+      {
+        field: "serviceTypeId",
+        label: "Loại dịch vụ",
+        type: "select",
+        width: 220,
+        options: serviceTypes.map((item) => ({
+          value: item.id,
+          label: `${item.code} - ${item.name}`,
+        })),
+      },
+      {
+        field: "saleMode",
+        label: "Hình thức bán",
+        type: "select",
+        width: 210,
+        options: [
+          { value: "standalone", label: "Bán lẻ" },
+          { value: "package_only", label: "Chỉ trong gói" },
+          { value: "both", label: "Bán lẻ và trong gói" },
+        ],
+      },
+      {
+        field: "status",
+        label: "Trạng thái",
+        type: "select",
+        width: 180,
+        options: [
+          { value: "active", label: "Hoạt động" },
+          { value: "inactive", label: "Ngừng hoạt động" },
+        ],
+      },
+    ],
+    [serviceTypes],
+  );
 
-  const handleResetFilters = () => {
-    setSearchInput("");
-    setSearch("");
-    setServiceTypeId(undefined);
-    setSaleMode(undefined);
-    setStatus(undefined);
+  const handleFilterChange = (
+    nextValues: TableFilterValues,
+    nextSearch?: string,
+  ) => {
+    setFilterValues(nextValues);
+    setSearch(nextSearch || undefined);
     setPage(1);
   };
 
@@ -323,6 +365,14 @@ export function ServiceCatalogTab() {
     <>
       {contextHolder}
 
+      <div style={{ marginBottom: 20 }}>
+        <TableFilter
+          columns={filterColumns}
+          values={filterValues}
+          clearLabel="Đặt lại"
+          onChange={handleFilterChange}
+        />
+      </div>
       <Card>
         <Flex
           justify="space-between"
@@ -348,101 +398,21 @@ export function ServiceCatalogTab() {
           </Button>
         </Flex>
 
-        <Flex wrap gap={12} style={{ marginBottom: 20 }}>
-          <Input
-            allowClear
-            value={searchInput}
-            prefix={<Search size={16} />}
-            placeholder="Tìm theo ID, mã hoặc tên"
-            style={{ width: 300 }}
-            onChange={(event) => setSearchInput(event.target.value)}
-            onPressEnter={handleSearch}
-          />
-
-          <Select
-            allowClear
-            showSearch
-            value={serviceTypeId}
-            placeholder="Loại dịch vụ"
-            optionFilterProp="label"
-            style={{ width: 220 }}
-            options={serviceTypes.map((item) => ({
-              value: item.id,
-              label: `${item.code} - ${item.name}`,
-            }))}
-            onChange={(value) => {
-              setServiceTypeId(value);
-              setPage(1);
-            }}
-          />
-
-          <Select
-            allowClear
-            value={saleMode}
-            placeholder="Hình thức bán"
-            style={{ width: 210 }}
-            options={[
-              {
-                value: "standalone",
-                label: "Bán lẻ",
-              },
-              {
-                value: "package_only",
-                label: "Chỉ trong gói",
-              },
-              {
-                value: "both",
-                label: "Bán lẻ và trong gói",
-              },
-            ]}
-            onChange={(value) => {
-              setSaleMode(value);
-              setPage(1);
-            }}
-          />
-
-          <Select
-            allowClear
-            value={status}
-            placeholder="Trạng thái"
-            style={{ width: 180 }}
-            options={[
-              {
-                value: "active",
-                label: "Hoạt động",
-              },
-              {
-                value: "inactive",
-                label: "Ngừng hoạt động",
-              },
-            ]}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
-          />
-
-          <Button type="primary" onClick={handleSearch}>
-            Tìm kiếm
-          </Button>
-
-          <Button icon={<RefreshCw size={16} />} onClick={handleResetFilters}>
-            Đặt lại
-          </Button>
-        </Flex>
-
         <Table<ManagementService>
           rowKey="id"
           loading={loading}
           columns={columns}
           dataSource={services}
-          scroll={{ x: 1550 }}
+          scroll={{
+            x: 900,
+            y: 380, // cố định chiều cao body → có scroll dọc, không bị tràn
+          }}
           pagination={{
             current: page,
             pageSize,
             total,
             showSizeChanger: true,
-            pageSizeOptions: [10, 20, 50, 100],
+            pageSizeOptions: [5, 10, 20, 50, 100],
             showTotal: (value) => `Tổng ${value} dịch vụ`,
             onChange: (nextPage, nextPageSize) => {
               if (nextPageSize !== pageSize) {

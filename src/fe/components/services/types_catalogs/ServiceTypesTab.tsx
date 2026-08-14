@@ -4,10 +4,8 @@ import {
   Button,
   Card,
   Flex,
-  Input,
   message,
   Popconfirm,
-  Select,
   Space,
   Table,
   Tag,
@@ -17,9 +15,9 @@ import {
 
 import type { ColumnsType } from "antd/es/table";
 
-import { Edit, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Edit, Plus, Trash2 } from "lucide-react";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ServiceTypeFormModal } from "./ServiceTypeFormModal";
 import {
@@ -30,6 +28,11 @@ import {
   deleteManagementServiceType,
   getManagementServiceTypes,
 } from "@/management/features/services/service-types/service-types.api";
+import {
+  TableFilter,
+  TableFilterColumn,
+  TableFilterValues,
+} from "@/management/components/ui/TableFilter";
 
 const { Text, Title } = Typography;
 
@@ -42,13 +45,14 @@ export function ServiceTypesTab() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-
-  const [status, setStatus] = useState<ServiceTypeStatus>();
+  const [filterValues, setFilterValues] = useState<TableFilterValues>({
+    search: undefined,
+    status: undefined,
+  });
+  const [search, setSearch] = useState<string | undefined>();
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(5);
   const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -62,7 +66,7 @@ export function ServiceTypesTab() {
     try {
       const result = await getManagementServiceTypes({
         search: search || undefined,
-        status,
+        status: filterValues.status as ServiceTypeStatus | undefined,
         page,
         limit: pageSize,
       });
@@ -77,7 +81,7 @@ export function ServiceTypesTab() {
     } finally {
       setLoading(false);
     }
-  }, [messageApi, page, pageSize, search, status]);
+  }, [messageApi, page, pageSize, search, filterValues]);
 
   useEffect(() => {
     const task = Promise.resolve().then(loadData);
@@ -87,15 +91,36 @@ export function ServiceTypesTab() {
     };
   }, [loadData]);
 
-  const handleSearch = () => {
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
+  const filterColumns: TableFilterColumn[] = useMemo(
+    () => [
+      {
+        field: "search",
+        label: "Tìm kiếm",
+        type: "text",
+        width: 320,
+        contains: true,
+        placeholder: "Tìm theo mã, tên hoặc mô tả",
+      },
+      {
+        field: "status",
+        label: "Trạng thái",
+        type: "select",
+        width: 180,
+        options: [
+          { value: "active", label: "Hoạt động" },
+          { value: "inactive", label: "Ngừng hoạt động" },
+        ],
+      },
+    ],
+    [],
+  );
 
-  const handleReset = () => {
-    setSearchInput("");
-    setSearch("");
-    setStatus(undefined);
+  const handleFilterChange = (
+    nextValues: TableFilterValues,
+    nextSearch?: string,
+  ) => {
+    setFilterValues(nextValues);
+    setSearch(nextSearch || undefined);
     setPage(1);
   };
 
@@ -222,6 +247,14 @@ export function ServiceTypesTab() {
     <>
       {contextHolder}
 
+      <div style={{ marginBottom: 20 }}>
+        <TableFilter
+          columns={filterColumns}
+          values={filterValues}
+          clearLabel="Đặt lại"
+          onChange={handleFilterChange}
+        />
+      </div>
       <Card>
         <Flex
           justify="space-between"
@@ -249,59 +282,21 @@ export function ServiceTypesTab() {
           </Button>
         </Flex>
 
-        <Flex wrap gap={12} style={{ marginBottom: 20 }}>
-          <Input
-            allowClear
-            value={searchInput}
-            prefix={<Search size={16} />}
-            placeholder="Tìm theo mã, tên hoặc mô tả"
-            style={{ width: 320 }}
-            onChange={(event) => setSearchInput(event.target.value)}
-            onPressEnter={handleSearch}
-          />
-
-          <Select
-            allowClear
-            value={status}
-            placeholder="Trạng thái"
-            style={{ width: 180 }}
-            options={[
-              {
-                value: "active",
-                label: "Hoạt động",
-              },
-              {
-                value: "inactive",
-                label: "Ngừng hoạt động",
-              },
-            ]}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
-          />
-
-          <Button type="primary" onClick={handleSearch}>
-            Tìm kiếm
-          </Button>
-
-          <Button icon={<RefreshCw size={16} />} onClick={handleReset}>
-            Đặt lại
-          </Button>
-        </Flex>
-
         <Table<ManagementServiceType>
           rowKey="id"
           loading={loading}
           columns={columns}
           dataSource={items}
-          scroll={{ x: 950 }}
+          scroll={{
+            x: 900,
+            y: 380, // cố định chiều cao body → có scroll dọc, không bị tràn
+          }}
           pagination={{
             current: page,
             pageSize,
             total,
             showSizeChanger: true,
-            pageSizeOptions: [10, 20, 50, 100],
+            pageSizeOptions: [5, 10, 20, 50, 100],
             showTotal: (value) => `Tổng ${value} loại dịch vụ`,
             onChange: (nextPage, nextPageSize) => {
               if (nextPageSize !== pageSize) {
