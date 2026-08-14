@@ -7,8 +7,9 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import type {
+  ReactNode,
+} from "react";
 import {
   Card,
   Result,
@@ -20,15 +21,33 @@ import {
   MessagesSquare,
   Tags,
 } from "lucide-react";
-
-import { useAuthStore } from "@/features/auth/auth.store";
-import { useForumRealtime } from "@/features/forum/useForumRealtime";
-import { AdminLayout } from "@/management/components/layouts/AdminLayout";
-import type { ForumTopic } from "@/management/features/forums/forums.types";
-import { ForumPostAdminTab } from "./components/ForumPostAdminTab";
-import { ForumPostsTab } from "./components/ForumPostsTab";
-import { ForumReportsTab } from "./components/ForumReportsTab";
-import { ForumTopicsTab } from "./components/ForumTopicsTab";
+import {
+  useSearchParams,
+} from "next/navigation";
+import {
+  useForumRealtime,
+} from "@/features/forum/useForumRealtime";
+import {
+  AdminLayout,
+} from "@/management/components/layouts/AdminLayout";
+import type {
+  ForumTopic,
+} from "@/management/features/forums/forums.types";
+import {
+  useForumAccess,
+} from "@/hooks/forums/useForumAccess";
+import {
+  ForumPostAdminTab,
+} from "@/fe/components/forums/ForumPostAdminTab";
+import {
+  ForumPostsTab,
+} from "@/fe/components/forums/ForumPostsTab";
+import {
+  ForumReportsTab,
+} from "@/fe/components/forums/ForumReportsTab";
+import {
+  ForumTopicsTab,
+} from "@/fe/components/forums/ForumTopicsTab";
 
 type ForumView =
   | "posts"
@@ -36,7 +55,7 @@ type ForumView =
   | "reports"
   | "topics";
 
-type ForumNavigationOption = {
+type NavigationOption = {
   value: ForumView;
   label: ReactNode;
 };
@@ -45,121 +64,38 @@ function ForumManagementContent() {
   const searchParams =
     useSearchParams();
 
-  const roles =
-    useAuthStore(
-      (state) => state.roles,
-    );
-  const user =
-    useAuthStore(
-      (state) => state.user,
-    );
-  const activeFacilityId =
-    useAuthStore(
-      (state) =>
-        state.activeFacilityId,
-    );
+  const access =
+    useForumAccess();
 
-  const effectiveRoles =
-    useMemo(() => {
-      const activeFacility =
-        user?.facilities?.find(
-          (facility) =>
-            String(
-              facility.id,
-            ) ===
-            String(
-              activeFacilityId ??
-                "",
-            ),
-        ) ??
-        user?.facilities?.find(
-          (facility) =>
-            facility.status ===
-            "active",
-        );
+  const [
+    view,
+    setView,
+  ] = useState<ForumView>(
+    "posts",
+  );
 
-      const facilityRoles =
-        activeFacility?.roles
-          ?.length
-          ? activeFacility.roles
-          : activeFacility?.role
-            ? [
-                activeFacility.role,
-              ]
-            : [];
-
-      const roleName = (
-        role:
-          | string
-          | {
-              name?: string;
-            }
-          | null
-          | undefined,
-      ) =>
-        typeof role === "string"
-          ? role
-          : role?.name;
-
-      return new Set(
-        [
-          ...roles,
-          ...(user?.roles?.map(
-            roleName,
-          ) ?? []),
-          ...facilityRoles.map(
-            roleName,
-          ),
-        ]
-          .filter(
-            (
-              role,
-            ): role is string =>
-              Boolean(role),
-          )
-          .map((role) =>
-            role.toLowerCase(),
-          ),
-      );
-    }, [
-      activeFacilityId,
-      roles,
-      user,
-    ]);
-
-  const canFullManageForum =
-    effectiveRoles.has("staff") ||
-    effectiveRoles.has("admin") ||
-    effectiveRoles.has(
-      "super_admin",
-    );
-
-  const isDoctor =
-    effectiveRoles.has("doctor");
-
-  const canAccessForum =
-    canFullManageForum ||
-    isDoctor;
-
-  const [view, setView] =
-    useState<ForumView>(
-      "posts",
-    );
   const [
     realtimeVersion,
     setRealtimeVersion,
   ] = useState(0);
-  const [topics, setTopics] =
-    useState<ForumTopic[]>([]);
+
+  const [
+    topics,
+    setTopics,
+  ] = useState<
+    ForumTopic[]
+  >([]);
 
   const activeView =
-    canFullManageForum
+    access.canFullManageForum
       ? view
       : "posts";
 
   useEffect(() => {
     const requestedView =
-      searchParams.get("view");
+      searchParams.get(
+        "view",
+      );
 
     if (
       requestedView !==
@@ -175,7 +111,7 @@ function ForumManagementContent() {
     }
 
     const nextView =
-      canFullManageForum ||
+      access.canFullManageForum ||
       requestedView ===
         "posts"
         ? requestedView
@@ -184,7 +120,9 @@ function ForumManagementContent() {
     const timer =
       window.setTimeout(
         () =>
-          setView(nextView),
+          setView(
+            nextView,
+          ),
         0,
       );
 
@@ -193,7 +131,7 @@ function ForumManagementContent() {
         timer,
       );
   }, [
-    canFullManageForum,
+    access.canFullManageForum,
     searchParams,
   ]);
 
@@ -208,7 +146,7 @@ function ForumManagementContent() {
 
   const navigationOptions =
     useMemo<
-      ForumNavigationOption[]
+      NavigationOption[]
     >(
       () => [
         {
@@ -220,7 +158,7 @@ function ForumManagementContent() {
             </span>
           ),
         },
-        ...(canFullManageForum
+        ...(access.canFullManageForum
           ? [
               {
                 value:
@@ -256,7 +194,7 @@ function ForumManagementContent() {
           : []),
       ],
       [
-        canFullManageForum,
+        access.canFullManageForum,
       ],
     );
 
@@ -279,21 +217,30 @@ function ForumManagementContent() {
       options={
         navigationOptions
       }
-      onChange={(nextView) => {
+      onChange={(
+        nextView,
+      ) => {
         if (
-          !canFullManageForum &&
-          nextView !== "posts"
+          !access.canFullManageForum &&
+          nextView !==
+            "posts"
         ) {
-          setView("posts");
+          setView(
+            "posts",
+          );
           return;
         }
 
-        setView(nextView);
+        setView(
+          nextView,
+        );
       }}
     />
   );
 
-  if (!canAccessForum) {
+  if (
+    !access.canAccessForum
+  ) {
     return (
       <AdminLayout>
         <Result
@@ -311,9 +258,9 @@ function ForumManagementContent() {
         <h1 className="mb-1 text-3xl font-semibold tracking-tight text-slate-900">
           Quản lý diễn đàn
         </h1>
+
         <p className="mb-0 text-sm text-slate-500">
-          Kiểm duyệt bài viết, quản trị nội dung, quản lý chủ đề và xử lý báo
-          cáo.
+          Kiểm duyệt bài viết, quản trị nội dung, quản lý chủ đề và xử lý báo cáo.
         </p>
       </div>
 
@@ -348,12 +295,12 @@ function ForumManagementContent() {
               realtimeVersion
             }
             canModerateContent={
-              canFullManageForum
+              access.canModerateContent
             }
           />
         </div>
 
-        {canFullManageForum ? (
+        {access.canFullManageForum ? (
           <>
             <div
               className={
@@ -368,7 +315,9 @@ function ForumManagementContent() {
                 realtimeVersion={
                   realtimeVersion
                 }
-                canHardDelete
+                canHardDelete={
+                  access.canHardDelete
+                }
               />
             </div>
 

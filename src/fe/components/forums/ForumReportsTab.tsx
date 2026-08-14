@@ -26,11 +26,25 @@ import {
   getForumReportGroups,
   resolveForumReportGroup,
 } from "@/management/features/forums/forums.api";
+import {
+  FORUM_REPORT_ACTION_OPTIONS,
+} from "@/management/features/forums/forums.constants";
+import {
+  formatForumDateTime,
+  getForumAuthorRoleLabel,
+  getForumContentStatusLabel,
+  getForumErrorMessage,
+  getForumReportDisplayContent,
+  getForumReportStatusLabel,
+  getForumReportTargetColor,
+  getForumReportTargetLabel,
+  isForumReportResolvedStatus,
+  summarizeForumReportTarget,
+} from "@/management/features/forums/forums.utils";
 import type {
   ForumReport,
   ForumReportGroup,
   ForumReportResolveAction,
-  ForumReportTargetContent,
 } from "@/management/features/forums/forums.types";
 
 const { Paragraph, Text } = Typography;
@@ -44,141 +58,6 @@ type ReportResolveRequest = {
   group: ForumReportGroup;
   action: ForumReportResolveAction;
 };
-
-const REPORT_ACTION_OPTIONS: Array<{
-  value: ForumReportResolveAction;
-  label: string;
-}> = [
-  { value: "hide", label: "Ẩn nội dung" },
-  { value: "delete", label: "Xóa nội dung" },
-  { value: "dismiss", label: "Bỏ qua báo cáo" },
-];
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : "Có lỗi xảy ra khi xử lý báo cáo.";
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return "Chưa cập nhật";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function isResolvedStatus(status: string) {
-  return ["resolved", "rejected", "dismissed", "closed"].includes(
-    status.toLowerCase(),
-  );
-}
-
-function getReportStatusLabel(status: string) {
-  const normalized = status.trim().toLowerCase();
-  const labels: Record<string, string> = {
-    pending: "Chờ xử lý",
-    resolved: "Đã xử lý",
-    rejected: "Đã bỏ qua",
-    dismissed: "Đã bỏ qua",
-  };
-
-  return labels[normalized] || status || "Chờ xử lý";
-}
-
-function getContentStatusLabel(status: string) {
-  const normalized = status.trim().toLowerCase();
-  const labels: Record<string, string> = {
-    pending: "Chờ duyệt",
-    published: "Đã xuất bản",
-    hidden: "Đã ẩn",
-    rejected: "Đã từ chối",
-    deleted: "Đã xóa",
-  };
-
-  return labels[normalized] || status || "Chưa cập nhật";
-}
-
-function getReporterRoleLabel(role: ForumReport["reporterRole"]) {
-  const labels: Record<ForumReport["reporterRole"], string> = {
-    user: "Người dùng",
-    staff: "Nhân viên",
-    doctor: "Bác sĩ",
-    moderator: "Kiểm duyệt viên",
-    admin: "Quản trị viên",
-  };
-
-  return labels[role] ?? role;
-}
-
-function stripReportHtml(value: string) {
-  return value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function getTargetLabel(targetType: ForumReportGroup["targetType"]) {
-  if (targetType === "post") return "Bài viết";
-  if (targetType === "comment") return "Bình luận";
-  return "Không xác định";
-}
-
-function getTargetColor(targetType: ForumReportGroup["targetType"]) {
-  if (targetType === "post") return "blue";
-  if (targetType === "comment") return "purple";
-  return "default";
-}
-
-function summarizeTargetContent(
-  target: ForumReportTargetContent | null,
-  group: ForumReportGroup,
-) {
-  if (!target) {
-    return {
-      title: `${getTargetLabel(group.targetType)} không còn tồn tại`,
-      content: "",
-    };
-  }
-
-  return {
-    title:
-      target.title ||
-      target.postTitle ||
-      getTargetLabel(group.targetType),
-    content: stripReportHtml(target.content),
-  };
-}
-
-function getReportDisplayContent(report: ForumReport) {
-  const reason = report.reason.trim();
-  const description = report.description.trim();
-
-  if (description || !reason.includes(":")) {
-    return {
-      reason: reason || "Không rõ lý do",
-      description: description || "Không có mô tả.",
-    };
-  }
-
-  const separatorIndex = reason.indexOf(":");
-  const reasonTitle = reason.slice(0, separatorIndex).trim();
-  const reasonDescription = reason.slice(separatorIndex + 1).trim();
-
-  return {
-    reason: reasonTitle || "Không rõ lý do",
-    description: reasonDescription || "Không có mô tả.",
-  };
-}
 
 function ReportResolveModal({
   request,
@@ -194,12 +73,18 @@ function ReportResolveModal({
   const [note, setNote] = useState("");
 
   useEffect(() => {
-    if (request) setNote("");
+    if (!request) return;
+
+    const timer = window.setTimeout(() => {
+      setNote("");
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [request]);
 
   if (!request) return null;
 
-  const target = summarizeTargetContent(
+  const target = summarizeForumReportTarget(
     request.group.targetContent,
     request.group,
   );
@@ -241,7 +126,7 @@ function ReportResolveModal({
           color={request.action === "dismiss" ? "default" : "red"}
           className="!mr-0"
         >
-          {REPORT_ACTION_OPTIONS.find((item) => item.value === request.action)
+          {FORUM_REPORT_ACTION_OPTIONS.find((item) => item.value === request.action)
             ?.label ?? request.action}
         </Tag>
       </div>
@@ -276,8 +161,8 @@ function ReportTargetContentModal({
 }) {
   if (!group) return null;
 
-  const target = summarizeTargetContent(group.targetContent, group);
-  const disabled = group.pendingCount === 0 || isResolvedStatus(group.status);
+  const target = summarizeForumReportTarget(group.targetContent, group);
+  const disabled = group.pendingCount === 0 || isForumReportResolvedStatus(group.status);
 
   return (
     <Modal
@@ -322,8 +207,8 @@ function ReportTargetContentModal({
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Tag color={getTargetColor(group.targetType)}>
-            {getTargetLabel(group.targetType)}
+          <Tag color={getForumReportTargetColor(group.targetType)}>
+            {getForumReportTargetLabel(group.targetType)}
           </Tag>
           <Text type="secondary">Mã nội dung: #{group.targetId}</Text>
           <Tag color="red">{group.reportCount} báo cáo</Tag>
@@ -360,7 +245,7 @@ function ReportTargetContentModal({
               <Text type="secondary" className="block text-xs">
                 Trạng thái nội dung
               </Text>
-              <Text>{getContentStatusLabel(group.targetContent.status)}</Text>
+              <Text>{getForumContentStatusLabel(group.targetContent.status)}</Text>
             </div>
           </div>
         ) : null}
@@ -371,7 +256,7 @@ function ReportTargetContentModal({
           </div>
           <div className="divide-y divide-slate-100">
             {group.reports.map((report) => {
-              const display = getReportDisplayContent(report);
+              const display = getForumReportDisplayContent(report);
 
               return (
                 <div key={report.id} className="p-4">
@@ -379,7 +264,7 @@ function ReportTargetContentModal({
                     <div>
                       <Text strong>{report.reporterName}</Text>
                       <Text type="secondary" className="ml-2 text-xs">
-                        {getReporterRoleLabel(report.reporterRole)}
+                        {getForumAuthorRoleLabel(report.reporterRole)}
                       </Text>
                       {report.reporterEmail ? (
                         <Text type="secondary" className="block text-xs">
@@ -390,13 +275,13 @@ function ReportTargetContentModal({
                     <div className="text-right">
                       <Tag
                         color={
-                          isResolvedStatus(report.status) ? "green" : "red"
+                          isForumReportResolvedStatus(report.status) ? "green" : "red"
                         }
                       >
-                        {getReportStatusLabel(report.status)}
+                        {getForumReportStatusLabel(report.status)}
                       </Tag>
                       <Text type="secondary" className="block text-xs">
-                        {formatDateTime(report.createdAt)}
+                        {formatForumDateTime(report.createdAt)}
                       </Text>
                     </div>
                   </div>
@@ -450,7 +335,7 @@ export function ForumReportsTab({
       setPage(result.page);
       setPageSize(result.limit);
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getForumErrorMessage(loadError));
     } finally {
       setLoading(false);
     }
@@ -480,7 +365,7 @@ export function ForumReportsTab({
       setResolveRequest(null);
       await loadReports();
     } catch (resolveError) {
-      message.error(getErrorMessage(resolveError));
+      message.error(getForumErrorMessage(resolveError));
     } finally {
       setSubmitting(false);
     }
@@ -489,21 +374,21 @@ export function ForumReportsTab({
   const columns: ColumnsType<ForumReportGroup> = [
     {
       title: "STT",
-      width: 70,
+      width: 56,
       align: "center",
       render: (_value, _record, index) => (page - 1) * pageSize + index + 1,
     },
     {
       title: "Nội dung bị báo cáo",
-      width: 280,
+      width: 250,
       render: (_value, group) => {
-        const target = summarizeTargetContent(group.targetContent, group);
+        const target = summarizeForumReportTarget(group.targetContent, group);
 
         return (
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1">
-              <Tag color={getTargetColor(group.targetType)}>
-                {getTargetLabel(group.targetType)}
+              <Tag color={getForumReportTargetColor(group.targetType)}>
+                {getForumReportTargetLabel(group.targetType)}
               </Tag>
               <Text type="secondary" className="text-xs">
                 #{group.targetId}
@@ -534,7 +419,7 @@ export function ForumReportsTab({
     },
     {
       title: "Báo cáo",
-      width: 220,
+      width: 185,
       render: (_value, group) => (
         <div>
           <div className="flex flex-wrap gap-1">
@@ -546,7 +431,7 @@ export function ForumReportsTab({
           <Paragraph ellipsis={{ rows: 2 }} className="!mb-0 !mt-2">
             {group.reports
               .slice(0, 2)
-              .map((report) => getReportDisplayContent(report).reason)
+              .map((report) => getForumReportDisplayContent(report).reason)
               .join(", ") || "Không rõ lý do"}
           </Paragraph>
         </div>
@@ -554,7 +439,7 @@ export function ForumReportsTab({
     },
     {
       title: "Người báo cáo",
-      width: 220,
+      width: 185,
       render: (_value, group) => (
         <div>
           {group.reports.slice(0, 2).map((report) => (
@@ -564,7 +449,7 @@ export function ForumReportsTab({
               </Text>
               <Text type="secondary" ellipsis className="block text-xs">
                 {report.reporterEmail ||
-                  getReporterRoleLabel(report.reporterRole)}
+                  getForumAuthorRoleLabel(report.reporterRole)}
               </Text>
             </div>
           ))}
@@ -578,12 +463,12 @@ export function ForumReportsTab({
     },
     {
       title: "Trạng thái",
-      width: 150,
+      width: 125,
       align: "center",
       render: (_value, group) => (
         <div>
-          <Tag color={isResolvedStatus(group.status) ? "green" : "red"}>
-            {getReportStatusLabel(group.status)}
+          <Tag color={isForumReportResolvedStatus(group.status) ? "green" : "red"}>
+            {getForumReportStatusLabel(group.status)}
           </Tag>
           <Text type="secondary" className="mt-1 block text-xs">
             {group.resolvedCount} xử lý, {group.rejectedCount} bỏ qua
@@ -592,22 +477,18 @@ export function ForumReportsTab({
       ),
     },
     {
-      title: "Ngày gửi gần nhất",
-      dataIndex: "updatedAt",
-      width: 160,
-      render: (value: string) => formatDateTime(value),
-    },
-    {
       title: "Hành động",
-      width: 170,
+      width: 164,
+      fixed: "right",
       align: "center",
       render: (_value, group) => {
-        const disabled = group.pendingCount === 0 || isResolvedStatus(group.status);
+        const disabled = group.pendingCount === 0 || isForumReportResolvedStatus(group.status);
 
         return (
-          <Space size={6} className="!flex !justify-center">
+          <Space size={4} className="!flex !w-full !justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
+                size="small"
                 icon={<Eye className="h-4 w-4" />}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -617,6 +498,7 @@ export function ForumReportsTab({
             </Tooltip>
             <Tooltip title="Ẩn nội dung">
               <Button
+                size="small"
                 disabled={disabled}
                 icon={<EyeOff className="h-4 w-4" />}
                 onClick={(event) => {
@@ -627,6 +509,7 @@ export function ForumReportsTab({
             </Tooltip>
             <Tooltip title="Xóa nội dung">
               <Button
+                size="small"
                 danger
                 disabled={disabled}
                 icon={<Trash2 className="h-4 w-4" />}
@@ -638,6 +521,7 @@ export function ForumReportsTab({
             </Tooltip>
             <Tooltip title="Bỏ qua báo cáo">
               <Button
+                size="small"
                 disabled={disabled}
                 icon={<XCircle className="h-4 w-4" />}
                 onClick={(event) => {
@@ -677,6 +561,7 @@ export function ForumReportsTab({
             loading={loading}
             columns={columns}
             dataSource={groups}
+            scroll={{ x: 965 }}
             pagination={{
               current: page,
               pageSize,
