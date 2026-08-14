@@ -4,10 +4,8 @@ import {
   Button,
   Card,
   Flex,
-  Input,
   message,
   Popconfirm,
-  Select,
   Space,
   Table,
   Tag,
@@ -15,8 +13,8 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Edit, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Edit, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   deleteManagementMaternityPackage,
@@ -27,10 +25,14 @@ import type {
   MaternityPackageStatus,
 } from "@/management/features/services/maternity-packages/maternity-packages.types";
 import { useStaffFacilityId } from "@/hooks/useStaffFacilityId";
-
 import { SchedulePackageFormModal } from "./SchedulePackageFormModal";
 import { ManagementFacilityService } from "@/management/features/services/facility-services/facility-services.types";
 import { getManagementFacilityServices } from "@/management/features/services/facility-services/facility-services.api";
+import {
+  TableFilter,
+  TableFilterColumn,
+  TableFilterValues,
+} from "@/management/components/ui/TableFilter";
 
 const { Text, Title } = Typography;
 
@@ -67,11 +69,14 @@ export function SchedulePackagesTab() {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<MaternityPackageStatus>();
+  const [filterValues, setFilterValues] = useState<TableFilterValues>({
+    search: undefined,
+    status: undefined,
+  });
+  const [search, setSearch] = useState<string | undefined>();
+
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(5);
   const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -99,7 +104,7 @@ export function SchedulePackagesTab() {
       const result = await getManagementMaternityPackages({
         facilityId,
         search: search || undefined,
-        status,
+        status: filterValues.status as MaternityPackageStatus | undefined,
         page,
         limit: pageSize,
       });
@@ -121,7 +126,7 @@ export function SchedulePackagesTab() {
     } finally {
       setLoading(false);
     }
-  }, [facilityId, messageApi, page, pageSize, search, status]);
+  }, [facilityId, messageApi, page, pageSize, search, filterValues]);
 
   useEffect(() => {
     if (!facilityId) return;
@@ -136,6 +141,40 @@ export function SchedulePackagesTab() {
       void loadPackages();
     });
   }, [facilityId, loadPackages]);
+
+  const filterColumns: TableFilterColumn[] = useMemo(
+    () => [
+      {
+        field: "search",
+        label: "Tìm kiếm",
+        type: "text",
+        width: 300,
+        contains: true,
+        placeholder: "Tìm theo mã, tên hoặc mô tả",
+      },
+      {
+        field: "status",
+        label: "Trạng thái",
+        type: "select",
+        width: 180,
+        options: [
+          { value: "draft", label: "Nháp" },
+          { value: "active", label: "Đang bán" },
+          { value: "inactive", label: "Ngừng bán" },
+        ],
+      },
+    ],
+    [],
+  );
+
+  const handleFilterChange = (
+    nextValues: TableFilterValues,
+    nextSearch?: string,
+  ) => {
+    setFilterValues(nextValues);
+    setSearch(nextSearch || undefined);
+    setPage(1);
+  };
 
   const columns: ColumnsType<MaternityPackage> = [
     {
@@ -280,6 +319,15 @@ export function SchedulePackagesTab() {
     <>
       {contextHolder}
 
+      <div style={{ marginBottom: 20 }}>
+        <TableFilter
+          columns={filterColumns}
+          values={filterValues}
+          clearLabel="Đặt lại"
+          onChange={handleFilterChange}
+        />
+      </div>
+
       <Card>
         <Flex
           justify="space-between"
@@ -309,71 +357,21 @@ export function SchedulePackagesTab() {
           </Button>
         </Flex>
 
-        <Flex wrap gap={12} style={{ marginBottom: 20 }}>
-          <Input
-            allowClear
-            value={searchInput}
-            prefix={<Search size={16} />}
-            placeholder="Tìm theo mã, tên hoặc mô tả"
-            style={{ width: 300 }}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onPressEnter={() => {
-              setPage(1);
-              setSearch(searchInput.trim());
-            }}
-          />
-
-          <Select
-            allowClear
-            value={status}
-            placeholder="Trạng thái"
-            style={{ width: 180 }}
-            options={[
-              { value: "draft", label: "Nháp" },
-              { value: "active", label: "Đang bán" },
-              { value: "inactive", label: "Ngừng bán" },
-            ]}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
-          />
-
-          <Button
-            type="primary"
-            onClick={() => {
-              setPage(1);
-              setSearch(searchInput.trim());
-            }}
-          >
-            Tìm kiếm
-          </Button>
-
-          <Button
-            icon={<RefreshCw size={16} />}
-            onClick={() => {
-              setSearchInput("");
-              setSearch("");
-              setStatus(undefined);
-              setPage(1);
-            }}
-          >
-            Đặt lại
-          </Button>
-        </Flex>
-
         <Table<MaternityPackage>
           rowKey="id"
           loading={loading || !ready}
           columns={columns}
           dataSource={items}
-          scroll={{ x: 1200 }}
+          scroll={{
+            x: 1200,
+            y: 380,
+          }}
           pagination={{
             current: page,
             pageSize,
             total,
             showSizeChanger: true,
-            pageSizeOptions: [10, 20, 50, 100],
+            pageSizeOptions: [5, 10, 20, 50, 100],
             showTotal: (value) => `Tổng ${value} gói`,
             onChange: (nextPage, nextPageSize) => {
               if (nextPageSize !== pageSize) {

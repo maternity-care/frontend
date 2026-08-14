@@ -4,29 +4,30 @@ import {
   Button,
   Card,
   Flex,
-  Input,
   message,
-  Select,
   Table,
   Tag,
   Tooltip,
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Eye, RefreshCw, Search } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getFacilities } from "@/management/features/facilities/facilities.api";
 import type { Facility } from "@/management/features/facilities/facilities.types";
-import {
-  getManagementMaternityPackages,
-} from "@/management/features/services/maternity-packages/maternity-packages.api";
+import { getManagementMaternityPackages } from "@/management/features/services/maternity-packages/maternity-packages.api";
 import type {
   MaternityPackage,
   MaternityPackageStatus,
   MaternityPackageType,
 } from "@/management/features/services/maternity-packages/maternity-packages.types";
 import { MaternityPackageDetailModal } from "./MaternityPackageDetailModal";
+import {
+  TableFilter,
+  TableFilterColumn,
+  TableFilterValues,
+} from "@/management/components/ui/TableFilter";
 
 const { Text, Title } = Typography;
 
@@ -70,14 +71,16 @@ export function MaternityPackagesReadonlyTab() {
   const [loading, setLoading] = useState(false);
   const [loadingFacilities, setLoadingFacilities] = useState(false);
 
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<MaternityPackageStatus>();
-  const [facilityId, setFacilityId] = useState<string>();
-  const [packageType, setPackageType] = useState<MaternityPackageType>();
+  const [filterValues, setFilterValues] = useState<TableFilterValues>({
+    search: undefined,
+    facilityId: undefined,
+    packageType: undefined,
+    status: undefined,
+  });
+  const [search, setSearch] = useState<string | undefined>();
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(5);
   const [total, setTotal] = useState(0);
 
   const [detailOpen, setDetailOpen] = useState(false);
@@ -106,16 +109,22 @@ export function MaternityPackagesReadonlyTab() {
     try {
       const result = await getManagementMaternityPackages({
         search: search || undefined,
-        status,
-        facilityId,
+        status: filterValues.status as MaternityPackageStatus | undefined,
+        facilityId: filterValues.facilityId as string | undefined,
         page,
         limit: pageSize,
       });
 
+      const packageType = filterValues.packageType as
+        | MaternityPackageType
+        | undefined;
+
       let filtered = result.items;
 
       if (packageType) {
-        filtered = result.items.filter((item) => item.packageType === packageType);
+        filtered = result.items.filter(
+          (item) => item.packageType === packageType,
+        );
       }
 
       setItems(filtered);
@@ -131,7 +140,7 @@ export function MaternityPackagesReadonlyTab() {
     } finally {
       setLoading(false);
     }
-  }, [facilityId, messageApi, page, pageSize, packageType, search, status]);
+  }, [filterValues, messageApi, page, pageSize, search]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -145,17 +154,57 @@ export function MaternityPackagesReadonlyTab() {
     });
   }, [loadPackages]);
 
-  const handleSearch = () => {
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
+  const filterColumns: TableFilterColumn[] = useMemo(
+    () => [
+      {
+        field: "search",
+        label: "Tìm kiếm",
+        type: "text",
+        width: 300,
+        contains: true,
+        placeholder: "Tìm theo mã, tên hoặc mô tả",
+      },
+      {
+        field: "facilityId",
+        label: "Cơ sở",
+        type: "select",
+        width: 240,
+        options: facilities.map((f) => ({
+          value: f.id,
+          label: `${f.code} - ${f.name}`,
+        })),
+      },
+      {
+        field: "packageType",
+        label: "Loại gói",
+        type: "select",
+        width: 180,
+        options: [
+          { value: "quantity", label: "Theo số lượng" },
+          { value: "schedule", label: "Theo lịch trình" },
+        ],
+      },
+      {
+        field: "status",
+        label: "Trạng thái",
+        type: "select",
+        width: 180,
+        options: [
+          { value: "draft", label: "Nháp" },
+          { value: "active", label: "Đang bán" },
+          { value: "inactive", label: "Ngừng bán" },
+        ],
+      },
+    ],
+    [facilities],
+  );
 
-  const handleReset = () => {
-    setSearchInput("");
-    setSearch("");
-    setStatus(undefined);
-    setFacilityId(undefined);
-    setPackageType(undefined);
+  const handleFilterChange = (
+    nextValues: TableFilterValues,
+    nextSearch?: string,
+  ) => {
+    setFilterValues(nextValues);
+    setSearch(nextSearch || undefined);
     setPage(1);
   };
 
@@ -265,6 +314,14 @@ export function MaternityPackagesReadonlyTab() {
     <>
       {contextHolder}
 
+      <div style={{ marginBottom: 20 }}>
+        <TableFilter
+          columns={filterColumns}
+          values={filterValues}
+          clearLabel="Đặt lại"
+          onChange={handleFilterChange}
+        />
+      </div>
       <Card>
         <Flex
           justify="space-between"
@@ -283,87 +340,21 @@ export function MaternityPackagesReadonlyTab() {
           </div>
         </Flex>
 
-        <Flex wrap gap={12} style={{ marginBottom: 20 }}>
-          <Input
-            allowClear
-            value={searchInput}
-            prefix={<Search size={16} />}
-            placeholder="Tìm theo mã, tên hoặc mô tả"
-            style={{ width: 300 }}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onPressEnter={handleSearch}
-          />
-
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            value={facilityId}
-            placeholder="Cơ sở"
-            style={{ width: 240 }}
-            loading={loadingFacilities}
-            options={facilities.map((f) => ({
-              value: f.id,
-              label: `${f.code} - ${f.name}`,
-            }))}
-            onChange={(value) => {
-              setFacilityId(value);
-              setPage(1);
-            }}
-          />
-
-          <Select
-            allowClear
-            value={packageType}
-            placeholder="Loại gói"
-            style={{ width: 180 }}
-            options={[
-              { value: "quantity", label: "Theo số lượng" },
-              { value: "schedule", label: "Theo lịch trình" },
-            ]}
-            onChange={(value) => {
-              setPackageType(value);
-              setPage(1);
-            }}
-          />
-
-          <Select
-            allowClear
-            value={status}
-            placeholder="Trạng thái"
-            style={{ width: 180 }}
-            options={[
-              { value: "draft", label: "Nháp" },
-              { value: "active", label: "Đang bán" },
-              { value: "inactive", label: "Ngừng bán" },
-            ]}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
-          />
-
-          <Button type="primary" onClick={handleSearch}>
-            Tìm kiếm
-          </Button>
-
-          <Button icon={<RefreshCw size={16} />} onClick={handleReset}>
-            Đặt lại
-          </Button>
-        </Flex>
-
         <Table<MaternityPackage>
           rowKey="id"
           loading={loading}
           columns={columns}
           dataSource={items}
-          scroll={{ x: 1400 }}
+          scroll={{
+            x: 900,
+            y: 380, // cố định chiều cao body → có scroll dọc, không bị tràn
+          }}
           pagination={{
             current: page,
             pageSize,
             total,
             showSizeChanger: true,
-            pageSizeOptions: [10, 20, 50, 100],
+            pageSizeOptions: [5, 10, 20, 50, 100],
             showTotal: (value) => `Tổng ${value} gói`,
             onChange: (nextPage, nextPageSize) => {
               if (nextPageSize !== pageSize) {
