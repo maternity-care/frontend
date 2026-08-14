@@ -104,6 +104,10 @@ export function useRoomLookups({
                       facility.status ??
                         "",
                     ),
+                    floorCount: Math.max(
+                      1,
+                      Math.trunc(Number(facility.floorCount ?? 1)),
+                    ),
                   }),
                 ),
               );
@@ -187,16 +191,19 @@ export function useRoomLookups({
     useMemo(
       () =>
         canManageRooms
-          ? facilities.filter(
-              (facility) =>
-                String(
-                  facility.id,
-                ) ===
-                scopedFacilityId,
-            )
+          ? canViewAllFacilities
+            ? facilities
+            : facilities.filter(
+                (facility) =>
+                  String(
+                    facility.id,
+                  ) ===
+                  scopedFacilityId,
+              )
           : [],
       [
         canManageRooms,
+        canViewAllFacilities,
         facilities,
         scopedFacilityId,
       ],

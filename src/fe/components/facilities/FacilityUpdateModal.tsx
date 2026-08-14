@@ -42,6 +42,7 @@ export type FacilityUpdateValues = {
   address: string;
   city: string;
   ward: string;
+  floorCount: number;
   latitude: string;
   longitude: string;
   schedules: FacilityScheduleInput[];
@@ -91,6 +92,7 @@ export function FacilityUpdateModal({
         address: facility.address,
         city: facility.city,
         ward: facility.ward,
+        floorCount: facility.floorCount ?? 1,
         latitude: facility.latitude ?? "",
         longitude: facility.longitude ?? "",
         schedules: getFacilitySchedules(facility),
@@ -177,6 +179,7 @@ export function FacilityUpdateModal({
         address: values.address,
         city: values.city,
         ward: values.ward,
+        floorCount: values.floorCount ?? 1,
         latitude: values.latitude ?? "",
         longitude: values.longitude ?? "",
       });

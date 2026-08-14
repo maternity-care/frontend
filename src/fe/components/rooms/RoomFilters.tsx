@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import {
   Button,
   Card,
@@ -18,6 +20,7 @@ import type {
   RoomStatus,
   RoomType,
 } from "@/management/features/rooms/rooms.types";
+import { buildFloorOptions } from "@/management/features/rooms/rooms.utils";
 
 type Props = {
   canViewAllFacilities: boolean;
@@ -62,6 +65,18 @@ export function RoomFilters({
   onStatusChange,
   onReset,
 }: Props) {
+  const floorOptions = useMemo(() => {
+    const selectedFacility = facilities.find(
+      (facility) => facility.id === facilityFilter,
+    );
+    const maximumFloorCount = selectedFacility?.floorCount ?? Math.max(
+      1,
+      ...facilities.map((facility) => facility.floorCount),
+    );
+
+    return buildFloorOptions(maximumFloorCount);
+  }, [facilities, facilityFilter]);
+
   return (
     <Card className="border-slate-200 bg-white">
       <div
@@ -108,16 +123,12 @@ export function RoomFilters({
           />
         ) : null}
 
-        <Input
+        <Select
           allowClear
           value={floorFilter}
           placeholder="Tầng"
-          onChange={(event) =>
-            onFloorChange(
-              event.target.value ||
-                undefined,
-            )
-          }
+          options={floorOptions}
+          onChange={onFloorChange}
         />
 
         <Select

@@ -6,6 +6,7 @@ import {
   Col,
   Form,
   Input,
+  InputNumber,
   Row,
   Select,
   Space,
@@ -103,6 +104,24 @@ export function FacilityGeneralFields({
             rules={[{ type: "email", message: "Email không đúng định dạng." }]}
           >
             <Input size="large" disabled={disabled} placeholder="Nhập email" />
+          </Form.Item>
+        </Col>
+
+        <Col xs={24} md={12}>
+          <Form.Item
+            name="floorCount"
+            label="Số tầng"
+            rules={[{ required: true, message: "Vui lòng nhập số tầng." }]}
+          >
+            <InputNumber
+              size="large"
+              min={1}
+              max={200}
+              precision={0}
+              disabled={disabled}
+              className="w-full"
+              placeholder="Nhập số tầng"
+            />
           </Form.Item>
         </Col>
 
