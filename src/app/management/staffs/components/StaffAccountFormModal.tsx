@@ -344,6 +344,7 @@ export function StaffAccountFormModal({
   const [form] = Form.useForm<StaffFormValues>();
   const { message: messageApi } = App.useApp();
   const currentUser = useAuthStore((state) => state.user);
+  const storeRoles = useAuthStore((state) => state.roles);
   const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
   const [submitting, setSubmitting] = useState(false);
   const [facilityOptions, setFacilityOptions] = useState<
@@ -364,8 +365,13 @@ export function StaffAccountFormModal({
   const status = Form.useWatch("status", form);
   const watchedAllowPermissionIds = Form.useWatch("allowPermissionIds", form);
   const watchedDenyPermissionIds = Form.useWatch("denyPermissionIds", form);
-  const isSuperAdmin =
-    currentUser?.roles?.some((role) => role.name === "super_admin") ?? false;
+  const currentUserRoleNames =
+    currentUser?.roles
+      ?.map((role) => role.name?.toLowerCase())
+      .filter((role): role is string => Boolean(role)) ?? [];
+  const isSuperAdmin = [...storeRoles, ...currentUserRoleNames]
+    .map((role) => role.toLowerCase())
+    .includes("super_admin");
   const activeFacility = currentUser?.facilities?.find(
     (facility) => String(facility.id) === String(activeFacilityId),
   );
