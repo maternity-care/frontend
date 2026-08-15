@@ -296,7 +296,6 @@ export function DoctorShiftBulkGenerateModal({
         return getShiftSlotLookup({
           facilityId: watchedFacilityId,
           status: "active",
-          limit: 40,
         });
       })
       .then((slots) => {

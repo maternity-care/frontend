@@ -232,8 +232,6 @@ function toListParams(
     dateFrom: params?.dateFrom,
     dateTo: params?.dateTo,
     status: params?.status,
-    page: params?.page,
-    limit: params?.limit ?? 20,
   });
 }
 
@@ -377,13 +375,6 @@ function getDoctorShiftApiErrorMessage(
     : "";
 }
 
-/**
- * Backend hiện trả 404 khi GET danh sách ca trực không có bản ghi.
- *
- * Với list endpoint, "không có dữ liệu" là danh sách rỗng chứ không phải
- * lỗi màn hình. Chỉ normalize đúng 404 có message của ca trực không tồn tại;
- * 404 khác vẫn throw để không che lỗi route/API.
- */
 function isEmptyDoctorShiftListError(
   error: unknown,
 ): boolean {
@@ -449,10 +440,8 @@ export async function getDoctorShifts(
     return {
       items: [],
       total: 0,
-      page:
-        params?.page ?? 1,
-      limit:
-        params?.limit ?? 20,
+      page: 1,
+      limit: 0,
       totalPages: 0,
     };
   }
@@ -461,24 +450,8 @@ export async function getDoctorShifts(
 export async function getAllDoctorShifts(
   params: GetDoctorShiftsParams = {},
 ): Promise<DoctorShiftItem[]> {
-  const limit = Math.max(1, params.limit ?? 100);
-  const items: DoctorShiftItem[] = [];
-  let page = 1;
-  let totalPages = 1;
-
-  do {
-    const result = await getDoctorShifts({
-      ...params,
-      page,
-      limit,
-    });
-
-    items.push(...result.items);
-    totalPages = Math.max(result.totalPages, 1);
-    page += 1;
-  } while (page <= totalPages);
-
-  return items;
+  const result = await getDoctorShifts(params);
+  return result.items;
 }
 
 export async function getDoctorShift(
