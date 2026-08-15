@@ -74,6 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const currentUser = fetchedUser ?? storeUser ?? localUser;
 
+  console.log('fetch', currentUser)
+
   const logout = useCallback(async () => {
     try {
       if (refreshToken) {
@@ -89,11 +91,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const effectiveRoles = useMemo(
     () => {
       if (!currentUser) return roles;
-      const globalRoles = currentUser.roles.map((role) => role.name);
-      if (globalRoles.includes("super_admin")) {
+      const globalRoles = currentUser?.roles?.map((role) => role.name);
+      if (globalRoles?.includes("super_admin")) {
         return [...new Set(globalRoles)];
       }
-      const facility = currentUser.facilities?.find(
+      const facility = currentUser?.facilities?.find(
         (facility) => String(facility.id) === String(activeFacilityId),
       );
       const facilityRoles = facility?.roles?.length
@@ -196,7 +198,6 @@ export function useAuth() {
 
 export async function getUserData(): Promise<User> {
   const response = await unwrapApiData(apiClient.get<ApiResponse<User>>("/users/me"));
-  console.log('response', response)
   return response;
 }
 

@@ -2,17 +2,48 @@ import { Avatar, Badge, Card, Divider, Tag } from "antd";
 import { Baby, CalendarHeart, Phone } from "lucide-react";
 
 import { InfoIconBox } from "./InfoIconBox";
-import { PregnantProfile } from "@/features/profile/profile.types";
+import { PregnantProfile, UserProfile } from "@/features/profile/profile.types";
 import { displayValue, EMPTY_TEXT, getInitials, getRoleText } from "@/utils/profile/utils";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 
 type ProfileSummaryCardProps = {
-  profile: PregnantProfile;
+  profile: UserProfile;
 };
 
 export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
   const isActive = profile.status === "active";
   const roleText = getRoleText(profile.roles);
+
+  const getGestationalAge = (
+    lastMenstrualPeriod?: string | null,
+  ): string => {
+    if (!lastMenstrualPeriod) {
+      return "Không mang thai";
+    }
+
+    const lmpDate = new Date(lastMenstrualPeriod);
+
+    if (Number.isNaN(lmpDate.getTime())) {
+      return "Không xác định";
+    }
+
+    const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+    const totalDays = Math.floor(
+      (new Date().getTime() - lmpDate.getTime()) / millisecondsPerDay,
+    );
+
+    if (totalDays < 0) {
+      return "Không xác định";
+    }
+
+    const weeks = Math.floor(totalDays / 7);
+    const days = totalDays % 7;
+
+    return `${weeks}W ${days}D`;
+  };
+
+  const activeProfile = profile?.pregnancyProfiles?.find(pre => pre.status === 'active')
 
   return (
     <Card className="overflow-hidden border-0 shadow-sm">
@@ -22,6 +53,7 @@ export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
       <div className="-mt-12 flex flex-col items-center text-center">
         <Badge status={isActive ? "success" : "default"} offset={[-8, 78]}>
           <Avatar
+            src={profile?.avatar}
             size={96}
             className="border-4 border-white bg-pink-100 text-xl font-semibold text-pink-600 shadow-sm"
           >
@@ -65,14 +97,13 @@ export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
           <div className="rounded-xl bg-white p-3 shadow-sm">
             <p className="text-xs text-slate-500">Tuần thai</p>
             <p className="mt-1 text-lg font-semibold text-pink-600">
-              {displayValue(profile.gestationalWeek)}
-              {profile.gestationalWeek ? " tuần" : ""}
+              {getGestationalAge(activeProfile?.lastMenstrualPeriod)}
             </p>
           </div>
 
           <div className="rounded-xl bg-white p-3 shadow-sm">
             <p className="text-xs text-slate-500">Nhóm máu</p>
-            <p className="mt-1 text-lg font-semibold text-slate-950">
+            <p className="mt-1 text-md font-semibold text-slate-950">
               {displayValue(profile.bloodType)}
             </p>
           </div>
@@ -83,39 +114,11 @@ export function ProfileSummaryCard({ profile }: ProfileSummaryCardProps) {
               <p className="text-xs text-slate-500">Ngày dự sinh</p>
             </div>
             <p className="mt-1 font-semibold text-slate-950">
-              {displayValue(profile.expectedDueDate)}
+              {activeProfile ? displayValue(activeProfile?.expectedDueDate) : "Không mang thai"}
             </p>
           </div>
         </div>
       </div>
-
-      {/* Liên hệ nhanh */}
-      {(profile.phone || profile.emergencyContactPhone) && (
-        <>
-          <Divider />
-          <div className="space-y-2 text-sm">
-            {profile.phone && (
-              <div className="flex items-center gap-2 text-slate-600">
-                <Phone className="h-4 w-4 text-slate-400" />
-                <span>{profile.phone}</span>
-              </div>
-            )}
-            {profile.emergencyContactName && (
-              <div className="rounded-lg bg-slate-50 px-3 py-2">
-                <p className="text-xs text-slate-500">Liên hệ khẩn cấp</p>
-                <p className="font-medium text-slate-800">
-                  {profile.emergencyContactName}
-                  {profile.emergencyContactPhone && (
-                    <span className="ml-2 text-slate-500">
-                      · {profile.emergencyContactPhone}
-                    </span>
-                  )}
-                </p>
-              </div>
-            )}
-          </div>
-        </>
-      )}
     </Card>
   );
 }
