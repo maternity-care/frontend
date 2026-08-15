@@ -73,16 +73,6 @@ interface SchedulePackageFormModalProps {
   onSuccess: () => void | Promise<void>;
 }
 
-function formatCurrency(value: string | number) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return "—";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function isFormValidationError(error: unknown) {
   return typeof error === "object" && error !== null && "errorFields" in error;
 }
@@ -141,7 +131,7 @@ export function SchedulePackageFormModal({
         const fs = activeFs.find((item) => item.serviceId === svc.id);
         return {
           value: svc.id,
-          label: `${svc.code} - ${svc.name} (${formatCurrency(fs?.price ?? svc.basePrice)})`,
+          label: `${svc.code} - ${svc.name}`,
         };
       });
   }, [services, facilityServices]);
