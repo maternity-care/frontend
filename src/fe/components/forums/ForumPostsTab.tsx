@@ -13,27 +13,35 @@ import {
   App,
 } from "antd";
 import {
+  createForumPost,
+  deleteForumPost,
   getForumPost,
   getForumPosts,
   moderateForumComment,
   moderateForumPost,
+  updateForumPost,
 } from "@/management/features/forums/forums.api";
 import {
   createForumComment,
   createForumReport,
 } from "@/features/forum/forum.api";
 import type {
+  CreateForumPostInput,
   ForumAuthorRole,
   ForumCategory,
   ForumComment,
   ForumPost,
   ForumPostStatus,
   ForumTopic,
+  UpdateForumPostInput,
 } from "@/management/features/forums/forums.types";
 import {
   getForumErrorMessage,
   getForumPostCreatedTime,
 } from "@/management/features/forums/forums.utils";
+import {
+  ForumHardDeleteModal,
+} from "./ForumHardDeleteModal";
 import {
   ForumModerationModal,
   ForumReportContentModal,
@@ -45,6 +53,13 @@ import type {
 import {
   ForumPostDetailModal,
 } from "./ForumPostDetailModal";
+import {
+  ForumPostEditorModal,
+} from "./ForumPostEditorModal";
+import type {
+  ForumPostEditorState,
+  ForumPostEditorValues,
+} from "./ForumPostEditorModal";
 import {
   ForumPostModerationFilters,
 } from "./ForumPostModerationFilters";
@@ -58,23 +73,18 @@ type Props = {
   focusPostId?: string;
   realtimeVersion?: number;
   canModerateContent: boolean;
+  canManagePosts: boolean;
+  canHardDelete: boolean;
 };
 
-/**
- * Tab Bài viết:
- * - list/filter/detail
- * - moderation
- * - comments/replies
- * - reporting
- *
- * Không chứa create/edit/hard delete.
- */
 export function ForumPostsTab({
   topics,
   navigation,
   focusPostId,
   realtimeVersion = 0,
   canModerateContent,
+  canManagePosts,
+  canHardDelete,
 }: Props) {
   const {
     message,
@@ -101,6 +111,32 @@ export function ForumPostsTab({
     submitting,
     setSubmitting,
   ] = useState(false);
+
+  const [
+    postSubmitting,
+    setPostSubmitting,
+  ] = useState(false);
+
+  const [
+    hardDeleting,
+    setHardDeleting,
+  ] = useState(false);
+
+  const [
+    editorState,
+    setEditorState,
+  ] = useState<ForumPostEditorState>({
+    open: false,
+    mode: "create",
+    post: null,
+  });
+
+  const [
+    deletingPost,
+    setDeletingPost,
+  ] = useState<
+    ForumPost | null
+  >(null);
 
   const [
     error,
@@ -404,6 +440,211 @@ export function ForumPostsTab({
     }
   }
 
+  function isManagementPost(
+    post: ForumPost,
+  ) {
+    return [
+      "staff",
+      "moderator",
+      "admin",
+    ].includes(
+      post.authorRole,
+    );
+  }
+
+  function openCreatePost() {
+    if (!canManagePosts) {
+      return;
+    }
+
+    setEditorState({
+      open: true,
+      mode: "create",
+      post: null,
+    });
+  }
+
+  function openEditPost(
+    post: ForumPost,
+  ) {
+    if (
+      !canManagePosts ||
+      !isManagementPost(post)
+    ) {
+      return;
+    }
+
+    setEditorState({
+      open: true,
+      mode: "edit",
+      post,
+    });
+  }
+
+  async function handlePostSubmit(
+    values: ForumPostEditorValues,
+  ) {
+    if (!canManagePosts) {
+      return;
+    }
+
+    setPostSubmitting(true);
+
+    try {
+      if (
+        editorState.open &&
+        editorState.mode ===
+          "edit"
+      ) {
+        const input:
+          UpdateForumPostInput = {
+          topicId:
+            values.topicId,
+          title:
+            values.title,
+          content:
+            values.content,
+          status:
+            values.status,
+          commentable:
+            values.commentable,
+          isPinned:
+            values.isPinned,
+          isFeatured:
+            values.isFeatured,
+          moderationReason:
+            values.moderationReason,
+        };
+
+        await updateForumPost(
+          editorState.post.id,
+          input,
+        );
+
+        message.success(
+          "Cập nhật bài viết thành công.",
+        );
+      } else {
+        const input:
+          CreateForumPostInput = {
+          topicId:
+            values.topicId,
+          title:
+            values.title,
+          content:
+            values.content,
+          status:
+            values.status,
+          commentable:
+            values.commentable,
+          isPinned:
+            values.isPinned,
+          isFeatured:
+            values.isFeatured,
+          moderationReason:
+            values.moderationReason,
+        };
+
+        await createForumPost(
+          input,
+        );
+
+        message.success(
+          "Tạo bài viết thành công.",
+        );
+      }
+
+      setEditorState({
+        open: false,
+        mode: "create",
+        post: null,
+      });
+
+      if (page !== 1) {
+        setPage(1);
+      } else {
+        await loadPosts();
+      }
+    } catch (
+      submitError
+    ) {
+      message.error(
+        getForumErrorMessage(
+          submitError,
+        ),
+      );
+    } finally {
+      setPostSubmitting(false);
+    }
+  }
+
+  async function handleHardDelete(
+    reason: string,
+  ) {
+    if (
+      !deletingPost ||
+      !canManagePosts ||
+      !canHardDelete ||
+      !isManagementPost(
+        deletingPost,
+      )
+    ) {
+      return;
+    }
+
+    const postId =
+      deletingPost.id;
+
+    setHardDeleting(true);
+
+    try {
+      await deleteForumPost(
+        postId,
+        {
+          reason,
+        },
+      );
+
+      message.success(
+        "Xóa cứng bài viết thành công.",
+      );
+
+      if (
+        selectedPost?.id ===
+        postId
+      ) {
+        setSelectedPost(null);
+      }
+
+      setDeletingPost(null);
+
+      if (
+        posts.length === 1 &&
+        page > 1
+      ) {
+        setPage(
+          (current) =>
+            Math.max(
+              1,
+              current - 1,
+            ),
+        );
+      } else {
+        await loadPosts();
+      }
+    } catch (
+      deleteError
+    ) {
+      message.error(
+        getForumErrorMessage(
+          deleteError,
+        ),
+      );
+    } finally {
+      setHardDeleting(false);
+    }
+  }
+
   async function handleModeration(
     reason: string,
   ) {
@@ -703,6 +944,12 @@ export function ForumPostsTab({
               value,
             )
           }
+          canCreatePost={
+            canManagePosts
+          }
+          onCreate={
+            openCreatePost
+          }
           onReset={
             resetFilters
           }
@@ -718,6 +965,12 @@ export function ForumPostsTab({
           canModerateContent={
             canModerateContent
           }
+          canManagePosts={
+            canManagePosts
+          }
+          canHardDelete={
+            canHardDelete
+          }
           onView={(post) => {
             void openPostDetail(
               post,
@@ -732,6 +985,12 @@ export function ForumPostsTab({
               target: post,
               action,
             })
+          }
+          onEdit={
+            openEditPost
+          }
+          onHardDelete={
+            setDeletingPost
           }
           onPageChange={(
             nextPage,
@@ -808,6 +1067,47 @@ export function ForumPostsTab({
             id: comment.id,
             label: "bình luận",
           })
+        }
+      />
+
+      <ForumPostEditorModal
+        state={
+          editorState
+        }
+        topics={topics}
+        submitting={
+          postSubmitting
+        }
+        onClose={() => {
+          if (!postSubmitting) {
+            setEditorState({
+              open: false,
+              mode: "create",
+              post: null,
+            });
+          }
+        }}
+        onSubmit={
+          handlePostSubmit
+        }
+      />
+
+      <ForumHardDeleteModal
+        post={
+          deletingPost
+        }
+        deleting={
+          hardDeleting
+        }
+        onClose={() => {
+          if (!hardDeleting) {
+            setDeletingPost(
+              null,
+            );
+          }
+        }}
+        onConfirm={
+          handleHardDelete
         }
       />
 

@@ -17,8 +17,10 @@ import {
   Eye,
   EyeOff,
   Lock,
+  Pencil,
   Pin,
   Star,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import type {
@@ -44,12 +46,20 @@ type Props = {
   pageSize: number;
   total: number;
   canModerateContent: boolean;
+  canManagePosts: boolean;
+  canHardDelete: boolean;
   onView: (
     post: ForumPost,
   ) => void;
   onModerate: (
     post: ForumPost,
     action: ForumPostModerationAction,
+  ) => void;
+  onEdit: (
+    post: ForumPost,
+  ) => void;
+  onHardDelete: (
+    post: ForumPost,
   ) => void;
   onPageChange: (
     page: number,
@@ -65,8 +75,12 @@ export function ForumPostModerationTable({
   pageSize,
   total,
   canModerateContent,
+  canManagePosts,
+  canHardDelete,
   onView,
   onModerate,
+  onEdit,
+  onHardDelete,
   onPageChange,
 }: Props) {
   const topicById =
@@ -78,6 +92,18 @@ export function ForumPostModerationTable({
         ],
       ),
     );
+
+  function isManagementPost(
+    post: ForumPost,
+  ) {
+    return [
+      "staff",
+      "moderator",
+      "admin",
+    ].includes(
+      post.authorRole,
+    );
+  }
 
   const columns:
     ColumnsType<ForumPost> = [
@@ -200,9 +226,11 @@ export function ForumPostModerationTable({
     {
       title: "Thao tác",
       width:
-        canModerateContent
-          ? 175
-          : 75,
+        canManagePosts
+          ? 250
+          : canModerateContent
+            ? 175
+            : 75,
       align: "center",
       render: (
         _value,
@@ -276,6 +304,52 @@ export function ForumPostModerationTable({
                   );
                 }}
               />
+            </Tooltip>
+          ) : null}
+
+          {canManagePosts &&
+          isManagementPost(post) ? (
+            <Tooltip title="Chỉnh sửa bài viết">
+              <Button
+                size="small"
+                icon={
+                  <Pencil className="h-4 w-4" />
+                }
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onEdit(post);
+                }}
+              />
+            </Tooltip>
+          ) : null}
+
+          {canManagePosts &&
+          isManagementPost(post) ? (
+            <Tooltip
+              title={
+                canHardDelete
+                  ? "Xóa cứng bài viết"
+                  : "Không có quyền xóa cứng"
+              }
+            >
+              <span>
+                <Button
+                  size="small"
+                  danger
+                  disabled={
+                    !canHardDelete
+                  }
+                  icon={
+                    <Trash2 className="h-4 w-4" />
+                  }
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onHardDelete(
+                      post,
+                    );
+                  }}
+                />
+              </span>
             </Tooltip>
           ) : null}
         </Space>
