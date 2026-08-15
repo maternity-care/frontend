@@ -23,9 +23,7 @@ import {
 } from "antd";
 import {
   Mail,
-  MinusCircle,
   Pencil,
-  Plus,
   Phone,
   Save,
   ShieldCheck,
@@ -120,6 +118,21 @@ const initialValues: Partial<StaffFormValues> = {
   password: "",
   facilityAssignments: [{ facilityId: "", roles: ["staff"] }],
 };
+
+function normalizeSingleFacilityAssignment(
+  assignments: StaffFormValues["facilityAssignments"],
+): StaffFormValues["facilityAssignments"] {
+  const firstAssignment = assignments?.[0];
+
+  return firstAssignment
+    ? [
+        {
+          facilityId: String(firstAssignment.facilityId ?? ""),
+          roles: firstAssignment.roles?.length ? firstAssignment.roles : ["staff"],
+        },
+      ]
+    : initialValues.facilityAssignments;
+}
 
 export function getRoleLabel(role: UserRole) {
   return roleOptions.find((item) => item.value === role)?.label || role;
@@ -599,8 +612,9 @@ export function StaffAccountFormModal({
           role: editingStaff.role,
           accountType: editingStaff.accountType,
           status: editingStaff.status,
-          facilityAssignments:
-            editingStaff.staffProfile?.facilityAssignments ?? initialValues.facilityAssignments,
+          facilityAssignments: normalizeSingleFacilityAssignment(
+            editingStaff.staffProfile?.facilityAssignments,
+          ),
           licenseNo: editingStaff.staffProfile?.doctor?.licenseNo,
           title: editingStaff.staffProfile?.doctor?.title,
           specialty: editingStaff.staffProfile?.doctor?.specialty,
@@ -623,7 +637,7 @@ export function StaffAccountFormModal({
         facilityAssignments:
           !isSuperAdmin && activeFacility
             ? [{ facilityId: String(activeFacility.id), roles: ["staff"] }]
-            : initialValues.facilityAssignments,
+            : normalizeSingleFacilityAssignment(initialValues.facilityAssignments),
       });
     }, 0);
 
@@ -662,7 +676,7 @@ export function StaffAccountFormModal({
           password: password || undefined,
           status: values.status ? toBackendStatus(values.status) : undefined,
           permissionOverrides: buildPermissionOverrides(values),
-          facilityAssignments: values.facilityAssignments,
+          facilityAssignments: normalizeSingleFacilityAssignment(values.facilityAssignments),
           licenseNo: values.licenseNo,
           title: values.title,
           specialty: values.specialty,
@@ -690,7 +704,7 @@ export function StaffAccountFormModal({
         personalEmail: values.email.trim(),
         phone: values.phone.trim(),
         permissionOverrides: buildPermissionOverrides(values),
-        facilityAssignments: values.facilityAssignments ?? [],
+        facilityAssignments: normalizeSingleFacilityAssignment(values.facilityAssignments) ?? [],
         licenseNo: values.licenseNo,
         title: values.title,
         specialty: values.specialty,
@@ -912,11 +926,11 @@ export function StaffAccountFormModal({
               }
             >
               <Form.List name="facilityAssignments">
-                {(fields, { add, remove }) => (
+                {(fields) => (
                   <>
                     {fields.map((field) => (
                       <Row gutter={12} key={field.key} align="middle">
-                        <Col xs={24} md={11}>
+                        <Col xs={24} md={12}>
                           <Form.Item
                             {...field}
                             name={[field.name, "facilityId"]}
@@ -928,10 +942,10 @@ export function StaffAccountFormModal({
 	                              options={facilitySelectOptions}
 	                              optionFilterProp="label"
                                 disabled={!isSuperAdmin}
-	                            />
+                            />
                           </Form.Item>
                         </Col>
-                        <Col xs={20} md={11}>
+                        <Col xs={24} md={12}>
                           <Form.Item
                             {...field}
                             name={[field.name, "roles"]}
@@ -941,28 +955,8 @@ export function StaffAccountFormModal({
                             <Select mode="multiple" options={roleOptions} />
                           </Form.Item>
                         </Col>
-                        <Col xs={4} md={2}>
-                          <Button
-                            type="text"
-                            danger
-                            icon={<MinusCircle className="h-4 w-4" />}
-                            onClick={() => remove(field.name)}
-                            disabled={fields.length === 1 || !isSuperAdmin}
-                            title="Xóa phân công"
-                          />
-                        </Col>
                       </Row>
                     ))}
-                    <Form.Item>
-                      <Button
-                        type="dashed"
-                        icon={<Plus className="h-4 w-4" />}
-                        onClick={() => add({ facilityId: "", roles: ["staff"] })}
-                        disabled={!isSuperAdmin}
-                      >
-                        Thêm cơ sở làm việc
-                      </Button>
-                    </Form.Item>
                   </>
                 )}
               </Form.List>
