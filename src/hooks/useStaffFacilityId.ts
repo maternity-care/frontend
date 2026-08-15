@@ -1,37 +1,28 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-
-function readFacilityId(): string | null {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const raw = window.localStorage.getItem("fe:user");
-    if (!raw || raw === "undefined" || raw === "null") return null;
-
-    const user = JSON.parse(raw) as { facilityId?: string | number | null };
-    const value = user?.facilityId;
-
-    if (value === null || value === undefined || value === "") return null;
-    return String(value);
-  } catch {
-    return null;
-  }
-}
-
-function subscribe() {
-  return () => undefined;
-}
+import { useAuthStore } from "@/features/auth/auth.store";
 
 /**
- * Đọc facilityId của staff từ localStorage key `fe:user`.
+ * Lay co so dang duoc staff chon tu phien dang nhap hien tai.
+ * Hook nay phai dung chung nguon du lieu voi bo chon co so tren management header.
  */
 export function useStaffFacilityId() {
-  const facilityId = useSyncExternalStore(subscribe, readFacilityId, () => null);
+  const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
+  const user = useAuthStore((state) => state.user);
+  const facilities = user?.facilities;
+
+  const fallbackFacility = facilities?.find(
+    (facility) => facility.status === "active",
+  );
+  const facilityId =
+    activeFacilityId ??
+    user?.facility?.id ??
+    fallbackFacility?.id ??
+    user?.facilityId ??
+    null;
 
   return {
-    facilityId,
-    /** Luôn true trên client sau hydrate; SSR = false nếu facilityId null từ server snapshot */
-    ready: typeof window !== "undefined",
+    facilityId: facilityId ? String(facilityId) : null,
+    ready: user !== null,
   };
 }
