@@ -59,16 +59,6 @@ interface Props {
   onSuccess: () => void | Promise<void>;
 }
 
-function formatCurrency(value: string | number) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return "—";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function isFormValidationError(error: unknown) {
   return typeof error === "object" && error !== null && "errorFields" in error;
 }
@@ -96,11 +86,6 @@ export function QuantityPackageFormModal({
     { key: "1", includedQuantity: 1, isRequired: true, isOptional: false },
   ]);
 
-  /**
-   * Options: lấy từ /management/services
-   * value = facilityServiceId (map qua facility-services của cơ sở)
-   * Chỉ hiện service đã được gán cho facility hiện tại
-   */
   const serviceOptions = useMemo(() => {
     const activeFs = facilityServices.filter((fs) => fs.status === "active");
 
@@ -114,7 +99,7 @@ export function QuantityPackageFormModal({
         const fs = activeFs.find((item) => item.serviceId === svc.id);
         return {
           value: svc.id,
-          label: `${svc.code} - ${svc.name} (${formatCurrency(fs?.price ?? svc.basePrice)})`,
+          label: `${svc.code} - ${svc.name}`,
         };
       });
   }, [services, facilityServices]);
