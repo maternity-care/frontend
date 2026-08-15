@@ -263,9 +263,9 @@ export function FacilityTab() {
                                         </div>
 
                                         <div className="mb-4">
-                                            <Text className="!text-xs !font-semibold !uppercase !tracking-wider !text-pink-500">
+                                            {/* <Text className="!text-xs !font-semibold !uppercase !tracking-wider !text-pink-500">
                                                 {facility.code}
-                                            </Text>
+                                            </Text> */}
 
                                             <Title
                                                 level={4}
