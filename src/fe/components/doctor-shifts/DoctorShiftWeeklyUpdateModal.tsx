@@ -261,13 +261,11 @@ export function DoctorShiftWeeklyUpdateModal({
           getShiftSlotLookup({
             facilityId: watchedFacilityId,
             status: "active",
-            limit: 40,
           }),
           getAllDoctorShifts({
             facilityId: watchedFacilityId,
             dateFrom: watchedFromDate,
             dateTo,
-            limit: 200,
           }),
         ]);
       })

@@ -311,7 +311,6 @@ export function DoctorShiftFormModalBase({
         return getShiftSlotLookup({
           facilityId: watchedFacilityId,
           status: "active",
-          limit: 40,
         });
       })
       .then((data) => {

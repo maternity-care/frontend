@@ -16,7 +16,6 @@ import {
   Segmented,
 } from "antd";
 import {
-  FilePenLine,
   Flag,
   MessagesSquare,
   Tags,
@@ -37,9 +36,6 @@ import {
   useForumAccess,
 } from "@/hooks/forums/useForumAccess";
 import {
-  ForumPostAdminTab,
-} from "@/fe/components/forums/ForumPostAdminTab";
-import {
   ForumPostsTab,
 } from "@/fe/components/forums/ForumPostsTab";
 import {
@@ -51,7 +47,6 @@ import {
 
 type ForumView =
   | "posts"
-  | "post-admin"
   | "reports"
   | "topics";
 
@@ -100,8 +95,6 @@ function ForumManagementContent() {
     if (
       requestedView !==
         "posts" &&
-      requestedView !==
-        "post-admin" &&
       requestedView !==
         "reports" &&
       requestedView !==
@@ -160,16 +153,6 @@ function ForumManagementContent() {
         },
         ...(access.canFullManageForum
           ? [
-              {
-                value:
-                  "post-admin" as const,
-                label: (
-                  <span className="flex items-center gap-2">
-                    <FilePenLine className="h-4 w-4" />
-                    Quản trị bài viết
-                  </span>
-                ),
-              },
               {
                 value:
                   "reports" as const,
@@ -297,30 +280,17 @@ function ForumManagementContent() {
             canModerateContent={
               access.canModerateContent
             }
+            canManagePosts={
+              access.canManagePosts
+            }
+            canHardDelete={
+              access.canHardDelete
+            }
           />
         </div>
 
         {access.canFullManageForum ? (
           <>
-            <div
-              className={
-                activeView ===
-                "post-admin"
-                  ? "block"
-                  : "hidden"
-              }
-            >
-              <ForumPostAdminTab
-                topics={topics}
-                realtimeVersion={
-                  realtimeVersion
-                }
-                canHardDelete={
-                  access.canHardDelete
-                }
-              />
-            </div>
-
             <div
               className={
                 activeView ===

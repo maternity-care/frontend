@@ -1,15 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { Alert, Modal } from "antd";
-import { AdminLayout } from "@/management/components/layouts/AdminLayout";
+import {
+  useState,
+} from "react";
+import {
+  Alert,
+  Modal,
+} from "antd";
+import {
+  AdminLayout,
+} from "@/management/components/layouts/AdminLayout";
 import {
   createFacility,
   deleteFacility,
 } from "@/management/features/facilities/facilities.api";
-import type { Facility } from "@/management/features/facilities/facilities.types";
-import { useAuthStore } from "@/features/auth/auth.store";
-import { useFacilities } from "@/hooks/facilities/useFacilities";
+import type {
+  Facility,
+} from "@/management/features/facilities/facilities.types";
+import {
+  useFacilityAccess,
+} from "@/hooks/facilities/useFacilityAccess";
+import {
+  useFacilities,
+} from "@/hooks/facilities/useFacilities";
 import {
   FacilityCreateModal,
   type FacilityFormValues,
@@ -18,46 +31,189 @@ import {
   FacilityDeleteModal,
   type FacilityDeleteTarget,
 } from "@/fe/components/facilities/FacilityDeleteModal";
-import { FacilityDetailModal } from "@/fe/components/facilities/FacilityDetailModal";
-import { FacilityFilters } from "@/fe/components/facilities/FacilityFilters";
-import { FacilityTable } from "@/fe/components/facilities/FacilityTable";
-import { FacilityUpdateModal } from "@/fe/components/facilities/FacilityUpdateModal";
-import { getFacilityErrorMessage } from "@/fe/components/facilities/facility-form.shared";
+import {
+  FacilityDetailModal,
+} from "@/fe/components/facilities/FacilityDetailModal";
+import {
+  FacilityFilters,
+} from "@/fe/components/facilities/FacilityFilters";
+import {
+  FacilityTable,
+} from "@/fe/components/facilities/FacilityTable";
+import {
+  FacilityUpdateModal,
+} from "@/fe/components/facilities/FacilityUpdateModal";
+import {
+  getFacilityErrorMessage,
+} from "@/fe/components/facilities/facility-form.shared";
 
 export default function FacilityManagementPage() {
-  const [modal, modalContextHolder] = Modal.useModal();
-  const isSuperAdmin = useAuthStore((state) =>
-    state.roles.includes("super_admin"),
-  );
-  const facilityState = useFacilities();
+  const [
+    modal,
+    modalContextHolder,
+  ] = Modal.useModal();
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [detailFacility, setDetailFacility] = useState<Facility | null>(null);
-  const [updateFacilityTarget, setUpdateFacilityTarget] =
-    useState<Facility | null>(null);
+  const facilityAccess =
+    useFacilityAccess();
 
-  const [deleteTarget, setDeleteTarget] =
-    useState<FacilityDeleteTarget>(null);
-  const [deleteReason, setDeleteReason] = useState("");
-  const [deleteTouched, setDeleteTouched] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const {
+    canViewAllFacilities,
+    canManageOwnFacility,
+    scopedFacilityId,
+  } = facilityAccess;
 
-  async function handleCreate(values: FacilityFormValues) {
-    await createFacility({ ...values });
-    facilityState.setCurrentPage(1);
-    await facilityState.reloadFacilities(1, facilityState.pageSize);
-  }
+  const facilityState =
+    useFacilities({
+      canViewAllFacilities,
+      scopedFacilityId,
+    });
 
-  function handleUpdated(updated: Facility) {
-    facilityState.replaceFacility(updated);
-    setDetailFacility((current) =>
-      current?.id === updated.id ? updated : current,
+  const [
+    createOpen,
+    setCreateOpen,
+  ] = useState(false);
+
+  const [
+    detailFacility,
+    setDetailFacility,
+  ] = useState<
+    Facility | null
+  >(null);
+
+  const [
+    updateFacilityTarget,
+    setUpdateFacilityTarget,
+  ] = useState<
+    Facility | null
+  >(null);
+
+  const [
+    deleteTarget,
+    setDeleteTarget,
+  ] =
+    useState<FacilityDeleteTarget>(
+      null,
+    );
+
+  const [
+    deleteReason,
+    setDeleteReason,
+  ] = useState("");
+
+  const [
+    deleteTouched,
+    setDeleteTouched,
+  ] = useState(false);
+
+  const [
+    deleteLoading,
+    setDeleteLoading,
+  ] = useState(false);
+
+  function canAccessFacility(
+    facility: Facility,
+  ) {
+    if (
+      canViewAllFacilities
+    ) {
+      return true;
+    }
+
+    return Boolean(
+      canManageOwnFacility &&
+      scopedFacilityId &&
+      String(
+        facility.id,
+      ) ===
+        String(
+          scopedFacilityId,
+        ),
     );
   }
 
-  function openDelete(facility: Facility) {
+  function openDetail(
+    facility: Facility,
+  ) {
+    if (
+      !canAccessFacility(
+        facility,
+      )
+    ) {
+      return;
+    }
+
+    setDetailFacility(
+      facility,
+    );
+  }
+
+  function openUpdate(
+    facility: Facility,
+  ) {
+    if (
+      !canAccessFacility(
+        facility,
+      )
+    ) {
+      return;
+    }
+
+    setUpdateFacilityTarget(
+      facility,
+    );
+  }
+
+  async function handleCreate(
+    values: FacilityFormValues,
+  ) {
+    if (
+      !canViewAllFacilities
+    ) {
+      return;
+    }
+
+    await createFacility({
+      ...values,
+    });
+
+    facilityState.setCurrentPage(
+      1,
+    );
+
+    await facilityState.reloadFacilities(
+      1,
+      facilityState.pageSize,
+    );
+  }
+
+  function handleUpdated(
+    updated: Facility,
+  ) {
+    facilityState.replaceFacility(
+      updated,
+    );
+
+    setDetailFacility(
+      (current) =>
+        current?.id ===
+        updated.id
+          ? updated
+          : current,
+    );
+  }
+
+  function openDelete(
+    facility: Facility,
+  ) {
+    if (
+      !canViewAllFacilities
+    ) {
+      return;
+    }
+
     setDeleteReason("");
     setDeleteTouched(false);
+
     setDeleteTarget({
       mode: "single",
       id: facility.id,
@@ -66,88 +222,158 @@ export default function FacilityManagementPage() {
   }
 
   function closeDelete() {
-    if (deleteLoading) return;
+    if (deleteLoading) {
+      return;
+    }
+
     setDeleteTarget(null);
     setDeleteReason("");
     setDeleteTouched(false);
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) return;
+    if (
+      !canViewAllFacilities ||
+      !deleteTarget
+    ) {
+      return;
+    }
 
-    const reason = deleteReason.trim();
+    const reason =
+      deleteReason.trim();
+
     if (!reason) {
       setDeleteTouched(true);
+
       return;
     }
 
     setDeleteLoading(true);
-    facilityState.setTableLoading(true);
+    facilityState.setTableLoading(
+      true,
+    );
     facilityState.setError(null);
 
     try {
-      if (deleteTarget.mode !== "single") return;
+      if (
+        deleteTarget.mode !==
+        "single"
+      ) {
+        return;
+      }
 
-      const deletedId = deleteTarget.id;
+      const deletedId =
+        deleteTarget.id;
 
       await deleteFacility(
         deletedId,
         reason,
       );
 
-      setDetailFacility((current) =>
-        current?.id === deletedId ? null : current,
-      );
-      setUpdateFacilityTarget((current) =>
-        current?.id === deletedId ? null : current,
+      setDetailFacility(
+        (current) =>
+          current?.id ===
+          deletedId
+            ? null
+            : current,
       );
 
-      const remaining = Math.max(
-        0,
-        facilityState.totalFacilities - 1,
+      setUpdateFacilityTarget(
+        (current) =>
+          current?.id ===
+          deletedId
+            ? null
+            : current,
       );
-      const lastPage = Math.max(
-        1,
-        Math.ceil(remaining / facilityState.pageSize),
-      );
-      const nextPage = Math.min(facilityState.currentPage, lastPage);
 
-      facilityState.setCurrentPage(nextPage);
+      const remaining =
+        Math.max(
+          0,
+          facilityState.totalFacilities -
+            1,
+        );
+
+      const lastPage =
+        Math.max(
+          1,
+          Math.ceil(
+            remaining /
+              facilityState.pageSize,
+          ),
+        );
+
+      const nextPage =
+        Math.min(
+          facilityState.currentPage,
+          lastPage,
+        );
+
+      facilityState.setCurrentPage(
+        nextPage,
+      );
+
       setDeleteTarget(null);
       setDeleteReason("");
       setDeleteTouched(false);
 
-      await facilityState.reloadFacilities(nextPage, facilityState.pageSize);
+      await facilityState.reloadFacilities(
+        nextPage,
+        facilityState.pageSize,
+      );
 
       modal.success({
-        title: "Xóa cơ sở thành công",
-        content: "Cơ sở đã được xóa.",
+        title:
+          "Xóa cơ sở thành công",
+        content:
+          "Cơ sở đã được xóa.",
         centered: true,
       });
     } catch (error) {
-      const message = getFacilityErrorMessage(error);
-      facilityState.setError(message);
+      const message =
+        getFacilityErrorMessage(
+          error,
+        );
+
+      facilityState.setError(
+        message,
+      );
+
       modal.error({
-        title: "Không thể xóa cơ sở",
+        title:
+          "Không thể xóa cơ sở",
         content: message,
         centered: true,
       });
     } finally {
       setDeleteLoading(false);
-      facilityState.setTableLoading(false);
+
+      facilityState.setTableLoading(
+        false,
+      );
     }
   }
 
   return (
-    <AdminLayout roles={["super_admin", "admin"]} permissions={["user.view"]}>
+    <AdminLayout
+      roles={[
+        "super_admin",
+        "admin",
+      ]}
+      permissions={[
+        "user.view",
+      ]}
+    >
       {modalContextHolder}
 
       <div>
         <h1 className="mb-1 text-3xl font-semibold tracking-tight text-slate-900">
           Quản lý cơ sở
         </h1>
+
         <p className="mb-0 text-sm text-slate-500">
-          Quản lý thông tin, trạng thái và lịch hoạt động của các cơ sở khám.
+          {canViewAllFacilities
+            ? "Quản lý thông tin, trạng thái và lịch hoạt động của các cơ sở khám."
+            : "Xem thông tin và cập nhật trạng thái, lịch hoạt động của cơ sở được phân công."}
         </p>
       </div>
 
@@ -155,67 +381,174 @@ export default function FacilityManagementPage() {
         {facilityState.error ? (
           <Alert
             type="error"
-            title={facilityState.error}
+            title={
+              facilityState.error
+            }
             showIcon
             closable
-            onClose={() => facilityState.setError(null)}
+            onClose={() =>
+              facilityState.setError(
+                null,
+              )
+            }
           />
         ) : null}
 
-        <FacilityFilters
-          query={facilityState.query}
-          city={facilityState.cityFilter}
-          status={facilityState.statusFilter}
-          cityOptions={facilityState.cityOptions}
-          onChange={facilityState.applyFilters}
-        />
+        {canViewAllFacilities ? (
+          <FacilityFilters
+            query={
+              facilityState.query
+            }
+            city={
+              facilityState.cityFilter
+            }
+            status={
+              facilityState.statusFilter
+            }
+            cityOptions={
+              facilityState.cityOptions
+            }
+            onChange={
+              facilityState.applyFilters
+            }
+          />
+        ) : null}
 
         <FacilityTable
-          facilities={facilityState.facilities}
-          loading={facilityState.loading || facilityState.tableLoading}
-          currentPage={facilityState.currentPage}
-          pageSize={facilityState.pageSize}
-          total={facilityState.totalFacilities}
-          isSuperAdmin={isSuperAdmin}
-          onView={setDetailFacility}
-          onEdit={setUpdateFacilityTarget}
-          onDelete={openDelete}
-          onCreate={() => setCreateOpen(true)}
-          onPageChange={facilityState.changePage}
+          facilities={
+            facilityState.facilities
+          }
+          loading={
+            facilityState.loading ||
+            facilityState.tableLoading
+          }
+          currentPage={
+            facilityState.currentPage
+          }
+          pageSize={
+            facilityState.pageSize
+          }
+          total={
+            facilityState.totalFacilities
+          }
+          isSuperAdmin={
+            canViewAllFacilities
+          }
+          onView={
+            openDetail
+          }
+          onEdit={
+            openUpdate
+          }
+          onDelete={
+            openDelete
+          }
+          onCreate={() =>
+            setCreateOpen(true)
+          }
+          onPageChange={
+            facilityState.changePage
+          }
         />
       </div>
 
-      <FacilityCreateModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onSubmit={handleCreate}
-      />
+      {canViewAllFacilities ? (
+        <FacilityCreateModal
+          open={
+            createOpen
+          }
+          onClose={() =>
+            setCreateOpen(false)
+          }
+          onSubmit={
+            handleCreate
+          }
+        />
+      ) : null}
 
       <FacilityDetailModal
-        open={Boolean(detailFacility)}
-        facility={detailFacility}
-        onClose={() => setDetailFacility(null)}
+        open={
+          Boolean(
+            detailFacility,
+          )
+        }
+        facility={
+          detailFacility
+        }
+        onClose={() =>
+          setDetailFacility(
+            null,
+          )
+        }
       />
 
       <FacilityUpdateModal
-        open={Boolean(updateFacilityTarget)}
-        facility={updateFacilityTarget}
-        onClose={() => setUpdateFacilityTarget(null)}
-        onUpdated={handleUpdated}
+        open={
+          Boolean(
+            updateFacilityTarget,
+          )
+        }
+        facility={
+          updateFacilityTarget
+        }
+        onClose={() =>
+          setUpdateFacilityTarget(
+            null,
+          )
+        }
+        onUpdated={
+          handleUpdated
+        }
+        /**
+         * Admin chỉ được sửa:
+         * - trạng thái hoạt động
+         * - lịch hoạt động
+         *
+         * Super Admin vẫn full update.
+         */
+        limitedToStatusAndSchedule={
+          !canViewAllFacilities
+        }
       />
 
-      <FacilityDeleteModal
-        target={deleteTarget}
-        reason={deleteReason}
-        reasonError={deleteTouched && !deleteReason.trim()}
-        loading={deleteLoading}
-        onReasonChange={(value) => {
-          setDeleteReason(value);
-          if (value.trim()) setDeleteTouched(false);
-        }}
-        onClose={closeDelete}
-        onConfirm={confirmDelete}
-      />
+      {canViewAllFacilities ? (
+        <FacilityDeleteModal
+          target={
+            deleteTarget
+          }
+          reason={
+            deleteReason
+          }
+          reasonError={
+            deleteTouched &&
+            !deleteReason.trim()
+          }
+          loading={
+            deleteLoading
+          }
+          onReasonChange={(
+            value,
+          ) => {
+            setDeleteReason(
+              value,
+            );
+
+            if (
+              value.trim()
+            ) {
+              setDeleteTouched(
+                false,
+              );
+            }
+          }}
+          onClose={
+            closeDelete
+          }
+          onConfirm={
+            confirmDelete
+          }
+        />
+      ) : null}
     </AdminLayout>
   );
 }

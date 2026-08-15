@@ -11,7 +11,7 @@ import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { getRooms } from "@/management/features/rooms/rooms.api";
 import type { ClinicRoom } from "@/management/features/rooms/rooms.types";
 import { getDoctors } from "@/management/features/doctors/doctors.api";
-import { getDoctorShifts } from "@/management/features/doctor-shifts/doctor-shifts.api";
+import { getDoctorShiftsInRange } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type { DoctorShiftItem } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import type {
   DoctorOption,
@@ -19,7 +19,6 @@ import type {
   RoomOption,
 } from "@/management/features/doctor-shifts/doctor-shifts.ui-types";
 import {
-  DOCTOR_SHIFT_PROGRESSIVE_PAGE_LIMIT,
   getDoctorShiftWeekRange,
   mergeDoctorShiftItems,
   removeDoctorShiftsInRange,
@@ -280,82 +279,57 @@ export function useDoctorShiftResources(access: AccessInput) {
       const requestPromise:
         Promise<void> =
         (async () => {
-          let page = 1;
-          let totalPages = 1;
-
-          do {
-            const result =
-              await getDoctorShifts({
-                ...(!canViewAllFacilities
-                  ? {
-                      facilityId,
-                    }
-                  : {}),
-                ...(isDoctorViewer &&
-                doctorId
-                  ? {
-                      doctorId,
-                    }
-                  : {}),
-                dateFrom,
-                dateTo,
-                page,
-                limit:
-                  DOCTOR_SHIFT_PROGRESSIVE_PAGE_LIMIT,
-              });
-
-            if (
-              scopeKeyRef.current !==
-              requestScope
-            ) {
-              return;
-            }
-
-            const safeItems =
-              filterShiftDataForViewer(
-                result.items,
-              );
-
-            if (
-              safeItems.length > 0
-            ) {
-              setShifts(
-                (current) =>
-                  mergeDoctorShiftItems(
-                    current,
-                    safeItems,
-                  ),
-              );
-
-              appendDoctorViewerLookups(
-                safeItems,
-              );
-            }
-
-            if (page === 1) {
-              onFirstPageLoaded?.();
-            }
-
-            totalPages =
-              Math.max(
-                result.totalPages,
-                0,
-              );
-
-            page += 1;
-          } while (
-            page <= totalPages
-          );
-
-          if (
-            scopeKeyRef.current ===
-            requestScope
-          ) {
-            markRangeLoaded(
+          const result =
+            await getDoctorShiftsInRange({
+              ...(!canViewAllFacilities
+                ? {
+                    facilityId,
+                  }
+                : {}),
+              ...(isDoctorViewer &&
+              doctorId
+                ? {
+                    doctorId,
+                  }
+                : {}),
               dateFrom,
               dateTo,
+            });
+
+          if (
+            scopeKeyRef.current !==
+            requestScope
+          ) {
+            return;
+          }
+
+          const safeItems =
+            filterShiftDataForViewer(
+              result.items,
+            );
+
+          if (
+            safeItems.length > 0
+          ) {
+            setShifts(
+              (current) =>
+                mergeDoctorShiftItems(
+                  current,
+                  safeItems,
+                ),
+            );
+
+            appendDoctorViewerLookups(
+              safeItems,
             );
           }
+
+          onFirstPageLoaded?.();
+
+          markRangeLoaded(
+            dateFrom,
+            dateTo,
+          );
         })().finally(() => {
           const currentRequest =
             inFlightRangesRef.current.get(
@@ -632,13 +606,9 @@ export function useDoctorShiftResources(access: AccessInput) {
         getFacilities(),
         getRooms({
           status: "active",
-          page: 1,
-          limit: 40,
           ...(!canViewAllFacilities ? { facilityId } : {}),
         }),
         getDoctors({
-          page: 1,
-          limit: 40,
           status: "active",
           sortYearsOfExperience: "desc",
           ...(!canViewAllFacilities ? { facilityId } : {}),

@@ -17,7 +17,10 @@ type AuthFacilityAssignment = {
 };
 
 type ShiftAccessAuthUser = {
+  id?: string | number | null;
   facilityId?: string | number | null;
+  facility?: { id?: string | number | null } | null;
+  doctor?: { id?: string | number | null } | null;
   roles?: AuthRoleValue[] | null;
   staffProfile?: {
     id?: string | number | null;
@@ -71,7 +74,10 @@ export function useDoctorShiftAccess() {
         .filter(Boolean),
     );
     const directFacilityId = String(
-      authUser?.facilityId ?? authUser?.staffProfile?.facilityId ?? "",
+      authUser?.facilityId ??
+        authUser?.facility?.id ??
+        authUser?.staffProfile?.facilityId ??
+        "",
     ).trim();
     const requestedFacilityId = String(activeFacilityId ?? "").trim();
     const requestedAllowed =
@@ -93,9 +99,14 @@ export function useDoctorShiftAccess() {
       (globalRoles.has("admin") && belongsToFacility);
     const isDoctor =
       facilityRoles.has("doctor") || globalRoles.has("doctor");
-    const doctorId = String(authUser?.staffProfile?.doctor?.id ?? "").trim();
+    const doctorId = String(
+      authUser?.staffProfile?.doctor?.id ?? authUser?.doctor?.id ?? "",
+    ).trim();
     const staffId = String(
-      authUser?.staffProfile?.staffId ?? authUser?.staffProfile?.id ?? "",
+      authUser?.staffProfile?.staffId ??
+        authUser?.staffProfile?.id ??
+        authUser?.id ??
+        "",
     ).trim();
     const canManage = belongsToFacility && isAdmin;
     const isDoctorViewer = belongsToFacility && isDoctor && !canManage;

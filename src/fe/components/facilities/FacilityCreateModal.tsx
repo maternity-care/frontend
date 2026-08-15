@@ -13,7 +13,6 @@ import { useFacilityOwners } from "@/hooks/facilities/useFacilityOwners";
 import { getFacilityErrorMessage } from "./facility-form.shared";
 import { FacilityGeneralFields } from "./FacilityGeneralFields";
 import { FacilityLocationCard } from "./FacilityLocationCard";
-import { FacilityPreview } from "./FacilityPreview";
 import { FacilityScheduleCard } from "./FacilityScheduleCard";
 
 const { Text, Title } = Typography;
@@ -61,16 +60,6 @@ export function FacilityCreateModal({ open, onClose, onSubmit }: Props) {
   const location = useFacilityLocation(form);
 
   const name = Form.useWatch("name", form);
-  const ownerId = Form.useWatch("ownerId", form);
-  const hotline = Form.useWatch("hotline", form);
-  const email = Form.useWatch("email", form);
-  const status = Form.useWatch("status", form);
-  const schedules = Form.useWatch("schedules", form);
-
-  const selectedOwnerName = owners.options.find(
-    (owner) => owner.value === ownerId,
-  )?.name;
-
   function handleCancel() {
     if (submitting) return;
     form.resetFields();
@@ -119,7 +108,7 @@ export function FacilityCreateModal({ open, onClose, onSubmit }: Props) {
       {location.modalContextHolder}
       <Modal
         open={open}
-        width={1180}
+        width={900}
         centered
         onCancel={handleCancel}
         footer={null}
@@ -143,7 +132,7 @@ export function FacilityCreateModal({ open, onClose, onSubmit }: Props) {
           onFinish={handleFinish}
           className="mt-5"
         >
-          <div className="grid max-h-[70vh] gap-5 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
             <div className="space-y-5">
               {owners.error ? (
                 <Alert type="warning" showIcon title={owners.error} />
@@ -167,15 +156,6 @@ export function FacilityCreateModal({ open, onClose, onSubmit }: Props) {
               <FacilityScheduleCard disabled={submitting} />
             </div>
 
-            <FacilityPreview
-              name={name}
-              status={status}
-              ownerName={selectedOwnerName}
-              hotline={hotline}
-              email={email}
-              fullAddress={location.fullAddress}
-              schedules={schedules}
-            />
           </div>
 
           <div className="mt-5 flex justify-end gap-2 border-t border-slate-200 pt-4">

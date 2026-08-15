@@ -10,6 +10,7 @@ import {
   Select,
 } from "antd";
 import {
+  Plus,
   Search,
   X,
 } from "lucide-react";
@@ -48,6 +49,8 @@ type Props = {
   onAuthorRoleChange: (
     value?: ForumAuthorRole,
   ) => void;
+  canCreatePost?: boolean;
+  onCreate?: () => void;
   onReset: () => void;
 };
 
@@ -64,6 +67,8 @@ export function ForumPostModerationFilters({
   onTopicChange,
   onStatusChange,
   onAuthorRoleChange,
+  canCreatePost = false,
+  onCreate,
   onReset,
 }: Props) {
   return (
@@ -81,7 +86,7 @@ export function ForumPostModerationFilters({
 
       <div className="my-4 h-px bg-slate-100" />
 
-      <div className="grid min-w-0 grid-cols-1 items-center gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.5fr)_minmax(130px,0.9fr)_minmax(150px,1fr)_minmax(130px,0.9fr)_minmax(145px,1fr)_auto]">
+      <div className="grid min-w-0 grid-cols-1 items-center gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.5fr)_minmax(130px,0.9fr)_minmax(150px,1fr)_minmax(130px,0.9fr)_minmax(145px,1fr)_auto_auto]">
         <Input
           allowClear
           value={keyword}
@@ -157,6 +162,20 @@ export function ForumPostModerationFilters({
         >
           Xóa lọc
         </Button>
+
+        {canCreatePost &&
+        onCreate ? (
+          <Button
+            type="primary"
+            icon={
+              <Plus className="h-4 w-4" />
+            }
+            className="whitespace-nowrap"
+            onClick={onCreate}
+          >
+            Tạo bài viết
+          </Button>
+        ) : null}
       </div>
     </Card>
   );
