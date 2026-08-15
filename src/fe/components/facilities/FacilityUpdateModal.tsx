@@ -1,8 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Button, Form, Input, Modal, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Typography,
+} from "antd";
 import { Save, X } from "lucide-react";
+import { FACILITY_STATUS_OPTIONS } from "@/management/features/facilities/facilities.constants";
 import {
   applyFacilityOperatingHours,
   getFacility,
@@ -27,7 +37,6 @@ import {
 } from "./facility-form.shared";
 import { FacilityGeneralFields } from "./FacilityGeneralFields";
 import { FacilityLocationCard } from "./FacilityLocationCard";
-import { FacilityPreview } from "./FacilityPreview";
 import { FacilityScheduleCard } from "./FacilityScheduleCard";
 
 const { Text, Title } = Typography;
@@ -55,6 +64,7 @@ type Props = {
   facility: Facility | null;
   onClose: () => void;
   onUpdated: (facility: Facility) => void;
+  limitedToStatusAndSchedule?: boolean;
 };
 
 export function FacilityUpdateModal({
@@ -62,22 +72,27 @@ export function FacilityUpdateModal({
   facility,
   onClose,
   onUpdated,
+  limitedToStatusAndSchedule = false,
 }: Props) {
   const [form] = Form.useForm<FacilityUpdateValues>();
   const [submitting, setSubmitting] = useState(false);
-  const owners = useFacilityOwners(open, facility);
+  const owners = useFacilityOwners(
+    open &&
+      !limitedToStatusAndSchedule,
+    facility,
+  );
   const location = useFacilityLocation(form);
 
-  const name = Form.useWatch("name", form);
-  const ownerId = Form.useWatch("ownerId", form);
-  const hotline = Form.useWatch("hotline", form);
-  const email = Form.useWatch("email", form);
-  const status = Form.useWatch("status", form);
-  const schedules = Form.useWatch("schedules", form);
-
-  const selectedOwnerName =
-    owners.options.find((owner) => owner.value === ownerId)?.name ||
-    (facility && ownerId === facility.ownerId ? facility.ownerName : undefined);
+  const name =
+    Form.useWatch(
+      "name",
+      form,
+    );
+  const status =
+    Form.useWatch(
+      "status",
+      form,
+    );
 
   useEffect(() => {
     if (!open || !facility) return;
@@ -171,18 +186,36 @@ export function FacilityUpdateModal({
 
       if (deactivateInvalidSlots === null) return;
 
-      await updateFacility(facility.id, {
-        name: values.name,
-        ownerId: values.ownerId,
-        hotline: values.hotline,
-        email: values.email ?? "",
-        address: values.address,
-        city: values.city,
-        ward: values.ward,
-        floorCount: values.floorCount ?? 1,
-        latitude: values.latitude ?? "",
-        longitude: values.longitude ?? "",
-      });
+      if (
+        !limitedToStatusAndSchedule
+      ) {
+        await updateFacility(
+          facility.id,
+          {
+            name: values.name,
+            ownerId:
+              values.ownerId,
+            hotline:
+              values.hotline,
+            email:
+              values.email ??
+              "",
+            address:
+              values.address,
+            city: values.city,
+            ward: values.ward,
+            floorCount:
+              values.floorCount ??
+              1,
+            latitude:
+              values.latitude ??
+              "",
+            longitude:
+              values.longitude ??
+              "",
+          },
+        );
+      }
 
       await applyFacilityOperatingHours(facility.id, {
         schedules: values.schedules,
@@ -277,7 +310,11 @@ export function FacilityUpdateModal({
       {location.modalContextHolder}
       <Modal
         open={open}
-        width={1180}
+        width={
+          limitedToStatusAndSchedule
+            ? 760
+            : 900
+        }
         centered
         onCancel={handleCancel}
         footer={null}
@@ -290,7 +327,9 @@ export function FacilityUpdateModal({
             Cập nhật cơ sở khám
           </Title>
           <Text className="text-slate-500">
-            Cập nhật thông tin, bản đồ, lịch hoạt động và trạng thái cơ sở.
+            {limitedToStatusAndSchedule
+              ? "Bạn chỉ có thể cập nhật trạng thái và lịch hoạt động của cơ sở."
+              : "Cập nhật thông tin, bản đồ, lịch hoạt động và trạng thái cơ sở."}
           </Text>
         </div>
 
@@ -300,43 +339,109 @@ export function FacilityUpdateModal({
           onFinish={handleFinish}
           className="mt-5"
         >
-          <div className="grid max-h-[70vh] gap-5 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
             <div className="space-y-5">
-              {owners.error ? (
-                <Alert type="warning" showIcon title={owners.error} />
-              ) : null}
+              {limitedToStatusAndSchedule ? (
+                <>
+                  <Card
+                    className="border-slate-200"
+                    title="Trạng thái hoạt động"
+                  >
+                    <Form.Item
+                      name="status"
+                      label="Trạng thái"
+                      rules={[
+                        {
+                          required: true,
+                          message:
+                            "Vui lòng chọn trạng thái.",
+                        },
+                      ]}
+                    >
+                      <Select
+                        size="large"
+                        disabled={
+                          submitting
+                        }
+                        options={
+                          FACILITY_STATUS_OPTIONS
+                        }
+                      />
+                    </Form.Item>
 
-              <FacilityGeneralFields
-                code={facility?.code}
-                ownerOptions={owners.options}
-                ownersLoading={owners.loading}
-                currentOwnerId={facility?.ownerId}
-                disabled={submitting}
-                statusExtra={statusExtra}
-              />
+                    {statusExtra}
+                  </Card>
 
-              <FacilityLocationCard
-                facilityName={name || facility?.name || "Cơ sở khám"}
-                fullAddress={location.fullAddress}
-                mapLocation={location.mapLocation}
-                locating={location.locating}
-                disabled={submitting}
-                onLocate={() => void location.useCurrentLocation()}
-              />
+                  <FacilityScheduleCard
+                    disabled={
+                      submitting
+                    }
+                  />
+                </>
+              ) : (
+                <>
+                  {owners.error ? (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      title={
+                        owners.error
+                      }
+                    />
+                  ) : null}
 
-              <FacilityScheduleCard disabled={submitting} />
+                  <FacilityGeneralFields
+                    code={
+                      facility?.code
+                    }
+                    ownerOptions={
+                      owners.options
+                    }
+                    ownersLoading={
+                      owners.loading
+                    }
+                    currentOwnerId={
+                      facility?.ownerId
+                    }
+                    disabled={
+                      submitting
+                    }
+                    statusExtra={
+                      statusExtra
+                    }
+                  />
+
+                  <FacilityLocationCard
+                    facilityName={
+                      name ||
+                      facility?.name ||
+                      "Cơ sở khám"
+                    }
+                    fullAddress={
+                      location.fullAddress
+                    }
+                    mapLocation={
+                      location.mapLocation
+                    }
+                    locating={
+                      location.locating
+                    }
+                    disabled={
+                      submitting
+                    }
+                    onLocate={() =>
+                      void location.useCurrentLocation()
+                    }
+                  />
+
+                  <FacilityScheduleCard
+                    disabled={
+                      submitting
+                    }
+                  />
+                </>
+              )}
             </div>
-
-            <FacilityPreview
-              name={name || facility?.name}
-              code={facility?.code}
-              status={status || facility?.status}
-              ownerName={selectedOwnerName}
-              hotline={hotline}
-              email={email}
-              fullAddress={location.fullAddress}
-              schedules={schedules}
-            />
           </div>
 
           <div className="mt-5 flex justify-end gap-2 border-t border-slate-200 pt-4">
