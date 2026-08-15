@@ -76,10 +76,12 @@ function getEffectiveAccess(
     : facility?.role
       ? [facility.role]
       : [];
-  const effectiveRoles = [
-    ...(user?.roles ?? []),
-    ...facilityRoles,
-  ];
+  const globalRoles = user?.roles ?? [];
+  const effectiveRoles = globalRoles.some((role) => role.name === "super_admin")
+    ? globalRoles
+    : facilityRoles.length > 0
+      ? facilityRoles
+      : globalRoles;
 
   return {
     roles: [...new Set(effectiveRoles.map((role) => role.name))],

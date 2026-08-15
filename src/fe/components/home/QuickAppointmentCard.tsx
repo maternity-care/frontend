@@ -14,14 +14,16 @@ import type { Facility } from "@/management/features/facilities/facilities.types
 import { getPublicFacilityServices } from "@/management/features/services/services.api";
 import type { FacilityService } from "@/management/features/services/services.types";
 import {
-  getDoctorAvailability,
-  getWeeklyDoctorShifts,
-} from "@/management/features/doctor-shifts/doctor-shifts.api";
-import type { DoctorShiftItem } from "@/management/features/doctor-shifts/doctor-shifts.types";
+  getPublicDoctorAvailability,
+  getPublicWeeklyDoctorShifts,
+} from "@/features/doctor-shifts/public-doctor-shifts.api";
+import type { PublicDoctorShiftItem } from "@/features/doctor-shifts/public-doctor-shifts.types";
 
 const { Text, Title } = Typography;
 
 type AvailabilityShift = {
+  doctorId?: string;
+  doctorLabel?: string;
   shiftId: string;
   startTime: string;
   endTime: string;
@@ -70,7 +72,7 @@ export function QuickAppointmentCard() {
   const [modal, modalContextHolder] = Modal.useModal();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [facilityServices, setFacilityServices] = useState<FacilityService[]>([]);
-  const [doctorShifts, setDoctorShifts] = useState<DoctorShiftItem[]>([]);
+  const [doctorShifts, setDoctorShifts] = useState<PublicDoctorShiftItem[]>([]);
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
 
   const [facilityId, setFacilityId] = useState<string>();
@@ -121,7 +123,7 @@ export function QuickAppointmentCard() {
     if (!facilityId || !date) return;
 
     setLoadingDoctors(true);
-    getWeeklyDoctorShifts({
+    getPublicWeeklyDoctorShifts({
       facilityId,
       weekStart: date.startOf("week").format("YYYY-MM-DD"),
     })
@@ -136,7 +138,7 @@ export function QuickAppointmentCard() {
   }, [facilityId, date]);
 
   const doctorOptions = useMemo(() => {
-    const doctors = new Map<string, DoctorShiftItem>();
+    const doctors = new Map<string, PublicDoctorShiftItem>();
 
     doctorShifts.forEach((shift) => {
       if (shift.doctorId && !doctors.has(shift.doctorId)) {
@@ -156,12 +158,21 @@ export function QuickAppointmentCard() {
     return doctorShifts.filter((shift) => !doctorId || shift.doctorId === doctorId);
   }, [doctorId, doctorShifts]);
 
-  const canCheckAvailability = Boolean(facilityId && serviceId && doctorId && date);
+  const canCheckAvailability = Boolean(facilityId && serviceId && date);
 
   const handleCheckAvailability = async () => {
-    if (!facilityId || !doctorId || !date) return;
+    if (!facilityId || !date) return;
     if (date.isBefore(dayjs(), "day")) {
       setError("Không thể đặt lịch trong quá khứ.");
+      return;
+    }
+
+    const targetDoctors = doctorId
+      ? doctorOptions.filter((doctor) => doctor.value === doctorId)
+      : doctorOptions;
+
+    if (targetDoctors.length === 0) {
+      setError("Ngày này chưa có bác sĩ trực để kiểm tra lịch trống.");
       return;
     }
 
@@ -170,13 +181,31 @@ export function QuickAppointmentCard() {
     setAvailability(null);
 
     try {
-      const data = await getDoctorAvailability(doctorId, {
-        facilityId,
-        date: date.format("YYYY-MM-DD"),
-        slotMinutes: 30,
-      });
+      const responses = await Promise.all(
+        targetDoctors.map(async (doctor) => {
+          const data = await getPublicDoctorAvailability(doctor.value, {
+            facilityId,
+            date: date.format("YYYY-MM-DD"),
+            slotMinutes: 30,
+          });
 
-      setAvailability(data as AvailabilityResponse);
+          return {
+            doctorId: doctor.value,
+            doctorLabel: doctor.label,
+            shifts: data.shifts ?? [],
+          };
+        }),
+      );
+
+      setAvailability({
+        shifts: responses.flatMap((response) =>
+          response.shifts.map((shift) => ({
+            ...shift,
+            doctorId: response.doctorId,
+            doctorLabel: response.doctorLabel,
+          })),
+        ),
+      });
     } catch (checkError) {
       setError(getErrorMessage(checkError, "Không kiểm tra được lịch trống."));
     } finally {
@@ -187,6 +216,8 @@ export function QuickAppointmentCard() {
   const availableSlots =
     availability?.shifts?.flatMap((shift) =>
       shift.availableSlots.map((slot) => ({
+        doctorId: shift.doctorId,
+        doctorLabel: shift.doctorLabel,
         shiftId: shift.shiftId,
         label: normalizeSlot(slot),
         ...getSlotTimes(slot),
@@ -203,7 +234,7 @@ export function QuickAppointmentCard() {
       return;
     }
 
-    if (!facilityId || !serviceId || !doctorId || !date) return;
+    if (!facilityId || !serviceId || !slot.doctorId || !date) return;
     if (isPastSlot(date, slot.startTime)) {
       setError("Không thể đặt lịch trong quá khứ.");
       return;
@@ -217,7 +248,7 @@ export function QuickAppointmentCard() {
       await createAppointment({
         facilityId,
         serviceId,
-        doctorId,
+        doctorId: slot.doctorId,
         shiftId: slot.shiftId,
         date: date.format("YYYY-MM-DD"),
         startTime: slot.startTime,
@@ -239,7 +270,7 @@ export function QuickAppointmentCard() {
       return;
     }
 
-    if (!facilityId || !serviceId || !doctorId || !date) return;
+    if (!facilityId || !serviceId || !slot.doctorId || !date) return;
     if (isPastSlot(date, slot.startTime)) {
       setError("Không thể đặt lịch trong quá khứ.");
       return;
@@ -265,7 +296,7 @@ export function QuickAppointmentCard() {
           </p>
           <p>
             <span className="font-semibold text-slate-900">Bác sĩ:</span>{" "}
-            {selectedDoctor?.label ?? "Bác sĩ đã chọn"}
+            {selectedDoctor?.label ?? slot.doctorLabel ?? "Bác sĩ đã chọn"}
           </p>
           <p>
             <span className="font-semibold text-slate-900">Thời gian:</span>{" "}
@@ -358,11 +389,12 @@ export function QuickAppointmentCard() {
         <Select
           size="large"
           showSearch
+          allowClear
           className="w-full min-w-0"
           popupMatchSelectWidth={false}
           disabled={!facilityId || !date}
           loading={loadingDoctors}
-          placeholder={RESPONSE_MESSAGES.HOME.QUICK_APPOINTMENT.DOCTOR_PLACEHOLDER}
+          placeholder={`${RESPONSE_MESSAGES.HOME.QUICK_APPOINTMENT.DOCTOR_PLACEHOLDER} (không bắt buộc)`}
           optionFilterProp="label"
           value={doctorId}
           onChange={(value) => {
@@ -413,7 +445,7 @@ export function QuickAppointmentCard() {
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {availableSlots.map((slot) => (
                   <Button
-                    key={`${slot.shiftId}-${slot.label}`}
+                    key={`${slot.doctorId}-${slot.shiftId}-${slot.label}`}
                     size="middle"
                     icon={<CheckCircle2 className="h-4 w-4" />}
                     loading={bookingSlotKey === `${slot.shiftId}-${slot.label}`}
@@ -422,6 +454,7 @@ export function QuickAppointmentCard() {
                     onClick={() => handleBookSlot(slot)}
                   >
                     Đặt {slot.label}
+                    {!doctorId && slot.doctorLabel ? ` · ${slot.doctorLabel}` : ""}
                   </Button>
                 ))}
               </div>

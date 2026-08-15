@@ -113,14 +113,23 @@ export function Sidebar() {
   const roleName = (role: string | { name?: string } | null | undefined) =>
     typeof role === "string" ? role : role?.name;
 
+  const globalRoles = [
+    ...roles,
+    ...(user?.roles?.map(roleName) ?? []),
+  ]
+    .filter((role): role is string => Boolean(role))
+    .map((role) => role.toLowerCase());
+  const isGlobalSuperAdmin = globalRoles.includes("super_admin");
+  const normalizedFacilityRoles = facilityRoles
+    .map(roleName)
+    .filter((role): role is string => Boolean(role))
+    .map((role) => role.toLowerCase());
   const effectiveRoles = new Set(
-    [
-      ...roles,
-      ...(user?.roles?.map(roleName) ?? []),
-      ...facilityRoles.map(roleName),
-    ]
-      .filter((role): role is string => Boolean(role))
-      .map((role) => role.toLowerCase()),
+    isGlobalSuperAdmin
+      ? globalRoles
+      : normalizedFacilityRoles.length > 0
+        ? normalizedFacilityRoles
+        : globalRoles,
   );
 
   const visibleNavItems = navItems.filter(

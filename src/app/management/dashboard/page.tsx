@@ -8,10 +8,11 @@ import {
   Badge,
   Button,
   Card,
+  DatePicker,
   Empty,
   Input,
   Progress,
-  Select,
+  Segmented,
   Skeleton,
   Space,
   Statistic,
@@ -38,6 +39,8 @@ import {
   UserRoundCheck,
   Users,
 } from "lucide-react";
+import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
@@ -54,10 +57,11 @@ import { getManagementPregnancyProfiles } from "@/management/features/management
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { getStaffsPage } from "@/management/features/staffs/staffs.api";
 
+const { RangePicker } = DatePicker;
 const { Text, Title } = Typography;
 
 type DashboardRole = "super_admin" | "admin" | "doctor" | "nurse" | "staff";
-type DashboardWindow = "today" | "7-days" | "30-days";
+type DashboardWindow = "day" | "week" | "30-days" | "custom";
 type AlertLevel = "critical" | "warning" | "info";
 type StatTone = "blue" | "emerald" | "violet" | "amber";
 
@@ -97,6 +101,18 @@ type FacilityUtilization = {
   totalRooms: number;
 };
 
+type RoleDashboardConfig = {
+  label: string;
+  description: string;
+  scopeLabel: string;
+  primaryMetric: string;
+  secondaryMetric: string;
+  shiftMetric: string;
+  showSystemCards: boolean;
+  showFacilityUtilization: boolean;
+  showDoctorColumn: boolean;
+};
+
 const emptyState: DashboardState = {
   appointments: [],
   shifts: [],
@@ -107,20 +123,62 @@ const emptyState: DashboardState = {
   errors: [],
 };
 
-const roleLabels: Record<DashboardRole, string> = {
-  super_admin: "Super Admin",
-  admin: "Quản trị cơ sở",
-  doctor: "Bác sĩ",
-  nurse: "Điều dưỡng",
-  staff: "Nhân viên vận hành",
-};
-
-const roleDescriptions: Record<DashboardRole, string> = {
-  super_admin: "Tổng quan toàn hệ thống: cơ sở, nhân sự, bác sĩ, lịch khám và hồ sơ thai kỳ.",
-  admin: "Tổng quan cơ sở đang chọn: lịch khám, ca trực, bác sĩ, nhân sự và hồ sơ thai kỳ.",
-  doctor: "Tập trung vào lịch khám, ca trực và hồ sơ thai kỳ cần theo dõi chuyên môn.",
-  nurse: "Tập trung vào lịch khám, ca trực, hỗ trợ thai phụ và điều phối vận hành.",
-  staff: "Tập trung vào lịch đặt khám, ca trực và các đầu việc vận hành trong ngày.",
+const roleDashboardConfig: Record<DashboardRole, RoleDashboardConfig> = {
+  super_admin: {
+    label: "Super Admin",
+    description: "Tổng quan toàn hệ thống: cơ sở, nhân sự, bác sĩ, lịch khám và hồ sơ thai kỳ.",
+    scopeLabel: "Toàn hệ thống",
+    primaryMetric: "Lịch hẹn toàn hệ thống",
+    secondaryMetric: "Thai phụ đang theo dõi",
+    shiftMetric: "Bác sĩ đang trực",
+    showSystemCards: true,
+    showFacilityUtilization: true,
+    showDoctorColumn: true,
+  },
+  admin: {
+    label: "Quản trị cơ sở",
+    description: "Tổng quan cơ sở đang chọn: lịch khám, ca trực, bác sĩ, nhân sự và hồ sơ thai kỳ.",
+    scopeLabel: "Cơ sở đang chọn",
+    primaryMetric: "Lịch hẹn của cơ sở",
+    secondaryMetric: "Hồ sơ thai kỳ tại cơ sở",
+    shiftMetric: "Nhân sự trực tại cơ sở",
+    showSystemCards: true,
+    showFacilityUtilization: true,
+    showDoctorColumn: true,
+  },
+  doctor: {
+    label: "Bác sĩ",
+    description: "Tập trung vào lịch khám của bạn, ca trực và hồ sơ thai kỳ cần theo dõi chuyên môn.",
+    scopeLabel: "Dữ liệu của bác sĩ",
+    primaryMetric: "Lịch khám của tôi",
+    secondaryMetric: "Hồ sơ cần theo dõi",
+    shiftMetric: "Ca trực của tôi",
+    showSystemCards: false,
+    showFacilityUtilization: false,
+    showDoctorColumn: false,
+  },
+  nurse: {
+    label: "Điều dưỡng",
+    description: "Tập trung vào lịch tiếp nhận, ca trực và các cảnh báo cần hỗ trợ thai phụ.",
+    scopeLabel: "Cơ sở đang chọn",
+    primaryMetric: "Lịch cần hỗ trợ",
+    secondaryMetric: "Thai phụ cần chăm sóc",
+    shiftMetric: "Ca trực hỗ trợ",
+    showSystemCards: false,
+    showFacilityUtilization: false,
+    showDoctorColumn: true,
+  },
+  staff: {
+    label: "Nhân viên vận hành",
+    description: "Tập trung vào đặt lịch, xác nhận thanh toán và điều phối ca khám trong ngày.",
+    scopeLabel: "Cơ sở đang chọn",
+    primaryMetric: "Lịch cần xử lý",
+    secondaryMetric: "Hồ sơ liên quan",
+    shiftMetric: "Ca khám khả dụng",
+    showSystemCards: false,
+    showFacilityUtilization: false,
+    showDoctorColumn: true,
+  },
 };
 
 const statusLabels: Record<ManagementAppointmentStatus, string> = {
@@ -148,9 +206,10 @@ const statusColors: Record<ManagementAppointmentStatus, string> = {
 };
 
 const periodOptions: { value: DashboardWindow; label: string }[] = [
-  { value: "today", label: "Hôm nay" },
-  { value: "7-days", label: "7 ngày gần nhất" },
+  { value: "day", label: "Theo ngày" },
+  { value: "week", label: "Theo tuần" },
   { value: "30-days", label: "30 ngày gần nhất" },
+  { value: "custom", label: "Tùy chọn" },
 ];
 
 const statToneClasses: Record<
@@ -205,9 +264,57 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
-function getWindowRange(window: DashboardWindow) {
+function startOfWeek(date: Date) {
+  const start = new Date(date);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diff);
+  return start;
+}
+
+function getDaysBetween(dateFrom: string, dateTo: string) {
+  const from = new Date(dateFrom);
+  const to = new Date(dateTo);
+  const diff = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+  return Math.max(1, Math.min(diff, 62));
+}
+
+function getWindowRange(
+  window: DashboardWindow,
+  selectedDate: Date,
+  customRange: [Date, Date],
+) {
+  if (window === "day") {
+    const date = formatDateKey(selectedDate);
+    return {
+      dateFrom: date,
+      dateTo: date,
+      days: 1,
+    };
+  }
+
+  if (window === "week") {
+    const dateFrom = formatDateKey(startOfWeek(selectedDate));
+    const dateTo = formatDateKey(addDays(startOfWeek(selectedDate), 6));
+    return {
+      dateFrom,
+      dateTo,
+      days: 7,
+    };
+  }
+
+  if (window === "custom") {
+    const dateFrom = formatDateKey(customRange[0]);
+    const dateTo = formatDateKey(customRange[1]);
+    return {
+      dateFrom,
+      dateTo,
+      days: getDaysBetween(dateFrom, dateTo),
+    };
+  }
+
   const today = new Date();
-  const days = window === "today" ? 1 : window === "7-days" ? 7 : 30;
+  const days = 30;
   return {
     dateFrom: formatDateKey(addDays(today, -(days - 1))),
     dateTo: formatDateKey(today),
@@ -391,81 +498,42 @@ function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
   );
 }
 
-function ShiftCard({ shift, bookedCount }: { shift: DoctorShiftItem; bookedCount: number }) {
-  const fillPercent =
-    shift.maxAppointments === 0
-      ? 0
-      : Math.min(100, Math.round((bookedCount / shift.maxAppointments) * 100));
-  const isAvailable = shift.status === "available" || shift.status === "full";
-  const doctorName = shift.doctorName;
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 gap-3">
-          <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-              isAvailable ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"
-            }`}
-          >
-            {isAvailable ? <Stethoscope className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-          </span>
-
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Text strong className="truncate text-slate-950">
-                {doctorName ? `${shift.doctorTitle ? `${shift.doctorTitle} ` : ""}${doctorName}` : "Chưa phân công bác sĩ"}
-              </Text>
-              <Tag color={shift.status === "full" ? "orange" : isAvailable ? "green" : "default"}>
-                {shift.status === "full"
-                  ? "Đã đầy"
-                  : shift.status === "available"
-                    ? "Sẵn sàng"
-                    : shift.status === "off"
-                      ? "Nghỉ"
-                      : "Đã hủy"}
-              </Tag>
-            </div>
-            <Text type="secondary" className="mt-0.5 block truncate text-xs">
-              {shift.doctorSpecialty || "Chuyên môn"} · {shift.roomName || "Chưa có phòng"}
-            </Text>
-            <Text type="secondary" className="mt-0.5 block truncate text-xs">
-              {shift.facilityName || shift.facilityCode || "Cơ sở"} · {shift.startTime} - {shift.endTime}
-            </Text>
-          </div>
-        </div>
-
-        <Text strong className="shrink-0 text-xs text-slate-700">
-          {bookedCount}/{shift.maxAppointments}
-        </Text>
-      </div>
-
-      <Progress
-        percent={fillPercent}
-        size="small"
-        showInfo={false}
-        status={fillPercent >= 100 ? "exception" : "normal"}
-        className="!mb-0 !mt-3"
-      />
-    </div>
-  );
-}
-
 export default function ManagementDashboardPage() {
   const { message } = App.useApp();
   const roles = useAuthStore((state) => state.roles);
   const currentUser = useAuthStore((state) => state.user);
   const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
   const dashboardRole = getDashboardRole(roles);
-  const [windowValue, setWindowValue] = useState<DashboardWindow>("7-days");
+  const roleConfig = roleDashboardConfig[dashboardRole];
+  const [windowValue, setWindowValue] = useState<DashboardWindow>("week");
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [customRange, setCustomRange] = useState<[Date, Date]>(() => [
+    addDays(new Date(), -6),
+    new Date(),
+  ]);
   const [appointmentKeyword, setAppointmentKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardState>(emptyState);
   const [lastRefresh, setLastRefresh] = useState<string>("");
 
-  const range = useMemo(() => getWindowRange(windowValue), [windowValue]);
-  const canViewSystemStats = dashboardRole === "super_admin" || dashboardRole === "admin";
-  const canViewStaffStats = dashboardRole === "super_admin" || dashboardRole === "admin";
+  const range = useMemo(
+    () => getWindowRange(windowValue, selectedDate, customRange),
+    [customRange, selectedDate, windowValue],
+  );
+  const canViewSystemStats = roleConfig.showSystemCards;
+  const canViewStaffStats = roleConfig.showSystemCards;
+
+  const handleSelectedDateChange = (value: Dayjs | null) => {
+    if (value) {
+      setSelectedDate(value.toDate());
+    }
+  };
+
+  const handleCustomRangeChange = (values: null | [Dayjs | null, Dayjs | null]) => {
+    if (values?.[0] && values[1]) {
+      setCustomRange([values[0].toDate(), values[1].toDate()]);
+    }
+  };
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -624,27 +692,6 @@ export default function ManagementDashboardPage() {
     appointmentSummary.total === 0
       ? 0
       : Math.round((appointmentSummary.completed / appointmentSummary.total) * 100);
-
-  const bookedByShiftId = useMemo(() => {
-    const next = new Map<string, number>();
-
-    data.appointments.forEach((appointment) => {
-      const matchedShift = data.shifts.find(
-        (shift) =>
-          shift.doctorId === appointment.doctorId &&
-          shift.facilityId === appointment.facilityId &&
-          shift.shiftDate === appointment.date &&
-          appointment.startTime >= shift.startTime &&
-          appointment.startTime < shift.endTime,
-      );
-
-      if (matchedShift) {
-        next.set(matchedShift.id, (next.get(matchedShift.id) ?? 0) + 1);
-      }
-    });
-
-    return next;
-  }, [data.appointments, data.shifts]);
 
   const totalBooked = data.appointments.filter(
     (appointment) => !["cancelled", "no_show"].includes(appointment.status),
@@ -810,39 +857,91 @@ export default function ManagementDashboardPage() {
     }));
   }, [data.appointments, data.shifts]);
 
-  const appointmentColumns: ColumnsType<ManagementAppointment> = [
-    {
-      title: "Lịch khám",
-      key: "appointment",
-      render: (_, appointment) => (
-        <div>
-          <Text strong>{appointment.patientName || "Chưa có tên"}</Text>
-          <Text type="secondary" className="block text-xs">
-            {appointment.date} · {appointment.startTime} - {appointment.endTime}
-          </Text>
-        </div>
-      ),
-    },
-    {
-      title: "Dịch vụ",
-      dataIndex: "serviceName",
-      key: "serviceName",
-      render: (value: string | undefined) => value || "-",
-    },
-    {
-      title: "Bác sĩ",
-      key: "doctor",
-      render: (_, appointment) => appointment.doctorName || "-",
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      key: "status",
-      render: (status: ManagementAppointmentStatus) => (
-        <Tag color={statusColors[status]}>{statusLabels[status]}</Tag>
-      ),
-    },
-  ];
+  const roleStatCards = useMemo(
+    () => [
+      {
+        title: roleConfig.primaryMetric,
+        value: appointmentSummary.total,
+        icon: <CalendarCheck className="h-5 w-5" />,
+        trend: `${completionRate}% hoàn thành`,
+        trendDirection: completionRate >= 60 ? "up" as const : "down" as const,
+        helper: `${range.days} ngày được chọn`,
+        tone: "blue" as const,
+      },
+      {
+        title: roleConfig.secondaryMetric,
+        value: data.profiles.length,
+        icon: <Baby className="h-5 w-5" />,
+        trend: highRiskProfiles > 0 ? `${highRiskProfiles} nguy cơ cao` : "Ổn định",
+        trendDirection: highRiskProfiles > 0 ? "down" as const : "up" as const,
+        helper: roleConfig.scopeLabel,
+        tone: "violet" as const,
+      },
+      {
+        title: roleConfig.shiftMetric,
+        value: dashboardRole === "doctor" ? visibleShifts.length : activeDoctors,
+        suffix: dashboardRole === "doctor" ? undefined : `/ ${visibleShifts.length}`,
+        icon: <UserRoundCheck className="h-5 w-5" />,
+        trend: vacantShifts > 0 ? `${vacantShifts} ca trống` : "Đủ nhân sự",
+        trendDirection: vacantShifts > 0 ? "down" as const : "up" as const,
+        helper: `${shiftSummary.capacity} suất khám khả dụng`,
+        tone: "emerald" as const,
+      },
+    ],
+    [
+      activeDoctors,
+      appointmentSummary.total,
+      completionRate,
+      dashboardRole,
+      data.profiles.length,
+      highRiskProfiles,
+      range.days,
+      roleConfig,
+      shiftSummary.capacity,
+      vacantShifts,
+      visibleShifts.length,
+    ],
+  );
+
+  const appointmentColumns = useMemo<ColumnsType<ManagementAppointment>>(
+    () =>
+      [
+        {
+          title: "Lịch khám",
+          key: "appointment",
+          render: (_: unknown, appointment: ManagementAppointment) => (
+            <div>
+              <Text strong>{appointment.patientName || "Chưa có tên"}</Text>
+              <Text type="secondary" className="block text-xs">
+                {appointment.date} · {appointment.startTime} - {appointment.endTime}
+              </Text>
+            </div>
+          ),
+        },
+        {
+          title: "Dịch vụ",
+          dataIndex: "serviceName",
+          key: "serviceName",
+          render: (value: string | undefined) => value || "-",
+        },
+        roleConfig.showDoctorColumn
+          ? {
+              title: "Bác sĩ",
+              key: "doctor",
+              render: (_: unknown, appointment: ManagementAppointment) => appointment.doctorName || "-",
+            }
+          : null,
+        {
+          title: "Trạng thái",
+          dataIndex: "status",
+          key: "status",
+          render: (status: ManagementAppointmentStatus) => (
+            <Tag color={statusColors[status]}>{statusLabels[status]}</Tag>
+          ),
+        },
+      ].filter(Boolean) as ColumnsType<ManagementAppointment>,
+    [roleConfig.showDoctorColumn],
+  );
 
   return (
     <AdminLayout>
@@ -852,40 +951,74 @@ export default function ManagementDashboardPage() {
       />
 
       <div className="mt-6 flex flex-col gap-5">
-        <Card className="border-slate-200 bg-white">
-          <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
-            <div>
-              <Tag color="blue" className="mb-2">
-                {roleLabels[dashboardRole]}
-              </Tag>
-              <Title level={4} className="!mb-1 !text-slate-950">
+        <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start">
+            <div className="min-w-0">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Tag color="blue" className="!m-0 !rounded-md !px-3 !py-1 text-sm">
+                  {roleConfig.label}
+                </Tag>
+                <Tag className="!m-0 !rounded-md !px-3 !py-1 text-sm">
+                  {roleConfig.scopeLabel}
+                </Tag>
+              </div>
+              <Title level={3} className="!mb-2 !text-slate-950">
                 Xin chào, {currentUser?.name ?? "tài khoản quản lý"}
               </Title>
-              <Text type="secondary">{roleDescriptions[dashboardRole]}</Text>
+              <Text type="secondary" className="text-base">
+                {roleConfig.description}
+              </Text>
             </div>
 
-            <Space wrap>
-              <Select<DashboardWindow>
+            <div className="flex flex-col gap-3 xl:items-end">
+              <Segmented<DashboardWindow>
                 value={windowValue}
-                className="w-[170px]"
                 options={periodOptions}
                 onChange={setWindowValue}
               />
-              <Tooltip title={lastRefresh ? `Cập nhật lần cuối lúc ${lastRefresh}` : "Chưa tải dữ liệu"}>
-                <Button
-                  icon={<RefreshCw className="h-4 w-4" />}
-                  loading={loading}
-                  onClick={() => void loadDashboard()}
-                >
-                  Làm mới
-                </Button>
-              </Tooltip>
-            </Space>
+
+              <Space wrap className="justify-start xl:justify-end">
+                {windowValue === "custom" ? (
+                  <RangePicker
+                    allowClear={false}
+                    value={[dayjs(customRange[0]), dayjs(customRange[1])]}
+                    format="DD/MM/YYYY"
+                    onChange={handleCustomRangeChange}
+                  />
+                ) : windowValue === "30-days" ? null : (
+                  <DatePicker
+                    allowClear={false}
+                    value={dayjs(selectedDate)}
+                    format="DD/MM/YYYY"
+                    picker="date"
+                    placeholder={windowValue === "week" ? "Chọn ngày trong tuần" : "Chọn ngày"}
+                    onChange={handleSelectedDateChange}
+                  />
+                )}
+                <Tooltip title={lastRefresh ? `Cập nhật lần cuối lúc ${lastRefresh}` : "Chưa tải dữ liệu"}>
+                  <Button
+                    icon={<RefreshCw className="h-4 w-4" />}
+                    loading={loading}
+                    onClick={() => void loadDashboard()}
+                  >
+                    Làm mới
+                  </Button>
+                </Tooltip>
+              </Space>
+            </div>
           </div>
-          <Text type="secondary" className="mt-3 block text-xs">
-            Khoảng dữ liệu: {range.dateFrom} đến {range.dateTo}
-            {lastRefresh ? ` · Cập nhật lúc ${lastRefresh}` : ""}
-          </Text>
+
+          <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-500">
+            <span className="rounded-md bg-slate-50 px-3 py-2">
+              Khoảng dữ liệu: <span className="font-medium text-slate-700">{range.dateFrom}</span> đến{" "}
+              <span className="font-medium text-slate-700">{range.dateTo}</span>
+            </span>
+            {lastRefresh ? (
+              <span className="rounded-md bg-slate-50 px-3 py-2">
+                Cập nhật lúc <span className="font-medium text-slate-700">{lastRefresh}</span>
+              </span>
+            ) : null}
+          </div>
         </Card>
 
         {data.errors.length > 0 ? (
@@ -902,34 +1035,9 @@ export default function ManagementDashboardPage() {
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <StatCard
-                title="Lịch hẹn trong kỳ"
-                value={appointmentSummary.total}
-                icon={<CalendarCheck className="h-5 w-5" />}
-                trend={`${completionRate}% hoàn thành`}
-                trendDirection={completionRate >= 60 ? "up" : "down"}
-                helper={`${range.days} ngày được chọn`}
-                tone="blue"
-              />
-              <StatCard
-                title="Thai phụ đang theo dõi"
-                value={data.profiles.length}
-                icon={<Baby className="h-5 w-5" />}
-                trend={highRiskProfiles > 0 ? `${highRiskProfiles} nguy cơ cao` : "Ổn định"}
-                trendDirection={highRiskProfiles > 0 ? "down" : "up"}
-                helper={canViewSystemStats ? "trên phạm vi được phép" : "theo dữ liệu hồ sơ"}
-                tone="violet"
-              />
-              <StatCard
-                title="Bác sĩ đang trực"
-                value={activeDoctors}
-                suffix={`/ ${visibleShifts.length}`}
-                icon={<UserRoundCheck className="h-5 w-5" />}
-                trend={vacantShifts > 0 ? `${vacantShifts} ca trống` : "Đủ nhân sự"}
-                trendDirection={vacantShifts > 0 ? "down" : "up"}
-                helper={`${shiftSummary.capacity} suất khám khả dụng`}
-                tone="emerald"
-              />
+              {roleStatCards.map((stat) => (
+                <StatCard key={stat.title} {...stat} />
+              ))}
             </div>
 
             <Card
@@ -1121,31 +1229,6 @@ export default function ManagementDashboardPage() {
               title={
                 <div>
                   <p className="mb-0 text-base font-semibold text-slate-950">
-                    Ca trực
-                  </p>
-                  <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                    Theo dõi bác sĩ, phòng khám và công suất từng ca.
-                  </p>
-                </div>
-              }
-              extra={<Badge count={vacantShifts} showZero color={vacantShifts > 0 ? "#f59e0b" : "#10b981"} />}
-            >
-              {visibleShifts.length > 0 ? (
-                <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-                  {visibleShifts.map((shift) => (
-                    <ShiftCard key={shift.id} shift={shift} bookedCount={bookedByShiftId.get(shift.id) ?? 0} />
-                  ))}
-                </div>
-              ) : (
-                <Empty description="Không có ca trực trong khoảng ngày này." />
-              )}
-            </Card>
-
-            <Card
-              className="border-slate-200 bg-white"
-              title={
-                <div>
-                  <p className="mb-0 text-base font-semibold text-slate-950">
                     Công việc cần xử lý
                   </p>
                   <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
@@ -1190,97 +1273,101 @@ export default function ManagementDashboardPage() {
               )}
             </Card>
 
-            <Card
-              className="border-slate-200 bg-white"
-              title={
-                <div>
-                  <p className="mb-0 text-base font-semibold text-slate-950">
-                    Hiệu suất cơ sở
-                  </p>
-                  <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                    Mức sử dụng lịch khám, phòng và nhân sự theo dữ liệu đã tải.
-                  </p>
-                </div>
-              }
-            >
-              {facilityUtilization.length > 0 ? (
-                <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                  {facilityUtilization.map((item) => {
-                    const appointmentPercent =
-                      item.maxAppointments === 0
-                        ? 0
-                        : Math.min(100, Math.round((item.appointments / item.maxAppointments) * 100));
-                    const roomPercent =
-                      item.totalRooms === 0 ? 0 : Math.min(100, Math.round((item.roomsInUse / item.totalRooms) * 100));
-
-                    return (
-                      <div key={item.facilityId} className="rounded-xl border border-slate-200 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex min-w-0 gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                              <Building2 className="h-4 w-4" />
-                            </span>
-                            <div className="min-w-0">
-                              <Text strong className="block truncate text-slate-950">
-                                {item.facilityName}
-                              </Text>
-                              <Text type="secondary" className="block text-xs">
-                                {item.facilityCode} · {item.activeDoctors} bác sĩ đang trực
-                              </Text>
-                            </div>
-                          </div>
-                          <Tag color="green">Đang hoạt động</Tag>
-                        </div>
-
-                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                          <div>
-                            <div className="mb-1.5 flex items-center justify-between text-xs">
-                              <Text type="secondary">Công suất lịch</Text>
-                              <Text strong>
-                                {item.appointments}/{item.maxAppointments}
-                              </Text>
-                            </div>
-                            <Progress percent={appointmentPercent} showInfo={false} size="small" />
-                          </div>
-                          <div>
-                            <div className="mb-1.5 flex items-center justify-between text-xs">
-                              <Text type="secondary">Phòng đang sử dụng</Text>
-                              <Text strong>
-                                {item.roomsInUse}/{item.totalRooms}
-                              </Text>
-                            </div>
-                            <Progress percent={roomPercent} showInfo={false} size="small" status="success" />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <Empty description="Không có dữ liệu cơ sở phù hợp." />
-              )}
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl bg-slate-50 p-4 text-center">
-                  <Users className="mx-auto h-5 w-5 text-slate-500" />
-                  <div className="mt-2 text-xl font-bold text-slate-950">
-                    {canViewStaffStats ? data.staffsTotal : activeDoctors}
+            {roleConfig.showFacilityUtilization ? (
+              <Card
+                className="border-slate-200 bg-white"
+                title={
+                  <div>
+                    <p className="mb-0 text-base font-semibold text-slate-950">
+                      Hiệu suất cơ sở
+                    </p>
+                    <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
+                      Mức sử dụng lịch khám, phòng và nhân sự theo dữ liệu đã tải.
+                    </p>
                   </div>
-                  <Text type="secondary" className="text-xs">
-                    Nhân sự hoạt động
-                  </Text>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-4 text-center">
-                  <HeartPulse className="mx-auto h-5 w-5 text-slate-500" />
-                  <div className="mt-2 text-xl font-bold text-slate-950">
-                    {completionRate}%
+                }
+              >
+                {facilityUtilization.length > 0 ? (
+                  <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                    {facilityUtilization.map((item) => {
+                      const appointmentPercent =
+                        item.maxAppointments === 0
+                          ? 0
+                          : Math.min(100, Math.round((item.appointments / item.maxAppointments) * 100));
+                      const roomPercent =
+                        item.totalRooms === 0
+                          ? 0
+                          : Math.min(100, Math.round((item.roomsInUse / item.totalRooms) * 100));
+
+                      return (
+                        <div key={item.facilityId} className="rounded-xl border border-slate-200 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 gap-3">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                                <Building2 className="h-4 w-4" />
+                              </span>
+                              <div className="min-w-0">
+                                <Text strong className="block truncate text-slate-950">
+                                  {item.facilityName}
+                                </Text>
+                                <Text type="secondary" className="block text-xs">
+                                  {item.facilityCode} · {item.activeDoctors} bác sĩ đang trực
+                                </Text>
+                              </div>
+                            </div>
+                            <Tag color="green">Đang hoạt động</Tag>
+                          </div>
+
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <div className="mb-1.5 flex items-center justify-between text-xs">
+                                <Text type="secondary">Công suất lịch</Text>
+                                <Text strong>
+                                  {item.appointments}/{item.maxAppointments}
+                                </Text>
+                              </div>
+                              <Progress percent={appointmentPercent} showInfo={false} size="small" />
+                            </div>
+                            <div>
+                              <div className="mb-1.5 flex items-center justify-between text-xs">
+                                <Text type="secondary">Phòng đang sử dụng</Text>
+                                <Text strong>
+                                  {item.roomsInUse}/{item.totalRooms}
+                                </Text>
+                              </div>
+                              <Progress percent={roomPercent} showInfo={false} size="small" status="success" />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <Text type="secondary" className="text-xs">
-                    Lịch khám hoàn thành
-                  </Text>
+                ) : (
+                  <Empty description="Không có dữ liệu cơ sở phù hợp." />
+                )}
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-4 text-center">
+                    <Users className="mx-auto h-5 w-5 text-slate-500" />
+                    <div className="mt-2 text-xl font-bold text-slate-950">
+                      {canViewStaffStats ? data.staffsTotal : activeDoctors}
+                    </div>
+                    <Text type="secondary" className="text-xs">
+                      Nhân sự hoạt động
+                    </Text>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4 text-center">
+                    <HeartPulse className="mx-auto h-5 w-5 text-slate-500" />
+                    <div className="mt-2 text-xl font-bold text-slate-950">
+                      {completionRate}%
+                    </div>
+                    <Text type="secondary" className="text-xs">
+                      Lịch khám hoàn thành
+                    </Text>
+                  </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Card className="border-slate-200 bg-white">

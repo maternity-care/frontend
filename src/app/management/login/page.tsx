@@ -52,6 +52,7 @@ function LoginForm() {
       });
       setSession(session, Boolean(values.rememberMe));
       router.replace(searchParams.get("next") ?? "/management/dashboard");
+      router.refresh();
     } catch (error) {
       setFormError(
         error instanceof Error ? error.message : "Đăng nhập thất bại",
