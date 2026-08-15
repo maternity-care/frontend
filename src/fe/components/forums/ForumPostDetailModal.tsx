@@ -52,23 +52,25 @@ const { TextArea } = Input;
 function ForumCommentItem({
   comment,
   nested = false,
-  canModerateContent,
+  readOnly = false,
+  canModerateContent = false,
   onModerateComment,
   onReplyComment,
   onReportComment,
 }: {
   comment: ForumComment;
   nested?: boolean;
-  canModerateContent: boolean;
-  onModerateComment: (
+  readOnly?: boolean;
+  canModerateContent?: boolean;
+  onModerateComment?: (
     comment: ForumComment,
     action: ForumCommentModerationAction,
   ) => void;
-  onReplyComment: (
+  onReplyComment?: (
     comment: ForumComment,
     content: string,
   ) => Promise<boolean>;
-  onReportComment: (
+  onReportComment?: (
     comment: ForumComment,
   ) => void;
 }) {
@@ -93,14 +95,20 @@ function ForumCommentItem({
   ] = useState(false);
 
   const canModerate =
+    !readOnly &&
     canModerateContent &&
+    Boolean(onModerateComment) &&
     comment.status !== "deleted";
 
   async function submitReply() {
     const content =
       replyContent.trim();
 
-    if (!content) {
+    if (
+      !content ||
+      !onReplyComment ||
+      readOnly
+    ) {
       return;
     }
 
@@ -177,38 +185,43 @@ function ForumCommentItem({
         </div>
 
         {comment.status !==
-        "deleted" ? (
+          "deleted" &&
+        !readOnly ? (
           <Space wrap>
-            <Button
-              type="primary"
-              size="small"
-              icon={
-                <Reply className="h-4 w-4" />
-              }
-              onClick={() => {
-                setReplyOpen(
-                  (current) =>
-                    !current,
-                );
-                setReplyContent("");
-              }}
-            >
-              Trả lời
-            </Button>
+            {onReplyComment ? (
+              <Button
+                type="primary"
+                size="small"
+                icon={
+                  <Reply className="h-4 w-4" />
+                }
+                onClick={() => {
+                  setReplyOpen(
+                    (current) =>
+                      !current,
+                  );
+                  setReplyContent("");
+                }}
+              >
+                Trả lời
+              </Button>
+            ) : null}
 
-            <Button
-              size="small"
-              icon={
-                <Flag className="h-4 w-4" />
-              }
-              onClick={() =>
-                onReportComment(
-                  comment,
-                )
-              }
-            >
-              Báo cáo
-            </Button>
+            {onReportComment ? (
+              <Button
+                size="small"
+                icon={
+                  <Flag className="h-4 w-4" />
+                }
+                onClick={() =>
+                  onReportComment(
+                    comment,
+                  )
+                }
+              >
+                Báo cáo
+              </Button>
+            ) : null}
 
             {canModerate &&
             comment.status !==
@@ -217,7 +230,7 @@ function ForumCommentItem({
                 size="small"
                 type="primary"
                 onClick={() =>
-                  onModerateComment(
+                  onModerateComment?.(
                     comment,
                     "approve",
                   )
@@ -229,7 +242,7 @@ function ForumCommentItem({
               <Button
                 size="small"
                 onClick={() =>
-                  onModerateComment(
+                  onModerateComment?.(
                     comment,
                     "hide",
                   )
@@ -244,7 +257,7 @@ function ForumCommentItem({
                 size="small"
                 danger
                 onClick={() =>
-                  onModerateComment(
+                  onModerateComment?.(
                     comment,
                     "delete",
                   )
@@ -262,7 +275,8 @@ function ForumCommentItem({
           "Bình luận không có nội dung."}
       </Paragraph>
 
-      {replyOpen ? (
+      {replyOpen &&
+      !readOnly ? (
         <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3">
           <Text
             type="secondary"
@@ -370,6 +384,9 @@ function ForumCommentItem({
                 key={reply.id}
                 comment={reply}
                 nested
+                readOnly={
+                  readOnly
+                }
                 canModerateContent={
                   canModerateContent
                 }
@@ -394,7 +411,8 @@ function ForumCommentItem({
 export function ForumPostDetailModal({
   post,
   loading,
-  canModerateContent,
+  readOnly = false,
+  canModerateContent = false,
   onClose,
   onModeratePost,
   onModerateComment,
@@ -404,24 +422,25 @@ export function ForumPostDetailModal({
 }: {
   post: ForumPost | null;
   loading: boolean;
-  canModerateContent: boolean;
+  readOnly?: boolean;
+  canModerateContent?: boolean;
   onClose: () => void;
-  onModeratePost: (
+  onModeratePost?: (
     post: ForumPost,
     action: ForumPostModerationAction,
   ) => void;
-  onModerateComment: (
+  onModerateComment?: (
     comment: ForumComment,
     action: ForumCommentModerationAction,
   ) => void;
-  onReplyComment: (
+  onReplyComment?: (
     comment: ForumComment,
     content: string,
   ) => Promise<boolean>;
-  onReportPost: (
+  onReportPost?: (
     post: ForumPost,
   ) => void;
-  onReportComment: (
+  onReportComment?: (
     comment: ForumComment,
   ) => void;
 }) {
@@ -564,19 +583,26 @@ export function ForumPostDetailModal({
               </Text>
             </div>
 
-            <Space wrap>
-              <Button
-                icon={
-                  <Flag className="h-4 w-4" />
-                }
-                onClick={() =>
-                  onReportPost(post)
-                }
-              >
-                Báo cáo
-              </Button>
+            {!readOnly &&
+            (onReportPost ||
+              (canModerateContent &&
+                onModeratePost)) ? (
+              <Space wrap>
+                {onReportPost ? (
+                  <Button
+                    icon={
+                      <Flag className="h-4 w-4" />
+                    }
+                    onClick={() =>
+                      onReportPost(post)
+                    }
+                  >
+                    Báo cáo
+                  </Button>
+                ) : null}
 
-              {canModerateContent ? (
+              {canModerateContent &&
+              onModeratePost ? (
                 <>
                   {post.status !==
                   "published" ? (
@@ -586,7 +612,7 @@ export function ForumPostDetailModal({
                         <CheckCircle2 className="h-4 w-4" />
                       }
                       onClick={() =>
-                        onModeratePost(
+                        onModeratePost?.(
                           post,
                           "approve",
                         )
@@ -600,7 +626,7 @@ export function ForumPostDetailModal({
                         <EyeOff className="h-4 w-4" />
                       }
                       onClick={() =>
-                        onModeratePost(
+                        onModeratePost?.(
                           post,
                           "hide",
                         )
@@ -615,7 +641,7 @@ export function ForumPostDetailModal({
                       <Lock className="h-4 w-4" />
                     }
                     onClick={() =>
-                      onModeratePost(
+                      onModeratePost?.(
                         post,
                         "lock",
                       )
@@ -629,7 +655,7 @@ export function ForumPostDetailModal({
                       <Pin className="h-4 w-4" />
                     }
                     onClick={() =>
-                      onModeratePost(
+                      onModeratePost?.(
                         post,
                         "pin",
                       )
@@ -639,7 +665,8 @@ export function ForumPostDetailModal({
                   </Button>
                 </>
               ) : null}
-            </Space>
+              </Space>
+            ) : null}
           </div>
 
           {post.medicalDisclaimer ||
@@ -771,6 +798,9 @@ export function ForumPostDetailModal({
                     <ForumCommentItem
                       key={comment.id}
                       comment={comment}
+                      readOnly={
+                        readOnly
+                      }
                       canModerateContent={
                         canModerateContent
                       }
