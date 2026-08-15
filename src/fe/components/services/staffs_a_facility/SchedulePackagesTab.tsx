@@ -26,8 +26,6 @@ import type {
 } from "@/management/features/services/maternity-packages/maternity-packages.types";
 import { useStaffFacilityId } from "@/hooks/useStaffFacilityId";
 import { SchedulePackageFormModal } from "./SchedulePackageFormModal";
-import { ManagementFacilityService } from "@/management/features/services/facility-services/facility-services.types";
-import { getManagementFacilityServices } from "@/management/features/services/facility-services/facility-services.api";
 import {
   TableFilter,
   TableFilterColumn,
@@ -63,9 +61,6 @@ export function SchedulePackagesTab() {
   const [messageApi, contextHolder] = message.useMessage();
 
   const [items, setItems] = useState<MaternityPackage[]>([]);
-  const [facilityServices, setFacilityServices] = useState<
-    ManagementFacilityService[]
-  >([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -82,20 +77,6 @@ export function SchedulePackagesTab() {
   const [formOpen, setFormOpen] = useState(false);
   const [selected, setSelected] = useState<MaternityPackage | null>(null);
 
-  const loadFacilityServices = useCallback(async (fid: string) => {
-    try {
-      const result = await getManagementFacilityServices({
-        facilityId: fid,
-        status: "active",
-        page: 1,
-        limit: 100,
-      });
-      setFacilityServices(result.items);
-    } catch {
-      setFacilityServices([]);
-    }
-  }, []);
-
   const loadPackages = useCallback(async () => {
     if (!facilityId) return;
 
@@ -103,22 +84,15 @@ export function SchedulePackagesTab() {
     try {
       const result = await getManagementMaternityPackages({
         facilityId,
+        packageType: "schedule",
         search: search || undefined,
         status: filterValues.status as MaternityPackageStatus | undefined,
         page,
         limit: pageSize,
       });
 
-      const scheduleItems = result.items.filter(
-        (item) => item.packageType === "schedule",
-      );
-
-      setItems(scheduleItems);
-      setTotal(
-        result.items.every((item) => item.packageType === "schedule")
-          ? result.total
-          : scheduleItems.length,
-      );
+      setItems(result.items);
+      setTotal(result.total);
     } catch {
       setItems([]);
       setTotal(0);
@@ -127,13 +101,6 @@ export function SchedulePackagesTab() {
       setLoading(false);
     }
   }, [facilityId, messageApi, page, pageSize, search, filterValues]);
-
-  useEffect(() => {
-    if (!facilityId) return;
-    queueMicrotask(() => {
-      void loadFacilityServices(facilityId);
-    });
-  }, [facilityId, loadFacilityServices]);
 
   useEffect(() => {
     if (!facilityId) return;
@@ -167,12 +134,10 @@ export function SchedulePackagesTab() {
     [],
   );
 
-  const handleFilterChange = (
-    nextValues: TableFilterValues,
-    nextSearch?: string,
-  ) => {
+  const handleFilterChange = (nextValues: TableFilterValues) => {
     setFilterValues(nextValues);
-    setSearch(nextSearch || undefined);
+    const rawSearch = nextValues.search;
+    setSearch(typeof rawSearch === "string" ? rawSearch.trim() || undefined : undefined);
     setPage(1);
   };
 
@@ -228,12 +193,6 @@ export function SchedulePackagesTab() {
       width: 100,
       align: "center",
       render: (_, record) => record.stages?.length ?? "—",
-    },
-    {
-      title: "Ưu tiên",
-      dataIndex: "priorityLevel",
-      width: 100,
-      align: "center",
     },
     {
       title: "Trạng thái",
@@ -390,7 +349,6 @@ export function SchedulePackagesTab() {
           open={formOpen}
           facilityId={facilityId}
           packageItem={selected}
-          facilityServices={facilityServices}
           onCancel={() => {
             setFormOpen(false);
             setSelected(null);

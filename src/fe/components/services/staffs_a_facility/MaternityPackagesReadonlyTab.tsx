@@ -69,7 +69,6 @@ export function MaternityPackagesReadonlyTab() {
   const [items, setItems] = useState<MaternityPackage[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingFacilities, setLoadingFacilities] = useState(false);
 
   const [filterValues, setFilterValues] = useState<TableFilterValues>({
     search: undefined,
@@ -92,15 +91,12 @@ export function MaternityPackagesReadonlyTab() {
   );
 
   const loadFacilities = useCallback(async () => {
-    setLoadingFacilities(true);
     try {
       const list = await getFacilities({ status: "active" });
       setFacilities(list);
     } catch {
       setFacilities([]);
       messageApi.error("Không thể tải danh sách cơ sở.");
-    } finally {
-      setLoadingFacilities(false);
     }
   }, [messageApi]);
 
@@ -111,28 +107,14 @@ export function MaternityPackagesReadonlyTab() {
         search: search || undefined,
         status: filterValues.status as MaternityPackageStatus | undefined,
         facilityId: filterValues.facilityId as string | undefined,
+        packageType: filterValues.packageType as
+          | MaternityPackageType
+          | undefined,
         page,
         limit: pageSize,
       });
-
-      const packageType = filterValues.packageType as
-        | MaternityPackageType
-        | undefined;
-
-      let filtered = result.items;
-
-      if (packageType) {
-        filtered = result.items.filter(
-          (item) => item.packageType === packageType,
-        );
-      }
-
-      setItems(filtered);
-      setTotal(
-        packageType
-          ? filtered.length
-          : Number(result.total ?? result.items.length),
-      );
+      setItems(result.items);
+      setTotal(Number(result.total ?? result.items.length));
     } catch {
       setItems([]);
       setTotal(0);
@@ -199,12 +181,12 @@ export function MaternityPackagesReadonlyTab() {
     [facilities],
   );
 
-  const handleFilterChange = (
-    nextValues: TableFilterValues,
-    nextSearch?: string,
-  ) => {
+  const handleFilterChange = (nextValues: TableFilterValues) => {
     setFilterValues(nextValues);
-    setSearch(nextSearch || undefined);
+    const rawSearch = nextValues.search;
+    setSearch(
+      typeof rawSearch === "string" ? rawSearch.trim() || undefined : undefined,
+    );
     setPage(1);
   };
 
@@ -276,12 +258,6 @@ export function MaternityPackagesReadonlyTab() {
       width: 120,
       align: "center",
       render: (value: number) => (value ? `${value} ngày` : "—"),
-    },
-    {
-      title: "Ưu tiên",
-      dataIndex: "priorityLevel",
-      width: 100,
-      align: "center",
     },
     {
       title: "Trạng thái",

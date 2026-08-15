@@ -160,9 +160,6 @@ export function MaternityPackageDetailModal({
               <Descriptions.Item label="Thời hạn">
                 {detail.durationDays ? `${detail.durationDays} ngày` : "—"}
               </Descriptions.Item>
-              <Descriptions.Item label="Độ ưu tiên">
-                {detail.priorityLevel ?? 0}
-              </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
                 <Tag color={STATUS_COLORS[detail.status]}>
                   {STATUS_LABELS[detail.status]}

@@ -28,8 +28,6 @@ import type {
   PackageServiceItemInput,
   PackageStageInput,
 } from "@/management/features/services/maternity-packages/maternity-packages.types";
-import { getManagementFacilityServices } from "@/management/features/services/facility-services/facility-services.api";
-import { ManagementFacilityService } from "@/management/features/services/facility-services/facility-services.types";
 import { getManagementServices } from "@/management/features/services/services/services.api";
 import { ManagementService } from "@/management/features/services/services/services.types";
 
@@ -60,7 +58,6 @@ interface FormValues {
   description?: string;
   price: number;
   durationDays: number;
-  priorityLevel?: number;
   status: MaternityPackageStatus;
 }
 
@@ -68,7 +65,6 @@ interface SchedulePackageFormModalProps {
   open: boolean;
   facilityId: string;
   packageItem: MaternityPackage | null;
-  facilityServices?: ManagementFacilityService[];
   onCancel: () => void;
   onSuccess: () => void | Promise<void>;
 }
@@ -102,7 +98,6 @@ export function SchedulePackageFormModal({
   open,
   facilityId,
   packageItem,
-  facilityServices: facilityServicesProp,
   onCancel,
   onSuccess,
 }: SchedulePackageFormModalProps) {
@@ -113,14 +108,9 @@ export function SchedulePackageFormModal({
   const [loadingServices, setLoadingServices] = useState(false);
 
   const [services, setServices] = useState<ManagementService[]>([]);
-  const [facilityServices, setFacilityServices] = useState<
-    ManagementFacilityService[]
-  >(facilityServicesProp ?? []);
   const [stages, setStages] = useState<StageRow[]>([createEmptyStageRow()]);
 
   const serviceOptions = useMemo(() => {
-    const activeFs = facilityServices.filter((fs) => fs.status === "active");
-
     return services
       .filter(
         (svc) =>
@@ -128,13 +118,12 @@ export function SchedulePackageFormModal({
           (svc.saleMode === "both" || svc.saleMode === "package_only"),
       )
       .map((svc) => {
-        const fs = activeFs.find((item) => item.serviceId === svc.id);
         return {
           value: svc.id,
           label: `${svc.code} - ${svc.name}`,
         };
       });
-  }, [services, facilityServices]);
+  }, [services]);
 
   useEffect(() => {
     if (!open || !facilityId) return;
@@ -142,27 +131,14 @@ export function SchedulePackageFormModal({
     const load = async () => {
       setLoadingServices(true);
       try {
-        const [servicesResult, fsResult] = await Promise.all([
-          getManagementServices({
-            status: "active",
-            page: 1,
-            limit: 100,
-          }),
-          facilityServicesProp && facilityServicesProp.length > 0
-            ? Promise.resolve({ items: facilityServicesProp })
-            : getManagementFacilityServices({
-                facilityId,
-                status: "active",
-                page: 1,
-                limit: 100,
-              }),
-        ]);
-
+        const servicesResult = await getManagementServices({
+          status: "active",
+          page: 1,
+          limit: 200,
+        });
         setServices(servicesResult.items);
-        setFacilityServices(fsResult.items);
       } catch {
         setServices([]);
-        setFacilityServices([]);
         messageApi.error("Không thể tải danh sách dịch vụ.");
       } finally {
         setLoadingServices(false);
@@ -170,7 +146,7 @@ export function SchedulePackageFormModal({
     };
 
     void load();
-  }, [open, facilityId, facilityServicesProp, messageApi]);
+  }, [open, facilityId, messageApi]);
 
   useEffect(() => {
     if (!open) return;
@@ -181,7 +157,6 @@ export function SchedulePackageFormModal({
         form.setFieldsValue({
           status: "draft",
           durationDays: 280,
-          priorityLevel: 0,
         });
         setStages([createEmptyStageRow()]);
         return;
@@ -196,7 +171,6 @@ export function SchedulePackageFormModal({
           description: detail.description ?? undefined,
           price: Number(detail.price),
           durationDays: detail.durationDays,
-          priorityLevel: detail.priorityLevel ?? 0,
           status: detail.status,
         });
 
@@ -222,7 +196,7 @@ export function SchedulePackageFormModal({
                           facilityServiceId: item.facilityServiceId,
                           includedQuantity: Number(item.includedQuantity) || 1,
                           isRequired: Boolean(item.isRequired),
-                          isOptional: Boolean(item.isOptional),
+                    isOptional: !Boolean(item.isRequired),
                         }))
                       : [createEmptyServiceRow()],
                 };
@@ -381,7 +355,6 @@ export function SchedulePackageFormModal({
         description: values.description?.trim() || undefined,
         price: Number(values.price).toFixed(2),
         durationDays: values.durationDays,
-        priorityLevel: values.priorityLevel ?? 0,
         status: values.status,
         stages: stagesPayload,
       };
@@ -491,14 +464,6 @@ export function SchedulePackageFormModal({
               style={{ minWidth: 160, flex: 1 }}
             >
               <InputNumber min={1} max={1000} style={{ width: "100%" }} />
-            </Form.Item>
-
-            <Form.Item
-              name="priorityLevel"
-              label="Độ ưu tiên hiển thị"
-              style={{ minWidth: 160, flex: 1 }}
-            >
-              <InputNumber min={0} max={999} style={{ width: "100%" }} />
             </Form.Item>
 
             <Form.Item
@@ -653,37 +618,23 @@ export function SchedulePackageFormModal({
                       ),
                     },
                     {
-                      title: "Bắt buộc",
-                      width: 90,
+                      title: "Phân loại",
+                      width: 150,
                       align: "center",
                       render: (_, record) => (
-                        <Switch
-                          checked={record.isRequired}
-                          onChange={(checked) =>
-                            updateStageService(stage.key, record.key, {
-                              isRequired: checked,
-                              isOptional: checked ? false : record.isOptional,
-                            })
-                          }
-                        />
-                      ),
-                    },
-                    {
-                      title: "Tùy chọn",
-                      width: 90,
-                      align: "center",
-                      render: (_, record) => (
-                        <Switch
-                          checked={record.isOptional}
-                          onChange={(checked) =>
-                            updateStageService(stage.key, record.key, {
-                              isOptional: checked,
-                              isRequired: checked ? false : record.isRequired,
-                            })
-                          }
-                        />
-                      ),
-                    },
+                          <Switch
+                            checked={record.isRequired}
+                            checkedChildren="Bắt buộc"
+                            unCheckedChildren="Tùy chọn"
+                            onChange={(checked) =>
+                              updateStageService(stage.key, record.key, {
+                                isRequired: checked,
+                                isOptional: !checked,
+                              })
+                            }
+                          />
+                        ),
+                      },
                     {
                       title: "",
                       width: 48,
