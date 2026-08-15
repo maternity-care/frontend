@@ -16,7 +16,10 @@ import { DoctorEditModal } from "@/fe/components/doctors/DoctorEditModal";
 import { DoctorFilters } from "@/fe/components/doctors/DoctorFilters";
 import { DoctorTable } from "@/fe/components/doctors/DoctorTable";
 import { useDoctorAccess } from "@/hooks/doctors/useDoctorAccess";
-import { useDoctorDisplayLookups } from "@/hooks/doctors/useDoctorLookups";
+import {
+  useDoctorDisplayLookups,
+  useDoctorSpecialties,
+} from "@/hooks/doctors/useDoctorLookups";
 import { useDoctors } from "@/hooks/doctors/useDoctors";
 
 export default function DoctorManagementPage() {
@@ -29,10 +32,20 @@ export default function DoctorManagementPage() {
     scopedFacilityId,
   });
 
-  const { facilityNameById, roomTypeNameById } = useDoctorDisplayLookups({
+  const {
+    facilityNameById,
+    facilityOptions,
+    roomTypeNameById,
+  } = useDoctorDisplayLookups({
     canViewAllFacilities,
     scopedFacilityId,
   });
+
+  const {
+    specialtyOptions,
+    specialtiesLoading,
+    specialtiesError,
+  } = useDoctorSpecialties();
 
   const [detailDoctor, setDetailDoctor] = useState<Doctor | null>(null);
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
@@ -138,11 +151,18 @@ export default function DoctorManagementPage() {
 
         <DoctorFilters
           searchValue={doctorState.searchValue}
+          facilityId={doctorState.facilityFilter}
+          facilityOptions={facilityOptions}
+          showFacilityFilter={canViewAllFacilities}
           specialty={doctorState.specialtyFilter}
+          specialtyOptions={specialtyOptions}
+          specialtyLoading={specialtiesLoading}
+          specialtyError={specialtiesError}
           status={doctorState.statusFilter}
           experienceLevel={doctorState.experienceLevel}
           experienceSort={doctorState.experienceSort}
           onSearchValueChange={doctorState.setSearchValue}
+          onFacilityChange={doctorState.setFacilityFilter}
           onSpecialtyChange={doctorState.setSpecialtyFilter}
           onStatusChange={doctorState.setStatusFilter}
           onExperienceLevelChange={doctorState.setExperienceLevel}
