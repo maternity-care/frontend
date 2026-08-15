@@ -61,10 +61,10 @@ const navItems = [
   // { href: "/management/uploads", label: "Uploads", icon: Upload, roles: ["super_admin"] },
   // { href: "/management/profile", label: "Hồ sơ cá nhân", icon: UserCog },
   { href: "/management/forums", label: "Quản lý diễn đàn", icon: MessageSquare, roles: ["super_admin", "admin", "staff", "doctor"] },
+  { href: "/management/shift-slots", label: "Quản lý khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
   { href: "/management/doctor-shifts", label: "Quản lý ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
   { href: "/management/appointments", label: "Lịch đặt khám", icon: CalendarCheck, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
-  { href: "/management/appointment-disruptions", label: "Lịch bị ảnh hưởng", icon: CalendarX2, roles: ["super_admin", "admin"] },
-  { href: "/management/shift-slots", label: "Quản lý khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
+  // { href: "/management/appointment-disruptions", label: "Lịch bị ảnh hưởng", icon: CalendarX2, roles: ["super_admin", "admin"] },
 ];
 
 export function Sidebar() {
