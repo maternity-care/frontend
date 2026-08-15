@@ -24,6 +24,8 @@ export interface PermissionOverride {
 
 export interface UserProfile {
   id: string;
+  facilityId?: string | null;
+  facility?: Facility | null;
   name: string;
   email: string;
   phone?: string | null;
