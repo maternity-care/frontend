@@ -16,11 +16,24 @@ import type { DoctorFilters as DoctorFilterValue } from "@/hooks/doctors/useDoct
 
 type Props = {
   searchValue: string;
+  facilityId?: string;
+  facilityOptions: Array<{
+    value: string;
+    label: string;
+  }>;
+  showFacilityFilter: boolean;
   specialty: string;
+  specialtyOptions: Array<{
+    value: string;
+    label: string;
+  }>;
+  specialtyLoading: boolean;
+  specialtyError?: string | null;
   status?: DoctorStatus;
   experienceLevel?: DoctorExperienceLevel;
   experienceSort: DoctorExperienceSort;
   onSearchValueChange: (value: string) => void;
+  onFacilityChange: (value?: string) => void;
   onSpecialtyChange: (value: string) => void;
   onStatusChange: (value?: DoctorStatus) => void;
   onExperienceLevelChange: (value?: DoctorExperienceLevel) => void;
@@ -31,11 +44,18 @@ type Props = {
 
 export function DoctorFilters({
   searchValue,
+  facilityId,
+  facilityOptions,
+  showFacilityFilter,
   specialty,
+  specialtyOptions,
+  specialtyLoading,
+  specialtyError,
   status,
   experienceLevel,
   experienceSort,
   onSearchValueChange,
+  onFacilityChange,
   onSpecialtyChange,
   onStatusChange,
   onExperienceLevelChange,
@@ -60,17 +80,47 @@ export function DoctorFilters({
           onPressEnter={() => onApply()}
         />
 
-        <Input
+        {showFacilityFilter ? (
+          <Select<string>
+            allowClear
+            showSearch
+            value={facilityId}
+            options={facilityOptions}
+            optionFilterProp="label"
+            placeholder="Cơ sở"
+            style={{ width: 210, flex: "0 0 210px" }}
+            onChange={(value) => {
+              onFacilityChange(value);
+              onApply({
+                facilityId: value,
+              });
+            }}
+          />
+        ) : null}
+
+        <Select<string>
           allowClear
-          value={specialty}
+          showSearch
+          value={specialty || undefined}
+          options={specialtyOptions}
+          loading={specialtyLoading}
+          optionFilterProp="label"
           placeholder="Chuyên khoa"
-          style={{ width: 160, flex: "0 0 160px" }}
-          onChange={(event) => {
-            const value = event.target.value;
-            onSpecialtyChange(value);
-            if (!value.trim()) onApply({ specialty: undefined });
+          style={{ width: 180, flex: "0 0 180px" }}
+          notFoundContent={
+            specialtyLoading
+              ? "Đang tải chuyên khoa..."
+              : specialtyError
+                ? "Không tải được chuyên khoa"
+                : "Chưa có chuyên khoa"
+          }
+          onChange={(value) => {
+            const nextValue = value ?? "";
+            onSpecialtyChange(nextValue);
+            onApply({
+              specialty: nextValue || undefined,
+            });
           }}
-          onPressEnter={() => onApply()}
         />
 
         <Select

@@ -217,6 +217,24 @@ export async function getDoctors(
   return normalizeListResult(data, params);
 }
 
+export async function getDoctorSpecialties(): Promise<string[]> {
+  const data = await unwrapApiData<string[]>(
+    apiClient.get(`${ENDPOINT}/specialty`),
+  );
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      data
+        .map(normalizeText)
+        .filter(Boolean),
+    ),
+  );
+}
+
 export async function getDoctorsByFacility(facilityId: string): Promise<Doctor[]> {
   const id = facilityId.trim();
   if (!id) return [];
@@ -277,6 +295,7 @@ export async function deleteDoctor(id: string): Promise<DoctorApiResponse<null>>
 
 export const doctorsApi = {
   getDoctors,
+  getDoctorSpecialties,
   getDoctorsByFacility,
   createDoctor,
   getDoctor,
