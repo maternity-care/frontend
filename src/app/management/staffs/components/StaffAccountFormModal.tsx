@@ -20,6 +20,9 @@ import {
   Tabs,
   Tag,
   Typography,
+  Upload,
+  UploadFile,
+  UploadProps,
 } from "antd";
 import {
   Mail,
@@ -28,11 +31,16 @@ import {
   Save,
   ShieldCheck,
   ShieldPlus,
+  UploadIcon,
   UserRound,
   Users,
   X,
 } from "lucide-react";
-import { createStaff, getPermissions, updateStaff } from "@/management/features/staffs/staffs.api";
+import {
+  createStaff,
+  getPermissions,
+  updateStaff,
+} from "@/management/features/staffs/staffs.api";
 import type { Staff as BackendStaff } from "@/management/features/staffs/staffs.types";
 import type {
   Permission,
@@ -42,10 +50,19 @@ import type {
 import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { ApiClientError } from "@/lib/axios";
 import { useAuthStore } from "@/features/auth/auth.store";
+import { createManagementPresignedUpload } from "@/management/features/uploads/uploads.api";
+import { useDoctorSpecialties } from "@/hooks/doctors/useDoctorLookups";
+import { DOCTOR_EXPERIENCE_OPTIONS } from "@/management/features/doctors/doctors.constants";
 
 const { Text, Title } = Typography;
 
-export type UserRole = "pregnant" | "staff" | "doctor" | "nurse" | "owner" | "admin";
+export type UserRole =
+  | "pregnant"
+  | "staff"
+  | "doctor"
+  | "nurse"
+  | "owner"
+  | "admin";
 export type UserStatus = "active" | "locked";
 export type AccountType = "customer" | "internal" | "system";
 
@@ -128,7 +145,9 @@ function normalizeSingleFacilityAssignment(
     ? [
         {
           facilityId: String(firstAssignment.facilityId ?? ""),
-          roles: firstAssignment.roles?.length ? firstAssignment.roles : ["staff"],
+          roles: firstAssignment.roles?.length
+            ? firstAssignment.roles
+            : ["staff"],
         },
       ]
     : initialValues.facilityAssignments;
@@ -260,16 +279,26 @@ type StaffListUser = BackendStaff & {
 function getStaffProfile(user: StaffListUser): BackendStaff["staffProfile"] {
   if (user.staffProfile) return user.staffProfile;
 
-  const facilityId = user.facilityId === null || user.facilityId === undefined
-    ? ""
-    : String(user.facilityId);
+  const facilityId =
+    user.facilityId === null || user.facilityId === undefined
+      ? ""
+      : String(user.facilityId);
   const roles = (user.roles ?? [])
     .map((role) => role.name)
-    .filter((role): role is StaffPosition =>
-      role === "admin" || role === "doctor" || role === "nurse" || role === "staff",
+    .filter(
+      (role): role is StaffPosition =>
+        role === "admin" ||
+        role === "doctor" ||
+        role === "nurse" ||
+        role === "staff",
     );
 
-  if (!facilityId && !user.personalEmail && !user.employeeCode && roles.length === 0) {
+  if (
+    !facilityId &&
+    !user.personalEmail &&
+    !user.employeeCode &&
+    roles.length === 0
+  ) {
     return null;
   }
 
@@ -289,7 +318,8 @@ function getStaffProfile(user: StaffListUser): BackendStaff["staffProfile"] {
 function normalizeStaff(user: BackendStaff): StaffAccount {
   const firstRole = user.roles?.[0];
   const staffProfile = getStaffProfile(user);
-  const roleName = staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
+  const roleName =
+    staffProfile?.facilityAssignments?.[0]?.roles?.[0] || firstRole?.name;
   const accountType = deriveAccountType(roleName);
 
   return {
@@ -335,6 +365,43 @@ function PreviewLine({
   );
 }
 
+function extractFacilities(
+  response: unknown,
+): Array<{ id: string | number; name: string; code?: string | null }> {
+  if (Array.isArray(response)) {
+    return response as Array<{
+      id: string | number;
+      name: string;
+      code?: string | null;
+    }>;
+  }
+
+  if (response && typeof response === "object") {
+    const obj = response as Record<string, unknown>;
+
+    if (obj.data && typeof obj.data === "object") {
+      const data = obj.data as Record<string, unknown>;
+      if (Array.isArray(data.items)) {
+        return data.items as Array<{
+          id: string | number;
+          name: string;
+          code?: string | null;
+        }>;
+      }
+    }
+
+    if (Array.isArray(obj.items)) {
+      return obj.items as Array<{
+        id: string | number;
+        name: string;
+        code?: string | null;
+      }>;
+    }
+  }
+
+  return [];
+}
+
 export function StaffAccountFormModal({
   open,
   editingStaff,
@@ -347,24 +414,23 @@ export function StaffAccountFormModal({
   const storeRoles = useAuthStore((state) => state.roles);
   const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
   const [submitting, setSubmitting] = useState(false);
-  const [facilityOptions, setFacilityOptions] = useState<
-    Array<{ value: string; label: string }>
-  >([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [defaultFacilityName, setDefaultFacilityName] = useState<string>("");
 
   const fullName = Form.useWatch("fullName", form);
   const email = Form.useWatch("email", form);
   const phone = Form.useWatch("phone", form);
   const facilityAssignments = Form.useWatch("facilityAssignments", form);
   const role = facilityAssignments?.[0]?.roles?.[0];
-  const hasDoctorRole = facilityAssignments?.some(
-    (assignment) => assignment?.roles?.includes("doctor"),
+  const hasDoctorRole = facilityAssignments?.some((assignment) =>
+    assignment?.roles?.includes("doctor"),
   );
   const accountType = Form.useWatch("accountType", form);
   const status = Form.useWatch("status", form);
   const watchedAllowPermissionIds = Form.useWatch("allowPermissionIds", form);
   const watchedDenyPermissionIds = Form.useWatch("denyPermissionIds", form);
+
   const currentUserRoleNames =
     currentUser?.roles
       ?.map((role) => role.name?.toLowerCase())
@@ -375,6 +441,9 @@ export function StaffAccountFormModal({
   const activeFacility = currentUser?.facilities?.find(
     (facility) => String(facility.id) === String(activeFacilityId),
   );
+  const [licenseFileList, setLicenseFileList] = useState<UploadFile[]>([]);
+  const [licenseUploading, setLicenseUploading] = useState(false);
+
   const allowPermissionIds = useMemo(
     () => watchedAllowPermissionIds ?? [],
     [watchedAllowPermissionIds],
@@ -383,22 +452,6 @@ export function StaffAccountFormModal({
     () => watchedDenyPermissionIds ?? [],
     [watchedDenyPermissionIds],
   );
-  const facilitySelectOptions = useMemo(() => {
-    const options = [...facilityOptions];
-    const existingOptionIds = new Set(options.map((option) => option.value));
-
-    (facilityAssignments ?? []).forEach((assignment) => {
-      const facilityId = assignment?.facilityId;
-      if (!facilityId || existingOptionIds.has(facilityId)) return;
-
-      options.push({
-        value: facilityId,
-        label: `Cơ sở #${facilityId}`,
-      });
-    });
-
-    return options;
-  }, [facilityAssignments, facilityOptions]);
 
   const permissionModuleGroups = useMemo(() => {
     const groups = new Map<string, Permission[]>();
@@ -492,13 +545,17 @@ export function StaffAccountFormModal({
 
   const rolePermissionModuleGroups = useMemo(() => {
     const selectedRoles = new Set(
-      (facilityAssignments ?? []).flatMap((assignment) => assignment?.roles ?? []),
+      (facilityAssignments ?? []).flatMap(
+        (assignment) => assignment?.roles ?? [],
+      ),
     );
     const rolePermissions = (editingStaff?.roles ?? [])
       .filter((staffRole) => selectedRoles.has(staffRole.name as StaffPosition))
       .flatMap((staffRole) => staffRole.permissions ?? []);
     const uniquePermissions = Array.from(
-      new Map(rolePermissions.map((permission) => [permission.id, permission])).values(),
+      new Map(
+        rolePermissions.map((permission) => [permission.id, permission]),
+      ).values(),
     );
     const groups = new Map<string, Permission[]>();
 
@@ -516,10 +573,38 @@ export function StaffAccountFormModal({
           .split("_")
           .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
           .join(" "),
-        permissions: items.sort((left, right) => left.name.localeCompare(right.name)),
+        permissions: items.sort((left, right) =>
+          left.name.localeCompare(right.name),
+        ),
       }))
       .sort((left, right) => left.label.localeCompare(right.label));
   }, [editingStaff?.roles, facilityAssignments]);
+
+  const {
+    specialtyOptions: lookupSpecialtyOptions,
+    specialtiesLoading,
+    specialtiesError,
+  } = useDoctorSpecialties();
+
+  const specialtyOptions = useMemo(() => {
+    const options = [...lookupSpecialtyOptions];
+
+    // Nếu đang edit và specialty hiện tại chưa có trong list → thêm vào
+    const currentSpecialty =
+      editingStaff?.staffProfile?.doctor?.specialty?.trim();
+
+    if (
+      currentSpecialty &&
+      !options.some((option) => option.value === currentSpecialty)
+    ) {
+      options.push({
+        value: currentSpecialty,
+        label: currentSpecialty,
+      });
+    }
+
+    return options;
+  }, [editingStaff, lookupSpecialtyOptions]);
 
   function selectPermissionModule(
     effect: "allow" | "deny",
@@ -567,48 +652,55 @@ export function StaffAccountFormModal({
   useEffect(() => {
     if (!open) return;
 
-    if (!isSuperAdmin && activeFacility) {
-      setFacilityOptions([
-        {
-          value: String(activeFacility.id),
-          label: `${activeFacility.name} (${activeFacility.code ?? activeFacility.id})`,
-        },
-      ]);
-    } else {
-      void getFacilities()
-        .then((facilities) => {
-        setFacilityOptions(
-          facilities
-            .map((facility) => ({
-              value: facility.id,
-              label: `${facility.name} (${facility.code})`,
-            })),
-        );
-        })
-        .catch((facilityError) => {
+    let cancelled = false;
+
+    const load = async () => {
+      let selectedFacility: {
+        id: string | number;
+        name: string;
+        code?: string | null;
+      } | null = null;
+
+      try {
+        const response = await getFacilities();
+        if (cancelled) return;
+
+        const facilities = extractFacilities(response);
+
+        selectedFacility = facilities[0] ?? null;
+
+        if (!isSuperAdmin && activeFacility) {
+          const matched = facilities.find(
+            (f) => String(f.id) === String(activeFacility.id),
+          );
+          selectedFacility = matched ?? {
+            id: activeFacility.id,
+            name: activeFacility.name,
+            code: activeFacility.code ?? null,
+          };
+        }
+
+        if (selectedFacility) {
+          const facilityLabel = `${selectedFacility.name}${
+            selectedFacility.code ? ` (${selectedFacility.code})` : ""
+          }`;
+          setDefaultFacilityName(facilityLabel);
+        } else {
+          setDefaultFacilityName("Chưa có cơ sở");
+        }
+      } catch (err) {
+        if (!cancelled) {
           void messageApi.error(
-            facilityError instanceof Error
-              ? facilityError.message
+            err instanceof Error
+              ? err.message
               : "Không tải được danh sách cơ sở.",
           );
-        });
-    }
+          setDefaultFacilityName("Lỗi tải cơ sở");
+        }
+      }
 
-    setPermissionsLoading(true);
-    void getPermissions()
-      .then(setPermissions)
-      .catch((permissionError) => {
-        void messageApi.error(
-          permissionError instanceof Error
-            ? permissionError.message
-            : "Không tải được danh sách quyền.",
-        );
-      })
-      .finally(() => {
-        setPermissionsLoading(false);
-      });
+      if (cancelled) return;
 
-    const timer = window.setTimeout(() => {
       if (editingStaff) {
         form.setFieldsValue({
           fullName: editingStaff.fullName,
@@ -624,31 +716,59 @@ export function StaffAccountFormModal({
           licenseNo: editingStaff.staffProfile?.doctor?.licenseNo,
           title: editingStaff.staffProfile?.doctor?.title,
           specialty: editingStaff.staffProfile?.doctor?.specialty,
-          yearsOfExperience: editingStaff.staffProfile?.doctor?.yearsOfExperience,
+          yearsOfExperience:
+            editingStaff.staffProfile?.doctor?.yearsOfExperience,
           bio: editingStaff.staffProfile?.doctor?.bio,
           allowPermissionIds: (editingStaff.permissionOverrides ?? [])
-            .filter((override) => override.effect === "allow")
-            .map((override) => override.permission.id),
+            .filter((o) => o.effect === "allow")
+            .map((o) => o.permission.id),
           denyPermissionIds: (editingStaff.permissionOverrides ?? [])
-            .filter((override) => override.effect === "deny")
-            .map((override) => override.permission.id),
+            .filter((o) => o.effect === "deny")
+            .map((o) => o.permission.id),
         });
+      } else {
+        form.resetFields();
 
-        return;
+        if (selectedFacility) {
+          form.setFieldsValue({
+            facilityAssignments: [
+              {
+                facilityId: String(selectedFacility.id),
+                roles: ["staff"],
+              },
+            ],
+          });
+        } else {
+          form.setFieldsValue({
+            facilityAssignments: [{ facilityId: "", roles: ["staff"] }],
+          });
+        }
+        setLicenseFileList([]);
       }
+    };
 
-      form.resetFields();
-      form.setFieldsValue({
-        ...initialValues,
-        facilityAssignments:
-          !isSuperAdmin && activeFacility
-            ? [{ facilityId: String(activeFacility.id), roles: ["staff"] }]
-            : normalizeSingleFacilityAssignment(initialValues.facilityAssignments),
+    void load();
+
+    setPermissionsLoading(true);
+    void getPermissions()
+      .then((data) => {
+        if (!cancelled) setPermissions(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          void messageApi.error(
+            err instanceof Error
+              ? err.message
+              : "Không tải được danh sách quyền.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPermissionsLoading(false);
       });
-    }, 0);
 
     return () => {
-      window.clearTimeout(timer);
+      cancelled = true;
     };
   }, [activeFacility, editingStaff, form, isSuperAdmin, messageApi, open]);
 
@@ -669,6 +789,65 @@ export function StaffAccountFormModal({
     onClose();
   }
 
+  const handleLicenseUpload: UploadProps["customRequest"] = async (options) => {
+    const { file, onSuccess: onUploadSuccess, onError } = options;
+    const rawFile = file as File;
+
+    setLicenseUploading(true);
+    try {
+      const presign = await createManagementPresignedUpload({
+        fileName: rawFile.name,
+        mimeType: rawFile.type || "application/octet-stream",
+        size: rawFile.size,
+        path: `doctors/licenses/${activeFacilityId || "unknown"}`,
+        baseName: "doctor-license",
+      });
+
+      const putRes = await fetch(presign.url, {
+        method: presign.method || "PUT",
+        headers: {
+          "Content-Type": rawFile.type || "application/octet-stream",
+          ...presign.headers,
+        },
+        body: rawFile,
+      });
+
+      if (!putRes.ok) {
+        throw new Error("Upload giấy phép thất bại");
+      }
+
+      const uploadedFile: UploadFile = {
+        uid: (file as UploadFile).uid,
+        name: rawFile.name,
+        status: "done",
+        url: presign.publicUrl,
+        type: rawFile.type,
+        response: {
+          publicUrl: presign.publicUrl,
+          key: presign.key,
+        },
+      };
+
+      setLicenseFileList([uploadedFile]);
+      form.setFieldsValue({ licenseNo: presign.publicUrl });
+
+      onUploadSuccess?.(presign);
+      messageApi.success(`Đã upload giấy phép: ${rawFile.name}`);
+    } catch (err) {
+      onError?.(err as Error);
+      messageApi.error(
+        err instanceof Error ? err.message : "Upload giấy phép thất bại",
+      );
+    } finally {
+      setLicenseUploading(false);
+    }
+  };
+
+  const handleLicenseRemove = () => {
+    setLicenseFileList([]);
+    form.setFieldsValue({ licenseNo: "" });
+  };
+
   async function handleFinish(values: StaffFormValues) {
     setSubmitting(true);
 
@@ -682,7 +861,9 @@ export function StaffAccountFormModal({
           password: password || undefined,
           status: values.status ? toBackendStatus(values.status) : undefined,
           permissionOverrides: buildPermissionOverrides(values),
-          facilityAssignments: normalizeSingleFacilityAssignment(values.facilityAssignments),
+          facilityAssignments: normalizeSingleFacilityAssignment(
+            values.facilityAssignments,
+          ),
           licenseNo: values.licenseNo,
           title: values.title,
           specialty: values.specialty,
@@ -710,7 +891,8 @@ export function StaffAccountFormModal({
         personalEmail: values.email.trim(),
         phone: values.phone.trim(),
         permissionOverrides: buildPermissionOverrides(values),
-        facilityAssignments: normalizeSingleFacilityAssignment(values.facilityAssignments) ?? [],
+        facilityAssignments:
+          normalizeSingleFacilityAssignment(values.facilityAssignments) ?? [],
         licenseNo: values.licenseNo,
         title: values.title,
         specialty: values.specialty,
@@ -732,17 +914,15 @@ export function StaffAccountFormModal({
 
       onSaved?.(createdStaff, "create");
 
-      void messageApi.success(
-        response.message ?? "Thêm tài khoản thành công.",
-      );
+      void messageApi.success(response.message ?? "Thêm tài khoản thành công.");
 
       form.resetFields();
       onClose();
     } catch (err) {
       if (err instanceof ApiClientError && err.validationErrors.length > 0) {
-        const fieldNames = Object.keys(
-          form.getFieldsValue(true),
-        ) as Array<keyof StaffFormValues>;
+        const fieldNames = Object.keys(form.getFieldsValue(true)) as Array<
+          keyof StaffFormValues
+        >;
         const fieldErrors = fieldNames
           .map((name) => ({
             name,
@@ -794,6 +974,7 @@ export function StaffAccountFormModal({
         layout="vertical"
         initialValues={initialValues}
         onFinish={handleFinish}
+        onFinishFailed={(info) => console.log("Validation failed:", info)}
         className="mt-4"
         autoComplete="off"
         clearOnDestroy
@@ -869,8 +1050,7 @@ export function StaffAccountFormModal({
                       },
                       {
                         pattern: /^(?:\+84|0)[35789]\d{8}$/,
-                        message:
-                          "Số điện thoại Việt Nam không hợp lệ",
+                        message: "Số điện thoại Việt Nam không hợp lệ",
                       },
                     ]}
                   >
@@ -882,23 +1062,25 @@ export function StaffAccountFormModal({
                   </Form.Item>
                 </Col>
 
-                {editingStaff ? <Col xs={24} md={12}>
-                  <Form.Item
-                    name="password"
-                    label="Mật khẩu mới"
-                    rules={[
-                      {
-                        min: 6,
-                        message: "Mật khẩu phải có ít nhất 6 ký tự",
-                      },
-                    ]}
-                  >
-                    <Input.Password
-                      placeholder="Bỏ trống nếu không đổi mật khẩu"
-                      autoComplete="new-password"
-                    />
-                  </Form.Item>
-                </Col> : null}
+                {editingStaff ? (
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="password"
+                      label="Mật khẩu mới"
+                      rules={[
+                        {
+                          min: 6,
+                          message: "Mật khẩu phải có ít nhất 6 ký tự",
+                        },
+                      ]}
+                    >
+                      <Input.Password
+                        placeholder="Bỏ trống nếu không đổi mật khẩu"
+                        autoComplete="new-password"
+                      />
+                    </Form.Item>
+                  </Col>
+                ) : null}
               </Row>
             </Card>
 
@@ -940,18 +1122,26 @@ export function StaffAccountFormModal({
                       return (
                         <Row gutter={12} key={key} align="middle">
                           <Col xs={24} md={12}>
+                            <Form.Item label="Cơ sở làm việc" required>
+                              <Input
+                                value={defaultFacilityName || "Đang tải..."}
+                                disabled
+                                readOnly
+                              />
+                            </Form.Item>
+
                             <Form.Item
                               {...fieldItemProps}
                               name={[field.name, "facilityId"]}
-                              label="Cơ sở làm việc"
-                              rules={[{ required: true, message: "Vui lòng chọn cơ sở" }]}
+                              hidden
+                              rules={[
+                                {
+                                  required: true,
+                                  message: "Thiếu cơ sở làm việc",
+                                },
+                              ]}
                             >
-                              <Select
-                                placeholder="Chọn cơ sở"
-                                options={facilitySelectOptions}
-                                optionFilterProp="label"
-                                disabled={!isSuperAdmin}
-                              />
+                              <Input />
                             </Form.Item>
                           </Col>
                           <Col xs={24} md={12}>
@@ -959,7 +1149,12 @@ export function StaffAccountFormModal({
                               {...fieldItemProps}
                               name={[field.name, "roles"]}
                               label="Chức vụ tại cơ sở"
-                              rules={[{ required: true, message: "Vui lòng chọn ít nhất một chức vụ" }]}
+                              rules={[
+                                {
+                                  required: true,
+                                  message: "Vui lòng chọn ít nhất một chức vụ",
+                                },
+                              ]}
                             >
                               <Select mode="multiple" options={roleOptions} />
                             </Form.Item>
@@ -970,17 +1165,57 @@ export function StaffAccountFormModal({
                   </>
                 )}
               </Form.List>
+
               {hasDoctorRole ? (
                 <Row gutter={[12, 0]}>
                   <Col xs={24} md={12}>
                     <Form.Item
-                      name="licenseNo"
-                      label="Số giấy phép hành nghề"
-                      rules={[{ required: true, message: "Vui lòng nhập số giấy phép" }]}
+                      label="Giấy phép hành nghề"
+                      required
+                      rules={[
+                        {
+                          validator: async () => {
+                            const file = licenseFileList[0];
+                            const hasValidFile =
+                              !!file &&
+                              file.status === "done" &&
+                              !!(file.response?.publicUrl || file.url);
+
+                            if (!hasValidFile) {
+                              return Promise.reject(
+                                new Error("Vui lòng upload Giấy phép hành nghề."),
+                              );
+                            }
+                          },
+                        },
+                      ]}
                     >
+                      <Upload
+                        maxCount={1}
+                        fileList={licenseFileList}
+                        customRequest={handleLicenseUpload}
+                        onRemove={handleLicenseRemove}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        disabled={licenseUploading || submitting}
+                        listType="text"
+                      >
+                        <Button
+                          icon={<UploadIcon size={16} />}
+                          loading={licenseUploading}
+                          disabled={licenseUploading || submitting}
+                        >
+                          {licenseFileList.length > 0
+                            ? "Thay file giấy phép"
+                            : "Chọn file giấy phép"}
+                        </Button>
+                      </Upload>
+                    </Form.Item>
+
+                    <Form.Item name="licenseNo" hidden>
                       <Input />
                     </Form.Item>
                   </Col>
+
                   <Col xs={24} md={12}>
                     <Form.Item
                       name="title"
@@ -990,24 +1225,46 @@ export function StaffAccountFormModal({
                       <Input placeholder="BS.CKI, ThS.BS..." />
                     </Form.Item>
                   </Col>
+
                   <Col xs={24} md={12}>
                     <Form.Item
                       name="specialty"
                       label="Chuyên khoa"
-                      rules={[{ required: true, message: "Vui lòng nhập chuyên khoa" }]}
+                      rules={[{ required: true, message: "Vui lòng chọn chuyên khoa" }]}
                     >
-                      <Input />
+                      <Select
+                        showSearch
+                        optionFilterProp="label"
+                        options={specialtyOptions}
+                        loading={specialtiesLoading}
+                        placeholder="Chọn chuyên khoa"
+                        notFoundContent={
+                          specialtiesLoading
+                            ? "Đang tải chuyên khoa..."
+                            : specialtiesError
+                              ? "Không tải được chuyên khoa"
+                              : "Chưa có chuyên khoa"
+                        }
+                      />
                     </Form.Item>
                   </Col>
+
                   <Col xs={24} md={12}>
                     <Form.Item
                       name="yearsOfExperience"
-                      label="Số năm kinh nghiệm"
-                      rules={[{ required: true, message: "Vui lòng nhập kinh nghiệm" }]}
+                      label="Mức kinh nghiệm"
+                      rules={[
+                        { required: true, message: "Vui lòng chọn mức kinh nghiệm" },
+                      ]}
                     >
-                      <InputNumber min={0} className="w-full" />
+                      <Select
+                        options={DOCTOR_EXPERIENCE_OPTIONS}
+                        placeholder="Chọn mức kinh nghiệm"
+                      />
                     </Form.Item>
                   </Col>
+
+                  {/* Giới thiệu */}
                   <Col xs={24}>
                     <Form.Item name="bio" label="Giới thiệu chuyên môn">
                       <Input.TextArea rows={3} />
@@ -1077,7 +1334,8 @@ export function StaffAccountFormModal({
                             </div>
                           ) : (
                             <Text className="text-sm text-slate-500">
-                              Chưa có quyền mặc định theo chức vụ hoặc chưa chọn chức vụ.
+                              Chưa có quyền mặc định theo chức vụ hoặc chưa chọn
+                              chức vụ.
                             </Text>
                           )}
                         </div>
@@ -1099,7 +1357,10 @@ export function StaffAccountFormModal({
                                           key={group.name}
                                           size="small"
                                           onClick={() =>
-                                            selectPermissionModule("allow", group.permissionIds)
+                                            selectPermissionModule(
+                                              "allow",
+                                              group.permissionIds,
+                                            )
                                           }
                                         >
                                           {group.label}
@@ -1107,7 +1368,10 @@ export function StaffAccountFormModal({
                                       ))}
                                     </Space>
                                   </div>
-                                  <Form.Item name="allowPermissionIds" label="Quyền được cấp thêm">
+                                  <Form.Item
+                                    name="allowPermissionIds"
+                                    label="Quyền được cấp thêm"
+                                  >
                                     <Select
                                       mode="multiple"
                                       showSearch
@@ -1137,7 +1401,10 @@ export function StaffAccountFormModal({
                                           size="small"
                                           danger
                                           onClick={() =>
-                                            selectPermissionModule("deny", group.permissionIds)
+                                            selectPermissionModule(
+                                              "deny",
+                                              group.permissionIds,
+                                            )
                                           }
                                         >
                                           {group.label}
@@ -1145,7 +1412,10 @@ export function StaffAccountFormModal({
                                       ))}
                                     </Space>
                                   </div>
-                                  <Form.Item name="denyPermissionIds" label="Quyền bị chặn">
+                                  <Form.Item
+                                    name="denyPermissionIds"
+                                    label="Quyền bị chặn"
+                                  >
                                     <Select
                                       mode="multiple"
                                       showSearch
