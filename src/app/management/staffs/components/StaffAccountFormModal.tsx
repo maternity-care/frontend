@@ -934,35 +934,39 @@ export function StaffAccountFormModal({
               <Form.List name="facilityAssignments">
                 {(fields) => (
                   <>
-                    {fields.map((field) => (
-                      <Row gutter={12} key={field.key} align="middle">
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            {...field}
-                            name={[field.name, "facilityId"]}
-                            label="Cơ sở làm việc"
-                            rules={[{ required: true, message: "Vui lòng chọn cơ sở" }]}
-                          >
-	                            <Select
-	                              placeholder="Chọn cơ sở"
-	                              options={facilitySelectOptions}
-	                              optionFilterProp="label"
+                    {fields.map((field) => {
+                      const { key, ...fieldItemProps } = field;
+
+                      return (
+                        <Row gutter={12} key={key} align="middle">
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              {...fieldItemProps}
+                              name={[field.name, "facilityId"]}
+                              label="Cơ sở làm việc"
+                              rules={[{ required: true, message: "Vui lòng chọn cơ sở" }]}
+                            >
+                              <Select
+                                placeholder="Chọn cơ sở"
+                                options={facilitySelectOptions}
+                                optionFilterProp="label"
                                 disabled={!isSuperAdmin}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            {...field}
-                            name={[field.name, "roles"]}
-                            label="Chức vụ tại cơ sở"
-                            rules={[{ required: true, message: "Vui lòng chọn ít nhất một chức vụ" }]}
-                          >
-                            <Select mode="multiple" options={roleOptions} />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-                    ))}
+                              />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              {...fieldItemProps}
+                              name={[field.name, "roles"]}
+                              label="Chức vụ tại cơ sở"
+                              rules={[{ required: true, message: "Vui lòng chọn ít nhất một chức vụ" }]}
+                            >
+                              <Select mode="multiple" options={roleOptions} />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      );
+                    })}
                   </>
                 )}
               </Form.List>
