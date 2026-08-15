@@ -26,9 +26,7 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  getDoctor,
-} from "@/management/features/doctors/doctors.api";
+import { getDoctor } from "@/management/features/doctors/doctors.api";
 import type {
   Doctor,
   DoctorStatus,
@@ -41,31 +39,18 @@ import {
   mergeDoctorDetail,
 } from "@/management/features/doctors/doctors.utils";
 
-const {
-  Text,
-  Title,
-} = Typography;
+const { Text, Title } = Typography;
 
 type DoctorDetailModalProps = {
   open: boolean;
   doctor: Doctor | null;
   canManage: boolean;
   allowedFacilityId?: string;
-  facilityNameById: Record<
-    string,
-    string
-  >;
-  roomTypeNameById: Record<
-    string,
-    string
-  >;
+  facilityNameById: Record<string, string>;
+  roomTypeNameById: Record<string, string>;
   onClose: () => void;
-  onEdit: (
-    doctor: Doctor,
-  ) => void;
-  onError?: (
-    message: string,
-  ) => void;
+  onEdit: (doctor: Doctor) => void;
+  onError?: (message: string) => void;
 };
 
 function renderStatus(status: DoctorStatus) {
@@ -74,6 +59,30 @@ function renderStatus(status: DoctorStatus) {
   ) : (
     <Tag>Ngừng hoạt động</Tag>
   );
+}
+
+function renderLicense(licenseNo?: string | null) {
+  if (!licenseNo) {
+    return "Chưa cập nhật";
+  }
+
+  const isUrl =
+    licenseNo.startsWith("http://") || licenseNo.startsWith("https://");
+
+  if (isUrl) {
+    return (
+      <a
+        href={licenseNo}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:underline"
+      >
+        Xem giấy phép hành nghề
+      </a>
+    );
+  }
+
+  return licenseNo;
 }
 
 export function DoctorDetailModal({
@@ -87,43 +96,22 @@ export function DoctorDetailModal({
   onEdit,
   onError,
 }: DoctorDetailModalProps) {
-  const [
-    detailDoctor,
-    setDetailDoctor,
-  ] =
-    useState<Doctor | null>(
-      doctor,
-    );
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
-  const [
-    error,
-    setError,
-  ] =
-    useState<string | null>(
-      null,
-    );
-  const onErrorRef =
-    useRef(onError);
+  const [detailDoctor, setDetailDoctor] = useState<Doctor | null>(doctor);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const onErrorRef = useRef(onError);
 
   useEffect(() => {
-    onErrorRef.current =
-      onError;
+    onErrorRef.current = onError;
   }, [onError]);
 
   useEffect(() => {
-    if (
-      !open ||
-      !doctor
-    ) {
-      const timer =
-        window.setTimeout(() => {
-          setDetailDoctor(null);
-          setError(null);
-          setLoading(false);
-        }, 0);
+    if (!open || !doctor) {
+      const timer = window.setTimeout(() => {
+        setDetailDoctor(null);
+        setError(null);
+        setLoading(false);
+      }, 0);
 
       return () => {
         window.clearTimeout(timer);
@@ -132,55 +120,35 @@ export function DoctorDetailModal({
 
     let cancelled = false;
 
-    const timer =
-      window.setTimeout(() => {
-        setDetailDoctor(doctor);
-        setError(null);
-        setLoading(true);
-      }, 0);
+    const timer = window.setTimeout(() => {
+      setDetailDoctor(doctor);
+      setError(null);
+      setLoading(true);
+    }, 0);
 
     void getDoctor(doctor.id)
       .then((loadedDoctor) => {
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
-        const mergedDoctor =
-          mergeDoctorDetail(
-            doctor,
-            loadedDoctor,
-          );
+        const mergedDoctor = mergeDoctorDetail(doctor, loadedDoctor);
 
         if (
           allowedFacilityId &&
-          !doctorBelongsToFacility(
-            mergedDoctor,
-            allowedFacilityId,
-          )
+          !doctorBelongsToFacility(mergedDoctor, allowedFacilityId)
         ) {
           throw new Error(
             "Bạn không có quyền xem bác sĩ của cơ sở này.",
           );
         }
 
-        setDetailDoctor(
-          mergedDoctor,
-        );
+        setDetailDoctor(mergedDoctor);
       })
       .catch((loadError) => {
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
-        const message =
-          getDoctorErrorMessage(
-            loadError,
-          );
-
+        const message = getDoctorErrorMessage(loadError);
         setError(message);
-        onErrorRef.current?.(
-          message,
-        );
+        onErrorRef.current?.(message);
       })
       .finally(() => {
         if (!cancelled) {
@@ -192,99 +160,50 @@ export function DoctorDetailModal({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [
-    allowedFacilityId,
-    doctor,
-    open,
-  ]);
+  }, [allowedFacilityId, doctor, open]);
 
-  const facilityName =
-    useMemo(() => {
-      if (!detailDoctor) {
-        return "";
-      }
+  const facilityName = useMemo(() => {
+    if (!detailDoctor) return "";
 
-      const facilityIds =
-        detailDoctor
-          .facilityIds.length >
-        0
-          ? detailDoctor.facilityIds
-          : detailDoctor.facilityId
-            ? [
-                detailDoctor.facilityId,
-              ]
-            : [];
+    const facilityIds =
+      detailDoctor.facilityIds.length > 0
+        ? detailDoctor.facilityIds
+        : detailDoctor.facilityId
+          ? [detailDoctor.facilityId]
+          : [];
 
-      if (
-        facilityIds.length === 0
-      ) {
-        return "Chưa được gán";
-      }
+    if (facilityIds.length === 0) {
+      return "Chưa được gán";
+    }
 
-      const names = Array.from(
-        new Set(facilityIds),
-      )
-        .map(
-          (facilityId) =>
-            facilityNameById[
-              facilityId
-            ],
-        )
-        .filter(
-          (
-            name,
-          ): name is string =>
-            Boolean(name),
-        );
+    const names = Array.from(new Set(facilityIds))
+      .map((facilityId) => facilityNameById[facilityId])
+      .filter((name): name is string => Boolean(name));
 
-      return names.length > 0
-        ? names.join(", ")
-        : "Không tìm thấy tên cơ sở";
-    }, [
-      detailDoctor,
-      facilityNameById,
-    ]);
+    return names.length > 0 ? names.join(", ") : "Không tìm thấy tên cơ sở";
+  }, [detailDoctor, facilityNameById]);
 
-  const roomTypeName =
-    useMemo(() => {
-      if (
-        !detailDoctor
-          ?.workingRoomTypeId
-      ) {
-        return "Chưa cập nhật";
-      }
+  const roomTypeName = useMemo(() => {
+    if (!detailDoctor?.workingRoomTypeId) {
+      return "Chưa cập nhật";
+    }
 
-      return (
-        roomTypeNameById[
-          detailDoctor
-            .workingRoomTypeId
-        ] ||
-        "Không tìm thấy tên loại phòng"
-      );
-    }, [
-      detailDoctor,
-      roomTypeNameById,
-    ]);
-
-  const canManageCurrentDoctor =
-    Boolean(
-      canManage &&
-      detailDoctor &&
-      (
-        !allowedFacilityId ||
-        doctorBelongsToFacility(
-          detailDoctor,
-          allowedFacilityId,
-        )
-      ),
+    return (
+      roomTypeNameById[detailDoctor.workingRoomTypeId] ||
+      "Không tìm thấy tên loại phòng"
     );
+  }, [detailDoctor, roomTypeNameById]);
+
+  const canManageCurrentDoctor = Boolean(
+    canManage &&
+      detailDoctor &&
+      (!allowedFacilityId ||
+        doctorBelongsToFacility(detailDoctor, allowedFacilityId)),
+  );
 
   return (
     <Modal
-      open={
-        open &&
-        Boolean(doctor)
-      }
+      open={open && Boolean(doctor)}
       width={900}
       centered
       title={null}
@@ -292,17 +211,10 @@ export function DoctorDetailModal({
       confirmLoading={loading}
       footer={
         <div className="flex justify-end gap-2 border-t border-slate-200 pt-2">
-          {detailDoctor &&
-          canManageCurrentDoctor ? (
+          {detailDoctor && canManageCurrentDoctor ? (
             <Button
-              icon={
-                <Pencil className="h-4 w-4" />
-              }
-              onClick={() =>
-                onEdit(
-                  detailDoctor,
-                )
-              }
+              icon={<Pencil className="h-4 w-4" />}
+              onClick={() => onEdit(detailDoctor)}
             >
               Cập nhật
             </Button>
@@ -310,9 +222,7 @@ export function DoctorDetailModal({
 
           <Button
             type="primary"
-            icon={
-              <X className="h-4 w-4" />
-            }
+            icon={<X className="h-4 w-4" />}
             onClick={onClose}
           >
             Đóng
@@ -338,32 +248,35 @@ export function DoctorDetailModal({
               </div>
 
               <div className="min-w-0">
-                <Title
-                  level={4}
-                  className="!mb-0.5 !text-slate-950"
-                >
+                <Title level={4} className="!mb-0.5 !text-slate-950">
                   {detailDoctor.name}
                 </Title>
 
-                <Text
-                  type="secondary"
-                  className="mb-2 block"
-                >
-                  {detailDoctor.title ||
-                    "Bác sĩ"}{" "}
-                  ·{" "}
-                  {detailDoctor.specialty ||
-                    "Chưa cập nhật chuyên khoa"}
+                <Text type="secondary" className="mb-2 block">
+                  {detailDoctor.title || "Bác sĩ"} ·{" "}
+                  {detailDoctor.specialty || "Chưa cập nhật chuyên khoa"}
                 </Text>
 
                 <Space size={8} wrap>
-                  {renderStatus(
-                    detailDoctor.status,
-                  )}
+                  {renderStatus(detailDoctor.status)}
 
                   <Tag color="blue">
-                    {detailDoctor.licenseNo ||
-                      "Chưa có giấy phép"}
+                    {detailDoctor.licenseNo ? (
+                      detailDoctor.licenseNo.startsWith("http") ? (
+                        <a
+                          href={detailDoctor.licenseNo}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-inherit underline"
+                        >
+                          Xem giấy phép
+                        </a>
+                      ) : (
+                        detailDoctor.licenseNo
+                      )
+                    ) : (
+                      "Chưa có giấy phép"
+                    )}
                   </Tag>
                 </Space>
               </div>
@@ -374,9 +287,7 @@ export function DoctorDetailModal({
               shape="circle"
               aria-label="Đóng"
               title="Đóng"
-              icon={
-                <X className="h-5 w-5" />
-              }
+              icon={<X className="h-5 w-5" />}
               className="shrink-0"
               onClick={onClose}
             />
@@ -406,161 +317,100 @@ export function DoctorDetailModal({
                 },
               }}
             >
-              <Descriptions.Item
-                label="Mã bác sĩ"
-              >
+              <Descriptions.Item label="Mã bác sĩ">
                 {detailDoctor.id}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Staff ID"
-              >
-                {detailDoctor.staffId ||
-                  "Chưa cập nhật"}
+              <Descriptions.Item label="Staff ID">
+                {detailDoctor.staffId || "Chưa cập nhật"}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Họ và tên"
-              >
+              <Descriptions.Item label="Họ và tên">
                 <Space size={6}>
                   <UserRound className="h-4 w-4 text-slate-400" />
                   {detailDoctor.name}
                 </Space>
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Mã nhân viên"
-              >
-                {detailDoctor.employeeCode ||
-                  "Chưa cập nhật"}
+              <Descriptions.Item label="Mã nhân viên">
+                {detailDoctor.employeeCode || "Chưa cập nhật"}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Email công việc"
-              >
+              <Descriptions.Item label="Email công việc">
                 <Space size={6}>
                   <Mail className="h-4 w-4 text-slate-400" />
-                  {detailDoctor.email ||
-                    "Chưa cập nhật"}
+                  {detailDoctor.email || "Chưa cập nhật"}
                 </Space>
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Email cá nhân"
-              >
-                {detailDoctor.personalEmail ||
-                  "Chưa cập nhật"}
+              <Descriptions.Item label="Email cá nhân">
+                {detailDoctor.personalEmail || "Chưa cập nhật"}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Số điện thoại"
-              >
+              <Descriptions.Item label="Số điện thoại">
                 <Space size={6}>
                   <Phone className="h-4 w-4 text-slate-400" />
-                  {detailDoctor.phone ||
-                    "Chưa cập nhật"}
+                  {detailDoctor.phone || "Chưa cập nhật"}
                 </Space>
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Cơ sở làm việc"
-              >
+              <Descriptions.Item label="Cơ sở làm việc">
                 {facilityName}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Giấy phép hành nghề"
-              >
-                {detailDoctor.licenseNo ||
-                  "Chưa cập nhật"}
+              {/* Giấy phép hành nghề – đã hỗ trợ URL */}
+              <Descriptions.Item label="Giấy phép hành nghề">
+                {renderLicense(detailDoctor.licenseNo)}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Học hàm / chức danh"
-              >
-                {detailDoctor.title ||
-                  "Chưa cập nhật"}
+              <Descriptions.Item label="Học hàm / chức danh">
+                {detailDoctor.title || "Chưa cập nhật"}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Chuyên khoa"
-              >
-                {detailDoctor.specialty ||
-                  "Chưa cập nhật"}
+              <Descriptions.Item label="Chuyên khoa">
+                {detailDoctor.specialty || "Chưa cập nhật"}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Mức kinh nghiệm"
-              >
+              <Descriptions.Item label="Mức kinh nghiệm">
                 {getDoctorExperienceLabel(
                   detailDoctor.yearsOfExperience,
                 )}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Loại phòng làm việc"
-              >
+              <Descriptions.Item label="Loại phòng làm việc">
                 {roomTypeName}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Trạng thái bác sĩ"
-              >
-                {renderStatus(
-                  detailDoctor.status,
-                )}
+              <Descriptions.Item label="Trạng thái bác sĩ">
+                {renderStatus(detailDoctor.status)}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Trạng thái nhân sự"
-                span={2}
-              >
-                {renderStatus(
-                  detailDoctor.staffStatus,
-                )}
+              <Descriptions.Item label="Trạng thái nhân sự" span={2}>
+                {renderStatus(detailDoctor.staffStatus)}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Địa chỉ"
-                span={2}
-              >
-                <Space
-                  size={6}
-                  align="start"
-                >
+              <Descriptions.Item label="Địa chỉ" span={2}>
+                <Space size={6} align="start">
                   <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
-                  {detailDoctor.address ||
-                    "Chưa cập nhật"}
+                  {detailDoctor.address || "Chưa cập nhật"}
                 </Space>
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Giới thiệu chuyên môn"
-                span={2}
-              >
-                {detailDoctor.bio ||
-                  "Chưa cập nhật"}
+              <Descriptions.Item label="Giới thiệu chuyên môn" span={2}>
+                {detailDoctor.bio || "Chưa cập nhật"}
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Ngày tạo"
-              >
+              <Descriptions.Item label="Ngày tạo">
                 <Space size={6}>
                   <CalendarClock className="h-4 w-4 text-slate-400" />
-                  {formatDoctorDateTime(
-                    detailDoctor.createdAt,
-                  )}
+                  {formatDoctorDateTime(detailDoctor.createdAt)}
                 </Space>
               </Descriptions.Item>
 
-              <Descriptions.Item
-                label="Cập nhật lần cuối"
-              >
+              <Descriptions.Item label="Cập nhật lần cuối">
                 <Space size={6}>
                   <CalendarClock className="h-4 w-4 text-slate-400" />
-                  {formatDoctorDateTime(
-                    detailDoctor.updatedAt,
-                  )}
+                  {formatDoctorDateTime(detailDoctor.updatedAt)}
                 </Space>
               </Descriptions.Item>
             </Descriptions>
