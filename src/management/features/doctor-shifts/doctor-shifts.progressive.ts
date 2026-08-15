@@ -7,11 +7,6 @@ import {
   toDoctorShiftDateKey,
 } from "./doctor-shifts.utils";
 
-/**
- * Mỗi request lấy tối đa 50 ca.
- * Trang đầu tiên của tuần hiện tại sẽ được render ngay,
- * các page còn lại tiếp tục được append sau đó.
- */
 export const DOCTOR_SHIFT_PROGRESSIVE_PAGE_LIMIT = 50;
 
 export type DoctorShiftDateRange = {
@@ -51,12 +46,6 @@ export function getDoctorShiftMonthRange(
   };
 }
 
-/**
- * Trả về đúng phạm vi người dùng đang mở:
- * - Day: đúng 1 ngày.
- * - Week: đúng Thứ 2 -> Chủ nhật.
- * - Month: đúng ngày đầu -> ngày cuối tháng.
- */
 export function getDoctorShiftViewRange(
   viewMode: DoctorShiftViewMode,
   selectedDate: string,
@@ -79,10 +68,6 @@ export function getDoctorShiftViewRange(
   );
 }
 
-/**
- * Append dữ liệu nhưng không tạo record trùng id.
- * Record mới luôn ghi đè record cũ để giữ dữ liệu mới nhất.
- */
 export function mergeDoctorShiftItems(
   current: DoctorShiftItem[],
   incoming: DoctorShiftItem[],
@@ -95,10 +80,6 @@ export function mergeDoctorShiftItems(
   return Array.from(itemById.values());
 }
 
-/**
- * Dùng sau create/update lịch tuần: xóa cache cũ trong khoảng đó
- * rồi thay bằng dữ liệu vừa tải lại từ server.
- */
 export function removeDoctorShiftsInRange(
   current: DoctorShiftItem[],
   dateFrom: string,
