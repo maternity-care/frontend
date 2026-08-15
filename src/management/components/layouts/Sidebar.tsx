@@ -49,7 +49,7 @@ const navItems = [
   { href: "/management/users", label: "Quản lý người dùng", icon: Users, roles: ["super_admin"] },
   { href: "/management/staffs", label: "Quản lý nhân viên", icon: UserCog, roles: ["super_admin", "admin"] },
   { href: "/management/doctors", label: "Quản lý bác sĩ", icon: Stethoscope, roles: ["super_admin", "admin"] },
-  { href: "/management/facilities", label: "Quản lý cơ sở", icon: Building2, roles: ["super_admin"] },
+  { href: "/management/facilities", label: "Quản lý cơ sở", icon: Building2, roles: ["super_admin", "admin"] },
   { href: "/management/rooms", label: "Quản lý phòng khám", icon: DoorOpen, roles: ["super_admin", "admin"] },
   { href: "/management/records", label: "Quản lý hồ sơ thai phụ", icon: HardDrive, roles: ["doctor"] },
   { href: "/management/services/super", label: "Quản lý dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin"] },
