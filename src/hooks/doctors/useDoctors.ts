@@ -18,6 +18,7 @@ import {
 
 export type DoctorFilters = {
   keyword?: string;
+  facilityId?: string;
   specialty?: string;
   status?: DoctorStatus;
   experienceLevel?: DoctorExperienceLevel;
@@ -44,7 +45,10 @@ function toApiParams(
 
   return {
     ...(keyword && searchField ? { [searchField]: keyword } : {}),
-    facilityId: facilityId?.trim() || undefined,
+    facilityId:
+      filters.facilityId?.trim() ||
+      facilityId?.trim() ||
+      undefined,
     specialty: filters.specialty?.trim() || undefined,
     status: filters.status,
     filterYearsOfExperienceLevel: filters.experienceLevel,
@@ -69,6 +73,8 @@ export function useDoctors({
   const [total, setTotal] = useState(0);
 
   const [searchValue, setSearchValue] = useState("");
+  const [facilityFilter, setFacilityFilter] =
+    useState<string>();
   const [specialtyFilter, setSpecialtyFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<DoctorStatus>();
   const [experienceLevel, setExperienceLevel] = useState<DoctorExperienceLevel>();
@@ -141,6 +147,10 @@ export function useDoctors({
   function buildFilters(overrides: Partial<DoctorFilters> = {}): DoctorFilters {
     return {
       keyword: searchValue.trim() || undefined,
+      facilityId:
+        canViewAllFacilities
+          ? facilityFilter?.trim() || undefined
+          : undefined,
       specialty: specialtyFilter.trim() || undefined,
       status: statusFilter,
       experienceLevel,
@@ -158,6 +168,7 @@ export function useDoctors({
 
   function resetFilters() {
     setSearchValue("");
+    setFacilityFilter(undefined);
     setSpecialtyFilter("");
     setStatusFilter(undefined);
     setExperienceLevel(undefined);
@@ -197,6 +208,8 @@ export function useDoctors({
     appliedFilters,
     searchValue,
     setSearchValue,
+    facilityFilter,
+    setFacilityFilter,
     specialtyFilter,
     setSpecialtyFilter,
     statusFilter,

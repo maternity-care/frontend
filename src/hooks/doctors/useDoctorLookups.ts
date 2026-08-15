@@ -6,7 +6,73 @@ import { getRoomTypeLookup } from "@/management/features/rooms/rooms.api";
 import type { RoomType } from "@/management/features/rooms/rooms.types";
 import { getStaffsPage } from "@/management/features/staffs/staffs.api";
 import type { Staff } from "@/management/features/staffs/staffs.types";
+import { getDoctorSpecialties } from "@/management/features/doctors/doctors.api";
 import { readStaffFacilityIds } from "@/management/features/doctors/doctors.utils";
+
+export function useDoctorSpecialties() {
+  const [specialties, setSpecialties] =
+    useState<string[]>([]);
+  const [
+    specialtiesLoading,
+    setSpecialtiesLoading,
+  ] = useState(true);
+  const [
+    specialtiesError,
+    setSpecialtiesError,
+  ] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getDoctorSpecialties()
+      .then((data) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSpecialties(data);
+        setSpecialtiesError(null);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSpecialties([]);
+
+        setSpecialtiesError(
+          error instanceof Error
+            ? error.message
+            : "Không tải được danh sách chuyên khoa.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSpecialtiesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const specialtyOptions = useMemo(
+    () =>
+      specialties.map((specialty) => ({
+        value: specialty,
+        label: specialty,
+      })),
+    [specialties],
+  );
+
+  return {
+    specialties,
+    specialtyOptions,
+    specialtiesLoading,
+    specialtiesError,
+  };
+}
 
 export function useDoctorDisplayLookups({
   canViewAllFacilities,
@@ -58,7 +124,22 @@ export function useDoctorDisplayLookups({
     };
   }, [canViewAllFacilities, scopedFacilityId]);
 
-  return { facilityNameById, roomTypeNameById };
+  const facilityOptions = useMemo(
+    () =>
+      Object.entries(facilityNameById).map(
+        ([value, label]) => ({
+          value,
+          label,
+        }),
+      ),
+    [facilityNameById],
+  );
+
+  return {
+    facilityNameById,
+    facilityOptions,
+    roomTypeNameById,
+  };
 }
 
 export function useDoctorFormLookups({
