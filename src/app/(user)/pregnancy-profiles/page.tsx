@@ -1,6 +1,6 @@
 "use client";
 
-import PregnancyProfileList from "@/fe/components/legal/record-keeping/PregnancyProfileList";
+import PregnancyProfileList from "@/fe/components/record-keeping/PregnancyProfileList";
 import { Typography } from "antd";
 const { Title } = Typography;
 
