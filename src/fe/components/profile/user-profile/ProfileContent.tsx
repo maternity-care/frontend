@@ -87,7 +87,7 @@ export function ProfileContent() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl mt-10">
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={8}>
           <ProfileSummaryCard profile={profile} />

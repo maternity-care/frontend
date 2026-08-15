@@ -7,12 +7,9 @@ import {
   DatePicker,
   Form,
   Input,
-  InputNumber,
   Row,
-  Select,
-  Space,
 } from "antd";
-import { Mail, Phone, Save, UserRound } from "lucide-react";
+import { LocationEdit, Mail, Phone, Save, UserRound } from "lucide-react";
 import dayjs, { Dayjs } from "dayjs";
 
 import { updateMyProfile } from "@/features/profile/profile.api";
@@ -35,6 +32,8 @@ type PersonalInfoFormProps = {
 type FormValues = {
   name: string;
   dateOfBirth?: Dayjs | null;
+  province?: string | null;
+  ward?: string | null;
   address?: string | null;
   gestationalWeek?: number | null;
   expectedDueDate?: Dayjs | null;
@@ -42,8 +41,6 @@ type FormValues = {
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
 };
-
-const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export function PersonalInfoForm({
   profile,
@@ -63,6 +60,8 @@ export function PersonalInfoForm({
     form.setFieldsValue({
       name: profile.name ?? "",
       dateOfBirth: profile.dateOfBirth ? dayjs(profile.dateOfBirth) : null,
+      province: profile.province ?? "",
+      ward: profile.ward ?? "",
       address: profile.address ?? "",
       gestationalWeek:
         profile.gestationalWeek != null
@@ -71,7 +70,6 @@ export function PersonalInfoForm({
       expectedDueDate: profile.expectedDueDate
         ? dayjs(profile.expectedDueDate)
         : null,
-      bloodType: profile.bloodType ?? undefined,
       emergencyContactName: profile.emergencyContactName ?? "",
       emergencyContactPhone: profile.emergencyContactPhone ?? "",
     });
@@ -172,6 +170,30 @@ export function PersonalInfoForm({
                 className="w-full"
                 format="DD/MM/YYYY"
                 placeholder="Chọn ngày sinh"
+                disabledDate={(current) =>
+                  current.isAfter(dayjs().subtract(15, "year"), "day")
+                }
+                defaultPickerValue={dayjs().subtract(15, "year")}
+              />
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Form.Item name="ward" label="Phường/Xã">
+              <Input
+                size="large"
+                prefix={<LocationEdit className="h-4 w-4 text-slate-400" />}
+                placeholder="Phường/Xã hiện tại"
+              />
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Form.Item name="province" label="Tỉnh/Thành phố">
+              <Input
+                size="large"
+                prefix={<LocationEdit className="h-4 w-4 text-slate-400" />}
+                placeholder="Tỉnh/Thành phố hiện tại"
               />
             </Form.Item>
           </Col>
@@ -182,83 +204,6 @@ export function PersonalInfoForm({
                 rows={2}
                 size="large"
                 placeholder="Nhập địa chỉ hiện tại"
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-      </div>
-
-      {/* === Thông tin thai kỳ === */}
-      <div className="mb-6">
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">
-          Thông tin thai kỳ
-        </h3>
-
-        <Row gutter={16}>
-          <Col xs={24} md={8}>
-            <Form.Item name="gestationalWeek" label="Tuần thai">
-              <Space.Compact className="w-full">
-                <InputNumber
-                  size="large"
-                  min={1}
-                  max={42}
-                  className="w-full"
-                  placeholder="VD: 28"
-                  style={{ width: "100%" }}
-                  onChange={handleGestationalWeekChange}
-                />
-                <Input
-                  size="large"
-                  value="tuần"
-                  disabled
-                  style={{
-                    width: 70,
-                    textAlign: "center",
-                    pointerEvents: "none",
-                    background: "#fafafa",
-                  }}
-                />
-              </Space.Compact>
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Form.Item
-              name="expectedDueDate"
-              label="Ngày dự sinh"
-              rules={[
-                {
-                  validator: (_, value) => {
-                    if (!value) return Promise.resolve();
-                    if (value.isBefore(dayjs(), "day")) {
-                      return Promise.reject(
-                        "Ngày dự sinh phải là ngày trong tương lai",
-                      );
-                    }
-                    return Promise.resolve();
-                  },
-                },
-              ]}
-            >
-              <DatePicker
-                size="large"
-                className="w-full"
-                format="DD/MM/YYYY"
-                placeholder="Chọn ngày dự sinh"
-                disabledDate={(current) =>
-                  current && current < dayjs().startOf("day")
-                }
-              />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Form.Item name="bloodType" label="Nhóm máu">
-              <Select
-                size="large"
-                allowClear
-                placeholder="Chọn nhóm máu"
-                options={BLOOD_TYPES.map((t) => ({ value: t, label: t }))}
               />
             </Form.Item>
           </Col>
@@ -284,7 +229,7 @@ export function PersonalInfoForm({
               label="Số điện thoại liên hệ"
               rules={[
                 {
-                  pattern: /^[0-9+\-\s]{9,15}$/,
+                  pattern: /^[0-9+\-\s]{9}$/,
                   message: "Số điện thoại không hợp lệ",
                 },
               ]}
