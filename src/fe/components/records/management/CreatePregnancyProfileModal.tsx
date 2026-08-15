@@ -19,6 +19,7 @@ import {
 import { getUsers } from "@/management/features/management-users/management-user.api";
 import type { User } from "@/management/features/management-users/management-user.types";
 import type { CreateManagementPregnancyProfileInput } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
+import { getUsersNoPregnant } from "@/features/pregnancy-profiles/pregnancy-profiles.api";
 
 const { TextArea } = Input;
 
@@ -46,7 +47,9 @@ interface Props {
   open: boolean;
   loading?: boolean;
   onCancel: () => void;
-  onSubmit: (input: CreateManagementPregnancyProfileInput) => Promise<void> | void;
+  onSubmit: (
+    input: CreateManagementPregnancyProfileInput,
+  ) => Promise<void> | void;
 }
 
 function formatUserLabel(user: User): string {
@@ -70,9 +73,8 @@ export function CreatePregnancyProfileModal({
 
     setLoadingPatients(true);
     try {
-      const result = await getUsers({
+      const result = await getUsersNoPregnant({
         search: patientSearch.trim() || undefined,
-        status: "active",
         page: 1,
         limit: 20,
       });
@@ -114,7 +116,8 @@ export function CreatePregnancyProfileModal({
 
     await onSubmit({
       patientId: values.patientId,
-      lastMenstrualPeriod: values.lastMenstrualPeriod?.format("YYYY-MM-DD") ?? null,
+      lastMenstrualPeriod:
+        values.lastMenstrualPeriod?.format("YYYY-MM-DD") ?? null,
       expectedDueDate: values.expectedDueDate?.format("YYYY-MM-DD") ?? null,
       fetalCount: values.fetalCount,
       gravida: values.gravida,
@@ -177,7 +180,12 @@ export function CreatePregnancyProfileModal({
             <Form.Item
               name="lastMenstrualPeriod"
               label="Ngày đầu kỳ kinh cuối"
-              rules={[{ required: true, message: "Vui lòng chọn ngày đầu kỳ kinh cuối." }]}
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng chọn ngày đầu kỳ kinh cuối.",
+                },
+              ]}
             >
               <DatePicker
                 format="DD/MM/YYYY"
@@ -197,17 +205,25 @@ export function CreatePregnancyProfileModal({
                 { required: true, message: "Vui lòng chọn ngày dự sinh." },
                 ({ getFieldValue }) => ({
                   validator(_, value: dayjs.Dayjs | null) {
-                    const lmp = getFieldValue("lastMenstrualPeriod") as dayjs.Dayjs | null;
+                    const lmp = getFieldValue(
+                      "lastMenstrualPeriod",
+                    ) as dayjs.Dayjs | null;
                     if (!value || !lmp || value.isAfter(lmp, "day")) {
                       return Promise.resolve();
                     }
 
-                    return Promise.reject(new Error("Ngày dự sinh phải sau ngày đầu kỳ kinh cuối."));
+                    return Promise.reject(
+                      new Error("Ngày dự sinh phải sau ngày đầu kỳ kinh cuối."),
+                    );
                   },
                 }),
               ]}
             >
-              <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} placeholder="Chọn ngày" />
+              <DatePicker
+                format="DD/MM/YYYY"
+                style={{ width: "100%" }}
+                placeholder="Chọn ngày"
+              />
             </Form.Item>
           </Col>
 
@@ -217,7 +233,12 @@ export function CreatePregnancyProfileModal({
               label="Số thai"
               rules={[{ required: true, message: "Vui lòng nhập số thai." }]}
             >
-              <InputNumber min={1} max={10} precision={0} style={{ width: "100%" }} />
+              <InputNumber
+                min={1}
+                max={10}
+                precision={0}
+                style={{ width: "100%" }}
+              />
             </Form.Item>
           </Col>
 
@@ -225,7 +246,9 @@ export function CreatePregnancyProfileModal({
             <Form.Item
               name="riskLevel"
               label="Mức nguy cơ"
-              rules={[{ required: true, message: "Vui lòng chọn mức nguy cơ." }]}
+              rules={[
+                { required: true, message: "Vui lòng chọn mức nguy cơ." },
+              ]}
             >
               <Select
                 options={[
@@ -259,9 +282,16 @@ export function CreatePregnancyProfileModal({
             <Form.Item
               name="gravida"
               label="Số lần mang thai"
-              rules={[{ required: true, message: "Vui lòng nhập số lần mang thai." }]}
+              rules={[
+                { required: true, message: "Vui lòng nhập số lần mang thai." },
+              ]}
             >
-              <InputNumber min={0} max={30} precision={0} style={{ width: "100%" }} />
+              <InputNumber
+                min={0}
+                max={30}
+                precision={0}
+                style={{ width: "100%" }}
+              />
             </Form.Item>
           </Col>
 
@@ -269,9 +299,19 @@ export function CreatePregnancyProfileModal({
             <Form.Item
               name="paraFullTerm"
               label="Số lần sinh đủ tháng"
-              rules={[{ required: true, message: "Vui lòng nhập số lần sinh đủ tháng." }]}
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập số lần sinh đủ tháng.",
+                },
+              ]}
             >
-              <InputNumber min={0} max={30} precision={0} style={{ width: "100%" }} />
+              <InputNumber
+                min={0}
+                max={30}
+                precision={0}
+                style={{ width: "100%" }}
+              />
             </Form.Item>
           </Col>
 
@@ -279,9 +319,16 @@ export function CreatePregnancyProfileModal({
             <Form.Item
               name="paraPremature"
               label="Số lần sinh non"
-              rules={[{ required: true, message: "Vui lòng nhập số lần sinh non." }]}
+              rules={[
+                { required: true, message: "Vui lòng nhập số lần sinh non." },
+              ]}
             >
-              <InputNumber min={0} max={30} precision={0} style={{ width: "100%" }} />
+              <InputNumber
+                min={0}
+                max={30}
+                precision={0}
+                style={{ width: "100%" }}
+              />
             </Form.Item>
           </Col>
 
@@ -289,9 +336,19 @@ export function CreatePregnancyProfileModal({
             <Form.Item
               name="paraAbortion"
               label="Số lần sảy/phá thai"
-              rules={[{ required: true, message: "Vui lòng nhập số lần sảy/phá thai." }]}
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập số lần sảy/phá thai.",
+                },
+              ]}
             >
-              <InputNumber min={0} max={30} precision={0} style={{ width: "100%" }} />
+              <InputNumber
+                min={0}
+                max={30}
+                precision={0}
+                style={{ width: "100%" }}
+              />
             </Form.Item>
           </Col>
 
@@ -299,9 +356,16 @@ export function CreatePregnancyProfileModal({
             <Form.Item
               name="paraLivingChildren"
               label="Số con đang sống"
-              rules={[{ required: true, message: "Vui lòng nhập số con đang sống." }]}
+              rules={[
+                { required: true, message: "Vui lòng nhập số con đang sống." },
+              ]}
             >
-              <InputNumber min={0} max={30} precision={0} style={{ width: "100%" }} />
+              <InputNumber
+                min={0}
+                max={30}
+                precision={0}
+                style={{ width: "100%" }}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -309,7 +373,9 @@ export function CreatePregnancyProfileModal({
         <Form.Item
           name="notes"
           label="Ghi chú chuyên môn"
-          rules={[{ max: 2000, message: "Ghi chú không được vượt quá 2.000 ký tự." }]}
+          rules={[
+            { max: 2000, message: "Ghi chú không được vượt quá 2.000 ký tự." },
+          ]}
         >
           <TextArea
             rows={4}
