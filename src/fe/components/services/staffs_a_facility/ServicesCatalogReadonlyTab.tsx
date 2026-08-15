@@ -11,7 +11,7 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Eye } from "lucide-react";
+import { Edit, Eye} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useStaffFacilityId } from "@/hooks/useStaffFacilityId";
@@ -31,6 +31,7 @@ import {
   TableFilterValues,
 } from "@/management/components/ui/TableFilter";
 import { ServiceDetailModal } from "../types_catalogs/ServiceDetailModal";
+import { FacilityServiceEditModal } from "../types_catalogs/FacilityServiceEditModal";
 
 const { Text, Title } = Typography;
 
@@ -82,6 +83,7 @@ export function ServicesCatalogReadonlyTab() {
   const [total, setTotal] = useState(0);
 
   const [detailOpen, setDetailOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [selectedService, setSelectedService] =
     useState<ManagementService | null>(null);
 
@@ -235,6 +237,11 @@ export function ServicesCatalogReadonlyTab() {
     setDetailOpen(true);
   };
 
+  const openEdit = (service: ManagementService) => {
+    setSelectedService(service);
+    setEditOpen(true);
+  };
+
   const columns: ColumnsType<ManagementService> = [
     {
       title: "STT",
@@ -379,17 +386,26 @@ export function ServicesCatalogReadonlyTab() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 90,
+      width: 110,
       fixed: "right",
       align: "center",
       render: (_, record) => (
-        <Tooltip title="Xem chi tiết">
-          <Button
-            type="text"
-            icon={<Eye size={17} />}
-            onClick={() => openDetail(record)}
-          />
-        </Tooltip>
+        <Flex gap={4} justify="center">
+          <Tooltip title="Xem chi tiết">
+            <Button
+              type="text"
+              icon={<Eye size={17} />}
+              onClick={() => openDetail(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Cấu hình tại cơ sở">
+            <Button
+              type="text"
+              icon={<Edit size={16} />}
+              onClick={() => openEdit(record)}
+            />
+          </Tooltip>
+        </Flex>
       ),
     },
   ];
@@ -477,6 +493,24 @@ export function ServicesCatalogReadonlyTab() {
         onCancel={() => {
           setDetailOpen(false);
           setSelectedService(null);
+        }}
+      />
+
+      <FacilityServiceEditModal
+        open={editOpen}
+        facilityId={facilityId!}
+        service={selectedService}
+        facilityService={
+          selectedService
+            ? facilityServiceMap.get(selectedService.id)
+            : undefined
+        }
+        onCancel={() => {
+          setEditOpen(false);
+          setSelectedService(null);
+        }}
+        onSuccess={async () => {
+          await loadFacilityServices();
         }}
       />
     </>
