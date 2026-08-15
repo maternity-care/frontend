@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Modal } from "antd";
+import { Alert, Modal, Spin } from "antd";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import {
   checkDoctorShiftConflicts,
@@ -14,6 +14,7 @@ import {
   getDoctorShiftErrorMessage,
   readDoctorShiftConflictResponse,
 } from "@/management/features/doctor-shifts/doctor-shifts.utils";
+import { getDoctorShiftViewRange } from "@/management/features/doctor-shifts/doctor-shifts.progressive";
 import { useDoctorShiftAccess } from "@/hooks/doctor-shifts/useDoctorShiftAccess";
 import { useDoctorShiftResources } from "@/hooks/doctor-shifts/useDoctorShiftResources";
 import { useDoctorShiftView } from "@/hooks/doctor-shifts/useDoctorShiftView";
@@ -42,7 +43,15 @@ export default function DoctorShiftPage() {
     setDoctorFilter,
     setFacilityFilter,
     setRoomFilter,
+    selectedDate,
+    viewMode,
   } = view;
+
+  const {
+    ensureRangeLoaded,
+    reloadRange,
+    initialReady,
+  } = resources;
 
   const [detailShift, setDetailShift] = useState<DoctorShiftItem | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -79,6 +88,20 @@ export default function DoctorShiftPage() {
     setFacilityFilter,
     setRoomFilter,
   ]);
+  useEffect(() => {
+    if (!initialReady) return;
+
+    const { dateFrom, dateTo } = getDoctorShiftViewRange(
+      viewMode,
+      selectedDate,
+    );
+
+    const timer = window.setTimeout(() => {
+      void ensureRangeLoaded(dateFrom, dateTo);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [ensureRangeLoaded, initialReady, selectedDate, viewMode]);
 
   const canOpenManagementForms =
     resources.managedFacilities.length > 0 &&
@@ -121,8 +144,14 @@ export default function DoctorShiftPage() {
     );
   }
 
-  async function handleWeekChanged({ fromDate }: { fromDate: string; toDate: string }) {
-    await resources.reloadManagedShifts();
+  async function handleWeekChanged({
+    fromDate,
+    toDate,
+  }: {
+    fromDate: string;
+    toDate: string;
+  }) {
+    await reloadRange(fromDate, toDate);
     view.setSelectedDate(fromDate);
     view.setViewMode("week");
   }
@@ -347,7 +376,24 @@ export default function DoctorShiftPage() {
           onOpenCreate={openCreate}
         />
 
-        {view.viewMode === "month" ? (
+        {resources.loading ||
+        resources.periodLoading ? (
+          <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-2 text-sm text-blue-700">
+            <Spin size="small" />
+            <span>
+              {resources.loading
+                ? "Đang tải lịch tuần hiện tại..."
+                : "Đang tải lịch của khoảng thời gian đang xem..."}
+            </span>
+          </div>
+        ) : null}
+
+        {(resources.loading || resources.periodLoading) &&
+        view.sortedScopedShifts.length === 0 ? (
+          <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-slate-200 bg-white">
+            <Spin size="large" description="Đang tải lịch ca trực..." />
+          </div>
+        ) : view.viewMode === "month" ? (
           <DoctorShiftMonthView
             selectedDate={view.selectedDate}
             monthGrid={view.monthGrid}
@@ -379,7 +425,7 @@ export default function DoctorShiftPage() {
             selectedDate={view.selectedDate}
             shifts={view.dayTableShifts}
             groupMeta={view.dayShiftGroupMeta}
-            loading={resources.loading}
+            loading={resources.loading || resources.periodLoading}
             total={view.sortedScopedShifts.length}
             canManage={access.canManage}
             doctorById={resources.doctorById}

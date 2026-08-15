@@ -1,6 +1,6 @@
 "use client";
 
-import PregnancyProfileDetail from "@/fe/components/record-keeping/PregnancyProfileDetail";
+import PregnancyProfileDetail from "@/fe/components/legal/record-keeping/PregnancyProfileDetail";
 import { useParams } from "next/navigation";
 export default function PregnancyProfileDetailPage() {
   const params = useParams();

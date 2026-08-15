@@ -337,16 +337,125 @@ function toBulkGenerateConfirmPayload(
   };
 }
 
+function getDoctorShiftApiErrorMessage(
+  error: unknown,
+): string {
+  if (
+    typeof error === "object" &&
+    error &&
+    "response" in error
+  ) {
+    const response = (
+      error as {
+        response?: {
+          status?: number;
+          data?: {
+            message?: string | string[];
+          };
+        };
+      }
+    ).response;
+
+    const message =
+      response?.data?.message;
+
+    if (
+      Array.isArray(message)
+    ) {
+      return message.join(" ");
+    }
+
+    if (
+      typeof message === "string"
+    ) {
+      return message;
+    }
+  }
+
+  return error instanceof Error
+    ? error.message
+    : "";
+}
+
+/**
+ * Backend hiện trả 404 khi GET danh sách ca trực không có bản ghi.
+ *
+ * Với list endpoint, "không có dữ liệu" là danh sách rỗng chứ không phải
+ * lỗi màn hình. Chỉ normalize đúng 404 có message của ca trực không tồn tại;
+ * 404 khác vẫn throw để không che lỗi route/API.
+ */
+function isEmptyDoctorShiftListError(
+  error: unknown,
+): boolean {
+  if (
+    typeof error !== "object" ||
+    !error ||
+    !("response" in error)
+  ) {
+    return false;
+  }
+
+  const response = (
+    error as {
+      response?: {
+        status?: number;
+      };
+    }
+  ).response;
+
+  if (
+    response?.status !== 404
+  ) {
+    return false;
+  }
+
+  const message =
+    getDoctorShiftApiErrorMessage(
+      error,
+    )
+      .trim()
+      .toLowerCase();
+
+  return message.includes(
+    "ca trực bác sĩ không tồn tại",
+  );
+}
+
 export async function getDoctorShifts(
   params?: GetDoctorShiftsParams,
 ): Promise<DoctorShiftListResult> {
-  const data = await unwrapApiData<DoctorShiftListData>(
-    apiClient.get(ENDPOINT, {
-      params: toListParams(params),
-    }),
-  );
+  try {
+    const data =
+      await unwrapApiData<DoctorShiftListData>(
+        apiClient.get(ENDPOINT, {
+          params:
+            toListParams(params),
+        }),
+      );
 
-  return normalizeDoctorShiftListResult(data, params);
+    return normalizeDoctorShiftListResult(
+      data,
+      params,
+    );
+  } catch (error) {
+    if (
+      !isEmptyDoctorShiftListError(
+        error,
+      )
+    ) {
+      throw error;
+    }
+
+    return {
+      items: [],
+      total: 0,
+      page:
+        params?.page ?? 1,
+      limit:
+        params?.limit ?? 20,
+      totalPages: 0,
+    };
+  }
 }
 
 export async function getAllDoctorShifts(
