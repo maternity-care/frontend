@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   Col,
+  Collapse,
   Form,
   Input,
   InputNumber,
@@ -42,6 +43,7 @@ import type {
 } from "@/management/features/staffs/staffs.types";
 import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { ApiClientError } from "@/lib/axios";
+import { useAuthStore } from "@/features/auth/auth.store";
 
 const { Text, Title } = Typography;
 
@@ -328,6 +330,8 @@ export function StaffAccountFormModal({
 }: StaffAccountFormModalProps) {
   const [form] = Form.useForm<StaffFormValues>();
   const { message: messageApi } = App.useApp();
+  const currentUser = useAuthStore((state) => state.user);
+  const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
   const [submitting, setSubmitting] = useState(false);
   const [facilityOptions, setFacilityOptions] = useState<
     Array<{ value: string; label: string }>
@@ -347,6 +351,11 @@ export function StaffAccountFormModal({
   const status = Form.useWatch("status", form);
   const watchedAllowPermissionIds = Form.useWatch("allowPermissionIds", form);
   const watchedDenyPermissionIds = Form.useWatch("denyPermissionIds", form);
+  const isSuperAdmin =
+    currentUser?.roles?.some((role) => role.name === "super_admin") ?? false;
+  const activeFacility = currentUser?.facilities?.find(
+    (facility) => String(facility.id) === String(activeFacilityId),
+  );
   const allowPermissionIds = useMemo(
     () => watchedAllowPermissionIds ?? [],
     [watchedAllowPermissionIds],
@@ -539,8 +548,16 @@ export function StaffAccountFormModal({
   useEffect(() => {
     if (!open) return;
 
-    void getFacilities()
-      .then((facilities) => {
+    if (!isSuperAdmin && activeFacility) {
+      setFacilityOptions([
+        {
+          value: String(activeFacility.id),
+          label: `${activeFacility.name} (${activeFacility.code ?? activeFacility.id})`,
+        },
+      ]);
+    } else {
+      void getFacilities()
+        .then((facilities) => {
         setFacilityOptions(
           facilities
             .map((facility) => ({
@@ -548,14 +565,15 @@ export function StaffAccountFormModal({
               label: `${facility.name} (${facility.code})`,
             })),
         );
-      })
-      .catch((facilityError) => {
-        void messageApi.error(
-          facilityError instanceof Error
-            ? facilityError.message
-            : "Không tải được danh sách cơ sở.",
-        );
-      });
+        })
+        .catch((facilityError) => {
+          void messageApi.error(
+            facilityError instanceof Error
+              ? facilityError.message
+              : "Không tải được danh sách cơ sở.",
+          );
+        });
+    }
 
     setPermissionsLoading(true);
     void getPermissions()
@@ -600,13 +618,19 @@ export function StaffAccountFormModal({
       }
 
       form.resetFields();
-      form.setFieldsValue(initialValues);
+      form.setFieldsValue({
+        ...initialValues,
+        facilityAssignments:
+          !isSuperAdmin && activeFacility
+            ? [{ facilityId: String(activeFacility.id), roles: ["staff"] }]
+            : initialValues.facilityAssignments,
+      });
     }, 0);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [open, editingStaff, form, messageApi]);
+  }, [activeFacility, editingStaff, form, isSuperAdmin, messageApi, open]);
 
   const modalTitle = editingStaff ? "Cập nhật tài khoản" : "Thêm tài khoản";
 
@@ -903,6 +927,7 @@ export function StaffAccountFormModal({
 	                              placeholder="Chọn cơ sở"
 	                              options={facilitySelectOptions}
 	                              optionFilterProp="label"
+                                disabled={!isSuperAdmin}
 	                            />
                           </Form.Item>
                         </Col>
@@ -922,7 +947,7 @@ export function StaffAccountFormModal({
                             danger
                             icon={<MinusCircle className="h-4 w-4" />}
                             onClick={() => remove(field.name)}
-                            disabled={fields.length === 1}
+                            disabled={fields.length === 1 || !isSuperAdmin}
                             title="Xóa phân công"
                           />
                         </Col>
@@ -933,6 +958,7 @@ export function StaffAccountFormModal({
                         type="dashed"
                         icon={<Plus className="h-4 w-4" />}
                         onClick={() => add({ facilityId: "", roles: ["staff"] })}
+                        disabled={!isSuperAdmin}
                       >
                         Thêm cơ sở làm việc
                       </Button>
@@ -1016,109 +1042,122 @@ export function StaffAccountFormModal({
                 </Space>
               }
             >
-              <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50 px-3 py-3">
-                <p className="mb-2 text-xs font-semibold uppercase text-sky-700">
-                  Quyền theo chức vụ
-                </p>
-                {rolePermissionModuleGroups.length > 0 ? (
-                  <div className="space-y-3">
-                    {rolePermissionModuleGroups.map((group) => (
-                      <div key={group.name}>
-                        <div className="mb-1.5 text-xs font-semibold text-slate-600">
-                          {group.label}
-                        </div>
-                        <Space size={[6, 6]} wrap>
-                          {group.permissions.map((permission) => (
-                            <Tag key={permission.id} color="blue">
-                              {permission.name}
-                            </Tag>
-                          ))}
-                        </Space>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Text className="text-sm text-slate-500">
-                    Chưa có quyền mặc định theo chức vụ hoặc chưa chọn chức vụ.
-                  </Text>
-                )}
-              </div>
-
-              <Tabs
+              <Collapse
+                ghost
                 items={[
                   {
-                    key: "allow",
-                    label: "Cấp thêm",
+                    key: "permissions",
+                    label: "Mở rộng cấu hình phân quyền",
                     children: (
-                      <div>
-                        <div className="mb-3">
-                          <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
-                            Chọn nhanh theo module
+                      <>
+                        <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50 px-3 py-3">
+                          <p className="mb-2 text-xs font-semibold uppercase text-sky-700">
+                            Quyền theo chức vụ
                           </p>
-                          <Space size={[6, 6]} wrap>
-                            {permissionModuleGroups.map((group) => (
-                              <Button
-                                key={group.name}
-                                size="small"
-                                onClick={() =>
-                                  selectPermissionModule("allow", group.permissionIds)
-                                }
-                              >
-                                {group.label}
-                              </Button>
-                            ))}
-                          </Space>
+                          {rolePermissionModuleGroups.length > 0 ? (
+                            <div className="space-y-3">
+                              {rolePermissionModuleGroups.map((group) => (
+                                <div key={group.name}>
+                                  <div className="mb-1.5 text-xs font-semibold text-slate-600">
+                                    {group.label}
+                                  </div>
+                                  <Space size={[6, 6]} wrap>
+                                    {group.permissions.map((permission) => (
+                                      <Tag key={permission.id} color="blue">
+                                        {permission.name}
+                                      </Tag>
+                                    ))}
+                                  </Space>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <Text className="text-sm text-slate-500">
+                              Chưa có quyền mặc định theo chức vụ hoặc chưa chọn chức vụ.
+                            </Text>
+                          )}
                         </div>
-                      <Form.Item name="allowPermissionIds" label="Quyền được cấp thêm">
-                        <Select
-                          mode="multiple"
-                          showSearch
-                          options={allowPermissionOptions}
-                          optionFilterProp="label"
-                          loading={permissionsLoading}
-                          placeholder="Chọn quyền cần cấp thêm"
-                          maxTagCount="responsive"
+
+                        <Tabs
+                          items={[
+                            {
+                              key: "allow",
+                              label: "Cấp thêm",
+                              children: (
+                                <div>
+                                  <div className="mb-3">
+                                    <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
+                                      Chọn nhanh theo module
+                                    </p>
+                                    <Space size={[6, 6]} wrap>
+                                      {permissionModuleGroups.map((group) => (
+                                        <Button
+                                          key={group.name}
+                                          size="small"
+                                          onClick={() =>
+                                            selectPermissionModule("allow", group.permissionIds)
+                                          }
+                                        >
+                                          {group.label}
+                                        </Button>
+                                      ))}
+                                    </Space>
+                                  </div>
+                                  <Form.Item name="allowPermissionIds" label="Quyền được cấp thêm">
+                                    <Select
+                                      mode="multiple"
+                                      showSearch
+                                      options={allowPermissionOptions}
+                                      optionFilterProp="label"
+                                      loading={permissionsLoading}
+                                      placeholder="Chọn quyền cần cấp thêm"
+                                      maxTagCount="responsive"
+                                    />
+                                  </Form.Item>
+                                </div>
+                              ),
+                            },
+                            {
+                              key: "deny",
+                              label: "Chặn quyền",
+                              children: (
+                                <div>
+                                  <div className="mb-3">
+                                    <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
+                                      Chọn nhanh theo module
+                                    </p>
+                                    <Space size={[6, 6]} wrap>
+                                      {permissionModuleGroups.map((group) => (
+                                        <Button
+                                          key={group.name}
+                                          size="small"
+                                          danger
+                                          onClick={() =>
+                                            selectPermissionModule("deny", group.permissionIds)
+                                          }
+                                        >
+                                          {group.label}
+                                        </Button>
+                                      ))}
+                                    </Space>
+                                  </div>
+                                  <Form.Item name="denyPermissionIds" label="Quyền bị chặn">
+                                    <Select
+                                      mode="multiple"
+                                      showSearch
+                                      options={denyPermissionOptions}
+                                      optionFilterProp="label"
+                                      loading={permissionsLoading}
+                                      placeholder="Chọn quyền cần chặn"
+                                      maxTagCount="responsive"
+                                    />
+                                  </Form.Item>
+                                </div>
+                              ),
+                            },
+                          ]}
                         />
-                      </Form.Item>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "deny",
-                    label: "Chặn quyền",
-                    children: (
-                      <div>
-                        <div className="mb-3">
-                          <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
-                            Chọn nhanh theo module
-                          </p>
-                          <Space size={[6, 6]} wrap>
-                            {permissionModuleGroups.map((group) => (
-                              <Button
-                                key={group.name}
-                                size="small"
-                                danger
-                                onClick={() =>
-                                  selectPermissionModule("deny", group.permissionIds)
-                                }
-                              >
-                                {group.label}
-                              </Button>
-                            ))}
-                          </Space>
-                        </div>
-                      <Form.Item name="denyPermissionIds" label="Quyền bị chặn">
-                        <Select
-                          mode="multiple"
-                          showSearch
-                          options={denyPermissionOptions}
-                          optionFilterProp="label"
-                          loading={permissionsLoading}
-                          placeholder="Chọn quyền cần chặn"
-                          maxTagCount="responsive"
-                        />
-                      </Form.Item>
-                      </div>
+                      </>
                     ),
                   },
                 ]}

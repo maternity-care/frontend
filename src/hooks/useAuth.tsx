@@ -10,6 +10,7 @@ import useLocalStorage from "./useLocalStorage";
 import { apiClient, ApiResponse, unwrapApiData } from "@/lib/axios";
 
 const USER_CACHE_KEY = "fe:user";
+const MANAGEMENT_USER_CACHE_KEY = "fe:management-user";
 
 interface AuthContextValue {
   accessToken: string | null;
@@ -33,20 +34,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accessToken,
     accountType,
     refreshToken,
+    user: storeUser,
     roles,
     permissions,
     activeFacilityId,
     clearSession,
     setUser,
   } = useAuthStore();
-  const [localUser, saveLocalUser, removeLocalUser] = useLocalStorage<UserProfile>(USER_CACHE_KEY);
+  const userCacheKey =
+    accountType === "staff" ? MANAGEMENT_USER_CACHE_KEY : USER_CACHE_KEY;
+  const [localUser, saveLocalUser, removeLocalUser] = useLocalStorage<UserProfile>(userCacheKey);
+  const authMeKey = accessToken
+    ? [accountType, "auth-me", accessToken]
+    : null;
 
   const {
-    data: currentUser,
+    data: fetchedUser,
     isLoading: firstLoading,
     isValidating,
     mutate,
-  } = useSWR<UserProfile>(accessToken ? "/auth/me" : null, {
+  } = useSWR<UserProfile>(authMeKey, {
     shouldRetryOnError: false,
     focusThrottleInterval: 60000,
     revalidateOnFocus: false,
@@ -54,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     revalidateIfStale: false,
     revalidateOnMount: true,
     dedupingInterval: 1000 * 60,
-    fallbackData: localUser,
+    fallbackData: storeUser ?? localUser,
     fetcher: getCurrentUser,
     onSuccess: (data) => {
       saveLocalUser(data);
@@ -65,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       removeLocalUser();
     },
   });
+  const currentUser = fetchedUser ?? storeUser ?? localUser;
 
   const logout = useCallback(async () => {
     try {
@@ -81,6 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const effectiveRoles = useMemo(
     () => {
       if (!currentUser) return roles;
+      const globalRoles = currentUser.roles.map((role) => role.name);
+      if (globalRoles.includes("super_admin")) {
+        return [...new Set(globalRoles)];
+      }
       const facility = currentUser.facilities?.find(
         (facility) => String(facility.id) === String(activeFacilityId),
       );
@@ -89,44 +101,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : facility?.role
           ? [facility.role]
           : [];
-      return [
-        ...new Set([
-          ...currentUser.roles.map((role) => role.name),
-          ...facilityRoles.map((role) => role.name),
-        ]),
-      ];
+      return facilityRoles.length > 0
+        ? [...new Set(facilityRoles.map((role) => role.name))]
+        : [...new Set(globalRoles)];
     },
     [activeFacilityId, currentUser, roles],
   );
   const effectivePermissions = useMemo(
-    () =>
-      currentUser?.roles
-        ? [
-            ...new Set(
-              [
-                ...currentUser.roles,
-                ...(currentUser.facilities?.find(
-                  (facility) =>
-                    String(facility.id) === String(activeFacilityId),
-                )?.roles ??
-                  (currentUser.facilities?.find(
-                    (facility) =>
-                      String(facility.id) === String(activeFacilityId),
-                  )?.role
-                    ? [
-                        currentUser.facilities.find(
-                          (facility) =>
-                            String(facility.id) === String(activeFacilityId),
-                        )!.role,
-                      ]
-                    : [])),
-              ].flatMap(
-                (role) =>
-                  role.permissions?.map((permission) => permission.name) ?? [],
-              ),
-            ),
-          ]
-        : permissions,
+    () => {
+      if (!currentUser?.roles) return permissions;
+      const globalRoles = currentUser.roles;
+      const selectedFacility = currentUser.facilities?.find(
+        (facility) => String(facility.id) === String(activeFacilityId),
+      );
+      const facilityRoles = selectedFacility?.roles?.length
+        ? selectedFacility.roles
+        : selectedFacility?.role
+          ? [selectedFacility.role]
+          : [];
+      const effectiveRoleObjects = globalRoles.some((role) => role.name === "super_admin")
+        ? globalRoles
+        : facilityRoles.length > 0
+          ? facilityRoles
+          : globalRoles;
+
+      return [
+        ...new Set(
+          effectiveRoleObjects.flatMap(
+            (role) => role.permissions?.map((permission) => permission.name) ?? [],
+          ),
+        ),
+      ];
+    },
     [activeFacilityId, currentUser, permissions],
   );
 

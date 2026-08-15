@@ -88,6 +88,7 @@ function LoginForm() {
 
       setTimeout(() => {
         router.replace(target);
+        router.refresh();
       }, 700);
     } catch (error) {
       const errorMessage =
