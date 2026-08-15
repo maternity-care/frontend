@@ -7,8 +7,6 @@ import {
   toDoctorShiftDateKey,
 } from "./doctor-shifts.utils";
 
-export const DOCTOR_SHIFT_PROGRESSIVE_PAGE_LIMIT = 50;
-
 export type DoctorShiftDateRange = {
   dateFrom: string;
   dateTo: string;
