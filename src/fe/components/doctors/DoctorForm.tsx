@@ -49,7 +49,6 @@ import {
   useDoctorFormLookups,
   useDoctorSpecialties,
 } from "@/hooks/doctors/useDoctorLookups";
-import { DoctorPreview } from "./DoctorPreview";
 import { createManagementPresignedUpload } from "@/management/features/uploads/uploads.api";
 
 const { Text, Title } = Typography;
@@ -168,18 +167,6 @@ export function DoctorForm({
 
     return options;
   }, [editingDoctor, roomTypes]);
-
-  const name = Form.useWatch("name", form);
-  const personalEmail = Form.useWatch("personalEmail", form);
-  const phone = Form.useWatch("phone", form);
-  const address = Form.useWatch("address", form);
-  const staffId = Form.useWatch("staffId", form);
-  const licenseNo = Form.useWatch("licenseNo", form);
-  const title = Form.useWatch("title", form);
-  const specialty = Form.useWatch("specialty", form);
-  const yearsOfExperience = Form.useWatch("yearsOfExperience", form);
-  const workingRoomTypeId = Form.useWatch("workingRoomTypeId", form);
-  const status = Form.useWatch("status", form);
 
   // Load form + file giấy phép
   useEffect(() => {
@@ -422,7 +409,7 @@ export function DoctorForm({
   return (
     <Modal
       open={open}
-      width={1180}
+      width={900}
       centered
       title={null}
       footer={null}
@@ -461,7 +448,7 @@ export function DoctorForm({
         clearOnDestroy
       >
         <div className="min-h-0 flex-1 overflow-y-auto pr-2">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div>
             <div className="space-y-3">
               {/* ========== CARD TÀI KHOẢN STAFF (CREATE) ========== */}
               {!isEditing ? (
@@ -802,22 +789,6 @@ export function DoctorForm({
               </Card>
             </div>
 
-            {/* Preview */}
-            <DoctorPreview
-              editingDoctor={editingDoctor}
-              name={name}
-              personalEmail={personalEmail}
-              phone={phone}
-              address={address}
-              staffId={staffId}
-              licenseNo={licenseNo}
-              title={title}
-              specialty={specialty}
-              yearsOfExperience={yearsOfExperience}
-              workingRoomTypeId={workingRoomTypeId}
-              status={status}
-              roomTypeOptions={roomTypeOptions}
-            />
           </div>
         </div>
 
