@@ -104,6 +104,14 @@ export interface GetDoctorShiftsParams {
   limit?: number;
 }
 
+export type GetDoctorShiftRangeParams = Omit<
+  GetDoctorShiftsParams,
+  "page" | "limit" | "dateFrom" | "dateTo"
+> & {
+  dateFrom: string;
+  dateTo: string;
+};
+
 export interface CreateDoctorShiftInput {
   doctorId: string;
   staffId: string;
@@ -222,12 +230,6 @@ export interface GetDoctorAvailabilityParams {
   facilityId?: string;
   date: string;
   slotMinutes?: number;
-}
-
-export interface GetWeeklyDoctorShiftsParams {
-  facilityId?: string;
-  doctorId?: string;
-  weekStart?: string;
 }
 
 export interface GetGroupedDoctorShiftsParams {
