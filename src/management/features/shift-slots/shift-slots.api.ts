@@ -649,12 +649,3 @@ export async function deleteShiftSlot(
     data: null,
   };
 }
-
-export const shiftSlotsApi = {
-  getShiftSlots,
-  getShiftSlotLookup,
-  getShiftSlot,
-  createShiftSlot,
-  updateShiftSlot,
-  deleteShiftSlot,
-};

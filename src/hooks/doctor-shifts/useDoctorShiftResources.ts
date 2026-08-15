@@ -11,7 +11,7 @@ import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { getRooms } from "@/management/features/rooms/rooms.api";
 import type { ClinicRoom } from "@/management/features/rooms/rooms.types";
 import { getDoctors } from "@/management/features/doctors/doctors.api";
-import { getDoctorShifts } from "@/management/features/doctor-shifts/doctor-shifts.api";
+import { getDoctorShiftsInRange } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type { DoctorShiftItem } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import type {
   DoctorOption,
@@ -280,7 +280,7 @@ export function useDoctorShiftResources(access: AccessInput) {
         Promise<void> =
         (async () => {
           const result =
-            await getDoctorShifts({
+            await getDoctorShiftsInRange({
               ...(!canViewAllFacilities
                 ? {
                     facilityId,
