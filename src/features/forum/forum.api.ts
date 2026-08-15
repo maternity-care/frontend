@@ -211,6 +211,9 @@ function normalizeAuthor(
     name:
       readText(author.name) ||
       readText(
+        fallback.author,
+      ) ||
+      readText(
         fallback.authorName,
       ) ||
       (id

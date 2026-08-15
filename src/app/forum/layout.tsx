@@ -8,6 +8,7 @@ import {
 import {
   AppShell,
 } from "@/fe/components/layout/AppShell";
+import { AuthProvider } from "@/hooks/useAuth";
 
 export default function ForumLayout({
   children,
@@ -16,9 +17,11 @@ export default function ForumLayout({
 }>) {
   return (
     <AntdThemeProvider mode="user">
-      <AppShell>
-        {children}
-      </AppShell>
+      <AuthProvider>
+        <AppShell>
+          {children}
+        </AppShell>
+      </AuthProvider>
     </AntdThemeProvider>
   );
 }

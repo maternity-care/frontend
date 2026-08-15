@@ -130,6 +130,7 @@ export interface MaternityPackage {
 export interface MaternityPackageQuery {
   search?: string;
   status?: MaternityPackageStatus;
+  packageType?: MaternityPackageType;
   facilityId?: string;
   page?: number;
   limit?: number;

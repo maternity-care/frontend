@@ -10,8 +10,6 @@ import {
   MaternityPackageStatus,
   PackageServiceItemInput,
 } from "@/management/features/services/maternity-packages/maternity-packages.types";
-import { getManagementFacilityServices } from "@/management/features/services/facility-services/facility-services.api";
-import { ManagementFacilityService } from "@/management/features/services/facility-services/facility-services.types";
 import { getManagementServices } from "@/management/features/services/services/services.api";
 import { ManagementService } from "@/management/features/services/services/services.types";
 import {
@@ -46,7 +44,6 @@ interface FormValues {
   description?: string;
   price: number;
   durationDays: number;
-  priorityLevel?: number;
   status: MaternityPackageStatus;
 }
 
@@ -54,7 +51,6 @@ interface Props {
   open: boolean;
   facilityId: string;
   packageItem: MaternityPackage | null;
-  facilityServices?: ManagementFacilityService[];
   onCancel: () => void;
   onSuccess: () => void | Promise<void>;
 }
@@ -67,7 +63,6 @@ export function QuantityPackageFormModal({
   open,
   facilityId,
   packageItem,
-  facilityServices: facilityServicesProp,
   onCancel,
   onSuccess,
 }: Props) {
@@ -78,17 +73,11 @@ export function QuantityPackageFormModal({
   const [loadingServices, setLoadingServices] = useState(false);
 
   const [services, setServices] = useState<ManagementService[]>([]);
-  const [facilityServices, setFacilityServices] = useState<
-    ManagementFacilityService[]
-  >(facilityServicesProp ?? []);
-
   const [serviceRows, setServiceRows] = useState<ServiceRow[]>([
     { key: "1", includedQuantity: 1, isRequired: true, isOptional: false },
   ]);
 
   const serviceOptions = useMemo(() => {
-    const activeFs = facilityServices.filter((fs) => fs.status === "active");
-
     return services
       .filter(
         (svc) =>
@@ -96,42 +85,28 @@ export function QuantityPackageFormModal({
           (svc.saleMode === "both" || svc.saleMode === "package_only"),
       )
       .map((svc) => {
-        const fs = activeFs.find((item) => item.serviceId === svc.id);
         return {
           value: svc.id,
           label: `${svc.code} - ${svc.name}`,
         };
       });
-  }, [services, facilityServices]);
+  }, [services]);
 
-  // Load /management/services + facility-services (để map facilityServiceId)
+  // Gói nhận serviceId; backend tự tạo facility-service khi cơ sở chưa cấu hình dịch vụ.
   useEffect(() => {
     if (!open || !facilityId) return;
 
     const load = async () => {
       setLoadingServices(true);
       try {
-        const [servicesResult, fsResult] = await Promise.all([
-          getManagementServices({
-            status: "active",
-            page: 1,
-            limit: 100,
-          }),
-          facilityServicesProp && facilityServicesProp.length > 0
-            ? Promise.resolve({ items: facilityServicesProp })
-            : getManagementFacilityServices({
-                facilityId,
-                status: "active",
-                page: 1,
-                limit: 100,
-              }),
-        ]);
-
+        const servicesResult = await getManagementServices({
+          status: "active",
+          page: 1,
+          limit: 200,
+        });
         setServices(servicesResult.items);
-        setFacilityServices(fsResult.items);
       } catch {
         setServices([]);
-        setFacilityServices([]);
         messageApi.error("Không thể tải danh sách dịch vụ.");
       } finally {
         setLoadingServices(false);
@@ -139,7 +114,7 @@ export function QuantityPackageFormModal({
     };
 
     void load();
-  }, [open, facilityId, facilityServicesProp, messageApi]);
+  }, [open, facilityId, messageApi]);
 
   useEffect(() => {
     if (!open) return;
@@ -150,7 +125,6 @@ export function QuantityPackageFormModal({
         form.setFieldsValue({
           status: "draft",
           durationDays: 280,
-          priorityLevel: 0,
         });
         setServiceRows([
           {
@@ -172,7 +146,6 @@ export function QuantityPackageFormModal({
           description: detail.description ?? undefined,
           price: Number(detail.price),
           durationDays: detail.durationDays,
-          priorityLevel: detail.priorityLevel ?? 0,
           status: detail.status,
         });
 
@@ -187,7 +160,7 @@ export function QuantityPackageFormModal({
                 facilityServiceId: item.facilityServiceId,
                 includedQuantity: Number(item.includedQuantity) || 1,
                 isRequired: Boolean(item.isRequired),
-                isOptional: Boolean(item.isOptional),
+                isOptional: !Boolean(item.isRequired),
               }))
             : [
                 {
@@ -252,7 +225,6 @@ export function QuantityPackageFormModal({
         description: values.description?.trim() || undefined,
         price: Number(values.price).toFixed(2),
         durationDays: values.durationDays,
-        priorityLevel: values.priorityLevel ?? 0,
         status: values.status,
         services: servicesPayload,
       };
@@ -361,14 +333,6 @@ export function QuantityPackageFormModal({
             </Form.Item>
 
             <Form.Item
-              name="priorityLevel"
-              label="Độ ưu tiên"
-              style={{ minWidth: 140, flex: 1 }}
-            >
-              <InputNumber min={0} max={999} style={{ width: "100%" }} />
-            </Form.Item>
-
-            <Form.Item
               name="status"
               label="Trạng thái"
               rules={[{ required: true, message: "Vui lòng chọn trạng thái." }]}
@@ -429,32 +393,18 @@ export function QuantityPackageFormModal({
                 ),
               },
               {
-                title: "Bắt buộc",
-                width: 100,
+                title: "Phân loại",
+                width: 150,
                 align: "center",
                 render: (_, record) => (
                   <Switch
                     checked={record.isRequired}
+                    checkedChildren="Bắt buộc"
+                    unCheckedChildren="Tùy chọn"
                     onChange={(checked) =>
                       updateRow(record.key, {
                         isRequired: checked,
-                        isOptional: checked ? false : record.isOptional,
-                      })
-                    }
-                  />
-                ),
-              },
-              {
-                title: "Tùy chọn",
-                width: 100,
-                align: "center",
-                render: (_, record) => (
-                  <Switch
-                    checked={record.isOptional}
-                    onChange={(checked) =>
-                      updateRow(record.key, {
-                        isOptional: checked,
-                        isRequired: checked ? false : record.isRequired,
+                        isOptional: !checked,
                       })
                     }
                   />
