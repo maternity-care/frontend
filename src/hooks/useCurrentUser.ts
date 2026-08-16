@@ -27,6 +27,7 @@ export interface CurrentUser {
 }
 
 const USER_STORAGE_KEY = "fe:user";
+const MANAGEMENT_USER_STORAGE_KEY = "fe:management-user";
 
 function parseUser(raw: string | null): CurrentUser | null {
   if (!raw) return null;
@@ -49,7 +50,16 @@ function parseUser(raw: string | null): CurrentUser | null {
 
 function readUserFromStorage(): CurrentUser | null {
   if (typeof window === "undefined") return null;
-  return parseUser(localStorage.getItem(USER_STORAGE_KEY));
+  const isManagement = window.location.pathname.startsWith("/management");
+  const primaryKey = isManagement ? MANAGEMENT_USER_STORAGE_KEY : USER_STORAGE_KEY;
+  const fallbackKey = isManagement ? USER_STORAGE_KEY : MANAGEMENT_USER_STORAGE_KEY;
+
+  return (
+    parseUser(localStorage.getItem(primaryKey)) ??
+    parseUser(sessionStorage.getItem(primaryKey)) ??
+    parseUser(localStorage.getItem(fallbackKey)) ??
+    parseUser(sessionStorage.getItem(fallbackKey))
+  );
 }
 
 export function useCurrentUser() {
@@ -61,7 +71,11 @@ export function useCurrentUser() {
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === USER_STORAGE_KEY || event.key === null) {
+      if (
+        event.key === USER_STORAGE_KEY ||
+        event.key === MANAGEMENT_USER_STORAGE_KEY ||
+        event.key === null
+      ) {
         setUser(readUserFromStorage());
       }
     };

@@ -134,10 +134,19 @@ export interface Appointment {
 export interface BackendAppointment {
   id?: string | number;
   pregnancyProfileId?: string | number | null;
+  pregnancy_profile_id?: string | number | null;
   doctorId?: string | number | null;
+  doctor_id?: string | number | null;
+  doctorStaffId?: string | number | null;
+  doctor?: { id?: string | number | null } | null;
   appointmentAt?: string | null;
+  appointment_at?: string | null;
+  scheduledStart?: string | null;
+  scheduled_start?: string | null;
   status?: string | null;
   note?: string | null;
   createdAt?: string | null;
+  created_at?: string | null;
   updatedAt?: string | null;
+  updated_at?: string | null;
 }
