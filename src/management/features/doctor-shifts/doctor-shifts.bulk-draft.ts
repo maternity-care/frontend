@@ -6,6 +6,7 @@ import {
   saveDoctorShiftDraft,
 } from "./doctor-shifts.draft-storage";
 import { isRecord } from "./doctor-shifts.utils";
+import { sanitizeSlotWorkingDays } from "./doctor-shifts.weekly-utils";
 
 const PREFIX = "management-doctor-shifts-weekly-draft:v1";
 const VERSION = 1;
@@ -86,6 +87,11 @@ export function mergeDraftSlotGroups(
 
   return slots.map((slot) => ({
     slotId: slot.id,
-    assignments: draftBySlotId.get(slot.id)?.assignments ?? [],
+    assignments: (draftBySlotId.get(slot.id)?.assignments ?? []).map(
+      (assignment) => ({
+        ...assignment,
+        workingDays: sanitizeSlotWorkingDays(slot, assignment.workingDays),
+      }),
+    ),
   }));
 }

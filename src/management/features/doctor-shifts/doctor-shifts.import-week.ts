@@ -6,6 +6,7 @@ import type {
 } from "./doctor-shifts.ui-types";
 import type { ShiftSlotLookupItem } from "@/management/features/shift-slots/shift-slots.types";
 import { DOCTOR_SHIFT_WORKING_DAY_OPTIONS } from "./doctor-shifts.constants";
+import { sanitizeSlotWorkingDays } from "./doctor-shifts.weekly-utils";
 
 export function buildImportedWeekSlotGroups({
   schedule,
@@ -20,7 +21,7 @@ export function buildImportedWeekSlotGroups({
   doctors: DoctorOption[];
   facilityId: string;
 }) {
-  const activeSlotIds = new Set(shiftSlots.map((slot) => slot.id));
+  const activeSlotById = new Map(shiftSlots.map((slot) => [slot.id, slot]));
   const availableRoomIds = new Set(
     rooms
       .filter((room) => room.facilityId === facilityId)
@@ -53,13 +54,17 @@ export function buildImportedWeekSlotGroups({
         item.status === "active" &&
         item.facilityIds.includes(facilityId),
     );
-    const workingDays = (group.workingDays ?? []).filter((day) =>
+    const slot = activeSlotById.get(slotId);
+    const knownWorkingDays = (group.workingDays ?? []).filter((day) =>
       DOCTOR_SHIFT_WORKING_DAY_OPTIONS.some((option) => option.value === day),
     );
+    const workingDays = slot
+      ? sanitizeSlotWorkingDays(slot, knownWorkingDays)
+      : [];
 
     if (
       !slotId ||
-      !activeSlotIds.has(slotId) ||
+      !slot ||
       !doctor ||
       workingDays.length === 0
     ) {
