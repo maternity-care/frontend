@@ -73,6 +73,10 @@ export function CreateMedicalRecordModal({
 
   const { doctorId, user } = useCurrentUser();
   const selectedAppointmentId = Form.useWatch("appointmentId", form);
+  const selectedAppointment = appointments.find(
+    (appointment) => String(appointment.id) === String(selectedAppointmentId || ""),
+  );
+  const effectiveDoctorId = doctorId ?? selectedAppointment?.doctorId ?? null;
 
   const appendPendingFiles = useCallback((pendingFiles: PendingMedicalRecordFile[]) => {
     if (!pendingFiles.length) return;
@@ -105,10 +109,10 @@ export function CreateMedicalRecordModal({
   // Tự điền doctorId
   useEffect(() => {
     if (!open) return;
-    if (doctorId) {
-      form.setFieldsValue({ doctorId });
+    if (effectiveDoctorId) {
+      form.setFieldsValue({ doctorId: effectiveDoctorId });
     }
-  }, [open, doctorId, form]);
+  }, [open, effectiveDoctorId, form]);
 
   useEffect(() => {
     if (!open || !initialAppointmentId) return;
@@ -263,13 +267,13 @@ export function CreateMedicalRecordModal({
   const handleSubmit = async () => {
     if (!profile) return;
 
-    if (!doctorId) {
-      message.error("Không xác định được bác sĩ đang đăng nhập.");
-      return;
-    }
-
     try {
       const values = await form.validateFields();
+      const recordDoctorId = doctorId ?? selectedAppointment?.doctorId ?? null;
+      if (!recordDoctorId) {
+        message.error("Không xác định được bác sĩ phụ trách lịch hẹn.");
+        return;
+      }
       setSubmitting(true);
 
       const files: CreateMedicalRecordFileInput[] = fileList
@@ -286,7 +290,7 @@ export function CreateMedicalRecordModal({
       const input: CreateMedicalRecordInput = {
         appointmentId: String(values.appointmentId).trim(),
         pregnancyProfileId: profile.id,
-        doctorId,
+        doctorId: recordDoctorId,
         diagnosis: values.diagnosis.trim(),
         conclusion: values.conclusion?.trim() || null,
         recommendation: values.recommendation?.trim() || null,
@@ -407,7 +411,7 @@ export function CreateMedicalRecordModal({
             <Input
               disabled
               placeholder={
-                doctorId ? `ID: ${doctorId}` : "Không xác định được bác sĩ"
+                effectiveDoctorId ? `ID: ${effectiveDoctorId}` : "Không xác định được bác sĩ"
               }
               style={{ flex: 1 }}
             />
