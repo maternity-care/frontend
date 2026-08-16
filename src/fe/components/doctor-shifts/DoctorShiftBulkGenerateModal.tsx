@@ -425,7 +425,7 @@ export function DoctorShiftBulkGenerateModal({
     try {
       const values =
         await form.validateFields();
-      const payload = buildBulkGeneratePayload(values, doctors);
+      const payload = buildBulkGeneratePayload(values, doctors, shiftSlots);
 
       setPreviewLoading(true);
 
