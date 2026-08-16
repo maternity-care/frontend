@@ -10,7 +10,7 @@ import {
 import { getFacilities } from "@/management/features/facilities/facilities.api";
 import { getRooms } from "@/management/features/rooms/rooms.api";
 import type { ClinicRoom } from "@/management/features/rooms/rooms.types";
-import { getDoctors } from "@/management/features/doctors/doctors.api";
+import { getAllDoctors } from "@/management/features/doctors/doctors.api";
 import { getDoctorShiftsInRange } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type { DoctorShiftItem } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import type {
@@ -608,7 +608,7 @@ export function useDoctorShiftResources(access: AccessInput) {
           status: "active",
           ...(!canViewAllFacilities ? { facilityId } : {}),
         }),
-        getDoctors({
+        getAllDoctors({
           status: "active",
           sortYearsOfExperience: "desc",
           ...(!canViewAllFacilities ? { facilityId } : {}),
@@ -650,7 +650,7 @@ export function useDoctorShiftResources(access: AccessInput) {
           );
 
           setDoctors(
-            doctorData.items
+            doctorData
               .filter(
                 (doctor) =>
                   canViewAllFacilities ||
