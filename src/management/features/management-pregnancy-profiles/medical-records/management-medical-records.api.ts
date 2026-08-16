@@ -63,15 +63,23 @@ function normalizeDoctor(
 }
 
 function normalizeAppointment(item: BackendAppointment): Appointment {
+  const doctorId =
+    item.doctorStaffId ?? item.doctor_id ?? item.doctorId ?? item.doctor?.id;
+
   return {
     id: toStringValue(item.id),
-    pregnancyProfileId: toNullableString(item.pregnancyProfileId),
-    doctorId: toNullableString(item.doctorId),
-    appointmentAt: item.appointmentAt ?? null,
+    pregnancyProfileId: toNullableString(item.pregnancyProfileId ?? item.pregnancy_profile_id),
+    doctorId: toNullableString(doctorId),
+    appointmentAt:
+      item.appointmentAt ??
+      item.appointment_at ??
+      item.scheduledStart ??
+      item.scheduled_start ??
+      null,
     status: item.status ?? null,
     note: item.note ?? null,
-    createdAt: item.createdAt ?? null,
-    updatedAt: item.updatedAt ?? null,
+    createdAt: item.createdAt ?? item.created_at ?? null,
+    updatedAt: item.updatedAt ?? item.updated_at ?? null,
   };
 }
 

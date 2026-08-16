@@ -71,12 +71,13 @@ export function CreateMedicalRecordModal({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
 
-  const { doctorId, user } = useCurrentUser();
+  const { doctorId, isDoctor, user } = useCurrentUser();
   const selectedAppointmentId = Form.useWatch("appointmentId", form);
   const selectedAppointment = appointments.find(
     (appointment) => String(appointment.id) === String(selectedAppointmentId || ""),
   );
-  const effectiveDoctorId = doctorId ?? selectedAppointment?.doctorId ?? null;
+  const appointmentDoctorId = selectedAppointment?.doctorId ?? null;
+  const effectiveDoctorId = isDoctor ? doctorId : appointmentDoctorId;
 
   const appendPendingFiles = useCallback((pendingFiles: PendingMedicalRecordFile[]) => {
     if (!pendingFiles.length) return;
@@ -269,7 +270,7 @@ export function CreateMedicalRecordModal({
 
     try {
       const values = await form.validateFields();
-      const recordDoctorId = doctorId ?? selectedAppointment?.doctorId ?? null;
+      const recordDoctorId = isDoctor ? doctorId : selectedAppointment?.doctorId;
       if (!recordDoctorId) {
         message.error("Không xác định được bác sĩ phụ trách lịch hẹn.");
         return;
@@ -402,20 +403,15 @@ export function CreateMedicalRecordModal({
           />
         </Form.Item>
 
-        <Form.Item
-          name="doctorId"
-          label="Bác sĩ phụ trách"
-          rules={[{ required: true, message: "Không xác định được bác sĩ" }]}
-        >
+        <Form.Item label="Bác sĩ phụ trách">
           <Space.Compact style={{ width: "100%" }}>
             <Input
               disabled
-              placeholder={
-                effectiveDoctorId ? `ID: ${effectiveDoctorId}` : "Không xác định được bác sĩ"
-              }
+              value={effectiveDoctorId ? `ID: ${effectiveDoctorId}` : ""}
+              placeholder="Không xác định được bác sĩ"
               style={{ flex: 1 }}
             />
-            {user?.name ? (
+            {isDoctor && user?.name ? (
               <Input
                 disabled
                 value={user.name}
