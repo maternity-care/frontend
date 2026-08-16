@@ -42,6 +42,23 @@ export function getDefaultWorkingDays(
     : [...DOCTOR_SHIFT_DEFAULT_WORKING_DAYS];
 }
 
+/**
+ * Loại các ngày đã bị bỏ khỏi khung ca nhưng vẫn còn lưu trong draft/form cũ.
+ * Checkbox chỉ ẩn option nên cần chủ động làm sạch value trước khi hiển thị và gửi BE.
+ */
+export function sanitizeSlotWorkingDays(
+  slot: ShiftSlotLookupItem,
+  workingDays: DoctorShiftWorkingDay[] = [],
+): DoctorShiftWorkingDay[] {
+  const allowedDays = new Set(
+    getSlotWorkingDayOptions(slot).map((option) => option.value),
+  );
+
+  return Array.from(
+    new Set(workingDays.filter((day) => allowedDays.has(day))),
+  );
+}
+
 export function getCurrentWeekDateRange() {
   const currentDate = new Date();
   const currentDay = currentDate.getDay();
