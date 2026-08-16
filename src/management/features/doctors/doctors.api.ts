@@ -217,6 +217,41 @@ export async function getDoctors(
   return normalizeListResult(data, params);
 }
 
+/**
+ * Loads every doctor matching a lookup filter. Select controls must not use only
+ * the first paginated result because their client-side search cannot find later pages.
+ */
+export async function getAllDoctors(
+  params: Omit<GetDoctorsParams, "page" | "limit"> = {},
+): Promise<Doctor[]> {
+  const firstPage = await getDoctors({
+    ...params,
+    page: 1,
+    limit: DOCTOR_MAX_LIMIT,
+  });
+
+  if (firstPage.totalPages <= 1) {
+    return firstPage.items;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
+      getDoctors({
+        ...params,
+        page: index + 2,
+        limit: DOCTOR_MAX_LIMIT,
+      }),
+    ),
+  );
+
+  const doctors = [
+    ...firstPage.items,
+    ...remainingPages.flatMap((page) => page.items),
+  ];
+
+  return Array.from(new Map(doctors.map((doctor) => [doctor.id, doctor])).values());
+}
+
 export async function getDoctorSpecialties(): Promise<string[]> {
   const data = await unwrapApiData<string[]>(
     apiClient.get(`${ENDPOINT}/specialty`),
@@ -295,6 +330,7 @@ export async function deleteDoctor(id: string): Promise<DoctorApiResponse<null>>
 
 export const doctorsApi = {
   getDoctors,
+  getAllDoctors,
   getDoctorSpecialties,
   getDoctorsByFacility,
   createDoctor,
