@@ -532,8 +532,8 @@ export function PregnancyProfileDetailModal({
                         <Stethoscope size={18} />
                         <Text strong>
                           Kết quả khám{" "}
-                          {consultation.createdAt
-                            ? `– ${formatDateTime(consultation.createdAt)}`
+                          {consultation.updatedAt
+                            ? `– ${formatDateTime(consultation.updatedAt)}`
                             : `#${index + 1}`}
                         </Text>
                         {consultation.conclusion && (
