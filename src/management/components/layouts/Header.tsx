@@ -26,6 +26,8 @@ const sectionLabels: Record<string, string> = {
   jobs: "Công việc",
   uploads: "Tệp tải lên",
   profile: "Hồ sơ cá nhân",
+  messages: "Hộp thư hỗ trợ",
+  "message-accounts": "Tài khoản kênh",
 };
 
 function getInitials(name?: string) {

@@ -31,6 +31,7 @@ export interface Staff {
   id: string;
   name: string;
   email: string;
+  avatar?: string | null;
   phone?: string | null;
   status: AccountStatus;
   roles: Role[];
