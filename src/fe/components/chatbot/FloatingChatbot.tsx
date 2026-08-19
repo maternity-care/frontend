@@ -6,6 +6,7 @@ import {
   Bot,
   Headphones,
   ImageIcon,
+  LogOut,
   Loader2,
   MessageCircle,
   Paperclip,
@@ -298,8 +299,12 @@ export function FloatingChatbot() {
     [currentUser],
   );
   const effectiveRequesterPayload = useMemo(
-    () => requesterPayload ?? { guestKey: getOrCreateGuestKey() },
-    [requesterPayload],
+    () => {
+      if (requesterPayload) return requesterPayload;
+      if (!isStaffMode && !isOpen) return undefined;
+      return { guestKey: getOrCreateGuestKey() };
+    },
+    [isOpen, isStaffMode, requesterPayload],
   );
   const activeAssignedToOther = Boolean(
     isStaffMode &&
@@ -340,6 +345,12 @@ export function FloatingChatbot() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!isStaffMode && !isOpen) {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+      setIsConnected(false);
+      return;
+    }
 
     const storedConversationId = isStaffMode
       ? null
@@ -429,7 +440,7 @@ export function FloatingChatbot() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [effectiveRequesterPayload, isStaffMode, socketUrl]);
+  }, [effectiveRequesterPayload, isOpen, isStaffMode, socketUrl]);
 
   useEffect(() => {
     if (!isStaffMode) return;
@@ -632,6 +643,25 @@ export function FloatingChatbot() {
     });
   };
 
+  const endConversation = () => {
+    if (!conversationId || !socketRef.current) {
+      setIsOpen(false);
+      return;
+    }
+
+    socketRef.current.emit(isStaffMode ? "chatbot:staff-end" : "chatbot:end", {
+      conversationId,
+    });
+
+    if (!isStaffMode && typeof window !== "undefined") {
+      window.localStorage.removeItem(CHATBOT_CONVERSATION_KEY);
+      setConversationId(null);
+      setMessages([]);
+      setHasMoreMessages(false);
+      setIsOpen(false);
+    }
+  };
+
   const title = isStaffMode ? "Hỗ trợ tư vấn" : "Maternity Care Bot";
   const buttonTitle = isOpen
     ? "Đóng chat"
@@ -692,13 +722,24 @@ export function FloatingChatbot() {
               </div>
             </div>
 
-            <Button
-              type="text"
-              aria-label="Đóng chat"
-              className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !text-slate-500 hover:!bg-slate-100 hover:!text-slate-800"
-              icon={<X className="h-5 w-5" />}
-              onClick={() => setIsOpen(false)}
-            />
+            <div className="flex items-center gap-1">
+              <Button
+                type="text"
+                aria-label="Kết thúc trò chuyện"
+                title="Kết thúc trò chuyện"
+                disabled={!conversationId}
+                className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !text-slate-500 hover:!bg-slate-100 hover:!text-slate-800 disabled:!opacity-40"
+                icon={<LogOut className="h-4 w-4" />}
+                onClick={endConversation}
+              />
+              <Button
+                type="text"
+                aria-label="Đóng chat"
+                className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !text-slate-500 hover:!bg-slate-100 hover:!text-slate-800"
+                icon={<X className="h-5 w-5" />}
+                onClick={() => setIsOpen(false)}
+              />
+            </div>
           </header>
 
           {isStaffMode ? (

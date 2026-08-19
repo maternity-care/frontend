@@ -139,6 +139,12 @@ export function deleteMessagingConversation(id: string) {
   );
 }
 
+export function closeMessagingConversation(id: string) {
+  return unwrapApiData<MessagingConversation>(
+    apiClient.patch(`/management/messages/conversations/${id}/close`),
+  );
+}
+
 export function getMessagingTags() {
   return unwrapApiData<MessagingTag[]>(
     apiClient.get("/management/messages/tags"),

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import { AlertCircle, CalendarClock, Clock3, Eye, ImageIcon, LinkIcon, MessageCircle, MoreVertical, Paperclip, Phone, RefreshCw, Save, Search, Send, Settings2, StickyNote, Tags, Trash2, Undo2, UserPlus, UserRound, X } from "lucide-react";
+import { AlertCircle, CalendarClock, Clock3, Eye, ImageIcon, LinkIcon, LogOut, MessageCircle, MoreVertical, Paperclip, Phone, RefreshCw, Save, Search, Send, Settings2, StickyNote, Tags, Trash2, Undo2, UserPlus, UserRound, X } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { StateBlock } from "@/management/components/ui/StateBlock";
 import {
   assignMessagingConversation,
+  closeMessagingConversation,
   createZaloPhoneConversation,
   createMessagingTag,
   deleteMessagingConversation,
@@ -86,11 +87,13 @@ function channelLabel(channel?: string) {
   if (channel === "zalo_personal") return "Zalo cá nhân";
   if (channel === "zalo_oa") return "Zalo OA";
   if (channel === "facebook_page") return "Facebook";
+  if (channel === "web_chat") return "Web chat";
   return "Nguồn khác";
 }
 
 function channelTone(channel?: string) {
   if (channel === "facebook_page") return "bg-blue-100 text-blue-800 ring-blue-300";
+  if (channel === "web_chat") return "bg-emerald-100 text-emerald-800 ring-emerald-300";
   if (channel === "zalo_oa") return "bg-sky-100 text-sky-800 ring-sky-300";
   return "bg-teal-100 text-teal-800 ring-teal-300";
 }
@@ -219,6 +222,19 @@ type ConversationMenuState = {
   conversation: MessagingConversation;
 };
 
+function sortConversations(items: MessagingConversation[]) {
+  return items.slice().sort((left, right) =>
+    new Date(right.lastMessageAt ?? right.updatedAt ?? 0).getTime() -
+    new Date(left.lastMessageAt ?? left.updatedAt ?? 0).getTime(),
+  );
+}
+
+function conversationMatchesTagFilter(conversation: MessagingConversation, tagIds: string[]) {
+  if (tagIds.length === 0) return true;
+  const conversationTagIds = metadataStringList(conversation.metadata, "tagIds");
+  return tagIds.every((tagId) => conversationTagIds.includes(tagId));
+}
+
 export default function ManagementMessagesPage() {
   const [conversations, setConversations] = useState<MessagingConversation[]>([]);
   const [accounts, setAccounts] = useState<MessagingAccount[]>([]);
@@ -226,6 +242,7 @@ export default function ManagementMessagesPage() {
   const [tags, setTags] = useState<MessagingTag[]>([]);
   const [staffs, setStaffs] = useState<Staff[]>([]);
   const [viewers, setViewers] = useState<Viewer[]>([]);
+  const [viewersByConversation, setViewersByConversation] = useState<Record<string, Viewer[]>>({});
   const [typingStaffs, setTypingStaffs] = useState<Viewer[]>([]);
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -254,6 +271,7 @@ export default function ManagementMessagesPage() {
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const selectedIdRef = useRef<string | null>(null);
+  const filterTagIdsRef = useRef<string[]>([]);
   const assignPopoverRef = useRef<HTMLDivElement | null>(null);
   const tagSelectRef = useRef<HTMLDivElement | null>(null);
   const filterTagRef = useRef<HTMLDivElement | null>(null);
@@ -306,6 +324,10 @@ export default function ManagementMessagesPage() {
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  useEffect(() => {
+    filterTagIdsRef.current = filterTagIds;
+  }, [filterTagIds]);
 
   useEffect(() => {
     if (!error) return;
@@ -408,6 +430,11 @@ export default function ManagementMessagesPage() {
   }, [selectedId]);
 
   useEffect(() => {
+    if (!selectedId) return;
+    setViewers(viewersByConversation[selectedId] ?? []);
+  }, [selectedId, viewersByConversation]);
+
+  useEffect(() => {
     if (!selectedId || chatItems.length === 0) return;
     scrollMessagesToBottom();
   }, [selectedId, chatItems.length]);
@@ -422,11 +449,11 @@ export default function ManagementMessagesPage() {
 
     socket.on("messages:conversation.updated", (conversation: MessagingConversation) => {
       setConversations((items) => {
+        if (!conversationMatchesTagFilter(conversation, filterTagIdsRef.current)) {
+          return items.filter((item) => item.id !== conversation.id);
+        }
         const next = items.filter((item) => item.id !== conversation.id);
-        return [conversation, ...next].sort((left, right) =>
-          new Date(right.lastMessageAt ?? right.updatedAt ?? 0).getTime() -
-          new Date(left.lastMessageAt ?? left.updatedAt ?? 0).getTime(),
-        );
+        return sortConversations([conversation, ...next]);
       });
     });
     socket.on("messages:conversation.deleted", (payload: { id?: string }) => {
@@ -437,9 +464,19 @@ export default function ManagementMessagesPage() {
         setMessages([]);
       }
     });
-    socket.on("messages:message.new", (payload: MessagingMessage | { message?: MessagingMessage }) => {
+    socket.on("messages:message.new", (payload: MessagingMessage | { message?: MessagingMessage; conversation?: MessagingConversation }) => {
       const message: MessagingMessage | undefined =
         "message" in payload ? payload.message : payload as MessagingMessage;
+      const conversation = "conversation" in payload ? payload.conversation : undefined;
+      if (conversation) {
+        setConversations((items) => {
+          if (!conversationMatchesTagFilter(conversation, filterTagIdsRef.current)) {
+            return items.filter((item) => item.id !== conversation.id);
+          }
+          const next = items.filter((item) => item.id !== conversation.id);
+          return sortConversations([conversation, ...next]);
+        });
+      }
       if (!message || message.conversationId !== selectedIdRef.current) return;
       setMessages((items) => items.some((item) => item.id === message.id) ? items : [...items, message]);
     });
@@ -451,8 +488,10 @@ export default function ManagementMessagesPage() {
       if (Array.isArray(items)) setTags(items);
     });
     socket.on("messages:conversation.viewers", (payload: { conversationId?: string; viewers?: Viewer[] }) => {
-      if (payload.conversationId !== selectedIdRef.current) return;
-      setViewers(Array.isArray(payload.viewers) ? payload.viewers : []);
+      if (!payload.conversationId) return;
+      const nextViewers = Array.isArray(payload.viewers) ? payload.viewers : [];
+      setViewersByConversation((items) => ({ ...items, [payload.conversationId as string]: nextViewers }));
+      if (payload.conversationId === selectedIdRef.current) setViewers(nextViewers);
     });
     socket.on("messages:conversation.typing", (payload: { conversationId?: string; typing?: boolean; staff?: Viewer }) => {
       if (payload.conversationId !== selectedIdRef.current || !payload.staff?.id) return;
@@ -622,6 +661,20 @@ export default function ManagementMessagesPage() {
 
   const replaceConversation = (conversation: MessagingConversation) => {
     setConversations((items) => items.map((item) => item.id === conversation.id ? conversation : item));
+  };
+
+  const handleCloseConversation = async (conversation?: MessagingConversation | null) => {
+    if (!conversation) return;
+    const label = conversation.customerName || conversation.externalThreadId;
+    if (!window.confirm(`Kết thúc hội thoại "${label}"?`)) return;
+    setError(null);
+    try {
+      const next = await closeMessagingConversation(conversation.id);
+      replaceConversation(next);
+      setConversationMenu(null);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
   };
 
   const handleAssign = async (staffId?: string | null) => {
@@ -847,6 +900,14 @@ export default function ManagementMessagesPage() {
           >
             <button
               type="button"
+              onClick={() => void handleCloseConversation(conversationMenu.conversation)}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <LogOut className="h-4 w-4" />
+              Kết thúc hội thoại
+            </button>
+            <button
+              type="button"
               onClick={() => handleDeleteConversation(conversationMenu.conversation)}
               className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
             >
@@ -957,6 +1018,7 @@ export default function ManagementMessagesPage() {
               <div className="h-[calc(100%-150px)] overflow-y-auto divide-y divide-slate-100">
                 {conversations.map((conversation) => {
                   const active = selectedId === conversation.id;
+                  const activeViewers = viewersByConversation[conversation.id] ?? [];
                   return (
                     <button
                       key={conversation.id}
@@ -1008,6 +1070,20 @@ export default function ManagementMessagesPage() {
                                 {tag.name}
                               </span>
                             ))}
+                          </div>
+                        ) : null}
+                        {activeViewers.length > 0 ? (
+                          <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-sky-700">
+                            <div className="flex shrink-0 -space-x-1">
+                              {activeViewers.slice(0, 3).map((viewer) => (
+                                <span key={viewer.id} title={`${viewer.name} đang ở đây`}>
+                                  <Avatar src={viewer.avatar} name={viewer.name} size="sm" />
+                                </span>
+                              ))}
+                            </div>
+                            <span className="min-w-0 truncate">
+                              {activeViewers.map((viewer) => viewer.name).join(", ")} đang ở đây
+                            </span>
                           </div>
                         ) : null}
                       </div>
@@ -1064,6 +1140,15 @@ export default function ManagementMessagesPage() {
                       onClick={() => setHistoryOpen(true)}
                     >
                       <Clock3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      className="rounded-md p-2 hover:bg-slate-100 disabled:opacity-40"
+                      type="button"
+                      title="Kết thúc hội thoại"
+                      disabled={!selectedConversation}
+                      onClick={() => void handleCloseConversation(selectedConversation)}
+                    >
+                      <LogOut className="h-4 w-4" />
                     </button>
                     <div className="relative" ref={assignPopoverRef}>
                       <button

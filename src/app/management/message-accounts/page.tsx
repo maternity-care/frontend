@@ -64,6 +64,7 @@ function channelLabel(channel: string) {
   if (channel === "zalo_personal") return "Zalo cá nhân";
   if (channel === "zalo_oa") return "Zalo OA";
   if (channel === "facebook_page") return "Facebook";
+  if (channel === "web_chat") return "Website chatbot";
   return channel;
 }
 
@@ -629,7 +630,8 @@ export default function MessageAccountsPage() {
               </div>
               <div className="divide-y divide-slate-100">
                 {accounts.map((account) => {
-                  const mustStopBeforeDelete = account.status === "connected" || account.status === "connecting";
+                  const isWebChat = account.channel === "web_chat";
+                  const mustStopBeforeDelete = isWebChat || account.status === "connected" || account.status === "connecting";
                   const isLoggedIn = Boolean(account.externalAccountId);
                   const isRunning = account.status === "connected" || account.status === "connecting";
                   return (
@@ -652,7 +654,11 @@ export default function MessageAccountsPage() {
                       {account.lastError ? <p className="mt-2 line-clamp-2 text-xs text-red-600">{account.lastError}</p> : null}
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      {isLoggedIn ? (
+                      {isWebChat ? (
+                        <span className="inline-flex h-9 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-xs font-semibold text-emerald-700">
+                          Luôn bật
+                        </span>
+                      ) : isLoggedIn ? (
                         isRunning ? (
                           <button
                             type="button"
@@ -695,7 +701,7 @@ export default function MessageAccountsPage() {
                       <button
                         type="button"
                         disabled={busy || mustStopBeforeDelete}
-                        title={mustStopBeforeDelete ? "Stop account trước khi xoá" : "Xoá account"}
+                        title={isWebChat ? "Account hệ thống của chatbot" : mustStopBeforeDelete ? "Stop account trước khi xoá" : "Xoá account"}
                         onClick={() => void handleDelete(account)}
                         className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-red-200 text-xs font-semibold text-red-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                       >

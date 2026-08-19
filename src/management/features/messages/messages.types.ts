@@ -7,7 +7,7 @@ export type MessagingAccountStatus =
 
 export type MessagingAccount = {
   id: string;
-  channel: "zalo_personal" | "zalo_oa" | "facebook_page";
+  channel: "zalo_personal" | "zalo_oa" | "facebook_page" | "web_chat";
   displayName: string;
   externalAccountId: string | null;
   status: MessagingAccountStatus;
