@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
-import { AlertCircle, ArrowLeft, CheckCircle2, FileUp, Pencil, Play, QrCode, RefreshCw, Square, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, FileUp, Pencil, Play, QrCode, RefreshCw, Square, Trash2, Upload, Webhook, X } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import { StateBlock } from "@/management/components/ui/StateBlock";
 import {
+  connectFacebookOAuthPage,
+  createFacebookPageAccount,
+  createFacebookOAuthUrl,
+  exchangeFacebookOAuth,
   getMessagingAccounts,
   deleteMessagingAccount,
   importZaloAccount,
@@ -28,6 +33,12 @@ type QrEvent = {
   message?: string;
   error?: string;
   profile?: { display_name?: string };
+};
+
+type FacebookOAuthPage = {
+  id: string;
+  name: string;
+  tasks?: string[];
 };
 
 function normalizeQrImage(value?: string) {
@@ -82,10 +93,18 @@ function qrStatusMessage(event: QrEvent) {
 }
 
 export default function MessageAccountsPage() {
+  const router = useRouter();
   const [accounts, setAccounts] = useState<MessagingAccount[]>([]);
   const [displayName, setDisplayName] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [fbPageId, setFbPageId] = useState("");
+  const [fbPageName, setFbPageName] = useState("");
+  const [fbPageAccessToken, setFbPageAccessToken] = useState("");
+  const [fbVerifyToken, setFbVerifyToken] = useState("");
+  const [fbAutoStart, setFbAutoStart] = useState(true);
+  const [fbOAuthSessionId, setFbOAuthSessionId] = useState<string | null>(null);
+  const [fbOAuthPages, setFbOAuthPages] = useState<FacebookOAuthPage[]>([]);
   const [qrEvent, setQrEvent] = useState<QrEvent | null>(null);
   const [editingAccount, setEditingAccount] = useState<MessagingAccount | null>(null);
   const [editDisplayName, setEditDisplayName] = useState("");
@@ -106,6 +125,33 @@ export default function MessageAccountsPage() {
       .catch((err) => setError(getErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    if (!code || !state) return;
+
+    const expectedState = window.sessionStorage.getItem("messaging_fb_oauth_state");
+    if (expectedState && expectedState !== state) {
+      setError("Facebook OAuth state không khớp, vui lòng connect lại.");
+      router.replace("/management/message-accounts");
+      return;
+    }
+
+    const redirectUri = `${window.location.origin}/management/message-accounts`;
+    setBusy(true);
+    setError(null);
+    exchangeFacebookOAuth({ code, state, redirectUri })
+      .then((result) => {
+        setFbOAuthSessionId(result.sessionId);
+        setFbOAuthPages(result.pages);
+        window.sessionStorage.removeItem("messaging_fb_oauth_state");
+        router.replace("/management/message-accounts");
+      })
+      .catch((err) => setError(getErrorMessage(err)))
+      .finally(() => setBusy(false));
+  }, [router]);
 
   useEffect(() => {
     const socket = io(`${getSocketUrl()}/messages`, {
@@ -201,6 +247,67 @@ export default function MessageAccountsPage() {
     try {
       await startZaloQrLoginForAccount(account.id);
       await loadAccounts();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCreateFacebookPage = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const account = await createFacebookPageAccount({
+        pageId: fbPageId.trim(),
+        pageName: fbPageName.trim(),
+        pageAccessToken: fbPageAccessToken.trim(),
+        verifyToken: fbVerifyToken.trim() || undefined,
+        autoStart: fbAutoStart,
+      });
+      setAccounts((items) => [account, ...items.filter((item) => item.id !== account.id)]);
+      setFbPageId("");
+      setFbPageName("");
+      setFbPageAccessToken("");
+      setFbVerifyToken("");
+      setFbAutoStart(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleStartFacebookOAuth = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const redirectUri = `${window.location.origin}/management/message-accounts`;
+      const result = await createFacebookOAuthUrl({ redirectUri });
+      window.sessionStorage.setItem("messaging_fb_oauth_state", result.state);
+      window.location.href = result.url;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      setBusy(false);
+    }
+  };
+
+  const handleConnectFacebookOAuthPage = async (page: FacebookOAuthPage) => {
+    if (!fbOAuthSessionId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const account = await connectFacebookOAuthPage({
+        sessionId: fbOAuthSessionId,
+        pageId: page.id,
+        verifyToken: fbVerifyToken.trim() || undefined,
+        autoStart: fbAutoStart,
+      });
+      setAccounts((items) => [account, ...items.filter((item) => item.id !== account.id)]);
+      setFbOAuthSessionId(null);
+      setFbOAuthPages([]);
+      setFbVerifyToken("");
+      setFbAutoStart(true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -360,6 +467,123 @@ export default function MessageAccountsPage() {
                   <RefreshCw className="h-4 w-4" />
                   Tạo QR
                 </button>
+              </div>
+            </section>
+
+            <section className="grid gap-3 rounded-lg border border-blue-100 bg-white p-4">
+              <div className="grid gap-3">
+                <div className="flex flex-col gap-2 rounded-md bg-blue-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-blue-950">Facebook Page</p>
+                    <p className="text-xs text-blue-700">Connect bằng Facebook App hoặc nhập Page token thủ công.</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void handleStartFacebookOAuth()}
+                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-blue-700 px-3 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    <Webhook className="h-4 w-4" />
+                    Connect Facebook
+                  </button>
+                </div>
+
+                {fbOAuthPages.length > 0 ? (
+                  <div className="grid gap-2 rounded-md border border-blue-100 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Chọn page từ Facebook</p>
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-900"
+                        onClick={() => {
+                          setFbOAuthPages([]);
+                          setFbOAuthSessionId(null);
+                        }}
+                      >
+                        Huỷ OAuth
+                      </button>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {fbOAuthPages.map((page) => (
+                        <button
+                          key={page.id}
+                          type="button"
+                          disabled={busy || !fbOAuthSessionId}
+                          onClick={() => void handleConnectFacebookOAuthPage(page)}
+                          className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2 text-left hover:border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-900">{page.name}</span>
+                            <span className="block truncate text-xs text-slate-500">{page.id}</span>
+                          </span>
+                          <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[11px] font-bold text-blue-700">Chọn</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_180px] xl:items-end">
+                <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(140px,180px)_minmax(160px,220px)_minmax(0,1fr)_minmax(140px,200px)]">
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
+                    Facebook Page ID
+                    <input
+                      value={fbPageId}
+                      onChange={(event) => setFbPageId(event.target.value)}
+                      className="h-10 min-w-0 rounded-md border border-slate-200 px-3 text-sm"
+                      placeholder="1234567890"
+                    />
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
+                    Tên page
+                    <input
+                      value={fbPageName}
+                      onChange={(event) => setFbPageName(event.target.value)}
+                      className="h-10 min-w-0 rounded-md border border-slate-200 px-3 text-sm"
+                      placeholder="Maternity Care"
+                    />
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
+                    Page access token
+                    <input
+                      value={fbPageAccessToken}
+                      onChange={(event) => setFbPageAccessToken(event.target.value)}
+                      className="h-10 min-w-0 rounded-md border border-slate-200 px-3 text-sm"
+                      placeholder="EAAB..."
+                      type="password"
+                    />
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
+                    Verify token
+                    <input
+                      value={fbVerifyToken}
+                      onChange={(event) => setFbVerifyToken(event.target.value)}
+                      className="h-10 min-w-0 rounded-md border border-slate-200 px-3 text-sm"
+                      placeholder="Webhook verify token"
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-2">
+                  <label className="flex h-10 items-center justify-between rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-600">
+                    Auto start
+                    <input
+                      type="checkbox"
+                      checked={fbAutoStart}
+                      onChange={(event) => setFbAutoStart(event.target.checked)}
+                      className="h-4 w-4"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={busy || !fbPageId.trim() || !fbPageName.trim() || !fbPageAccessToken.trim()}
+                    onClick={() => void handleCreateFacebookPage()}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-blue-200 px-3 text-sm font-semibold text-blue-700 disabled:opacity-50"
+                  >
+                    <Webhook className="h-4 w-4" />
+                    Thêm thủ công
+                  </button>
+                </div>
               </div>
             </section>
 

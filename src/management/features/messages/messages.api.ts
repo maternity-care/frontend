@@ -58,6 +58,48 @@ export function startZaloQrLoginForAccount(id: string) {
   );
 }
 
+export function createFacebookPageAccount(input: {
+  pageId: string;
+  pageName: string;
+  pageAccessToken: string;
+  verifyToken?: string;
+  autoStart?: boolean;
+}) {
+  return unwrapApiData<MessagingAccount>(
+    apiClient.post("/management/messages/accounts/facebook-page", input),
+  );
+}
+
+export function createFacebookOAuthUrl(input: { redirectUri: string }) {
+  return unwrapApiData<{ url: string; state: string }>(
+    apiClient.post("/management/messages/accounts/facebook/oauth-url", input),
+  );
+}
+
+export function exchangeFacebookOAuth(input: {
+  code: string;
+  redirectUri: string;
+  state: string;
+}) {
+  return unwrapApiData<{
+    sessionId: string;
+    pages: Array<{ id: string; name: string; tasks?: string[] }>;
+  }>(
+    apiClient.post("/management/messages/accounts/facebook/oauth-exchange", input),
+  );
+}
+
+export function connectFacebookOAuthPage(input: {
+  sessionId: string;
+  pageId: string;
+  verifyToken?: string;
+  autoStart?: boolean;
+}) {
+  return unwrapApiData<MessagingAccount>(
+    apiClient.post("/management/messages/accounts/facebook/oauth-connect", input),
+  );
+}
+
 export function startMessagingAccount(id: string) {
   return unwrapApiData<{ started: boolean }>(
     apiClient.post(`/management/messages/accounts/${id}/start`),
