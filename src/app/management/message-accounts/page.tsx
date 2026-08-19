@@ -475,7 +475,7 @@ export default function MessageAccountsPage() {
                 <div className="flex flex-col gap-2 rounded-md bg-blue-50 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-blue-950">Facebook Page</p>
-                    <p className="text-xs text-blue-700">Nhập Page token từ Messenger app, hoặc connect qua Login Config nếu đã bật.</p>
+                    <p className="text-xs text-blue-700">Nhập Page token từ Messenger app. OAuth chỉ dùng khi backend đã có Login Config ID.</p>
                   </div>
                   <button
                     type="button"
@@ -484,7 +484,7 @@ export default function MessageAccountsPage() {
                     className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-blue-700 px-3 text-sm font-semibold text-white disabled:opacity-50"
                   >
                     <Webhook className="h-4 w-4" />
-                    Connect qua config
+                    OAuth config
                   </button>
                 </div>
 
