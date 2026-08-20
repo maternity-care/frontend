@@ -279,6 +279,7 @@ export default function ManagementMessagesPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedId) ?? null,
@@ -319,6 +320,13 @@ export default function ManagementMessagesPage() {
     const data = await getMessagingConversations({ tagIds });
     setConversations(data);
     setSelectedId((current) => current && data.some((conversation) => conversation.id === current) ? current : null);
+  };
+
+  const scheduleRealtimeRefresh = () => {
+    if (realtimeRefreshTimerRef.current) clearTimeout(realtimeRefreshTimerRef.current);
+    realtimeRefreshTimerRef.current = setTimeout(() => {
+      loadConversations(filterTagIdsRef.current).catch((err) => setError(getErrorMessage(err)));
+    }, 350);
   };
 
   useEffect(() => {
@@ -447,6 +455,9 @@ export default function ManagementMessagesPage() {
     });
     socketRef.current = socket;
 
+    socket.on("connect", scheduleRealtimeRefresh);
+    socket.io.on("reconnect", scheduleRealtimeRefresh);
+
     socket.on("messages:conversation.updated", (conversation: MessagingConversation) => {
       setConversations((items) => {
         if (!conversationMatchesTagFilter(conversation, filterTagIdsRef.current)) {
@@ -455,6 +466,7 @@ export default function ManagementMessagesPage() {
         const next = items.filter((item) => item.id !== conversation.id);
         return sortConversations([conversation, ...next]);
       });
+      scheduleRealtimeRefresh();
     });
     socket.on("messages:conversation.deleted", (payload: { id?: string }) => {
       if (!payload?.id) return;
@@ -476,6 +488,7 @@ export default function ManagementMessagesPage() {
           const next = items.filter((item) => item.id !== conversation.id);
           return sortConversations([conversation, ...next]);
         });
+        scheduleRealtimeRefresh();
       }
       if (!message || message.conversationId !== selectedIdRef.current) return;
       setMessages((items) => items.some((item) => item.id === message.id) ? items : [...items, message]);
@@ -502,6 +515,8 @@ export default function ManagementMessagesPage() {
     });
 
     return () => {
+      if (realtimeRefreshTimerRef.current) clearTimeout(realtimeRefreshTimerRef.current);
+      socket.io.off("reconnect", scheduleRealtimeRefresh);
       socket.disconnect();
       socketRef.current = null;
     };
