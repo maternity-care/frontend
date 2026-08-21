@@ -104,6 +104,7 @@ export async function getPublicWeeklyDoctorShifts(
       params: compactObject({
         facilityId: params.facilityId?.trim(),
         doctorId: params.doctorId?.trim(),
+        specialty: params.specialty?.trim(),
         weekStart: params.weekStart,
       }),
     }),

@@ -9,6 +9,16 @@ import type { Staff } from "@/management/features/staffs/staffs.types";
 import { getDoctorSpecialties } from "@/management/features/doctors/doctors.api";
 import { readStaffFacilityIds } from "@/management/features/doctors/doctors.utils";
 
+const DEFAULT_DOCTOR_SPECIALTIES = [
+  "Sản phụ khoa",
+  "Siêu âm sản khoa",
+  "Xét nghiệm sản khoa",
+  "Sàng lọc trước sinh",
+  "Theo dõi thai kỳ",
+  "Chăm sóc sau sinh",
+  "Thủ thuật sản khoa",
+];
+
 export function useDoctorSpecialties() {
   const [specialties, setSpecialties] =
     useState<string[]>([]);
@@ -59,10 +69,12 @@ export function useDoctorSpecialties() {
 
   const specialtyOptions = useMemo(
     () =>
-      specialties.map((specialty) => ({
-        value: specialty,
-        label: specialty,
-      })),
+      Array.from(new Set([...specialties, ...DEFAULT_DOCTOR_SPECIALTIES])).map(
+        (specialty) => ({
+          value: specialty,
+          label: specialty,
+        }),
+      ),
     [specialties],
   );
 

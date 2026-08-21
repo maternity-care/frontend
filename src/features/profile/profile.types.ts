@@ -26,6 +26,18 @@ export interface PermissionOverride {
 
 export interface UserProfile {
   id: string;
+  doctor?: {
+    id: string;
+    specialty?: string | null;
+    title?: string | null;
+  } | null;
+  staffProfile?: {
+    doctor?: {
+      id: string;
+      specialty?: string | null;
+      title?: string | null;
+    } | null;
+  } | null;
   facilityId?: string | null;
   facility?: Facility | null;
   name: string;

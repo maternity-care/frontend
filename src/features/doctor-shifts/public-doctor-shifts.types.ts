@@ -71,6 +71,7 @@ export interface PublicDoctorShiftItem {
 export interface PublicWeeklyDoctorShiftsParams {
   facilityId?: string;
   doctorId?: string;
+  specialty?: string;
   weekStart?: string;
 }
 

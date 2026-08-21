@@ -37,11 +37,17 @@ type BackendBoolean =
 
 type BackendService = Omit<
   Service,
-  "description" | "defaultDurationMinutes" | "requiresDoctorWarning"
+  | "description"
+  | "defaultDurationMinutes"
+  | "requiresDoctorWarning"
+  | "allowDoctorSelection"
+  | "doctorSpecialty"
 > & {
   description?: unknown;
   defaultDurationMinutes: unknown;
   requiresDoctorWarning: BackendBoolean;
+  allowDoctorSelection?: BackendBoolean;
+  doctorSpecialty?: unknown;
 };
 
 type BackendFacilityService = Omit<
@@ -50,11 +56,15 @@ type BackendFacilityService = Omit<
   | "serviceDescription"
   | "serviceDefaultDurationMinutes"
   | "serviceRequiresDoctorWarning"
+  | "serviceAllowDoctorSelection"
+  | "serviceDoctorSpecialty"
 > & {
   durationMinutes: unknown;
   serviceDescription?: unknown;
   serviceDefaultDurationMinutes: unknown;
   serviceRequiresDoctorWarning: BackendBoolean;
+  serviceAllowDoctorSelection?: BackendBoolean;
+  serviceDoctorSpecialty?: unknown;
   facility?: unknown;
   service?: unknown;
 };
@@ -338,6 +348,10 @@ export function normalizeService(
     requiresDoctorWarning: normalizeBoolean(
       service.requiresDoctorWarning,
     ),
+    allowDoctorSelection: normalizeBoolean(
+      service.allowDoctorSelection ?? service.requiresDoctorWarning,
+    ),
+    doctorSpecialty: normalizeNullableString(service.doctorSpecialty),
   };
 }
 
@@ -364,6 +378,8 @@ export function toCreateServicePayload(
     defaultDurationMinutes: input.defaultDurationMinutes,
     basePrice: input.basePrice.trim(),
     requiresDoctorWarning: input.requiresDoctorWarning,
+    allowDoctorSelection: input.allowDoctorSelection ?? input.requiresDoctorWarning,
+    doctorSpecialty: trimOrUndefined(input.doctorSpecialty),
     status: input.status,
   };
 }
@@ -382,6 +398,11 @@ export function toUpdateServicePayload(
     defaultDurationMinutes: input.defaultDurationMinutes,
     basePrice: trimOrUndefined(input.basePrice),
     requiresDoctorWarning: input.requiresDoctorWarning,
+    allowDoctorSelection: input.allowDoctorSelection,
+    doctorSpecialty:
+      input.doctorSpecialty === null
+        ? null
+        : trimOrUndefined(input.doctorSpecialty),
     status: input.status,
   });
 }
@@ -462,6 +483,28 @@ export function normalizeFacilityService(
         "serviceRequiresDoctorWarning",
         service,
         "requiresDoctorWarning",
+      ),
+    ),
+    serviceAllowDoctorSelection: normalizeBoolean(
+      pickNestedValue(
+        record,
+        "serviceAllowDoctorSelection",
+        service,
+        "allowDoctorSelection",
+      ) ??
+        pickNestedValue(
+          record,
+          "serviceRequiresDoctorWarning",
+          service,
+          "requiresDoctorWarning",
+        ),
+    ),
+    serviceDoctorSpecialty: normalizeNullableString(
+      pickNestedValue(
+        record,
+        "serviceDoctorSpecialty",
+        service,
+        "doctorSpecialty",
       ),
     ),
   };

@@ -309,12 +309,21 @@ export function ServiceCatalogTab() {
       render: (value: number) => (value ? `${value} phút` : "—"),
     },
     {
-      title: "Yêu cầu bác sĩ",
-      dataIndex: "requiresDoctorWarning",
-      width: 145,
+      title: "Chọn bác sĩ",
+      dataIndex: "allowDoctorSelection",
+      width: 180,
       align: "center",
-      render: (value: boolean) =>
-        value ? <Tag color="orange">Có</Tag> : <Tag>Không</Tag>,
+      render: (value: boolean, record: ManagementService) =>
+        value ? (
+          <div className="flex flex-col items-center gap-1">
+            <Tag color="orange">Có</Tag>
+            {record.doctorSpecialty ? (
+              <span className="text-xs text-slate-500">{record.doctorSpecialty}</span>
+            ) : null}
+          </div>
+        ) : (
+          <Tag>Không</Tag>
+        ),
     },
     {
       title: "Trạng thái",

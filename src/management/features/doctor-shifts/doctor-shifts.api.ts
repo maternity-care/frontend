@@ -232,6 +232,7 @@ function toListParams(
     dateFrom: params?.dateFrom,
     dateTo: params?.dateTo,
     status: params?.status,
+    specialty: params?.specialty?.trim(),
     page: params?.page,
     limit: params?.limit,
   });

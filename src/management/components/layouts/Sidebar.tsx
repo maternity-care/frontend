@@ -10,6 +10,7 @@ import {
   CalendarX2,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   DoorOpen,
   Gauge,
   Inbox,
@@ -27,6 +28,19 @@ import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_KEY = "management-sidebar-collapsed";
 const SIDEBAR_COLLAPSED_EVENT = "management-sidebar-collapsed-change";
+
+function normalizeSpecialty(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function isObstetricsSpecialty(value?: string | null) {
+  const normalized = normalizeSpecialty(value);
+  return normalized.includes("phu san") || normalized.includes("san phu");
+}
 
 function subscribeSidebarCollapsed(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -67,7 +81,8 @@ const navItems = [
   { href: "/management/message-accounts", label: "Tài khoản kênh", icon: Settings2, roles: ["super_admin", "admin", "staff"] },
   { href: "/management/shift-slots", label: "Quản lý khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
   { href: "/management/doctor-shifts", label: "Quản lý ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
-  { href: "/management/appointments", label: "Lịch đặt khám", icon: CalendarCheck, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
+  { href: "/management/appointments", label: "Lịch đặt khám", icon: CalendarCheck, roles: ["super_admin", "admin", "staff", "doctor"], obstetricsDoctorOnly: true },
+  { href: "/management/service-indications", label: "Chỉ định của tôi", icon: ClipboardList, roles: ["doctor"] },
   // { href: "/management/appointment-disruptions", label: "Lịch bị ảnh hưởng", icon: CalendarX2, roles: ["super_admin", "admin"] },
 ];
 
@@ -136,9 +151,16 @@ export function Sidebar() {
         : globalRoles,
   );
 
-  const visibleNavItems = navItems.filter(
-    (item) => !item.roles || item.roles.some((role) => effectiveRoles.has(role)),
-  );
+  const doctorSpecialty =
+    user?.doctor?.specialty ?? user?.staffProfile?.doctor?.specialty;
+  const isDoctor = effectiveRoles.has("doctor");
+  const isObstetricsDoctor = isDoctor && isObstetricsSpecialty(doctorSpecialty);
+
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.roles && !item.roles.some((role) => effectiveRoles.has(role))) return false;
+    if (item.obstetricsDoctorOnly && isDoctor && !isObstetricsDoctor) return false;
+    return true;
+  });
 
   return (
     <aside

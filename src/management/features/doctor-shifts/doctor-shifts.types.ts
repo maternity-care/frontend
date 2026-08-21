@@ -100,6 +100,7 @@ export interface GetDoctorShiftsParams {
   dateFrom?: string;
   dateTo?: string;
   status?: DoctorShiftStatus;
+  specialty?: string;
   page?: number;
   limit?: number;
 }

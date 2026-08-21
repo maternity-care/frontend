@@ -67,6 +67,14 @@ function isPastSlot(date: Dayjs, startTime: string) {
   return dayjs(`${date.format("YYYY-MM-DD")} ${startTime}`).isBefore(dayjs());
 }
 
+function getServiceDoctorSpecialty(service?: FacilityService) {
+  if (!service?.serviceAllowDoctorSelection) {
+    return undefined;
+  }
+
+  return service.serviceDoctorSpecialty?.trim() || undefined;
+}
+
 export function QuickAppointmentCard() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const [modal, modalContextHolder] = Modal.useModal();
@@ -120,11 +128,15 @@ export function QuickAppointmentCard() {
     setDoctorShifts([]);
     setAvailability(null);
 
-    if (!facilityId || !date) return;
+    const selectedService = facilityServices.find((service) => service.serviceId === serviceId);
+    const specialty = getServiceDoctorSpecialty(selectedService);
+
+    if (!facilityId || !serviceId || !date) return;
 
     setLoadingDoctors(true);
     getPublicWeeklyDoctorShifts({
       facilityId,
+      specialty,
       weekStart: date.startOf("week").format("YYYY-MM-DD"),
     })
       .then((shifts) => {
@@ -135,7 +147,7 @@ export function QuickAppointmentCard() {
         setError(getErrorMessage(loadError, "Không tải được lịch bác sĩ.")),
       )
       .finally(() => setLoadingDoctors(false));
-  }, [facilityId, date]);
+  }, [facilityId, serviceId, facilityServices, date]);
 
   const doctorOptions = useMemo(() => {
     const doctors = new Map<string, PublicDoctorShiftItem>();
@@ -157,6 +169,12 @@ export function QuickAppointmentCard() {
   const selectedDoctorShifts = useMemo(() => {
     return doctorShifts.filter((shift) => !doctorId || shift.doctorId === doctorId);
   }, [doctorId, doctorShifts]);
+
+  const selectedFacility = facilities.find((facility) => facility.id === facilityId);
+  const selectedService = facilityServices.find((service) => service.serviceId === serviceId);
+  const selectedServiceSpecialty = getServiceDoctorSpecialty(selectedService);
+  const canChooseDoctor = Boolean(selectedService?.serviceAllowDoctorSelection);
+  const selectedDoctor = doctorOptions.find((doctor) => doctor.value === doctorId);
 
   const canCheckAvailability = Boolean(facilityId && serviceId && date);
 
@@ -223,10 +241,6 @@ export function QuickAppointmentCard() {
         ...getSlotTimes(slot),
       })).filter((slot) => !date || !isPastSlot(date, slot.startTime)),
     ) ?? [];
-
-  const selectedFacility = facilities.find((facility) => facility.id === facilityId);
-  const selectedService = facilityServices.find((service) => service.serviceId === serviceId);
-  const selectedDoctor = doctorOptions.find((doctor) => doctor.value === doctorId);
 
   const bookSlot = async (slot: (typeof availableSlots)[number]) => {
     if (!accessToken) {
@@ -364,6 +378,8 @@ export function QuickAppointmentCard() {
           value={serviceId}
           onChange={(value) => {
             setServiceId(value);
+            setDoctorId(undefined);
+            setDoctorShifts([]);
             setAvailability(null);
           }}
           options={facilityServices.map((service) => ({
@@ -392,9 +408,15 @@ export function QuickAppointmentCard() {
           allowClear
           className="w-full min-w-0"
           popupMatchSelectWidth={false}
-          disabled={!facilityId || !date}
+          disabled={!facilityId || !serviceId || !date || !canChooseDoctor}
           loading={loadingDoctors}
-          placeholder={`${RESPONSE_MESSAGES.HOME.QUICK_APPOINTMENT.DOCTOR_PLACEHOLDER} (không bắt buộc)`}
+          placeholder={
+            !canChooseDoctor
+              ? "Dịch vụ này sẽ tự chọn bác sĩ theo ca trực"
+              : selectedServiceSpecialty
+              ? `${RESPONSE_MESSAGES.HOME.QUICK_APPOINTMENT.DOCTOR_PLACEHOLDER} chuyên khoa ${selectedServiceSpecialty}`
+              : "Chọn dịch vụ trước"
+          }
           optionFilterProp="label"
           value={doctorId}
           onChange={(value) => {
@@ -402,7 +424,11 @@ export function QuickAppointmentCard() {
             setAvailability(null);
           }}
           options={doctorOptions}
-          notFoundContent={facilityId && date ? "Chưa có bác sĩ trực ngày này" : null}
+          notFoundContent={
+            facilityId && serviceId && date
+              ? `Chưa có bác sĩ ${selectedServiceSpecialty ?? "phù hợp"} trực ngày này`
+              : null
+          }
         />
 
         {selectedDoctorShifts.length ? (

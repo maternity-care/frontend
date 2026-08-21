@@ -37,6 +37,8 @@ export interface Service {
   defaultDurationMinutes: number;
   basePrice: string;
   requiresDoctorWarning: boolean;
+  allowDoctorSelection: boolean;
+  doctorSpecialty?: string | null;
   status: ServiceStatus;
   createdAt: string;
   updatedAt: string;
@@ -62,6 +64,8 @@ export interface CreateServiceInput {
   defaultDurationMinutes: number;
   basePrice: string;
   requiresDoctorWarning: boolean;
+  allowDoctorSelection?: boolean;
+  doctorSpecialty?: string | null;
   status: ServiceStatus;
 }
 
@@ -73,6 +77,8 @@ export interface UpdateServiceInput {
   defaultDurationMinutes?: number;
   basePrice?: string;
   requiresDoctorWarning?: boolean;
+  allowDoctorSelection?: boolean;
+  doctorSpecialty?: string | null;
   status?: ServiceStatus;
 }
 
@@ -107,6 +113,8 @@ export interface FacilityService {
   serviceBasePrice: string;
   serviceDefaultDurationMinutes: number;
   serviceRequiresDoctorWarning: boolean;
+  serviceAllowDoctorSelection: boolean;
+  serviceDoctorSpecialty?: string | null;
 }
 
 export interface GetFacilityServicesParams extends PaginationParams {
