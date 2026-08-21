@@ -53,6 +53,8 @@ export interface ManagementService {
   defaultDurationMinutes: number;
   basePrice: string;
   requiresDoctorWarning: boolean;
+  allowDoctorSelection: boolean;
+  doctorSpecialty?: string | null;
   status: ServiceStatus;
 
   facilityAssignments?: ServiceFacilityAssignment[];
@@ -86,6 +88,8 @@ export interface CreateManagementServiceInput {
   defaultDurationMinutes: number;
   basePrice: string;
   requiresDoctorWarning: boolean;
+  allowDoctorSelection?: boolean;
+  doctorSpecialty?: string | null;
   status: ServiceStatus;
   facilityAssignments?: ServiceFacilityAssignmentInput[];
 }

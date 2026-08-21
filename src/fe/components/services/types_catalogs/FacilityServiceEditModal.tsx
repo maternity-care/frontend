@@ -1,6 +1,6 @@
 "use client";
 
-import { Form, InputNumber, message, Modal, Select, Typography } from "antd";
+import { Form, InputNumber, message, Modal, Select, Switch, Typography } from "antd";
 import { useEffect, useState } from "react";
 
 import {
@@ -8,7 +8,9 @@ import {
   updateManagementFacilityService,
 } from "@/management/features/services/facility-services/facility-services.api";
 import type { ManagementFacilityService } from "@/management/features/services/facility-services/facility-services.types";
+import { updateManagementService } from "@/management/features/services/services/services.api";
 import type { ManagementService } from "@/management/features/services/services/services.types";
+import { useDoctorSpecialties } from "@/hooks/doctors/useDoctorLookups";
 
 const { Text } = Typography;
 
@@ -16,6 +18,8 @@ type FormValues = {
   price: number;
   durationMinutes: number;
   status: "active" | "inactive";
+  allowDoctorSelection: boolean;
+  doctorSpecialty?: string | null;
 };
 
 type FacilityServiceEditModalProps = {
@@ -52,6 +56,8 @@ export function FacilityServiceEditModal({
   const [form] = Form.useForm<FormValues>();
   const [messageApi, contextHolder] = message.useMessage();
   const [submitting, setSubmitting] = useState(false);
+  const allowDoctorSelection = Form.useWatch("allowDoctorSelection", form);
+  const { specialtyOptions, specialtiesLoading } = useDoctorSpecialties();
 
   const isEdit = Boolean(facilityService);
 
@@ -65,6 +71,9 @@ export function FacilityServiceEditModal({
         service.defaultDurationMinutes ??
         30,
       status: facilityService?.status ?? "active",
+      allowDoctorSelection:
+        service.allowDoctorSelection ?? service.requiresDoctorWarning,
+      doctorSpecialty: service.doctorSpecialty ?? undefined,
     });
   }, [open, service, facilityService, form]);
 
@@ -94,6 +103,14 @@ export function FacilityServiceEditModal({
         await createManagementFacilityService(payload);
         messageApi.success("Cấu hình dịch vụ tại cơ sở thành công.");
       }
+
+      await updateManagementService(service.id, {
+        allowDoctorSelection: values.allowDoctorSelection,
+        requiresDoctorWarning: values.allowDoctorSelection,
+        doctorSpecialty: values.allowDoctorSelection
+          ? values.doctorSpecialty?.trim()
+          : null,
+      });
 
       await onSuccess();
       onCancel();
@@ -185,6 +202,47 @@ export function FacilityServiceEditModal({
                 { value: "active", label: "Hoạt động" },
                 { value: "inactive", label: "Ngừng hoạt động" },
               ]}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="allowDoctorSelection"
+            label="Cho phép người đặt chọn bác sĩ"
+            valuePropName="checked"
+          >
+            <Switch
+              checkedChildren="Bật"
+              unCheckedChildren="Tắt"
+              onChange={(checked) => {
+                if (!checked) {
+                  form.setFieldValue("doctorSpecialty", undefined);
+                }
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="doctorSpecialty"
+            label="Chuyên khoa bác sĩ"
+            rules={[
+              {
+                required: Boolean(allowDoctorSelection),
+                message: "Vui lòng chọn chuyên khoa bác sĩ.",
+              },
+            ]}
+          >
+            <Select
+              showSearch
+              allowClear={!allowDoctorSelection}
+              disabled={!allowDoctorSelection}
+              loading={specialtiesLoading}
+              optionFilterProp="label"
+              placeholder={
+                allowDoctorSelection
+                  ? "Chọn chuyên khoa của dịch vụ"
+                  : "Bật chọn bác sĩ để cấu hình chuyên khoa"
+              }
+              options={specialtyOptions}
             />
           </Form.Item>
         </Form>

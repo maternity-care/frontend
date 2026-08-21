@@ -6,6 +6,7 @@ import {
   Alert,
   DatePicker,
   Descriptions,
+  Divider,
   Form,
   Input,
   Modal,
@@ -21,10 +22,12 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import {
   CheckCircle2,
+  ClipboardList,
   Eye,
   FilePlus2,
   FileText,
   LogIn,
+  Printer,
   RefreshCw,
   UserX,
   XCircle,
@@ -37,14 +40,22 @@ import {
   type TableFilterValues,
 } from "@/management/components/ui/TableFilter";
 import {
+  addAppointmentServiceItems,
+  callAppointmentServiceItem,
   cancelAppointment,
   checkInAppointment,
+  checkInAppointmentServiceItem,
   completeAppointment,
+  completeAppointmentServiceItem,
+  getAppointmentServiceItems,
   getManagementAppointments,
   markNoShowAppointment,
   rescheduleAppointment,
+  startAppointmentServiceItem,
 } from "@/management/features/appointments/appointments.api";
 import type {
+  AppointmentServiceItem,
+  AppointmentServiceItemStatus,
   ManagementAppointment,
   ManagementAppointmentStatus,
 } from "@/management/features/appointments/appointments.types";
@@ -59,7 +70,13 @@ import type { ManagementPregnancyProfile } from "@/management/features/managemen
 import { PregnancyProfileDetailModal } from "@/fe/components/records/management/PregnancyProfileDetailModal";
 import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
 import { getDoctorAvailability } from "@/management/features/doctor-shifts/doctor-shifts.api";
+import type { DoctorShiftItem } from "@/management/features/doctor-shifts/doctor-shifts.types";
+import { getPublicWeeklyDoctorShifts } from "@/features/doctor-shifts/public-doctor-shifts.api";
 import { useAuthStore } from "@/features/auth/auth.store";
+import { getFacilityServices } from "@/management/features/services/services.api";
+import type { FacilityService } from "@/management/features/services/services.types";
+import { getRooms } from "@/management/features/rooms/rooms.api";
+import type { ClinicRoom } from "@/management/features/rooms/rooms.types";
 
 const { Text } = Typography;
 
@@ -78,10 +95,24 @@ const statusMeta: Record<
   no_show: { label: "Không đến", color: "default" },
 };
 
+const serviceItemStatusMeta: Record<
+  AppointmentServiceItemStatus,
+  { label: string; color: string }
+> = {
+  ordered: { label: "Đã chỉ định", color: "blue" },
+  checked_in: { label: "Đã check-in", color: "purple" },
+  waiting: { label: "Đang chờ", color: "gold" },
+  called: { label: "Đã gọi", color: "cyan" },
+  in_progress: { label: "Đang làm", color: "processing" },
+  waiting_result: { label: "Chờ kết quả", color: "orange" },
+  result_uploaded: { label: "Đã có KQ", color: "green" },
+  completed: { label: "Hoàn tất", color: "green" },
+  cancelled: { label: "Đã hủy", color: "red" },
+};
+
 type CheckInFormValues = {
   pregnancyProfileId: string;
   doctorId?: string;
-  confirmDoctorChange?: boolean;
 };
 
 type RescheduleFormValues = {
@@ -89,6 +120,13 @@ type RescheduleFormValues = {
   date: Dayjs;
   slot: string;
   reason?: string;
+};
+
+type ServiceIndicationFormValues = {
+  serviceId: string;
+  roomId: string;
+  doctorId?: string;
+  note?: string;
 };
 
 type AvailabilitySlot = { startTime: string; endTime: string } | string;
@@ -105,15 +143,44 @@ function getDoctorLabel(doctor: Doctor) {
   }`;
 }
 
+function getAppointmentDoctorLabel(appointment?: ManagementAppointment | null) {
+  if (!appointment?.doctorId) return "";
+  return (
+    [appointment.doctorTitle, appointment.doctorName].filter(Boolean).join(" ") ||
+    `Bác sĩ #${appointment.doctorId}`
+  );
+}
+
 function formatPatient(appointment: ManagementAppointment) {
   return appointment.patientName || `User #${appointment.patientId}`;
 }
 
+function normalizeSearchText(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export default function ManagementAppointmentsPage() {
   const authUser = useAuthStore((state) => state.user);
+  const effectiveRoleNames = useAuthStore((state) => state.roles);
   const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
-  const isSuperAdmin =
-    authUser?.roles?.some((role) => role.name === "super_admin") ?? false;
+  const isSuperAdmin = effectiveRoleNames.includes("super_admin");
+  const roleNames = useMemo(
+    () => new Set(effectiveRoleNames),
+    [effectiveRoleNames],
+  );
+  const canCreateIndication =
+    roleNames.has("super_admin") || roleNames.has("admin") || roleNames.has("doctor");
+  const isDoctor = roleNames.has("doctor");
+  const canCheckInAppointment =
+    roleNames.has("super_admin") || roleNames.has("admin") || roleNames.has("staff");
+  const canOperateIndication =
+    roleNames.has("super_admin") ||
+    roleNames.has("admin") ||
+    roleNames.has("doctor");
   const activeFacility = authUser?.facilities?.find(
     (facility) => String(facility.id) === String(activeFacilityId),
   );
@@ -160,20 +227,50 @@ export default function ManagementAppointmentsPage() {
       endTime: string;
     }>
   >([]);
+  const [serviceItemsOpen, setServiceItemsOpen] = useState(false);
+  const [serviceItems, setServiceItems] = useState<AppointmentServiceItem[]>([]);
+  const [loadingServiceItems, setLoadingServiceItems] = useState(false);
+  const [facilityServices, setFacilityServices] = useState<FacilityService[]>([]);
+  const [serviceRooms, setServiceRooms] = useState<ClinicRoom[]>([]);
+  const [serviceDoctorShifts, setServiceDoctorShifts] = useState<DoctorShiftItem[]>([]);
+  const [serviceItemSubmitting, setServiceItemSubmitting] = useState(false);
+  const [loadingServiceDoctors, setLoadingServiceDoctors] = useState(false);
   const [checkInForm] = Form.useForm<CheckInFormValues>();
   const [rescheduleForm] = Form.useForm<RescheduleFormValues>();
+  const [serviceItemForm] = Form.useForm<ServiceIndicationFormValues>();
   const scopedFacilityId = isSuperAdmin
     ? facilityId
     : (activeFacilityId ?? undefined);
 
-  const doctorOptions = useMemo(
-    () =>
-      doctors.map((doctor) => ({
-        value: doctor.id,
-        label: getDoctorLabel(doctor),
-      })),
-    [doctors],
-  );
+  const doctorOptions = useMemo(() => {
+    const options = doctors.map((doctor) => ({
+      value: doctor.id,
+      label: getDoctorLabel(doctor),
+    }));
+    if (
+      selectedAppointment?.doctorId &&
+      !options.some((option) => option.value === selectedAppointment.doctorId)
+    ) {
+      options.unshift({
+        value: selectedAppointment.doctorId,
+        label: getAppointmentDoctorLabel(selectedAppointment),
+      });
+    }
+    return options;
+  }, [doctors, selectedAppointment]);
+
+  const serviceDoctorOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return serviceDoctorShifts
+      .filter((shift) => shift.staffId && shift.roomId && !seen.has(shift.staffId))
+      .map((shift) => {
+        seen.add(shift.staffId);
+        return {
+          value: shift.staffId,
+          label: `${shift.doctorTitle ? `${shift.doctorTitle} ` : ""}${shift.doctorName} · ${shift.doctorSpecialty || "Chuyên khoa"} · ${shift.roomName || `Phòng #${shift.roomId}`}`,
+        };
+      });
+  }, [serviceDoctorShifts]);
 
   const filterColumns: TableFilterColumn[] = useMemo(
     () => [
@@ -209,6 +306,7 @@ export default function ManagementAppointmentsPage() {
         type: "select",
         width: 260,
         options: doctorOptions,
+        disabled: isDoctor,
       },
       {
         field: "dateRange",
@@ -217,7 +315,7 @@ export default function ManagementAppointmentsPage() {
         width: 280,
       },
     ],
-    [doctorOptions, facilityOptions, isSuperAdmin],
+    [doctorOptions, facilityOptions, isDoctor, isSuperAdmin],
   );
 
   const filterValues: TableFilterValues = {
@@ -249,11 +347,13 @@ export default function ManagementAppointmentsPage() {
       );
     }
 
-    setDoctorId(
-      values.doctorId === undefined || values.doctorId === null
-        ? undefined
-        : String(values.doctorId),
-    );
+    if (!isDoctor) {
+      setDoctorId(
+        values.doctorId === undefined || values.doctorId === null
+          ? undefined
+          : String(values.doctorId),
+      );
+    }
 
     if (Array.isArray(values.dateRange)) {
       setDateRange(values.dateRange as [Dayjs | null, Dayjs | null]);
@@ -267,7 +367,7 @@ export default function ManagementAppointmentsPage() {
     try {
       setAppointments(
         await getManagementAppointments({
-          scope,
+          scope: isDoctor ? "mine" : scope,
           status,
           search,
           facilityId: scopedFacilityId,
@@ -281,7 +381,7 @@ export default function ManagementAppointmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, doctorId, scope, scopedFacilityId, search, status]);
+  }, [dateRange, doctorId, isDoctor, scope, scopedFacilityId, search, status]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -298,13 +398,34 @@ export default function ManagementAppointmentsPage() {
         setDoctors([]);
         return;
       }
-      void getDoctors({
-        limit: 100,
-        facilityId: isSuperAdmin
-          ? facilityId
-          : (activeFacilityId ?? undefined),
-      })
-        .then((result) => setDoctors(result.items))
+      const facilityIdForDoctors = isSuperAdmin
+        ? facilityId
+        : (activeFacilityId ?? undefined);
+      const loadDoctors = async () => {
+        const firstPage = await getDoctors({
+          limit: 50,
+          page: 1,
+          facilityId: facilityIdForDoctors,
+        });
+        const totalPages = Math.max(1, firstPage.totalPages || 1);
+        const restPages =
+          totalPages > 1
+            ? await Promise.all(
+                Array.from({ length: totalPages - 1 }, (_, index) =>
+                  getDoctors({
+                    limit: 50,
+                    page: index + 2,
+                    facilityId: facilityIdForDoctors,
+                  }),
+                ),
+              )
+            : [];
+        setDoctors([
+          ...firstPage.items,
+          ...restPages.flatMap((page) => page.items),
+        ]);
+      };
+      void loadDoctors()
         .catch(() => setDoctors([]));
     }, 0);
 
@@ -351,7 +472,6 @@ export default function ManagementAppointmentsPage() {
     checkInForm.setFieldsValue({
       pregnancyProfileId: appointment.pregnancyProfileId ?? undefined,
       doctorId: appointment.doctorId ?? undefined,
-      confirmDoctorChange: false,
     });
     setLoadingProfiles(true);
     try {
@@ -414,16 +534,8 @@ export default function ManagementAppointmentsPage() {
     }
   };
 
-  const handleCheckIn = async (values: CheckInFormValues) => {
+  const submitCheckIn = async (values: CheckInFormValues) => {
     if (!selectedAppointment) return;
-    if (
-      values.doctorId &&
-      values.doctorId !== selectedAppointment.doctorId &&
-      !values.confirmDoctorChange
-    ) {
-      message.warning("Nếu đổi bác sĩ, bạn cần tick xác nhận đổi bác sĩ.");
-      return;
-    }
     try {
       await checkInAppointment(selectedAppointment.id, {
         pregnancyProfileId: values.pregnancyProfileId,
@@ -438,6 +550,28 @@ export default function ManagementAppointmentsPage() {
     } catch {
       message.error("Check-in thất bại.");
     }
+  };
+
+  const handleCheckIn = async (values: CheckInFormValues) => {
+    if (!selectedAppointment) return;
+    const oldDoctorId = selectedAppointment.doctorId ?? undefined;
+    const newDoctorId = values.doctorId;
+    if (newDoctorId && oldDoctorId && newDoctorId !== oldDoctorId) {
+      const oldDoctorLabel = getAppointmentDoctorLabel(selectedAppointment);
+      const newDoctorLabel =
+        doctorOptions.find((option) => option.value === newDoctorId)?.label ??
+        `Bác sĩ #${newDoctorId}`;
+      Modal.confirm({
+        title: "Xác nhận đổi bác sĩ?",
+        content: `Đổi bác sĩ phụ trách từ ${oldDoctorLabel} sang ${newDoctorLabel}.`,
+        okText: "Xác nhận đổi",
+        cancelText: "Hủy",
+        centered: true,
+        onOk: () => submitCheckIn(values),
+      });
+      return;
+    }
+    await submitCheckIn(values);
   };
 
   const handleReschedule = async (values: RescheduleFormValues) => {
@@ -552,6 +686,195 @@ export default function ManagementAppointmentsPage() {
     }
   };
 
+  const loadServiceItems = useCallback(async (appointmentId: string) => {
+    setLoadingServiceItems(true);
+    try {
+      setServiceItems(await getAppointmentServiceItems(appointmentId));
+    } catch {
+      message.error("Không tải được danh sách chỉ định.");
+      setServiceItems([]);
+    } finally {
+      setLoadingServiceItems(false);
+    }
+  }, []);
+
+  const applyServiceShift = useCallback(
+    (shift: DoctorShiftItem | null) => {
+      if (!shift) {
+        serviceItemForm.setFieldsValue({ doctorId: undefined, roomId: undefined });
+        message.warning("Chưa có bác sĩ đang trực phù hợp trong ngày lịch này.");
+        return;
+      }
+      serviceItemForm.setFieldsValue({
+        doctorId: shift.staffId,
+        roomId: shift.roomId,
+      });
+    },
+    [serviceItemForm],
+  );
+
+  const handleServiceSelect = async (serviceId: string) => {
+    if (!selectedAppointment) return;
+    const service = facilityServices.find((item) => item.serviceId === serviceId);
+    const specialty = service?.serviceDoctorSpecialty?.trim() || undefined;
+    serviceItemForm.setFieldsValue({ doctorId: undefined, roomId: undefined });
+    setServiceDoctorShifts([]);
+    setLoadingServiceDoctors(true);
+    try {
+      const shifts = await getPublicWeeklyDoctorShifts({
+        facilityId: selectedAppointment.facilityId,
+        specialty,
+        weekStart: selectedAppointment.date,
+      });
+      const availableShifts = shifts.filter(
+        (shift) =>
+          shift.staffId &&
+          shift.roomId &&
+          shift.status === "available" &&
+          shift.shiftDate === selectedAppointment.date &&
+          String(shift.facilityId) === String(selectedAppointment.facilityId),
+      ) as unknown as DoctorShiftItem[];
+      setServiceDoctorShifts(availableShifts);
+      applyServiceShift(availableShifts[Math.floor(Math.random() * availableShifts.length)] ?? null);
+    } catch {
+      setServiceDoctorShifts([]);
+      message.warning("Không tải được danh sách bác sĩ đang trực tại cơ sở này.");
+    } finally {
+      setLoadingServiceDoctors(false);
+    }
+  };
+
+  const handleServiceDoctorSelect = (doctorId?: string) => {
+    if (!doctorId) {
+      serviceItemForm.setFieldsValue({ roomId: undefined });
+      return;
+    }
+    const shift = serviceDoctorShifts.find((item) => item.staffId === doctorId && item.roomId);
+    serviceItemForm.setFieldsValue({ roomId: shift?.roomId });
+  };
+
+  const openServiceItems = async (appointment: ManagementAppointment) => {
+    setSelectedAppointment(appointment);
+    setServiceItemsOpen(true);
+    serviceItemForm.resetFields();
+    void loadServiceItems(appointment.id);
+    const facilityIdForLookup = appointment.facilityId;
+    try {
+      const [facilityServiceResult, roomResult] = await Promise.all([
+        getFacilityServices({
+          facilityId: facilityIdForLookup,
+          status: "active" as never,
+          limit: 200,
+        }),
+        getRooms({
+          facilityId: facilityIdForLookup,
+          status: "active",
+          limit: 200,
+        }),
+      ]);
+      setFacilityServices(facilityServiceResult);
+      setServiceRooms(roomResult.items);
+    } catch {
+      message.warning("Không tải đủ danh sách dịch vụ/phòng/ca trực của cơ sở.");
+      setFacilityServices([]);
+      setServiceRooms([]);
+    }
+
+    setServiceDoctorShifts([]);
+  };
+
+  const handleAddServiceItem = async (values: ServiceIndicationFormValues) => {
+    if (!selectedAppointment) return;
+    setServiceItemSubmitting(true);
+    try {
+      if (!values.doctorId || !values.roomId) {
+        message.warning("Cần chọn bác sĩ đang trực để tự lấy phòng thực hiện.");
+        return;
+      }
+      const assignedDoctorId = values.doctorId;
+      await addAppointmentServiceItems(selectedAppointment.id, {
+        items: [
+          {
+            serviceId: values.serviceId,
+            roomId: values.roomId,
+            doctorId: assignedDoctorId,
+            note: values.note,
+          },
+        ],
+      });
+      message.success("Đã thêm chỉ định dịch vụ.");
+      serviceItemForm.resetFields();
+      await loadServiceItems(selectedAppointment.id);
+    } catch {
+      message.error("Không thêm được chỉ định.");
+    } finally {
+      setServiceItemSubmitting(false);
+    }
+  };
+
+  const refreshOneServiceItem = async (
+    item: AppointmentServiceItem,
+    action: () => Promise<AppointmentServiceItem>,
+    successMessage: string,
+  ) => {
+    if (!selectedAppointment) return;
+    try {
+      await action();
+      message.success(successMessage);
+      await loadServiceItems(selectedAppointment.id);
+    } catch {
+      message.error("Thao tác chỉ định thất bại.");
+    }
+  };
+
+  const printServiceItem = (item: AppointmentServiceItem) => {
+    if (!selectedAppointment) return;
+    const printWindow = window.open("", "_blank", "width=760,height=900");
+    if (!printWindow) {
+      message.warning("Trình duyệt đang chặn cửa sổ in.");
+      return;
+    }
+    const doctorText = [selectedAppointment.doctorTitle, selectedAppointment.doctorName]
+      .filter(Boolean)
+      .join(" ");
+    const assignedDoctorText =
+      [item.doctorTitle, item.doctorName].filter(Boolean).join(" ") ||
+      (item.doctorStaffId ? `Bác sĩ #${item.doctorStaffId}` : "");
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Phiếu chỉ định #${item.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 32px; color: #111827; }
+            h1 { font-size: 22px; margin: 0 0 18px; text-align: center; }
+            .row { display: flex; border-bottom: 1px solid #e5e7eb; padding: 8px 0; }
+            .label { width: 190px; color: #475569; font-weight: 600; }
+            .value { flex: 1; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 56px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h1>PHIẾU CHỈ ĐỊNH DỊCH VỤ</h1>
+          <div class="row"><div class="label">Mã lịch</div><div class="value">#${selectedAppointment.id}</div></div>
+          <div class="row"><div class="label">Người bệnh</div><div class="value">${formatPatient(selectedAppointment)}</div></div>
+          <div class="row"><div class="label">SĐT/Email</div><div class="value">${selectedAppointment.patientPhone || selectedAppointment.patientEmail || ""}</div></div>
+          <div class="row"><div class="label">Ngày khám</div><div class="value">${dayjs(selectedAppointment.date).format("DD/MM/YYYY")} ${selectedAppointment.startTime} - ${selectedAppointment.endTime}</div></div>
+          <div class="row"><div class="label">Bác sĩ khám ban đầu</div><div class="value">${doctorText || ""}</div></div>
+          <div class="row"><div class="label">Dịch vụ chỉ định</div><div class="value">${item.serviceName || `#${item.serviceId}`}</div></div>
+          <div class="row"><div class="label">Bác sĩ thực hiện</div><div class="value">${assignedDoctorText}</div></div>
+          <div class="row"><div class="label">Phòng thực hiện</div><div class="value">${item.roomName || `#${item.roomId}`}</div></div>
+          <div class="row"><div class="label">Ghi chú</div><div class="value">${item.note || ""}</div></div>
+          <div class="signatures">
+            <div>Người chỉ định<br/><br/><br/>______________</div>
+            <div>Nhân viên tiếp nhận<br/><br/><br/>______________</div>
+          </div>
+          <script>window.print(); window.close();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const columns: ColumnsType<ManagementAppointment> = [
     {
       title: "Lịch",
@@ -611,71 +934,229 @@ export default function ManagementAppointmentsPage() {
     {
       title: "Thao tác",
       fixed: "right",
+      render: (_, item) => {
+        if (!canCreateIndication && ["checked_in", "in_progress"].includes(item.status)) {
+          return (
+            <Space wrap>
+              <Button
+                size="small"
+                icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                onClick={() => handleComplete(item)}
+              >
+                Đã xong
+              </Button>
+            </Space>
+          );
+        }
+
+        return (
+          <Space wrap>
+            <Button
+              size="small"
+              icon={<Eye className="h-3.5 w-3.5" />}
+              onClick={() => {
+                setSelectedAppointment(item);
+                setDetailOpen(true);
+              }}
+            >
+              Chi tiết
+            </Button>
+            {item.pregnancyProfileId ? (
+              <Button
+                size="small"
+                icon={<FilePlus2 className="h-3.5 w-3.5" />}
+                onClick={() => openCreateMedicalRecord(item)}
+              >
+                Thêm kết quả
+              </Button>
+            ) : null}
+            {canCreateIndication ? (
+              <Button
+                size="small"
+                icon={<ClipboardList className="h-3.5 w-3.5" />}
+                onClick={() => openServiceItems(item)}
+              >
+                Chỉ định
+              </Button>
+            ) : null}
+            {["checked_in", "in_progress"].includes(item.status) ? (
+              <Button
+                size="small"
+                icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                onClick={() => handleComplete(item)}
+              >
+                Đã xong
+              </Button>
+            ) : null}
+            {canCheckInAppointment && ["booked", "confirmed", "rescheduled"].includes(item.status) ? (
+              <Button
+                size="small"
+                type="primary"
+                icon={<LogIn className="h-3.5 w-3.5" />}
+                onClick={() => openCheckIn(item)}
+              >
+                Check-in
+              </Button>
+            ) : null}
+            {["booked", "confirmed", "rescheduled"].includes(item.status) ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<RefreshCw className="h-3.5 w-3.5" />}
+                  onClick={() => openReschedule(item)}
+                >
+                  Dời
+                </Button>
+                <Button
+                  size="small"
+                  icon={<UserX className="h-3.5 w-3.5" />}
+                  onClick={() => handleNoShow(item)}
+                >
+                  No-show
+                </Button>
+                <Button
+                  danger
+                  size="small"
+                  icon={<XCircle className="h-3.5 w-3.5" />}
+                  onClick={() => handleCancel(item)}
+                >
+                  Hủy
+                </Button>
+              </>
+            ) : null}
+          </Space>
+        );
+      },
+    },
+  ];
+
+  const serviceItemColumns: ColumnsType<AppointmentServiceItem> = [
+    {
+      title: "Dịch vụ",
+      render: (_, item) => (
+        <div>
+          <Text strong>{item.serviceName || `Dịch vụ #${item.serviceId}`}</Text>
+          <div className="text-xs text-slate-500">
+            {Number(item.durationMinutes ?? 0) || "—"} phút
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Phòng",
+      render: (_, item) => item.roomName || `Phòng #${item.roomId}`,
+    },
+    {
+      title: "Bác sĩ thực hiện",
+      render: (_, item) => {
+        const assignedDoctorText =
+          [item.doctorTitle, item.doctorName].filter(Boolean).join(" ") ||
+          (item.doctorStaffId ? `Bác sĩ #${item.doctorStaffId}` : "Chưa gán");
+
+        return (
+          <div>
+            <Text>{assignedDoctorText}</Text>
+            {item.doctorSpecialty ? (
+              <div className="text-xs text-slate-500">{item.doctorSpecialty}</div>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      title: "Trạng thái",
+      render: (_, item) => (
+        <Tag color={serviceItemStatusMeta[item.status]?.color}>
+          {serviceItemStatusMeta[item.status]?.label ?? item.status}
+        </Tag>
+      ),
+    },
+    {
+      title: "KQ",
+      render: (_, item) =>
+        item.medicalRecordId ? (
+          <Tag color="green">Đã upload</Tag>
+        ) : item.resultExpectedAt ? (
+          <Tag color="orange">
+            Hẹn {dayjs(item.resultExpectedAt).format("HH:mm DD/MM")}
+          </Tag>
+        ) : (
+          <Tag>Chưa có</Tag>
+        ),
+    },
+    {
+      title: "Thao tác",
+      fixed: "right",
       render: (_, item) => (
         <Space wrap>
           <Button
             size="small"
-            icon={<Eye className="h-3.5 w-3.5" />}
-            onClick={() => {
-              setSelectedAppointment(item);
-              setDetailOpen(true);
-            }}
+            icon={<Printer className="h-3.5 w-3.5" />}
+            onClick={() => printServiceItem(item)}
           >
-            Chi tiết
+            In phiếu
           </Button>
-          {item.pregnancyProfileId ? (
-            <Button
-              size="small"
-              icon={<FilePlus2 className="h-3.5 w-3.5" />}
-              onClick={() => openCreateMedicalRecord(item)}
-            >
-              Thêm kết quả
-            </Button>
-          ) : null}
-          {["booked", "confirmed", "rescheduled"].includes(item.status) ? (
+          {canOperateIndication && item.status === "ordered" ? (
             <Button
               size="small"
               type="primary"
-              icon={<LogIn className="h-3.5 w-3.5" />}
-              onClick={() => openCheckIn(item)}
+              onClick={() =>
+                refreshOneServiceItem(
+                  item,
+                  () =>
+                    checkInAppointmentServiceItem(
+                      item.appointmentId,
+                      item.id,
+                    ),
+                  "Đã check-in chỉ định.",
+                )
+              }
             >
               Check-in
             </Button>
           ) : null}
-          {["checked_in", "in_progress"].includes(item.status) ? (
+          {canOperateIndication && item.status === "waiting" ? (
             <Button
               size="small"
-              icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-              onClick={() => handleComplete(item)}
+              onClick={() =>
+                refreshOneServiceItem(
+                  item,
+                  () => callAppointmentServiceItem(item.appointmentId, item.id),
+                  "Đã gọi vào phòng.",
+                )
+              }
             >
-              Đã xong
+              Gọi
             </Button>
           ) : null}
-          {["booked", "confirmed", "rescheduled"].includes(item.status) ? (
-            <>
-              <Button
-                size="small"
-                icon={<RefreshCw className="h-3.5 w-3.5" />}
-                onClick={() => openReschedule(item)}
-              >
-                Dời
-              </Button>
-              <Button
-                size="small"
-                icon={<UserX className="h-3.5 w-3.5" />}
-                onClick={() => handleNoShow(item)}
-              >
-                No-show
-              </Button>
-              <Button
-                danger
-                size="small"
-                icon={<XCircle className="h-3.5 w-3.5" />}
-                onClick={() => handleCancel(item)}
-              >
-                Hủy
-              </Button>
-            </>
+          {canOperateIndication && item.status === "called" ? (
+            <Button
+              size="small"
+              onClick={() =>
+                refreshOneServiceItem(
+                  item,
+                  () => startAppointmentServiceItem(item.appointmentId, item.id),
+                  "Đã bắt đầu dịch vụ.",
+                )
+              }
+            >
+              Bắt đầu
+            </Button>
+          ) : null}
+          {canOperateIndication && item.status === "in_progress" ? (
+            <Button
+              size="small"
+              onClick={() =>
+                refreshOneServiceItem(
+                  item,
+                  () =>
+                    completeAppointmentServiceItem(item.appointmentId, item.id),
+                  "Đã hoàn tất dịch vụ.",
+                )
+              }
+            >
+              Xong
+            </Button>
           ) : null}
         </Space>
       ),
@@ -716,20 +1197,30 @@ export default function ManagementAppointmentsPage() {
 
       <div className="mt-6">
         <Tabs
-          activeKey={scope}
+          activeKey={isDoctor ? "mine" : scope}
           onChange={(value) => setScope(value as "all" | "mine")}
-          items={[
-            {
-              key: "all",
-              label: "Tất cả",
-              children: listContent,
-            },
-            {
-              key: "mine",
-              label: "Lịch của tôi",
-              children: listContent,
-            },
-          ]}
+          items={
+            isDoctor
+              ? [
+                  {
+                    key: "mine",
+                    label: "Lịch của tôi",
+                    children: listContent,
+                  },
+                ]
+              : [
+                  {
+                    key: "all",
+                    label: "Tất cả",
+                    children: listContent,
+                  },
+                  {
+                    key: "mine",
+                    label: "Lịch của tôi",
+                    children: listContent,
+                  },
+                ]
+          }
         />
       </div>
 
@@ -840,32 +1331,6 @@ export default function ManagementAppointmentsPage() {
               options={doctorOptions}
             />
           </Form.Item>
-          <Form.Item shouldUpdate noStyle>
-            {({ getFieldValue }) =>
-              getFieldValue("doctorId") &&
-              getFieldValue("doctorId") !== selectedAppointment?.doctorId ? (
-                <Form.Item
-                  name="confirmDoctorChange"
-                  valuePropName="checked"
-                  rules={[
-                    {
-                      validator: (_, value) =>
-                        value
-                          ? Promise.resolve()
-                          : Promise.reject(
-                              new Error("Cần xác nhận đổi bác sĩ"),
-                            ),
-                    },
-                  ]}
-                >
-                  <label className="inline-flex items-center gap-2 text-sm">
-                    <input type="checkbox" className="mr-1" />
-                    Tôi xác nhận đổi bác sĩ cho lịch này.
-                  </label>
-                </Form.Item>
-              ) : null
-            }
-          </Form.Item>
         </Form>
       </Modal>
 
@@ -911,6 +1376,116 @@ export default function ManagementAppointmentsPage() {
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={
+          selectedAppointment
+            ? `Chỉ định dịch vụ - lịch #${selectedAppointment.id}`
+            : "Chỉ định dịch vụ"
+        }
+        open={serviceItemsOpen}
+        onCancel={() => setServiceItemsOpen(false)}
+        footer={null}
+        width={980}
+      >
+        {selectedAppointment ? (
+          <div className="space-y-4">
+            <Descriptions bordered size="small" column={2}>
+              <Descriptions.Item label="Người bệnh">
+                {formatPatient(selectedAppointment)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Lịch khám">
+                {dayjs(selectedAppointment.date).format("DD/MM/YYYY")}{" "}
+                {selectedAppointment.startTime} - {selectedAppointment.endTime}
+              </Descriptions.Item>
+              <Descriptions.Item label="Dịch vụ đặt lịch">
+                {selectedAppointment.serviceName}
+              </Descriptions.Item>
+              <Descriptions.Item label="Bác sĩ khám">
+                {selectedAppointment.doctorTitle} {selectedAppointment.doctorName}
+              </Descriptions.Item>
+            </Descriptions>
+
+            {canCreateIndication ? (
+              <>
+                <Divider>Thêm chỉ định</Divider>
+                <Form
+                  form={serviceItemForm}
+                  layout="vertical"
+                  onFinish={handleAddServiceItem}
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Form.Item
+                      name="serviceId"
+                      label="Dịch vụ chỉ định"
+                      rules={[{ required: true, message: "Chọn dịch vụ" }]}
+                    >
+                      <Select
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="Chọn dịch vụ tại cơ sở"
+                        onChange={handleServiceSelect}
+                        options={facilityServices.map((item) => ({
+                          value: item.serviceId,
+                          label: `${item.serviceName} · ${item.durationMinutes} phút`,
+                        }))}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      name="roomId"
+                      label="Phòng thực hiện"
+                      rules={[{ required: true, message: "Chọn phòng" }]}
+                    >
+                      <Select
+                        showSearch
+                        disabled
+                        optionFilterProp="label"
+                        placeholder="Tự lấy theo phòng trực của bác sĩ"
+                        options={serviceRooms.map((room) => ({
+                          value: room.id,
+                          label: `${room.roomName} · ${room.floor}`,
+                        }))}
+                      />
+                    </Form.Item>
+                    <Form.Item name="doctorId" label="Bác sĩ chuyên khoa">
+                      <Select
+                        allowClear
+                        showSearch
+                        loading={loadingServiceDoctors}
+                        optionFilterProp="label"
+                        placeholder="Tự chọn theo dịch vụ hoặc chỉ định bác sĩ"
+                        options={serviceDoctorOptions}
+                        onChange={handleServiceDoctorSelect}
+                      />
+                    </Form.Item>
+                    <Form.Item name="note" label="Ghi chú">
+                      <Input.TextArea rows={2} />
+                    </Form.Item>
+                  </div>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={serviceItemSubmitting}
+                  >
+                    Thêm chỉ định
+                  </Button>
+                </Form>
+              </>
+            ) : null}
+
+            <Divider>Danh sách chỉ định</Divider>
+            <Table
+              rowKey="id"
+              size="small"
+              loading={loadingServiceItems}
+              columns={serviceItemColumns}
+              dataSource={serviceItems}
+              pagination={false}
+              scroll={{ x: 900 }}
+            />
+          </div>
+        ) : null}
       </Modal>
 
       <PregnancyProfileDetailModal

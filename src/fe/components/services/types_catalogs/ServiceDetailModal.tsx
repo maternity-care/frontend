@@ -98,9 +98,14 @@ export function ServiceDetailModal({
               </Tag>
             </Descriptions.Item>
 
-            <Descriptions.Item label="Yêu cầu bác sĩ">
-              {service.requiresDoctorWarning ? (
-                <Tag color="orange">Có</Tag>
+            <Descriptions.Item label="Cho phép chọn bác sĩ">
+              {service.allowDoctorSelection ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Tag color="orange">Có</Tag>
+                  {service.doctorSpecialty ? (
+                    <Tag color="blue">{service.doctorSpecialty}</Tag>
+                  ) : null}
+                </div>
               ) : (
                 <Tag>Không</Tag>
               )}

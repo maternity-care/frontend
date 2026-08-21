@@ -59,3 +59,71 @@ export interface RescheduleAppointmentInput {
   endTime: string;
   reason?: string;
 }
+
+export type AppointmentServiceItemStatus =
+  | "ordered"
+  | "checked_in"
+  | "waiting"
+  | "called"
+  | "in_progress"
+  | "waiting_result"
+  | "result_uploaded"
+  | "completed"
+  | "cancelled";
+
+export interface AppointmentServiceItem {
+  id: string;
+  appointmentId: string;
+  serviceId: string;
+  serviceName?: string;
+  facilityServiceId?: string | null;
+  facilityId?: string | null;
+  facilityName?: string | null;
+  patientId?: string | null;
+  patientName?: string | null;
+  patientPhone?: string | null;
+  scheduledStart?: string | null;
+  scheduledEnd?: string | null;
+  appointmentStatus?: ManagementAppointmentStatus | null;
+  doctorId?: string | null;
+  doctorStaffId?: string | null;
+  doctorName?: string | null;
+  doctorTitle?: string | null;
+  doctorSpecialty?: string | null;
+  roomId: string;
+  roomName?: string | null;
+  sequence: number;
+  status: AppointmentServiceItemStatus;
+  checkedInAt?: string | null;
+  calledAt?: string | null;
+  startedAt?: string | null;
+  resultExpectedAt?: string | null;
+  resultUploadedAt?: string | null;
+  completedAt?: string | null;
+  note?: string | null;
+  durationMinutes?: number | string | null;
+  medicalRecordId?: string | null;
+  diagnosis?: string | null;
+  conclusion?: string | null;
+  recommendation?: string | null;
+}
+
+export interface CreateAppointmentServiceItemInput {
+  serviceId: string;
+  roomId: string;
+  doctorId: string;
+  note?: string;
+}
+
+export interface AddAppointmentServiceItemsInput {
+  items: CreateAppointmentServiceItemInput[];
+}
+
+export interface CheckInAppointmentServiceItemInput {
+  doctorId?: string;
+  roomId?: string;
+}
+
+export interface SetServiceResultExpectedAtInput {
+  resultExpectedAt: string;
+}

@@ -11,6 +11,7 @@ import {
   ServiceSaleMode,
   ServiceStatus,
 } from "@/management/features/services/services/services.types";
+import { useDoctorSpecialties } from "@/hooks/doctors/useDoctorLookups";
 import {
   Form,
   Input,
@@ -33,6 +34,8 @@ interface ServiceFormValues {
   defaultDurationMinutes: number;
   basePrice: number;
   requiresDoctorWarning: boolean;
+  allowDoctorSelection: boolean;
+  doctorSpecialty?: string | null;
   status: ServiceStatus;
 }
 
@@ -58,6 +61,8 @@ export function ServiceFormModal({
   const [form] = Form.useForm<ServiceFormValues>();
   const [messageApi, contextHolder] = message.useMessage();
   const [submitting, setSubmitting] = useState(false);
+  const allowDoctorSelection = Form.useWatch("allowDoctorSelection", form);
+  const { specialtyOptions, specialtiesLoading } = useDoctorSpecialties();
 
   useEffect(() => {
     if (!open) {
@@ -72,7 +77,11 @@ export function ServiceFormModal({
         saleMode: service.saleMode,
         defaultDurationMinutes: service.defaultDurationMinutes,
         basePrice: Number(service.basePrice),
-        requiresDoctorWarning: service.requiresDoctorWarning,
+        requiresDoctorWarning:
+          service.allowDoctorSelection ?? service.requiresDoctorWarning,
+        allowDoctorSelection:
+          service.allowDoctorSelection ?? service.requiresDoctorWarning,
+        doctorSpecialty: service.doctorSpecialty ?? undefined,
         status: service.status,
       });
 
@@ -84,6 +93,8 @@ export function ServiceFormModal({
       saleMode: "standalone",
       defaultDurationMinutes: 30,
       requiresDoctorWarning: false,
+      allowDoctorSelection: false,
+      doctorSpecialty: undefined,
       status: "active",
     });
   }, [form, open, service]);
@@ -99,7 +110,11 @@ export function ServiceFormModal({
         saleMode: values.saleMode,
         defaultDurationMinutes: values.defaultDurationMinutes,
         basePrice: Number(values.basePrice).toFixed(2),
-        requiresDoctorWarning: values.requiresDoctorWarning,
+        requiresDoctorWarning: values.allowDoctorSelection,
+        allowDoctorSelection: values.allowDoctorSelection,
+        doctorSpecialty: values.allowDoctorSelection
+          ? values.doctorSpecialty?.trim()
+          : null,
         status: values.status,
       };
 
@@ -323,11 +338,49 @@ export function ServiceFormModal({
           </Form.Item>
 
           <Form.Item
-            name="requiresDoctorWarning"
-            label="Yêu cầu bác sĩ"
+            name="allowDoctorSelection"
+            label="Cho phép chọn bác sĩ"
             valuePropName="checked"
           >
-            <Switch checkedChildren="Có" unCheckedChildren="Không" />
+            <Switch
+              checkedChildren="Có"
+              unCheckedChildren="Không"
+              onChange={(checked) => {
+                form.setFieldValue("requiresDoctorWarning", checked);
+                if (!checked) {
+                  form.setFieldValue("doctorSpecialty", undefined);
+                }
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item name="requiresDoctorWarning" hidden valuePropName="checked">
+            <Switch />
+          </Form.Item>
+
+          <Form.Item
+            name="doctorSpecialty"
+            label="Chuyên khoa bác sĩ"
+            rules={[
+              {
+                required: Boolean(allowDoctorSelection),
+                message: "Vui lòng chọn chuyên khoa bác sĩ.",
+              },
+            ]}
+          >
+            <Select
+              showSearch
+              allowClear={!allowDoctorSelection}
+              disabled={!allowDoctorSelection}
+              loading={specialtiesLoading}
+              optionFilterProp="label"
+              placeholder={
+                allowDoctorSelection
+                  ? "Chọn chuyên khoa của dịch vụ"
+                  : "Bật chọn bác sĩ để cấu hình chuyên khoa"
+              }
+              options={specialtyOptions}
+            />
           </Form.Item>
 
           <Form.Item
