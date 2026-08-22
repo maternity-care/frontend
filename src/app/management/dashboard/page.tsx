@@ -13,6 +13,7 @@ import {
   Input,
   Progress,
   Segmented,
+  Select,
   Skeleton,
   Space,
   Statistic,
@@ -30,6 +31,8 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
+  DollarSign,
+  Download,
   HeartPulse,
   RefreshCw,
   Search,
@@ -53,6 +56,7 @@ import { getDoctorShifts } from "@/management/features/doctor-shifts/doctor-shif
 import type { DoctorShiftItem } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import { getDoctors } from "@/management/features/doctors/doctors.api";
 import { getFacilitiesPage } from "@/management/features/facilities/facilities.api";
+import type { Facility } from "@/management/features/facilities/facilities.types";
 import { getManagementPregnancyProfiles } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.api";
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { getStaffsPage } from "@/management/features/staffs/staffs.api";
@@ -99,6 +103,14 @@ type FacilityUtilization = {
   activeDoctors: number;
   roomsInUse: number;
   totalRooms: number;
+};
+
+type ServiceMetric = {
+  serviceId: string;
+  serviceName: string;
+  appointments: number;
+  completed: number;
+  revenue: number;
 };
 
 type RoleDashboardConfig = {
@@ -356,6 +368,44 @@ function includesKeyword(value: string | null | undefined, keyword: string) {
   return value?.toLowerCase().includes(keyword) ?? false;
 }
 
+function parseMoney(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return 0;
+  const normalized = value.replace(/[^\d.-]/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function isRevenueAppointment(appointment: ManagementAppointment) {
+  return !["cancelled", "no_show", "pending_payment"].includes(appointment.status);
+}
+
+function escapeCsv(value: unknown) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, rows: unknown[][]) {
+  const csv = `\ufeff${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function getAlertVisual(level: AlertLevel) {
   if (level === "critical") {
     return {
@@ -512,6 +562,8 @@ export default function ManagementDashboardPage() {
     new Date(),
   ]);
   const [appointmentKeyword, setAppointmentKeyword] = useState("");
+  const [selectedFacilityId, setSelectedFacilityId] = useState("all");
+  const [facilityOptions, setFacilityOptions] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardState>(emptyState);
   const [lastRefresh, setLastRefresh] = useState<string>("");
@@ -522,6 +574,12 @@ export default function ManagementDashboardPage() {
   );
   const canViewSystemStats = roleConfig.showSystemCards;
   const canViewStaffStats = roleConfig.showSystemCards;
+  const dashboardFacilityId =
+    dashboardRole === "super_admin"
+      ? selectedFacilityId === "all"
+        ? undefined
+        : selectedFacilityId
+      : activeFacilityId ?? undefined;
 
   const handleSelectedDateChange = (value: Dayjs | null) => {
     if (value) {
@@ -538,7 +596,7 @@ export default function ManagementDashboardPage() {
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     const errors: string[] = [];
-    const facilityId = dashboardRole === "super_admin" ? undefined : activeFacilityId ?? undefined;
+    const facilityId = dashboardFacilityId;
 
     const [
       appointmentsResult,
@@ -582,10 +640,10 @@ export default function ManagementDashboardPage() {
       canViewSystemStats
         ? getFacilitiesPage({
             page: 1,
-            limit: 1,
+            limit: dashboardRole === "super_admin" ? 100 : 1,
             status: "active",
           })
-        : Promise.resolve({ total: 0 }),
+        : Promise.resolve({ items: [], total: 0, page: 1, limit: 1, totalPages: 0 }),
     ]);
 
     const nextState: DashboardState = { ...emptyState };
@@ -622,6 +680,9 @@ export default function ManagementDashboardPage() {
 
     if (facilitiesResult.status === "fulfilled") {
       nextState.facilitiesTotal = facilitiesResult.value.total ?? 0;
+      if (dashboardRole === "super_admin") {
+        setFacilityOptions(facilitiesResult.value.items);
+      }
     } else if (canViewSystemStats) {
       errors.push(`Cơ sở: ${getErrorMessage(facilitiesResult.reason)}`);
     }
@@ -636,9 +697,9 @@ export default function ManagementDashboardPage() {
     );
     setLoading(false);
   }, [
-    activeFacilityId,
     canViewStaffStats,
     canViewSystemStats,
+    dashboardFacilityId,
     dashboardRole,
     range.dateFrom,
     range.dateTo,
@@ -737,10 +798,110 @@ export default function ManagementDashboardPage() {
     );
   }, [appointmentKeyword, data.appointments]);
 
+  const revenueSummary = useMemo(() => {
+    const billableAppointments = data.appointments.filter(isRevenueAppointment);
+    const estimatedRevenue = billableAppointments.reduce(
+      (sum, appointment) => sum + parseMoney(appointment.servicePrice),
+      0,
+    );
+    const completedRevenue = data.appointments
+      .filter((appointment) => appointment.status === "completed")
+      .reduce((sum, appointment) => sum + parseMoney(appointment.servicePrice), 0);
+    const averageRevenue =
+      billableAppointments.length === 0
+        ? 0
+        : Math.round(estimatedRevenue / billableAppointments.length);
+
+    return {
+      estimatedRevenue,
+      completedRevenue,
+      averageRevenue,
+      billableCount: billableAppointments.length,
+    };
+  }, [data.appointments]);
+
+  const serviceMetrics = useMemo<ServiceMetric[]>(() => {
+    const services = new Map<string, ServiceMetric>();
+
+    data.appointments.forEach((appointment) => {
+      const serviceId = appointment.serviceId || "unknown";
+      const current =
+        services.get(serviceId) ??
+        {
+          serviceId,
+          serviceName: appointment.serviceName || "Chưa cập nhật dịch vụ",
+          appointments: 0,
+          completed: 0,
+          revenue: 0,
+        };
+
+      current.appointments += 1;
+      if (appointment.status === "completed") current.completed += 1;
+      if (isRevenueAppointment(appointment)) {
+        current.revenue += parseMoney(appointment.servicePrice);
+      }
+      services.set(serviceId, current);
+    });
+
+    return Array.from(services.values()).sort((a, b) => b.revenue - a.revenue || b.appointments - a.appointments);
+  }, [data.appointments]);
+
   const visibleShifts = useMemo(
     () => data.shifts.filter((shift) => shift.status === "available" || shift.status === "full"),
     [data.shifts],
   );
+
+  const exportDashboard = useCallback(() => {
+    const rows: unknown[][] = [
+      ["Dashboard", `${range.dateFrom} - ${range.dateTo}`],
+      ["Cơ sở", dashboardRole === "super_admin" && selectedFacilityId === "all" ? "Tất cả cơ sở" : dashboardFacilityId ?? "-"],
+      [],
+      ["Tổng quan"],
+      ["Tổng lịch", appointmentSummary.total],
+      ["Lịch hoàn thành", appointmentSummary.completed],
+      ["Doanh thu ước tính", revenueSummary.estimatedRevenue],
+      ["Doanh thu hoàn thành", revenueSummary.completedRevenue],
+      [],
+      ["Thống kê dịch vụ"],
+      ["Dịch vụ", "Số lịch", "Hoàn thành", "Doanh thu ước tính"],
+      ...serviceMetrics.map((item) => [
+        item.serviceName,
+        item.appointments,
+        item.completed,
+        item.revenue,
+      ]),
+      [],
+      ["Danh sách lịch"],
+      ["Mã lịch", "Ngày", "Giờ bắt đầu", "Giờ kết thúc", "Thai phụ", "SĐT", "Cơ sở", "Dịch vụ", "Bác sĩ", "Trạng thái", "Giá"],
+      ...visibleAppointments.map((appointment) => [
+        appointment.id,
+        appointment.date,
+        appointment.startTime,
+        appointment.endTime,
+        appointment.patientName,
+        appointment.patientPhone,
+        appointment.facilityName,
+        appointment.serviceName,
+        appointment.doctorName,
+        statusLabels[appointment.status],
+        parseMoney(appointment.servicePrice),
+      ]),
+    ];
+
+    downloadCsv(`dashboard-${range.dateFrom}-${range.dateTo}.csv`, rows);
+  }, [
+    appointmentSummary.completed,
+    appointmentSummary.total,
+    dashboardFacilityId,
+    dashboardRole,
+    range.dateFrom,
+    range.dateTo,
+    revenueSummary.completedRevenue,
+    revenueSummary.estimatedRevenue,
+    selectedFacilityId,
+    serviceMetrics,
+    visibleAppointments,
+  ]);
 
   const dashboardAlerts = useMemo<DashboardAlert[]>(() => {
     const alerts: DashboardAlert[] = [];
@@ -887,6 +1048,15 @@ export default function ManagementDashboardPage() {
         helper: `${shiftSummary.capacity} suất khám khả dụng`,
         tone: "emerald" as const,
       },
+      {
+        title: "Doanh thu ước tính",
+        value: formatCurrency(revenueSummary.estimatedRevenue),
+        icon: <DollarSign className="h-5 w-5" />,
+        trend: `${revenueSummary.billableCount} lịch hợp lệ`,
+        trendDirection: revenueSummary.estimatedRevenue > 0 ? "up" as const : "down" as const,
+        helper: `${serviceMetrics.length} dịch vụ`,
+        tone: "amber" as const,
+      },
     ],
     [
       activeDoctors,
@@ -897,6 +1067,9 @@ export default function ManagementDashboardPage() {
       highRiskProfiles,
       range.days,
       roleConfig,
+      revenueSummary.billableCount,
+      revenueSummary.estimatedRevenue,
+      serviceMetrics.length,
       shiftSummary.capacity,
       vacantShifts,
       visibleShifts.length,
@@ -978,6 +1151,20 @@ export default function ManagementDashboardPage() {
               />
 
               <Space wrap className="justify-start xl:justify-end">
+                {dashboardRole === "super_admin" ? (
+                  <Select
+                    value={selectedFacilityId}
+                    className="min-w-[240px]"
+                    options={[
+                      { value: "all", label: "Tất cả cơ sở" },
+                      ...facilityOptions.map((facility) => ({
+                        value: facility.id,
+                        label: `${facility.name} (${facility.code})`,
+                      })),
+                    ]}
+                    onChange={setSelectedFacilityId}
+                  />
+                ) : null}
                 {windowValue === "custom" ? (
                   <RangePicker
                     allowClear={false}
@@ -995,6 +1182,13 @@ export default function ManagementDashboardPage() {
                     onChange={handleSelectedDateChange}
                   />
                 )}
+                <Button
+                  icon={<Download className="h-4 w-4" />}
+                  disabled={loading}
+                  onClick={exportDashboard}
+                >
+                  Xuất Excel
+                </Button>
                 <Tooltip title={lastRefresh ? `Cập nhật lần cuối lúc ${lastRefresh}` : "Chưa tải dữ liệu"}>
                   <Button
                     icon={<RefreshCw className="h-4 w-4" />}
@@ -1034,7 +1228,7 @@ export default function ManagementDashboardPage() {
           <Skeleton active paragraph={{ rows: 10 }} />
         ) : (
           <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {roleStatCards.map((stat) => (
                 <StatCard key={stat.title} {...stat} />
               ))}
@@ -1142,6 +1336,57 @@ export default function ManagementDashboardPage() {
                   </div>
                 </div>
               </div>
+            </Card>
+
+            <Card
+              className="border-slate-200 bg-white"
+              title={
+                <div>
+                  <p className="mb-0 text-base font-semibold text-slate-950">
+                    Thống kê dịch vụ
+                  </p>
+                  <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
+                    Doanh thu ước tính và số lượt theo từng dịch vụ trong khoảng ngày.
+                  </p>
+                </div>
+              }
+              extra={<Tag color="gold">{formatCurrency(revenueSummary.completedRevenue)} đã hoàn thành</Tag>}
+            >
+              {serviceMetrics.length > 0 ? (
+                <div className="grid gap-3 xl:grid-cols-3">
+                  {serviceMetrics.slice(0, 6).map((item) => {
+                    const completionPercent =
+                      item.appointments === 0 ? 0 : Math.round((item.completed / item.appointments) * 100);
+
+                    return (
+                      <div key={item.serviceId} className="rounded-xl border border-slate-200 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <Text strong className="block truncate text-slate-950">
+                              {item.serviceName}
+                            </Text>
+                            <Text type="secondary" className="mt-1 block text-xs">
+                              {item.appointments} lịch · {item.completed} hoàn thành
+                            </Text>
+                          </div>
+                          <Tag color="blue">{completionPercent}%</Tag>
+                        </div>
+                        <div className="mt-3 text-xl font-bold text-slate-950">
+                          {formatCurrency(item.revenue)}
+                        </div>
+                        <Progress
+                          percent={completionPercent}
+                          showInfo={false}
+                          size="small"
+                          className="mt-2"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Empty description="Không có dữ liệu dịch vụ trong khoảng ngày." />
+              )}
             </Card>
 
             {canViewSystemStats ? (

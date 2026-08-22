@@ -278,6 +278,10 @@ export default function ForumPostDetailPage() {
     setReplyContent,
   ] = useState("");
   const [
+    showAllComments,
+    setShowAllComments,
+  ] = useState(false);
+  const [
     reportTarget,
     setReportTarget,
   ] = useState<ReportTarget>(
@@ -357,6 +361,11 @@ export default function ForumPostDetailPage() {
         ) ?? [],
       [post],
     );
+
+  const displayedComments =
+    showAllComments
+      ? visibleComments
+      : visibleComments.slice(0, 5);
 
   async function submitComment(
     parentId?: string,
@@ -773,7 +782,7 @@ export default function ForumPostDetailPage() {
                   <Empty description="Chưa có bình luận." />
                 ) : (
                   <div className="flex flex-col gap-4">
-                    {visibleComments.map(
+                    {displayedComments.map(
                       (comment, index) => (
                         <CommentCard
                           key={comment.id}
@@ -824,6 +833,19 @@ export default function ForumPostDetailPage() {
                         />
                       ),
                     )}
+                    {visibleComments.length > 5 ? (
+                      <div className="flex justify-center border-t border-slate-100 pt-4">
+                        <Button
+                          onClick={() =>
+                            setShowAllComments((value) => !value)
+                          }
+                        >
+                          {showAllComments
+                            ? "Thu gọn bình luận"
+                            : `Xem thêm ${visibleComments.length - displayedComments.length} bình luận`}
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </Card>

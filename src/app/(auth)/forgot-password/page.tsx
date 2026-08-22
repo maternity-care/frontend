@@ -15,19 +15,16 @@ export default function ForgotPasswordPage() {
   const [form] = Form.useForm<ForgotPasswordFormValues>();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [resetUrl, setResetUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onFinish = async (values: ForgotPasswordFormValues) => {
     setMessage(null);
     setError(null);
-    setResetUrl(null);
     setIsSubmitting(true);
 
     try {
       const response = await forgotPassword(values);
       setMessage(response.message || "Đã tạo hướng dẫn đặt lại mật khẩu.");
-      setResetUrl(response.data.reset_url);
     } catch (err) {
       setError(
         err instanceof Error
@@ -57,16 +54,7 @@ export default function ForgotPasswordPage() {
           className="mt-5"
           type="success"
           title={message}
-          description={
-            resetUrl ? (
-              <Link
-                href={resetUrl}
-                className="font-medium text-pink-700 hover:text-pink-900 hover:underline"
-              >
-                {RESPONSE_MESSAGES.AUTH.RESET_PASSWORD_LINK}
-              </Link>
-            ) : null
-          }
+          description="Vui lòng kiểm tra email và bấm vào link đặt lại mật khẩu trong email."
           showIcon
         />
       ) : null}

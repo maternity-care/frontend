@@ -74,16 +74,21 @@ export function UserDetailModal({ open, user, onClose, onEdit }: Props) {
     <Modal
       open={open}
       centered
-      width={900}
+      width="min(1120px, 96vw)"
       title={null}
       footer={null}
       onCancel={onClose}
       mask={{ closable: true }}
       styles={{
+        root: {
+          maxHeight: "calc(100vh - 48px)",
+        },
         body: {
-          maxHeight: "calc(100vh - 160px)",
-          overflowY: "auto",
-          paddingRight: 8,
+          paddingTop: 4,
+        },
+        close: {
+          insetInlineEnd: 20,
+          top: 20,
         },
       }}
     >

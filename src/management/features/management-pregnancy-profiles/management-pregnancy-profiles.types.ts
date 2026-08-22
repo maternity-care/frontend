@@ -43,8 +43,17 @@ export interface PregnancyConsultationRecord {
   id: string;
 
   appointmentId: string | null;
+  appointmentScheduledStart: string | null;
+  appointmentScheduledEnd: string | null;
+  bookedServiceName: string | null;
+  appointmentDoctorName: string | null;
+  appointmentServiceItemId: string | null;
+  appointmentServiceName: string | null;
+  appointmentServiceRoomName: string | null;
+  appointmentServiceDoctorName: string | null;
   pregnancyProfileId: string | null;
   doctorId: string | null;
+  doctorName: string | null;
 
   diagnosis: string | null;
   conclusion: string | null;
@@ -233,8 +242,41 @@ export interface BackendPregnancyConsultationRecord {
   id?: string | number;
 
   appointmentId?: string | number | null;
+  appointment?: {
+    id?: string | number | null;
+    scheduledStart?: string | null;
+    scheduledEnd?: string | null;
+    service?: {
+      id?: string | number | null;
+      name?: string | null;
+    } | null;
+    doctor?: {
+      id?: string | number | null;
+      name?: string | null;
+    } | null;
+  } | null;
+  appointmentServiceItemId?: string | number | null;
+  appointmentServiceItem?: {
+    id?: string | number | null;
+    service?: {
+      id?: string | number | null;
+      name?: string | null;
+    } | null;
+    room?: {
+      id?: string | number | null;
+      name?: string | null;
+    } | null;
+    doctor?: {
+      id?: string | number | null;
+      name?: string | null;
+    } | null;
+  } | null;
   pregnancyProfileId?: string | number | null;
   doctorId?: string | number | null;
+  doctor?: {
+    id?: string | number | null;
+    name?: string | null;
+  } | null;
 
   diagnosis?: string | null;
   conclusion?: string | null;

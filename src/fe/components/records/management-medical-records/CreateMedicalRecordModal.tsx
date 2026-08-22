@@ -12,7 +12,6 @@ import {
   Upload,
   message,
   Typography,
-  Space,
   Spin,
 } from "antd";
 import type { UploadFile, UploadProps } from "antd";
@@ -42,6 +41,9 @@ interface Props {
   open: boolean;
   profile: ManagementPregnancyProfile | null;
   initialAppointmentId?: string | null;
+  initialAppointmentServiceItemId?: string | null;
+  initialAppointmentLabel?: string | null;
+  initialDoctorLabel?: string | null;
   loading?: boolean;
   onCancel: () => void;
   onSuccess: () => void;
@@ -60,6 +62,9 @@ export function CreateMedicalRecordModal({
   open,
   profile,
   initialAppointmentId,
+  initialAppointmentServiceItemId,
+  initialAppointmentLabel,
+  initialDoctorLabel,
   onCancel,
   onSuccess,
 }: Props) {
@@ -78,6 +83,33 @@ export function CreateMedicalRecordModal({
   );
   const appointmentDoctorId = selectedAppointment?.doctorId ?? null;
   const effectiveDoctorId = isDoctor ? doctorId : appointmentDoctorId;
+
+  const appointmentOptions = appointments.map((item) => {
+    const id = String(item.id);
+    const timeLabel = item.appointmentAt
+      ? dayjs(item.appointmentAt).format("DD/MM/YYYY HH:mm")
+      : "Chưa có giờ";
+
+    return {
+      value: id,
+      label: `#${id} • ${timeLabel}${item.status ? ` • ${item.status}` : ""}`,
+    };
+  });
+
+  if (
+    initialAppointmentId &&
+    !appointmentOptions.some((option) => option.value === String(initialAppointmentId))
+  ) {
+    appointmentOptions.unshift({
+      value: String(initialAppointmentId),
+      label: initialAppointmentLabel || `Lịch #${initialAppointmentId}`,
+    });
+  }
+
+  const doctorDisplayLabel =
+    initialDoctorLabel ||
+    (isDoctor && user?.name ? user.name : "") ||
+    (effectiveDoctorId ? `Bác sĩ #${effectiveDoctorId}` : "");
 
   const appendPendingFiles = useCallback((pendingFiles: PendingMedicalRecordFile[]) => {
     if (!pendingFiles.length) return;
@@ -290,6 +322,9 @@ export function CreateMedicalRecordModal({
 
       const input: CreateMedicalRecordInput = {
         appointmentId: String(values.appointmentId).trim(),
+        appointmentServiceItemId: initialAppointmentServiceItemId
+          ? String(initialAppointmentServiceItemId)
+          : null,
         pregnancyProfileId: profile.id,
         doctorId: recordDoctorId,
         diagnosis: values.diagnosis.trim(),
@@ -387,44 +422,16 @@ export function CreateMedicalRecordModal({
                 "Không có lịch hẹn nào"
               )
             }
-            options={appointments.map((item) => {
-              const id = String(item.id); // luôn dùng string
-              const timeLabel = item.appointmentAt
-                ? dayjs(item.appointmentAt).format("DD/MM/YYYY HH:mm")
-                : "Chưa có giờ";
-
-              return {
-                value: id,
-                label: `#${id} • ${timeLabel}${
-                  item.status ? ` • ${item.status}` : ""
-                }`,
-              };
-            })}
+            options={appointmentOptions}
           />
         </Form.Item>
 
         <Form.Item label="Bác sĩ phụ trách">
-          <Space.Compact style={{ width: "100%" }}>
-            <Input
-              disabled
-              value={effectiveDoctorId ? `ID: ${effectiveDoctorId}` : ""}
-              placeholder="Không xác định được bác sĩ"
-              style={{ flex: 1 }}
-            />
-            {isDoctor && user?.name ? (
-              <Input
-                disabled
-                value={user.name}
-                style={{
-                  width: "auto",
-                  maxWidth: 180,
-                  textAlign: "center",
-                  color: "rgba(0, 0, 0, 0.65)",
-                  background: "#fafafa",
-                }}
-              />
-            ) : null}
-          </Space.Compact>
+          <Input
+            disabled
+            value={doctorDisplayLabel}
+            placeholder="Không xác định được bác sĩ"
+          />
         </Form.Item>
 
         <Form.Item

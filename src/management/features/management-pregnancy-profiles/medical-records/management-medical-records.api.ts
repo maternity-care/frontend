@@ -94,6 +94,7 @@ export function normalizeMedicalRecord(
   return {
     id: toStringValue(record.id),
     appointmentId: toNullableString(record.appointmentId),
+    appointmentServiceItemId: toNullableString(record.appointmentServiceItemId),
     pregnancyProfileId: toNullableString(record.pregnancyProfileId),
     doctorId: toNullableString(record.doctorId),
     diagnosis: record.diagnosis ?? null,
@@ -115,6 +116,19 @@ export async function getManagementMedicalRecordById(
     apiClient.get(`${MEDICAL_RECORDS_URL}/${id}`),
   );
   return normalizeMedicalRecord(data);
+}
+
+/** GET /management/medical-records?appointmentServiceItemId=... */
+export async function getManagementMedicalRecordsByServiceItemId(
+  appointmentServiceItemId: string,
+): Promise<MedicalRecord[]> {
+  const data = await unwrapApiData<BackendMedicalRecord[] | { items?: BackendMedicalRecord[] }>(
+    apiClient.get(MEDICAL_RECORDS_URL, {
+      params: { appointmentServiceItemId },
+    }),
+  );
+  const list = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : [];
+  return list.map(normalizeMedicalRecord);
 }
 
 /** POST /management/medical-records */
