@@ -58,6 +58,26 @@ function formatDateTime(value?: string | null): string {
   }).format(date);
 }
 
+function formatTime(value?: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatAppointmentRange(
+  start?: string | null,
+  end?: string | null,
+): string {
+  if (!start) return "";
+  const startLabel = formatDateTime(start);
+  const endLabel = formatTime(end);
+  return endLabel ? `${startLabel} - ${endLabel}` : startLabel;
+}
+
 function formatFileSize(value?: number | null): string {
   if (!value || value <= 0) return "";
   if (value < 1024) return `${value} B`;
@@ -255,6 +275,16 @@ function MedicalRecordFileCard({ file }: MedicalRecordFileCardProps) {
   );
 }
 
+interface ConsultationGroup {
+  key: string;
+  appointmentId: string | null;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  bookedServiceName: string | null;
+  appointmentDoctorName: string | null;
+  records: PregnancyConsultationRecord[];
+}
+
 /* ===== Main Modal ===== */
 export function PregnancyProfileDetailModal({
   open,
@@ -281,9 +311,39 @@ export function PregnancyProfileDetailModal({
     consultationMap.set(key, c);
   });
   const consultations = Array.from(consultationMap.values());
+  const generalConsultationCount = consultations.filter(
+    (consultation) => !consultation.appointmentServiceItemId,
+  ).length;
+  const indicationConsultationCount =
+    consultations.length - generalConsultationCount;
 
   // Sắp xếp mới nhất lên đầu (nếu muốn)
   // consultations.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+  const consultationGroups = Array.from(
+    consultations
+      .reduce((groups, consultation) => {
+        const key = consultation.appointmentId || "unknown-appointment";
+        const group = groups.get(key);
+
+        if (group) {
+          group.records.push(consultation);
+          return groups;
+        }
+
+        groups.set(key, {
+          key,
+          appointmentId: consultation.appointmentId,
+          scheduledStart: consultation.appointmentScheduledStart,
+          scheduledEnd: consultation.appointmentScheduledEnd,
+          bookedServiceName: consultation.bookedServiceName,
+          appointmentDoctorName: consultation.appointmentDoctorName,
+          records: [consultation],
+        });
+        return groups;
+      }, new Map<string, ConsultationGroup>())
+      .values(),
+  );
 
   const allFilesFromConsultations: PregnancyProfileMedicalRecordFile[] = [];
   const seenFileIds = new Set<string>();
@@ -505,7 +565,13 @@ export function PregnancyProfileDetailModal({
 
         {/* ===== KẾT QUẢ KHÁM – dùng Collapse ===== */}
         <div>
-          <Title level={5}>Kết quả khám ({consultations.length})</Title>
+          <Title level={5}>
+            Kết quả khám ({generalConsultationCount} chung
+            {indicationConsultationCount > 0
+              ? `, ${indicationConsultationCount} theo chỉ định`
+              : ""}
+            )
+          </Title>
 
           {consultations.length === 0 ? (
             <Empty
@@ -516,12 +582,20 @@ export function PregnancyProfileDetailModal({
             <Collapse
               accordion={false}
               defaultActiveKey={[]} // mặc định đóng hết → không bị cao
-              // defaultActiveKey={consultations[0]?.id ? [consultations[0].id] : []} // nếu muốn mở cái mới nhất
-              items={consultations.map((consultation, index) => {
-                const key = consultation.id || `consultation-${index}`;
+              items={consultationGroups.map((group, groupIndex) => {
+                const appointmentTitle = group.appointmentId
+                  ? `Lịch #${group.appointmentId}`
+                  : "Lịch hẹn chưa rõ";
+                const appointmentDetails = [
+                  formatAppointmentRange(group.scheduledStart, group.scheduledEnd),
+                  group.bookedServiceName,
+                  group.appointmentDoctorName
+                    ? `Bác sĩ khám: ${group.appointmentDoctorName}`
+                    : "",
+                ].filter(Boolean);
 
                 return {
-                  key,
+                  key: group.key || `appointment-group-${groupIndex}`,
                   label: (
                     <Flex
                       justify="space-between"
@@ -530,96 +604,169 @@ export function PregnancyProfileDetailModal({
                     >
                       <Space size={8}>
                         <Stethoscope size={18} />
-                        <Text strong>
-                          Kết quả khám{" "}
-                          {consultation.updatedAt
-                            ? `– ${formatDateTime(consultation.updatedAt)}`
-                            : `#${index + 1}`}
-                        </Text>
-                        {consultation.conclusion && (
+                        <Text strong>{appointmentTitle}</Text>
+                        {appointmentDetails.length > 0 && (
                           <Text type="secondary" style={{ fontSize: 13 }}>
-                            • {consultation.conclusion}
+                            • {appointmentDetails.join(" • ")}
                           </Text>
                         )}
+                        <Tag>{group.records.length} kết quả</Tag>
                       </Space>
-
-                      {/* {onEditMedicalRecord && consultation.id && (
-                        <Button
-                          type="link"
-                          size="small"
-                          icon={<Pencil size={14} />}
-                          onClick={(e) => {
-                            e.stopPropagation(); // quan trọng
-                            onEditMedicalRecord(consultation.id);
-                          }}
-                        >
-                          Sửa
-                        </Button>
-                      )} */}
                     </Flex>
                   ),
                   children: (
-                    <div>
-                      <Descriptions
-                        size="small"
-                        column={{ xs: 1, md: 2 }}
-                        style={{
-                          marginBottom:
-                            consultation.files && consultation.files.length > 0
-                              ? 16
-                              : 0,
-                        }}
-                      >
-                        <Descriptions.Item label="Chẩn đoán">
-                          {consultation.diagnosis || "—"}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Kết luận">
-                          {consultation.conclusion || "—"}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Khuyến nghị">
-                          {consultation.recommendation || "—"}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Ngày tái khám đề xuất">
-                          {formatDateTime(
-                            consultation.nextAppointmentSuggestedAt,
-                          )}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Mã lịch hẹn">
-                          {consultation.appointmentId || "—"}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Mã bác sĩ">
-                          {consultation.doctorId || "—"}
-                        </Descriptions.Item>
-                      </Descriptions>
+                    <Collapse
+                      accordion={false}
+                      defaultActiveKey={[]}
+                      items={group.records.map((consultation, index) => {
+                        const key =
+                          consultation.id ||
+                          `${group.key}-consultation-${index}`;
+                        const isServiceIndicationResult = Boolean(
+                          consultation.appointmentServiceItemId,
+                        );
+                        const serviceName =
+                          consultation.appointmentServiceName ||
+                          (consultation.appointmentServiceItemId
+                            ? `#${consultation.appointmentServiceItemId}`
+                            : "");
+                        const consultationTitle = isServiceIndicationResult
+                          ? `Kết quả chỉ định: ${serviceName}`
+                          : "Kết quả khám chung";
 
-                      {consultation.files &&
-                        consultation.files.length > 0 && (
-                          <div>
-                            <Text
-                              strong
-                              style={{ display: "block", marginBottom: 8 }}
+                        return {
+                          key,
+                          label: (
+                            <Flex
+                              justify="space-between"
+                              align="center"
+                              style={{ width: "100%", paddingRight: 8 }}
                             >
-                              Tài liệu đính kèm ({consultation.files.length})
-                            </Text>
-                            <div
-                              style={{
-                                maxHeight: 200,
-                                overflowY: "auto",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 6,
-                              }}
-                            >
-                              {consultation.files.map((file) => (
-                                <MedicalRecordFileCard
-                                  key={file.id || file.fileUrl}
-                                  file={file}
-                                />
-                              ))}
+                              <Space size={8}>
+                                <Stethoscope size={18} />
+                                <Text strong>
+                                  {consultationTitle}{" "}
+                                  {consultation.updatedAt
+                                    ? `– ${formatDateTime(
+                                        consultation.updatedAt,
+                                      )}`
+                                    : `#${index + 1}`}
+                                </Text>
+                                <Tag color={isServiceIndicationResult ? "blue" : "default"}>
+                                  {isServiceIndicationResult ? "Chỉ định" : "Chung"}
+                                </Tag>
+                                {consultation.conclusion && (
+                                  <Text type="secondary" style={{ fontSize: 13 }}>
+                                    • {consultation.conclusion}
+                                  </Text>
+                                )}
+                              </Space>
+                            </Flex>
+                          ),
+                          children: (
+                            <div>
+                              <Descriptions
+                                size="small"
+                                column={{ xs: 1, md: 2 }}
+                                style={{
+                                  marginBottom:
+                                    consultation.files &&
+                                    consultation.files.length > 0
+                                      ? 16
+                                      : 0,
+                                }}
+                              >
+                                <Descriptions.Item label="Chẩn đoán">
+                                  {consultation.diagnosis || "—"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Kết luận">
+                                  {consultation.conclusion || "—"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Khuyến nghị">
+                                  {consultation.recommendation || "—"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Ngày tái khám đề xuất">
+                                  {formatDateTime(
+                                    consultation.nextAppointmentSuggestedAt,
+                                  )}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Loại kết quả">
+                                  {isServiceIndicationResult
+                                    ? "Kết quả theo chỉ định dịch vụ"
+                                    : "Kết quả khám chung của lịch hẹn"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Lịch hẹn">
+                                  {[
+                                    consultation.appointmentId
+                                      ? `#${consultation.appointmentId}`
+                                      : "",
+                                    formatAppointmentRange(
+                                      consultation.appointmentScheduledStart,
+                                      consultation.appointmentScheduledEnd,
+                                    ),
+                                    consultation.bookedServiceName,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" • ") || "—"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Bác sĩ khám lịch hẹn">
+                                  {consultation.appointmentDoctorName || "—"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Chỉ định dịch vụ">
+                                  {isServiceIndicationResult
+                                    ? serviceName
+                                    : "—"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Phòng chỉ định">
+                                  {consultation.appointmentServiceRoomName || "—"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Bác sĩ thực hiện chỉ định">
+                                  {consultation.appointmentServiceDoctorName || "—"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Bác sĩ đọc kết quả">
+                                  {consultation.doctorName ||
+                                    (consultation.doctorId
+                                      ? `#${consultation.doctorId}`
+                                      : "—")}
+                                </Descriptions.Item>
+                              </Descriptions>
+
+                              {consultation.files &&
+                                consultation.files.length > 0 && (
+                                  <div>
+                                    <Text
+                                      strong
+                                      style={{
+                                        display: "block",
+                                        marginBottom: 8,
+                                      }}
+                                    >
+                                      Tài liệu đính kèm (
+                                      {consultation.files.length})
+                                    </Text>
+                                    <div
+                                      style={{
+                                        maxHeight: 200,
+                                        overflowY: "auto",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 6,
+                                      }}
+                                    >
+                                      {consultation.files.map((file) => (
+                                        <MedicalRecordFileCard
+                                          key={file.id || file.fileUrl}
+                                          file={file}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                             </div>
-                          </div>
-                        )}
-                    </div>
+                          ),
+                        };
+                      })}
+                    />
                   ),
                 };
               })}

@@ -15,6 +15,7 @@ import { ProfileEditCard } from "./ProfileEditCard";
 import { ProfileLoading } from "./ProfileLoading";
 import { ProfileSummaryCard } from "./ProfileSummaryCard";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
+import { ChangePasswordCard } from "./ChangePasswordCard";
 
 export function ProfileContent() {
   const { currentUser, mutate } = useAuth();
@@ -94,13 +95,16 @@ export function ProfileContent() {
         </Col>
 
         <Col xs={24} lg={16}>
-          <ProfileEditCard
-            profile={profile}
-            feedback={feedback}
-            onClearFeedback={clearFeedback}
-            onUpdated={handleProfileUpdated}
-            onError={handleProfileError}
-          />
+          <div className="grid gap-6">
+            <ProfileEditCard
+              profile={profile}
+              feedback={feedback}
+              onClearFeedback={clearFeedback}
+              onUpdated={handleProfileUpdated}
+              onError={handleProfileError}
+            />
+            <ChangePasswordCard />
+          </div>
         </Col>
       </Row>
     </div>

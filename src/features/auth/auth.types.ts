@@ -20,6 +20,11 @@ export interface ResetPasswordInput {
   password: string;
 }
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface AuthResponse {
   accountType: "user" | "staff";
   accessToken: string;

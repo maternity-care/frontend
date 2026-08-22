@@ -16,6 +16,7 @@ export interface CreateMedicalRecordFileInput {
 
 export interface CreateMedicalRecordInput {
   appointmentId: string;
+  appointmentServiceItemId?: string | null;
   pregnancyProfileId: string;
   doctorId: string;
   diagnosis: string;
@@ -27,6 +28,7 @@ export interface CreateMedicalRecordInput {
 
 export interface UpdateMedicalRecordInput {
   appointmentId?: string;
+  appointmentServiceItemId?: string | null;
   pregnancyProfileId?: string;
   doctorId?: string;
   diagnosis?: string;
@@ -72,6 +74,7 @@ export interface MedicalRecordDoctor {
 export interface MedicalRecord {
   id: string;
   appointmentId: string | null;
+  appointmentServiceItemId: string | null;
   pregnancyProfileId: string | null;
   doctorId: string | null;
   diagnosis: string | null;
@@ -101,6 +104,7 @@ export interface BackendMedicalRecordFile {
 export interface BackendMedicalRecord {
   id?: string | number;
   appointmentId?: string | number | null;
+  appointmentServiceItemId?: string | number | null;
   pregnancyProfileId?: string | number | null;
   doctorId?: string | number | null;
   diagnosis?: string | null;

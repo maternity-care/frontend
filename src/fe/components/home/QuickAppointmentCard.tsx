@@ -269,6 +269,11 @@ export function QuickAppointmentCard() {
         endTime: slot.endTime,
       });
 
+      window.localStorage.setItem(
+        "maternity-care:appointment-created-at",
+        String(Date.now()),
+      );
+      window.dispatchEvent(new Event("maternity-care:appointment-created"));
       message.success("Đặt lịch thành công.");
       await handleCheckAvailability();
     } catch (bookError) {

@@ -163,6 +163,52 @@ function normalizeSearchText(value?: string | null) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+function getSpecialtyKeyword(value?: string | null) {
+  const text = normalizeSearchText(value);
+  if (text.includes("sieu am")) return "sieu am";
+  if (text.includes("xet nghiem") || text.includes("sang loc")) return "xet nghiem";
+  if (text.includes("thu thuat")) return "thu thuat";
+  if (text.includes("phu san") || text.includes("san phu") || text.includes("theo doi thai")) {
+    return "san phu khoa";
+  }
+  return text;
+}
+
+function isObstetricsSpecialty(value?: string | null) {
+  return getSpecialtyKeyword(value) === "san phu khoa";
+}
+
+function getServiceSpecialtyKey(service?: FacilityService | null) {
+  if (!service) return "";
+  if (service.serviceType === "ultrasound") return "sieu am";
+  if (service.serviceType === "lab_test" || service.serviceType === "screening") {
+    return "xet nghiem";
+  }
+  if (service.serviceType === "procedure") return "thu thuat";
+
+  return getSpecialtyKeyword(
+    [
+      service.serviceDoctorSpecialty,
+      service.serviceName,
+      service.serviceCode,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+}
+
+function getSpecialtySearchLabel(key: string, service?: FacilityService | null) {
+  if (service?.serviceDoctorSpecialty && getSpecialtyKeyword(service.serviceDoctorSpecialty) === key) {
+    return service.serviceDoctorSpecialty;
+  }
+
+  if (key === "sieu am") return "Siêu âm";
+  if (key === "xet nghiem") return "Xét nghiệm";
+  if (key === "thu thuat") return "Thủ thuật";
+  if (key === "san phu khoa") return "Sản phụ khoa";
+  return undefined;
+}
+
 export default function ManagementAppointmentsPage() {
   const authUser = useAuthStore((state) => state.user);
   const effectiveRoleNames = useAuthStore((state) => state.roles);
@@ -172,9 +218,12 @@ export default function ManagementAppointmentsPage() {
     () => new Set(effectiveRoleNames),
     [effectiveRoleNames],
   );
-  const canCreateIndication =
-    roleNames.has("super_admin") || roleNames.has("admin") || roleNames.has("doctor");
   const isDoctor = roleNames.has("doctor");
+  const doctorSpecialty =
+    authUser?.doctor?.specialty ?? authUser?.staffProfile?.doctor?.specialty;
+  const isObstetricsDoctor = isDoctor && isObstetricsSpecialty(doctorSpecialty);
+  const canCreateIndication =
+    roleNames.has("super_admin") || roleNames.has("admin") || isObstetricsDoctor;
   const canCheckInAppointment =
     roleNames.has("super_admin") || roleNames.has("admin") || roleNames.has("staff");
   const canOperateIndication =
@@ -183,6 +232,12 @@ export default function ManagementAppointmentsPage() {
     roleNames.has("doctor");
   const activeFacility = authUser?.facilities?.find(
     (facility) => String(facility.id) === String(activeFacilityId),
+  );
+  const canCreateIndicationForAppointment = useCallback(
+    (appointment?: ManagementAppointment | null) =>
+      canCreateIndication ||
+      (isDoctor && isObstetricsSpecialty(appointment?.doctorSpecialty)),
+    [canCreateIndication, isDoctor],
   );
 
   const [appointments, setAppointments] = useState<ManagementAppointment[]>(
@@ -244,15 +299,15 @@ export default function ManagementAppointmentsPage() {
 
   const doctorOptions = useMemo(() => {
     const options = doctors.map((doctor) => ({
-      value: doctor.id,
+      value: String(doctor.id),
       label: getDoctorLabel(doctor),
     }));
     if (
       selectedAppointment?.doctorId &&
-      !options.some((option) => option.value === selectedAppointment.doctorId)
+      !options.some((option) => option.value === String(selectedAppointment.doctorId))
     ) {
       options.unshift({
-        value: selectedAppointment.doctorId,
+        value: String(selectedAppointment.doctorId),
         label: getAppointmentDoctorLabel(selectedAppointment),
       });
     }
@@ -392,6 +447,33 @@ export default function ManagementAppointmentsPage() {
   }, [loadAppointments]);
 
   useEffect(() => {
+    const reloadFromExternalBooking = () => {
+      void loadAppointments();
+      void message.info("Có lịch đặt mới, danh sách đã được cập nhật.");
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "maternity-care:appointment-created-at") {
+        reloadFromExternalBooking();
+      }
+    };
+
+    const handleFocus = () => {
+      void loadAppointments();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("maternity-care:appointment-created", reloadFromExternalBooking);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("maternity-care:appointment-created", reloadFromExternalBooking);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [loadAppointments, message]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       setDoctorId(undefined);
       if (!authUser || (!isSuperAdmin && !activeFacilityId)) {
@@ -471,7 +553,7 @@ export default function ManagementAppointmentsPage() {
     setCheckInOpen(true);
     checkInForm.setFieldsValue({
       pregnancyProfileId: appointment.pregnancyProfileId ?? undefined,
-      doctorId: appointment.doctorId ?? undefined,
+      doctorId: appointment.doctorId ? String(appointment.doctorId) : undefined,
     });
     setLoadingProfiles(true);
     try {
@@ -498,7 +580,7 @@ export default function ManagementAppointmentsPage() {
     setAvailableSlots([]);
     setRescheduleOpen(true);
     rescheduleForm.setFieldsValue({
-      doctorId: appointment.doctorId ?? undefined,
+      doctorId: appointment.doctorId ? String(appointment.doctorId) : undefined,
       date: dayjs(appointment.date),
       slot: undefined,
       reason: "",
@@ -716,7 +798,8 @@ export default function ManagementAppointmentsPage() {
   const handleServiceSelect = async (serviceId: string) => {
     if (!selectedAppointment) return;
     const service = facilityServices.find((item) => item.serviceId === serviceId);
-    const specialty = service?.serviceDoctorSpecialty?.trim() || undefined;
+    const normalizedSpecialty = getServiceSpecialtyKey(service);
+    const specialty = getSpecialtySearchLabel(normalizedSpecialty, service);
     serviceItemForm.setFieldsValue({ doctorId: undefined, roomId: undefined });
     setServiceDoctorShifts([]);
     setLoadingServiceDoctors(true);
@@ -732,7 +815,9 @@ export default function ManagementAppointmentsPage() {
           shift.roomId &&
           shift.status === "available" &&
           shift.shiftDate === selectedAppointment.date &&
-          String(shift.facilityId) === String(selectedAppointment.facilityId),
+          String(shift.facilityId) === String(selectedAppointment.facilityId) &&
+          (!normalizedSpecialty ||
+            getSpecialtyKeyword(shift.doctorSpecialty) === normalizedSpecialty),
       ) as unknown as DoctorShiftItem[];
       setServiceDoctorShifts(availableShifts);
       applyServiceShift(availableShifts[Math.floor(Math.random() * availableShifts.length)] ?? null);
@@ -935,20 +1020,6 @@ export default function ManagementAppointmentsPage() {
       title: "Thao tác",
       fixed: "right",
       render: (_, item) => {
-        if (!canCreateIndication && ["checked_in", "in_progress"].includes(item.status)) {
-          return (
-            <Space wrap>
-              <Button
-                size="small"
-                icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                onClick={() => handleComplete(item)}
-              >
-                Đã xong
-              </Button>
-            </Space>
-          );
-        }
-
         return (
           <Space wrap>
             <Button
@@ -970,7 +1041,7 @@ export default function ManagementAppointmentsPage() {
                 Thêm kết quả
               </Button>
             ) : null}
-            {canCreateIndication ? (
+            {canCreateIndicationForAppointment(item) ? (
               <Button
                 size="small"
                 icon={<ClipboardList className="h-3.5 w-3.5" />}
@@ -1407,7 +1478,7 @@ export default function ManagementAppointmentsPage() {
               </Descriptions.Item>
             </Descriptions>
 
-            {canCreateIndication ? (
+            {canCreateIndicationForAppointment(selectedAppointment) ? (
               <>
                 <Divider>Thêm chỉ định</Divider>
                 <Form

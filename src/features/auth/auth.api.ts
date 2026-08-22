@@ -3,6 +3,7 @@ import type { UserProfile } from "../profile/profile.types";
 import type {
   AuthResponse,
   BackendAuthResponse,
+  ChangePasswordInput,
   ForgotPasswordInput,
   ForgotPasswordResponse,
   LoginInput,
@@ -110,6 +111,12 @@ export function forgotPassword(input: ForgotPasswordInput) {
 
 export function resetPassword(input: ResetPasswordInput) {
   return unwrapApiResponse<null>(apiClient.post("/auth/reset-password", input));
+}
+
+export function changePassword(input: ChangePasswordInput) {
+  return unwrapApiResponse<null>(
+    apiClient.patch("/auth/change-password", input),
+  );
 }
 
 export function register(input: RegisterInput) {

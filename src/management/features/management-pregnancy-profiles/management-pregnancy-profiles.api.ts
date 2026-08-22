@@ -215,9 +215,22 @@ function normalizeConsultation(
 ): PregnancyConsultationRecord {
   return {
     id: toStringValue(consultation.id),
-    appointmentId: toNullableString(consultation.appointmentId),
+    appointmentId: toNullableString(
+      consultation.appointmentId ?? consultation.appointment?.id,
+    ),
+    appointmentScheduledStart: consultation.appointment?.scheduledStart ?? null,
+    appointmentScheduledEnd: consultation.appointment?.scheduledEnd ?? null,
+    bookedServiceName: consultation.appointment?.service?.name ?? null,
+    appointmentDoctorName: consultation.appointment?.doctor?.name ?? null,
+    appointmentServiceItemId: toNullableString(
+      consultation.appointmentServiceItemId ?? consultation.appointmentServiceItem?.id,
+    ),
+    appointmentServiceName: consultation.appointmentServiceItem?.service?.name ?? null,
+    appointmentServiceRoomName: consultation.appointmentServiceItem?.room?.name ?? null,
+    appointmentServiceDoctorName: consultation.appointmentServiceItem?.doctor?.name ?? null,
     pregnancyProfileId: toNullableString(consultation.pregnancyProfileId),
     doctorId: toNullableString(consultation.doctorId),
+    doctorName: consultation.doctor?.name ?? null,
     diagnosis: consultation.diagnosis ?? null,
     conclusion: consultation.conclusion ?? null,
     recommendation: consultation.recommendation ?? null,
