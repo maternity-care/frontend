@@ -39,6 +39,8 @@ interface Props {
   onClose: () => void;
   onEdit: (profile: ManagementPregnancyProfile) => void;
   onEditMedicalRecord?: (recordId: string) => void;
+  canEditProfile?: boolean;
+  canViewMedicalRecords?: boolean;
 }
 
 function formatDate(value?: string | null): string {
@@ -292,21 +294,30 @@ export function PregnancyProfileDetailModal({
   onClose,
   onEdit,
   onEditMedicalRecord,
+  canEditProfile = true,
+  canViewMedicalRecords = true,
 }: Props) {
   if (!profile) return null;
 
   const user = profile.user;
+  const shouldShowMedicalRecords = canViewMedicalRecords;
 
-  const fileRecords = profile.medicalRecords.filter(
-    (record): record is string | PregnancyProfilePdfRecord =>
-      typeof record === "string" || isPdfRecord(record),
-  );
+  const fileRecords = shouldShowMedicalRecords
+    ? profile.medicalRecords.filter(
+        (record): record is string | PregnancyProfilePdfRecord =>
+          typeof record === "string" || isPdfRecord(record),
+      )
+    : [];
 
-  const embeddedConsultations =
-    profile.medicalRecords.filter(isConsultationRecord);
+  const embeddedConsultations = shouldShowMedicalRecords
+    ? profile.medicalRecords.filter(isConsultationRecord)
+    : [];
 
   const consultationMap = new Map<string, PregnancyConsultationRecord>();
-  [...profile.consultations, ...embeddedConsultations].forEach((c) => {
+  [
+    ...(shouldShowMedicalRecords ? profile.consultations : []),
+    ...embeddedConsultations,
+  ].forEach((c) => {
     const key = c.id || `${c.appointmentId}-${c.createdAt}`;
     consultationMap.set(key, c);
   });
@@ -371,15 +382,17 @@ export function PregnancyProfileDetailModal({
         <Button key="close" onClick={onClose}>
           Đóng
         </Button>,
-        <Button
-          key="edit"
-          type="primary"
-          icon={<Pencil size={16} />}
-          disabled={profile.status === "deleted"}
-          onClick={() => onEdit(profile)}
-        >
-          Cập nhật hồ sơ
-        </Button>,
+        canEditProfile ? (
+          <Button
+            key="edit"
+            type="primary"
+            icon={<Pencil size={16} />}
+            disabled={profile.status === "deleted"}
+            onClick={() => onEdit(profile)}
+          >
+            Cập nhật hồ sơ
+          </Button>
+        ) : null,
       ]}
     >
       <Space orientation="vertical" size={20} style={{ width: "100%" }}>
@@ -518,71 +531,73 @@ export function PregnancyProfileDetailModal({
           </Paragraph>
         </div>
 
-        <Divider style={{ margin: 0 }} />
+        {shouldShowMedicalRecords ? (
+          <>
+            <Divider style={{ margin: 0 }} />
 
-        {/* ===== TÀI LIỆU Y TẾ ===== */}
-        <div>
-          <Title level={5}>Tài liệu y tế ({totalMedicalDocuments})</Title>
+            {/* ===== TÀI LIỆU Y TẾ ===== */}
+            <div>
+              <Title level={5}>Tài liệu y tế ({totalMedicalDocuments})</Title>
 
-          {totalMedicalDocuments === 0 ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="Chưa có tài liệu"
-            />
-          ) : (
-            <div
-              style={{
-                maxHeight: 280,
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                paddingRight: 4,
-              }}
-            >
-              {fileRecords.map((record, index) => (
-                <DocumentCard
-                  key={
-                    typeof record === "string"
-                      ? `${record}-${index}`
-                      : record.id
-                  }
-                  record={record}
-                  index={index}
+              {totalMedicalDocuments === 0 ? (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="Chưa có tài liệu"
                 />
-              ))}
-              {allFilesFromConsultations.map((file) => (
-                <MedicalRecordFileCard
-                  key={file.id || file.fileUrl}
-                  file={file}
-                />
-              ))}
+              ) : (
+                <div
+                  style={{
+                    maxHeight: 280,
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    paddingRight: 4,
+                  }}
+                >
+                  {fileRecords.map((record, index) => (
+                    <DocumentCard
+                      key={
+                        typeof record === "string"
+                          ? `${record}-${index}`
+                          : record.id
+                      }
+                      record={record}
+                      index={index}
+                    />
+                  ))}
+                  {allFilesFromConsultations.map((file) => (
+                    <MedicalRecordFileCard
+                      key={file.id || file.fileUrl}
+                      file={file}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <Divider style={{ margin: 0 }} />
+            <Divider style={{ margin: 0 }} />
 
-        {/* ===== KẾT QUẢ KHÁM – dùng Collapse ===== */}
-        <div>
-          <Title level={5}>
-            Kết quả khám ({generalConsultationCount} chung
-            {indicationConsultationCount > 0
-              ? `, ${indicationConsultationCount} theo chỉ định`
-              : ""}
-            )
-          </Title>
+            {/* ===== KẾT QUẢ KHÁM – dùng Collapse ===== */}
+            <div>
+              <Title level={5}>
+                Kết quả khám ({generalConsultationCount} chung
+                {indicationConsultationCount > 0
+                  ? `, ${indicationConsultationCount} theo chỉ định`
+                  : ""}
+                )
+              </Title>
 
-          {consultations.length === 0 ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="Chưa có kết quả khám"
-            />
-          ) : (
-            <Collapse
-              accordion={false}
-              defaultActiveKey={[]} // mặc định đóng hết → không bị cao
-              items={consultationGroups.map((group, groupIndex) => {
+              {consultations.length === 0 ? (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="Chưa có kết quả khám"
+                />
+              ) : (
+                <Collapse
+                  accordion={false}
+                  defaultActiveKey={[]} // mặc định đóng hết → không bị cao
+                  items={consultationGroups.map((group, groupIndex) => {
                 const appointmentTitle = group.appointmentId
                   ? `Lịch #${group.appointmentId}`
                   : "Lịch hẹn chưa rõ";
@@ -769,10 +784,12 @@ export function PregnancyProfileDetailModal({
                     />
                   ),
                 };
-              })}
-            />
-          )}
-        </div>
+                  })}
+                />
+              )}
+            </div>
+          </>
+        ) : null}
       </Space>
     </Modal>
   );

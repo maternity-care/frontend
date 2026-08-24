@@ -125,7 +125,22 @@ export default function ManagementPregnancyProfilesPage() {
   ]
     .filter((role): role is string => Boolean(role))
     .map((role) => role.toLowerCase());
-  const canAccessRecords = roleNames.includes("doctor");
+  const hasRole = (role: string) => roleNames.includes(role);
+  const isStaffOnly =
+    hasRole("staff") &&
+    !hasRole("doctor") &&
+    !hasRole("admin") &&
+    !hasRole("super_admin");
+  const canViewPregnancyProfiles =
+    hasRole("doctor") ||
+    hasRole("staff") ||
+    hasRole("admin") ||
+    hasRole("super_admin");
+  const canManagePregnancyProfiles =
+    !isStaffOnly &&
+    (hasRole("doctor") || hasRole("admin") || hasRole("super_admin"));
+  const canViewMedicalRecords = !isStaffOnly && canViewPregnancyProfiles;
+  const canManageMedicalRecords = canViewMedicalRecords;
 
   const [profiles, setProfiles] = useState<ManagementPregnancyProfile[]>([]);
 
@@ -176,7 +191,7 @@ export default function ManagementPregnancyProfilesPage() {
   }, [filters, message, page, pageSize]);
 
   useEffect(() => {
-    if (!canAccessRecords) return;
+    if (!canViewPregnancyProfiles) return;
 
     const timeoutId = window.setTimeout(() => {
       void loadProfiles();
@@ -185,7 +200,7 @@ export default function ManagementPregnancyProfilesPage() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [canAccessRecords, loadProfiles]);
+  }, [canViewPregnancyProfiles, loadProfiles]);
 
   const handleFilterChange = (values: TableFilterValues) => {
     const nextFilters: GetManagementPregnancyProfilesParams = {
@@ -322,13 +337,13 @@ export default function ManagementPregnancyProfilesPage() {
 
   return (
     <AdminLayout>
-      {!canAccessRecords ? (
+      {!canViewPregnancyProfiles ? (
         <Card>
           <Title level={4} style={{ marginTop: 0 }}>
             Không có quyền truy cập
           </Title>
           <Text type="secondary">
-            Chỉ bác sĩ được xem và cập nhật hồ sơ thai kỳ tại màn này.
+            Bạn không có quyền xem hồ sơ thai kỳ tại màn này.
           </Text>
         </Card>
       ) : (
@@ -353,13 +368,15 @@ export default function ManagementPregnancyProfilesPage() {
           </div>
 
           <Space wrap>
-            <Button
-              type="primary"
-              icon={<Plus size={16} />}
-              onClick={() => setCreateProfileOpen(true)}
-            >
-              Thêm hồ sơ
-            </Button>
+            {canManagePregnancyProfiles ? (
+              <Button
+                type="primary"
+                icon={<Plus size={16} />}
+                onClick={() => setCreateProfileOpen(true)}
+              >
+                Thêm hồ sơ
+              </Button>
+            ) : null}
 
             <Button
               icon={<RefreshCcw size={16} />}
@@ -396,12 +413,15 @@ export default function ManagementPregnancyProfilesPage() {
             onEdit={setEditingProfile}
             onDelete={handleDelete}
             onAddMedicalRecord={setCreatingMedicalRecordFor}
+            canManageProfiles={canManagePregnancyProfiles}
+            canViewMedicalRecords={canViewMedicalRecords}
+            canAddMedicalRecord={canManageMedicalRecords}
           />
         </Card>
       </Space>
       )}
 
-      {canAccessRecords ? (
+      {canViewPregnancyProfiles ? (
       <>
         <PregnancyProfileDetailModal
         open={detailProfile !== null}
@@ -412,50 +432,60 @@ export default function ManagementPregnancyProfilesPage() {
           setEditingProfile(profile);
         }}
         onEditMedicalRecord={(id) => setEditingMedicalRecordId(id)}
+        canEditProfile={canManagePregnancyProfiles}
+        canViewMedicalRecords={canViewMedicalRecords}
       />
 
-      <CreatePregnancyProfileModal
-        open={createProfileOpen}
-        loading={creating}
-        onCancel={() => {
-          if (!creating) {
-            setCreateProfileOpen(false);
-          }
-        }}
-        onSubmit={handleCreate}
-      />
+      {canManagePregnancyProfiles ? (
+        <>
+          <CreatePregnancyProfileModal
+            open={createProfileOpen}
+            loading={creating}
+            onCancel={() => {
+              if (!creating) {
+                setCreateProfileOpen(false);
+              }
+            }}
+            onSubmit={handleCreate}
+          />
 
-      <UpdatePregnancyProfileModal
-        open={editingProfile !== null}
-        profile={editingProfile}
-        loading={updating}
-        onCancel={() => {
-          if (!updating) {
-            setEditingProfile(null);
-          }
-        }}
-        onSubmit={handleUpdate}
-      />
+          <UpdatePregnancyProfileModal
+            open={editingProfile !== null}
+            profile={editingProfile}
+            loading={updating}
+            onCancel={() => {
+              if (!updating) {
+                setEditingProfile(null);
+              }
+            }}
+            onSubmit={handleUpdate}
+          />
+        </>
+      ) : null}
 
-      <CreateMedicalRecordModal
-        open={creatingMedicalRecordFor !== null}
-        profile={creatingMedicalRecordFor}
-        onCancel={() => setCreatingMedicalRecordFor(null)}
-        onSuccess={() => {
-          setCreatingMedicalRecordFor(null);
-          void loadProfiles();
-        }}
-      />
+      {canManageMedicalRecords ? (
+        <>
+          <CreateMedicalRecordModal
+            open={creatingMedicalRecordFor !== null}
+            profile={creatingMedicalRecordFor}
+            onCancel={() => setCreatingMedicalRecordFor(null)}
+            onSuccess={() => {
+              setCreatingMedicalRecordFor(null);
+              void loadProfiles();
+            }}
+          />
 
-      <UpdateMedicalRecordModal
-        open={editingMedicalRecordId !== null}
-        medicalRecordId={editingMedicalRecordId}
-        onCancel={() => setEditingMedicalRecordId(null)}
-        onSuccess={() => {
-          setEditingMedicalRecordId(null);
-          void loadProfiles();
-        }}
-      />
+          <UpdateMedicalRecordModal
+            open={editingMedicalRecordId !== null}
+            medicalRecordId={editingMedicalRecordId}
+            onCancel={() => setEditingMedicalRecordId(null)}
+            onSuccess={() => {
+              setEditingMedicalRecordId(null);
+              void loadProfiles();
+            }}
+          />
+        </>
+      ) : null}
       </>
       ) : null}
     </AdminLayout>
