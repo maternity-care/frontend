@@ -64,16 +64,22 @@ import { getDoctors } from "@/management/features/doctors/doctors.api";
 import type { Doctor } from "@/management/features/doctors/doctors.types";
 import { getFacilities } from "@/management/features/facilities/facilities.api";
 import {
+  createManagementPregnancyProfile,
   getManagementPregnancyProfiles,
   getManagementPregnancyProfileById,
 } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.api";
-import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
+import type {
+  CreateManagementPregnancyProfileInput,
+  ManagementPregnancyProfile,
+} from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { PregnancyProfileDetailModal } from "@/fe/components/records/management/PregnancyProfileDetailModal";
+import { CreatePregnancyProfileModal } from "@/fe/components/records/management/CreatePregnancyProfileModal";
 import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
 import { getDoctorAvailability } from "@/management/features/doctor-shifts/doctor-shifts.api";
 import type { DoctorShiftItem } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import { getPublicWeeklyDoctorShifts } from "@/features/doctor-shifts/public-doctor-shifts.api";
 import { useAuthStore } from "@/features/auth/auth.store";
+import { useNotificationRealtime } from "@/features/notifications/useNotificationRealtime";
 import { getFacilityServices } from "@/management/features/services/services.api";
 import type { FacilityService } from "@/management/features/services/services.types";
 import { getRooms } from "@/management/features/rooms/rooms.api";
@@ -268,6 +274,8 @@ export default function ManagementAppointmentsPage() {
     ManagementPregnancyProfile[]
   >([]);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [creatingCheckInProfile, setCreatingCheckInProfile] = useState(false);
+  const [createCheckInProfileOpen, setCreateCheckInProfileOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] =
     useState<ManagementAppointment | null>(null);
   const [checkInOpen, setCheckInOpen] = useState(false);
@@ -493,6 +501,34 @@ export default function ManagementAppointmentsPage() {
     }
   }, [dateRange, doctorId, isDoctor, scope, scopedFacilityId, search, status]);
 
+  const realtimeReloadTimerRef = useRef<number | null>(null);
+  const scheduleRealtimeReload = useCallback(
+    (notice: string) => {
+      if (realtimeReloadTimerRef.current) {
+        window.clearTimeout(realtimeReloadTimerRef.current);
+      }
+      realtimeReloadTimerRef.current = window.setTimeout(() => {
+        void loadAppointments();
+        void message.info(notice);
+        realtimeReloadTimerRef.current = null;
+      }, 250);
+    },
+    [loadAppointments],
+  );
+
+  const handleRealtimeAppointmentNotification = useCallback(
+    (notification: { referenceType: string }) => {
+      if (notification.referenceType !== "appointment") return;
+      scheduleRealtimeReload("Lịch đặt khám vừa có cập nhật mới.");
+    },
+    [scheduleRealtimeReload],
+  );
+
+  useNotificationRealtime({
+    management: true,
+    onNotification: handleRealtimeAppointmentNotification,
+  });
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadAppointments();
@@ -500,6 +536,15 @@ export default function ManagementAppointmentsPage() {
 
     return () => window.clearTimeout(timer);
   }, [loadAppointments]);
+
+  useEffect(
+    () => () => {
+      if (realtimeReloadTimerRef.current) {
+        window.clearTimeout(realtimeReloadTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!initialAppointmentId || loading) return;
@@ -742,6 +787,27 @@ export default function ManagementAppointmentsPage() {
       return;
     }
     await submitCheckIn(values);
+  };
+
+  const handleCreateCheckInProfile = async (
+    input: CreateManagementPregnancyProfileInput,
+  ) => {
+    setCreatingCheckInProfile(true);
+    try {
+      const profile = await createManagementPregnancyProfile(input);
+      setProfileOptions((current) => {
+        const next = current.filter((item) => item.id !== profile.id);
+        return [profile, ...next];
+      });
+      checkInForm.setFieldsValue({ pregnancyProfileId: profile.id });
+      setCreateCheckInProfileOpen(false);
+      message.success("Tạo hồ sơ thai kỳ thành công.");
+    } catch {
+      message.error("Tạo hồ sơ thai kỳ thất bại.");
+      throw new Error("Tạo hồ sơ thai kỳ thất bại.");
+    } finally {
+      setCreatingCheckInProfile(false);
+    }
   };
 
   const handleReschedule = async (values: RescheduleFormValues) => {
@@ -1454,7 +1520,10 @@ export default function ManagementAppointmentsPage() {
               title="Người dùng này chưa có hồ sơ thai kỳ"
               description="Cần tạo hồ sơ thai kỳ cho user trước, sau đó quay lại check-in và chọn hồ sơ."
               action={
-                <Button size="small" href="/management/records">
+                <Button
+                  size="small"
+                  onClick={() => setCreateCheckInProfileOpen(true)}
+                >
                   Tạo hồ sơ
                 </Button>
               }
@@ -1492,6 +1561,27 @@ export default function ManagementAppointmentsPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <CreatePregnancyProfileModal
+        open={createCheckInProfileOpen}
+        loading={creatingCheckInProfile}
+        initialPatient={
+          selectedAppointment
+            ? {
+                id: selectedAppointment.patientId,
+                name: selectedAppointment.patientName || `User #${selectedAppointment.patientId}`,
+                phone: selectedAppointment.patientPhone || "",
+                email: selectedAppointment.patientEmail || "",
+              }
+            : null
+        }
+        onCancel={() => {
+          if (!creatingCheckInProfile) {
+            setCreateCheckInProfileOpen(false);
+          }
+        }}
+        onSubmit={handleCreateCheckInProfile}
+      />
 
       <Modal
         title="Dời lịch khám"

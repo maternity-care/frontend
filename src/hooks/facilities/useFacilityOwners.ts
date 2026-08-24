@@ -8,12 +8,14 @@ import {
 } from "@/fe/components/facilities/facility-owner.shared";
 
 function currentOwnerFallback(facility: Facility): FacilityOwnerOption {
+  const ownerId = facility.ownerId ?? "";
+
   return {
-    value: facility.ownerId,
+    value: ownerId,
     label: facility.ownerEmail
       ? `${facility.ownerName} (${facility.ownerEmail})`
       : facility.ownerName,
-    name: facility.ownerName || `Chủ cơ sở #${facility.ownerId}`,
+    name: facility.ownerName || `Chủ cơ sở #${ownerId}`,
     email: facility.ownerEmail ?? "",
     phone: facility.ownerPhone ?? "",
     status: "active",
@@ -57,7 +59,7 @@ export function useFacilityOwners(
         .catch((loadError) => {
           if (cancelled) return;
 
-          setOptions(facility ? [currentOwnerFallback(facility)] : []);
+          setOptions(facility?.ownerId ? [currentOwnerFallback(facility)] : []);
           setError(
             loadError instanceof Error
               ? loadError.message

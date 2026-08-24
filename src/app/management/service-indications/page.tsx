@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Empty, Modal, Space, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
@@ -23,6 +23,7 @@ import { getManagementPregnancyProfileById } from "@/management/features/managem
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
 import { getManagementMedicalRecordsByServiceItemId } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
 import type { MedicalRecord } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.types";
+import { useNotificationRealtime } from "@/features/notifications/useNotificationRealtime";
 
 const { Text } = Typography;
 
@@ -60,6 +61,7 @@ export default function ManagementServiceIndicationsPage() {
   const [viewingAppointmentFor, setViewingAppointmentFor] = useState<AppointmentServiceItem | null>(null);
   const [resultRecords, setResultRecords] = useState<MedicalRecord[]>([]);
   const [resultsLoading, setResultsLoading] = useState(false);
+  const realtimeReloadTimerRef = useRef<number | null>(null);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -76,6 +78,43 @@ export default function ManagementServiceIndicationsPage() {
   useEffect(() => {
     void loadItems();
   }, [loadItems]);
+
+  const scheduleRealtimeReload = useCallback(() => {
+    if (realtimeReloadTimerRef.current) {
+      window.clearTimeout(realtimeReloadTimerRef.current);
+    }
+    realtimeReloadTimerRef.current = window.setTimeout(() => {
+      void loadItems();
+      realtimeReloadTimerRef.current = null;
+    }, 250);
+  }, [loadItems]);
+
+  const handleRealtimeServiceItemNotification = useCallback(
+    (notification: { referenceType: string }) => {
+      if (
+        notification.referenceType !== "appointment_service_item" &&
+        notification.referenceType !== "appointment"
+      ) {
+        return;
+      }
+      scheduleRealtimeReload();
+    },
+    [scheduleRealtimeReload],
+  );
+
+  useNotificationRealtime({
+    management: true,
+    onNotification: handleRealtimeServiceItemNotification,
+  });
+
+  useEffect(
+    () => () => {
+      if (realtimeReloadTimerRef.current) {
+        window.clearTimeout(realtimeReloadTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const runAction = async (
     item: AppointmentServiceItem,

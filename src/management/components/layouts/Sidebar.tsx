@@ -54,7 +54,7 @@ const navItems = [
   // { href: "/management/doctors", label: "Quản lý bác sĩ", icon: Stethoscope, roles: ["super_admin", "admin"] },
   { href: "/management/facilities", label: "Quản lý cơ sở", icon: Building2, roles: ["super_admin", "admin"] },
   { href: "/management/rooms", label: "Quản lý phòng khám", icon: DoorOpen, roles: ["super_admin", "admin"] },
-  { href: "/management/records", label: "Quản lý hồ sơ thai phụ", icon: HardDrive, roles: ["doctor"] },
+  { href: "/management/records", label: "Quản lý hồ sơ thai phụ", icon: HardDrive, roles: ["doctor", "staff"] },
   { href: "/management/services/super", label: "Quản lý dịch vụ", icon: BriefcaseBusiness, roles: ["super_admin"] },
   { href: "/management/services/facility", label: "Quản lý dịch vụ cơ sở", icon: BriefcaseBusiness, roles: ["admin"] },
   // { href: "/management/roles", label: "Roles", icon: ShieldCheck, roles: ["super_admin"] },

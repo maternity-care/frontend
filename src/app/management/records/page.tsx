@@ -136,6 +136,7 @@ export default function ManagementPregnancyProfilesPage() {
     hasRole("staff") ||
     hasRole("admin") ||
     hasRole("super_admin");
+  const canCreatePregnancyProfiles = canViewPregnancyProfiles;
   const canManagePregnancyProfiles =
     !isStaffOnly &&
     (hasRole("doctor") || hasRole("admin") || hasRole("super_admin"));
@@ -368,7 +369,7 @@ export default function ManagementPregnancyProfilesPage() {
           </div>
 
           <Space wrap>
-            {canManagePregnancyProfiles ? (
+            {canCreatePregnancyProfiles ? (
               <Button
                 type="primary"
                 icon={<Plus size={16} />}
@@ -436,7 +437,7 @@ export default function ManagementPregnancyProfilesPage() {
         canViewMedicalRecords={canViewMedicalRecords}
       />
 
-      {canManagePregnancyProfiles ? (
+      {canCreatePregnancyProfiles ? (
         <>
           <CreatePregnancyProfileModal
             open={createProfileOpen}
@@ -448,7 +449,11 @@ export default function ManagementPregnancyProfilesPage() {
             }}
             onSubmit={handleCreate}
           />
+        </>
+      ) : null}
 
+      {canManagePregnancyProfiles ? (
+        <>
           <UpdatePregnancyProfileModal
             open={editingProfile !== null}
             profile={editingProfile}

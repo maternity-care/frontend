@@ -68,7 +68,6 @@ export function FacilityGeneralFields({
           <Form.Item
             name="ownerId"
             label="Chủ cơ sở"
-            rules={[{ required: true, message: "Vui lòng chọn chủ cơ sở." }]}
           >
             <Select
               size="large"

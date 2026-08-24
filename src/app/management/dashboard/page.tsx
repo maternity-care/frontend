@@ -114,6 +114,18 @@ type ServiceMetric = {
   revenue: number;
 };
 
+type DashboardStatCard = {
+  title: string;
+  value: string | number;
+  suffix?: string;
+  helper: string;
+  icon: ReactNode;
+  trend: string;
+  trendDirection: "up" | "down";
+  tone: StatTone;
+  onClick?: () => void;
+};
+
 type RoleDashboardConfig = {
   label: string;
   description: string;
@@ -624,6 +636,10 @@ export default function ManagementDashboardPage() {
   );
   const canViewSystemStats = roleConfig.showSystemCards;
   const canViewStaffStats = roleConfig.showSystemCards;
+  const canOpenShiftManagement = ["super_admin", "admin", "doctor", "nurse"].includes(dashboardRole);
+  const canOpenRoomManagement = ["super_admin", "admin"].includes(dashboardRole);
+  const canOpenPregnancyProfiles = ["doctor", "staff"].includes(dashboardRole);
+  const canViewRevenueStats = ["super_admin", "admin"].includes(dashboardRole);
   const dashboardFacilityId =
     dashboardRole === "super_admin"
       ? selectedFacilityId === "all"
@@ -1294,8 +1310,8 @@ export default function ManagementDashboardPage() {
     windowValue,
   ]);
 
-  const roleStatCards = useMemo(
-    () => [
+  const roleStatCards = useMemo(() => {
+    const cards: DashboardStatCard[] = [
       {
         title: roleConfig.primaryMetric,
         value: appointmentSummary.total,
@@ -1314,7 +1330,7 @@ export default function ManagementDashboardPage() {
         trendDirection: highRiskProfiles > 0 ? "down" as const : "up" as const,
         helper: roleConfig.scopeLabel,
         tone: "violet" as const,
-        onClick: dashboardRole === "doctor" ? () => goToManagement("/management/records") : undefined,
+        onClick: canOpenPregnancyProfiles ? () => goToManagement("/management/records") : undefined,
       },
       {
         title: roleConfig.shiftMetric,
@@ -1325,13 +1341,18 @@ export default function ManagementDashboardPage() {
         trendDirection: vacantShifts > 0 ? "down" as const : "up" as const,
         helper: `${shiftSummary.capacity} suất khám khả dụng`,
         tone: "emerald" as const,
-        onClick: () => goToManagement("/management/doctor-shifts", {
-          dateFrom: range.dateFrom,
-          dateTo: range.dateTo,
-          facilityId: dashboardFacilityId,
-        }),
+        onClick: canOpenShiftManagement
+          ? () => goToManagement("/management/doctor-shifts", {
+              dateFrom: range.dateFrom,
+              dateTo: range.dateTo,
+              facilityId: dashboardFacilityId,
+            })
+          : undefined,
       },
-      {
+    ];
+
+    if (canViewRevenueStats) {
+      cards.push({
         title: "Doanh thu ước tính",
         value: formatCurrency(revenueSummary.estimatedRevenue),
         icon: <DollarSign className="h-5 w-5" />,
@@ -1340,11 +1361,16 @@ export default function ManagementDashboardPage() {
         helper: `${serviceMetrics.length} dịch vụ`,
         tone: "amber" as const,
         onClick: () => goToAppointments(),
-      },
-    ],
-    [
+      });
+    }
+
+    return cards;
+  }, [
       activeDoctors,
       appointmentSummary.total,
+      canOpenPregnancyProfiles,
+      canOpenShiftManagement,
+      canViewRevenueStats,
       completionRate,
       dashboardRole,
       dashboardFacilityId,
@@ -1362,8 +1388,7 @@ export default function ManagementDashboardPage() {
       shiftSummary.capacity,
       vacantShifts,
       visibleShifts.length,
-    ],
-  );
+    ]);
 
   const appointmentColumns = useMemo<ColumnsType<ManagementAppointment>>(
     () =>
@@ -1654,11 +1679,17 @@ export default function ManagementDashboardPage() {
                     Thống kê dịch vụ
                   </p>
                   <p className="mb-0 mt-1 text-sm font-normal text-slate-500">
-                    Doanh thu ước tính và số lượt theo từng dịch vụ trong khoảng ngày.
+                    {canViewRevenueStats
+                      ? "Doanh thu ước tính và số lượt theo từng dịch vụ trong khoảng ngày."
+                      : "Số lượt theo từng dịch vụ trong khoảng ngày."}
                   </p>
                 </div>
               }
-              extra={<Tag color="gold">{formatCurrency(revenueSummary.completedRevenue)} đã hoàn thành</Tag>}
+              extra={
+                canViewRevenueStats ? (
+                  <Tag color="gold">{formatCurrency(revenueSummary.completedRevenue)} đã hoàn thành</Tag>
+                ) : null
+              }
             >
               {serviceMetrics.length > 0 ? (
                 <div className="grid gap-3 xl:grid-cols-3">
@@ -1684,9 +1715,11 @@ export default function ManagementDashboardPage() {
                           </div>
                           <Tag color="blue">{completionPercent}%</Tag>
                         </div>
-                        <div className="mt-3 text-xl font-bold text-slate-950">
-                          {formatCurrency(item.revenue)}
-                        </div>
+                        {canViewRevenueStats ? (
+                          <div className="mt-3 text-xl font-bold text-slate-950">
+                            {formatCurrency(item.revenue)}
+                          </div>
+                        ) : null}
                         <Progress
                           percent={completionPercent}
                           showInfo={false}
@@ -1831,11 +1864,13 @@ export default function ManagementDashboardPage() {
                           } else if (item.id === "cancelled") {
                             goToAppointments({ status: "cancelled" });
                           } else if (item.id === "shift-capacity") {
-                            goToManagement("/management/doctor-shifts", {
-                              dateFrom: range.dateFrom,
-                              dateTo: range.dateTo,
-                              facilityId: dashboardFacilityId,
-                            });
+                            if (canOpenShiftManagement) {
+                              goToManagement("/management/doctor-shifts", {
+                                dateFrom: range.dateFrom,
+                                dateTo: range.dateTo,
+                                facilityId: dashboardFacilityId,
+                              });
+                            }
                           } else if (dashboardRole === "doctor") {
                             goToManagement("/management/records");
                           }
@@ -2010,13 +2045,17 @@ export default function ManagementDashboardPage() {
                 </div>
               </Card>
               <Card
-                hoverable
-                className="cursor-pointer border-slate-200 bg-white"
-                onClick={() => goToManagement("/management/doctor-shifts", {
-                  dateFrom: range.dateFrom,
-                  dateTo: range.dateTo,
-                  facilityId: dashboardFacilityId,
-                })}
+                hoverable={canOpenShiftManagement}
+                className={`border-slate-200 bg-white ${canOpenShiftManagement ? "cursor-pointer" : ""}`}
+                onClick={
+                  canOpenShiftManagement
+                    ? () => goToManagement("/management/doctor-shifts", {
+                        dateFrom: range.dateFrom,
+                        dateTo: range.dateTo,
+                        facilityId: dashboardFacilityId,
+                      })
+                    : undefined
+                }
               >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
@@ -2032,26 +2071,28 @@ export default function ManagementDashboardPage() {
                   </div>
                 </div>
               </Card>
-              <Card
-                hoverable
-                className="cursor-pointer border-slate-200 bg-white"
-                onClick={() => goToManagement("/management/rooms", { facilityId: dashboardFacilityId })}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
-                    <Building2 className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <Text type="secondary" className="block text-xs">
-                      Phòng đang sử dụng
-                    </Text>
-                    <Text strong className="text-lg text-slate-950">
-                      {facilityUtilization.reduce((sum, item) => sum + item.roomsInUse, 0)} /{" "}
-                      {facilityUtilization.reduce((sum, item) => sum + item.totalRooms, 0)} phòng
-                    </Text>
+              {canOpenRoomManagement ? (
+                <Card
+                  hoverable
+                  className="cursor-pointer border-slate-200 bg-white"
+                  onClick={() => goToManagement("/management/rooms", { facilityId: dashboardFacilityId })}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                      <Building2 className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <Text type="secondary" className="block text-xs">
+                        Phòng đang sử dụng
+                      </Text>
+                      <Text strong className="text-lg text-slate-950">
+                        {facilityUtilization.reduce((sum, item) => sum + item.roomsInUse, 0)} /{" "}
+                        {facilityUtilization.reduce((sum, item) => sum + item.totalRooms, 0)} phòng
+                      </Text>
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              ) : null}
             </div>
           </>
         )}

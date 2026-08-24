@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import dayjs from "dayjs";
 
@@ -46,6 +46,7 @@ interface CreatePregnancyProfileFormValues {
 interface Props {
   open: boolean;
   loading?: boolean;
+  initialPatient?: Pick<User, "id" | "name" | "phone" | "email"> | null;
   onCancel: () => void;
   onSubmit: (
     input: CreateManagementPregnancyProfileInput,
@@ -60,6 +61,7 @@ function formatUserLabel(user: User): string {
 export function CreatePregnancyProfileModal({
   open,
   loading = false,
+  initialPatient = null,
   onCancel,
   onSubmit,
 }: Props) {
@@ -100,6 +102,7 @@ export function CreatePregnancyProfileModal({
     if (!open) return;
 
     form.setFieldsValue({
+      patientId: initialPatient?.id,
       fetalCount: 1,
       gravida: 1,
       paraFullTerm: 0,
@@ -130,6 +133,20 @@ export function CreatePregnancyProfileModal({
       notes: values.notes?.trim() || null,
     });
   };
+
+  const patientOptions = useMemo(() => {
+    const map = new Map<string, User | Pick<User, "id" | "name" | "phone" | "email">>();
+    if (initialPatient?.id) {
+      map.set(String(initialPatient.id), initialPatient);
+    }
+    for (const patient of patients) {
+      map.set(String(patient.id), patient);
+    }
+    return Array.from(map.values()).map((patient) => ({
+      value: patient.id,
+      label: formatUserLabel(patient as User),
+    }));
+  }, [initialPatient, patients]);
 
   return (
     <Modal
@@ -168,10 +185,7 @@ export function CreatePregnancyProfileModal({
             loading={loadingPatients}
             placeholder="Tìm theo tên, SĐT, email hoặc CCCD"
             onSearch={setPatientSearch}
-            options={patients.map((patient) => ({
-              value: patient.id,
-              label: formatUserLabel(patient),
-            }))}
+            options={patientOptions}
           />
         </Form.Item>
 

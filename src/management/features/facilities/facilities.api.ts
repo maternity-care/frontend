@@ -217,7 +217,7 @@ function normalizeSchedules(schedules: FacilityScheduleInput[]) {
 function toCreatePayload(input: CreateFacilityInput) {
   return removeUndefined({
     name: input.name.trim(),
-    ownerId: input.ownerId.trim(),
+    ownerId: input.ownerId?.trim() || undefined,
     phone: input.hotline.trim(),
     email: input.email?.trim() || "",
     schedules: normalizeSchedules(input.schedules),
