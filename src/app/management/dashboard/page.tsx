@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
@@ -442,6 +443,7 @@ function StatCard({
   trend,
   trendDirection,
   tone,
+  onClick,
 }: {
   title: string;
   value: string | number;
@@ -451,11 +453,24 @@ function StatCard({
   trend: string;
   trendDirection: "up" | "down";
   tone: StatTone;
+  onClick?: () => void;
 }) {
   const toneClasses = statToneClasses[tone];
 
   return (
-    <Card className={`h-full overflow-hidden ${toneClasses.card}`}>
+    <Card
+      hoverable={Boolean(onClick)}
+      className={`h-full overflow-hidden ${toneClasses.card} ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(event) => {
+        if (!onClick) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <Text className="text-sm font-medium text-slate-500">{title}</Text>
@@ -493,7 +508,13 @@ function StatCard({
   );
 }
 
-function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
+function AppointmentTrendChart({
+  data,
+  onDateClick,
+}: {
+  data: DailyMetric[];
+  onDateClick?: (date: string) => void;
+}) {
   if (data.length === 0) {
     return <Empty description="Không có dữ liệu lịch hẹn trong khoảng ngày đã chọn." />;
   }
@@ -522,7 +543,12 @@ function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
               : Math.round((item.completed / item.appointments) * totalPercent);
 
           return (
-            <div key={item.date} className="grid gap-2 sm:grid-cols-[96px_1fr_82px] sm:items-center">
+            <button
+              key={item.date}
+              type="button"
+              className="grid w-full gap-2 rounded-lg text-left transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 sm:grid-cols-[96px_1fr_82px] sm:items-center"
+              onClick={() => onDateClick?.(item.date)}
+            >
               <Text type="secondary" className="text-xs">
                 {item.label}
               </Text>
@@ -540,7 +566,7 @@ function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
               <Text strong className="text-right text-xs text-slate-700">
                 {item.appointments} lịch
               </Text>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -550,6 +576,7 @@ function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
 
 export default function ManagementDashboardPage() {
   const { message } = App.useApp();
+  const router = useRouter();
   const roles = useAuthStore((state) => state.roles);
   const currentUser = useAuthStore((state) => state.user);
   const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
@@ -580,6 +607,47 @@ export default function ManagementDashboardPage() {
         ? undefined
         : selectedFacilityId
       : activeFacilityId ?? undefined;
+
+  const buildAppointmentUrl = useCallback(
+    (overrides: Record<string, string | undefined> = {}) => {
+      const params = new URLSearchParams();
+      params.set("dateFrom", range.dateFrom);
+      params.set("dateTo", range.dateTo);
+
+      if (dashboardFacilityId) {
+        params.set("facilityId", dashboardFacilityId);
+      }
+
+      if (dashboardRole === "doctor") {
+        params.set("scope", "mine");
+      }
+
+      Object.entries(overrides).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+
+      return `/management/appointments?${params.toString()}`;
+    },
+    [dashboardFacilityId, dashboardRole, range.dateFrom, range.dateTo],
+  );
+
+  const goToAppointments = useCallback(
+    (overrides: Record<string, string | undefined> = {}) => {
+      router.push(buildAppointmentUrl(overrides));
+    },
+    [buildAppointmentUrl, router],
+  );
+
+  const goToManagement = useCallback(
+    (path: string, params?: Record<string, string | undefined>) => {
+      const query = new URLSearchParams();
+      Object.entries(params ?? {}).forEach(([key, value]) => {
+        if (value) query.set(key, value);
+      });
+      router.push(query.size > 0 ? `${path}?${query.toString()}` : path);
+    },
+    [router],
+  );
 
   const handleSelectedDateChange = (value: Dayjs | null) => {
     if (value) {
@@ -1028,6 +1096,7 @@ export default function ManagementDashboardPage() {
         trendDirection: completionRate >= 60 ? "up" as const : "down" as const,
         helper: `${range.days} ngày được chọn`,
         tone: "blue" as const,
+        onClick: () => goToAppointments(),
       },
       {
         title: roleConfig.secondaryMetric,
@@ -1037,6 +1106,7 @@ export default function ManagementDashboardPage() {
         trendDirection: highRiskProfiles > 0 ? "down" as const : "up" as const,
         helper: roleConfig.scopeLabel,
         tone: "violet" as const,
+        onClick: dashboardRole === "doctor" ? () => goToManagement("/management/records") : undefined,
       },
       {
         title: roleConfig.shiftMetric,
@@ -1047,6 +1117,11 @@ export default function ManagementDashboardPage() {
         trendDirection: vacantShifts > 0 ? "down" as const : "up" as const,
         helper: `${shiftSummary.capacity} suất khám khả dụng`,
         tone: "emerald" as const,
+        onClick: () => goToManagement("/management/doctor-shifts", {
+          dateFrom: range.dateFrom,
+          dateTo: range.dateTo,
+          facilityId: dashboardFacilityId,
+        }),
       },
       {
         title: "Doanh thu ước tính",
@@ -1056,6 +1131,7 @@ export default function ManagementDashboardPage() {
         trendDirection: revenueSummary.estimatedRevenue > 0 ? "up" as const : "down" as const,
         helper: `${serviceMetrics.length} dịch vụ`,
         tone: "amber" as const,
+        onClick: () => goToAppointments(),
       },
     ],
     [
@@ -1063,8 +1139,13 @@ export default function ManagementDashboardPage() {
       appointmentSummary.total,
       completionRate,
       dashboardRole,
+      dashboardFacilityId,
       data.profiles.length,
+      goToAppointments,
+      goToManagement,
       highRiskProfiles,
+      range.dateFrom,
+      range.dateTo,
       range.days,
       roleConfig,
       revenueSummary.billableCount,
@@ -1248,7 +1329,10 @@ export default function ManagementDashboardPage() {
               }
               extra={<Tag color="blue">{getPeriodLabel(windowValue)}</Tag>}
             >
-              <AppointmentTrendChart data={appointmentTrend} />
+              <AppointmentTrendChart
+                data={appointmentTrend}
+                onDateClick={(date) => goToAppointments({ dateFrom: date, dateTo: date })}
+              />
             </Card>
 
             <Card
@@ -1265,38 +1349,54 @@ export default function ManagementDashboardPage() {
               }
             >
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+                <button
+                  type="button"
+                  className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  onClick={() => goToAppointments({ status: "completed" })}
+                >
                   <Text type="secondary" className="text-xs">
                     Hoàn thành
                   </Text>
                   <div className="mt-1 text-2xl font-bold text-slate-950">
                     {appointmentSummary.completed}
                   </div>
-                </div>
-                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-blue-100 bg-blue-50/70 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onClick={() => goToAppointments({ status: "in_progress" })}
+                >
                   <Text type="secondary" className="text-xs">
                     Đang xử lý
                   </Text>
                   <div className="mt-1 text-2xl font-bold text-slate-950">
                     {appointmentSummary.active}
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  onClick={() => goToAppointments({ status: "cancelled" })}
+                >
                   <Text type="secondary" className="text-xs">
                     Đã hủy
                   </Text>
                   <div className="mt-1 text-2xl font-bold text-slate-950">
                     {appointmentSummary.cancelled}
                   </div>
-                </div>
-                <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-4">
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-left transition hover:border-violet-300 hover:bg-violet-50 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  onClick={() => goToAppointments()}
+                >
                   <Text type="secondary" className="text-xs">
                     Tỷ lệ lấp đầy
                   </Text>
                   <div className="mt-1 text-2xl font-bold text-slate-950">
                     {bookingRate}%
                   </div>
-                </div>
+                </button>
               </div>
 
               <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -1359,7 +1459,12 @@ export default function ManagementDashboardPage() {
                       item.appointments === 0 ? 0 : Math.round((item.completed / item.appointments) * 100);
 
                     return (
-                      <div key={item.serviceId} className="rounded-xl border border-slate-200 p-4">
+                      <button
+                        key={item.serviceId}
+                        type="button"
+                        className="rounded-xl border border-slate-200 p-4 text-left transition hover:border-teal-300 hover:bg-teal-50/40 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        onClick={() => goToAppointments({ q: item.serviceName })}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <Text strong className="block truncate text-slate-950">
@@ -1380,7 +1485,7 @@ export default function ManagementDashboardPage() {
                           size="small"
                           className="mt-2"
                         />
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -1391,7 +1496,11 @@ export default function ManagementDashboardPage() {
 
             {canViewSystemStats ? (
               <div className="grid gap-4 md:grid-cols-3">
-                <Card className="border-slate-200 bg-white">
+                <Card
+                  hoverable
+                  className="cursor-pointer border-slate-200 bg-white"
+                  onClick={() => goToManagement("/management/facilities")}
+                >
                   <div className="flex items-center gap-3">
                     <Building2 className="h-5 w-5 text-blue-700" />
                     <div>
@@ -1404,7 +1513,11 @@ export default function ManagementDashboardPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="border-slate-200 bg-white">
+                <Card
+                  hoverable
+                  className="cursor-pointer border-slate-200 bg-white"
+                  onClick={() => goToManagement("/management/doctors", { facilityId: dashboardFacilityId })}
+                >
                   <div className="flex items-center gap-3">
                     <UserRoundCheck className="h-5 w-5 text-emerald-700" />
                     <div>
@@ -1417,7 +1530,11 @@ export default function ManagementDashboardPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="border-slate-200 bg-white">
+                <Card
+                  hoverable
+                  className="cursor-pointer border-slate-200 bg-white"
+                  onClick={() => goToManagement("/management/staffs", { facilityId: dashboardFacilityId })}
+                >
                   <div className="flex items-center gap-3">
                     <Users className="h-5 w-5 text-violet-700" />
                     <div>
@@ -1460,6 +1577,13 @@ export default function ManagementDashboardPage() {
                 size="middle"
                 columns={appointmentColumns}
                 dataSource={visibleAppointments}
+                rowClassName="cursor-pointer"
+                onRow={(appointment) => ({
+                  onClick: () => goToAppointments({
+                    appointmentId: String(appointment.id),
+                    q: String(appointment.id),
+                  }),
+                })}
                 pagination={{
                   pageSize: 8,
                   showTotal: (total, rangeValues) => `${rangeValues[0]}-${rangeValues[1]} / ${total} lịch hẹn`,
@@ -1489,7 +1613,26 @@ export default function ManagementDashboardPage() {
                     const visual = getAlertVisual(item.level);
 
                     return (
-                      <div key={item.id} className={`rounded-xl border p-4 ${visual.borderClass}`}>
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`rounded-xl border p-4 text-left transition hover:brightness-[0.98] focus:outline-none focus:ring-2 focus:ring-teal-500 ${visual.borderClass}`}
+                        onClick={() => {
+                          if (item.id === "pending-payment") {
+                            goToAppointments({ status: "pending_payment" });
+                          } else if (item.id === "cancelled") {
+                            goToAppointments({ status: "cancelled" });
+                          } else if (item.id === "shift-capacity") {
+                            goToManagement("/management/doctor-shifts", {
+                              dateFrom: range.dateFrom,
+                              dateTo: range.dateTo,
+                              facilityId: dashboardFacilityId,
+                            });
+                          } else if (dashboardRole === "doctor") {
+                            goToManagement("/management/records");
+                          }
+                        }}
+                      >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex min-w-0 gap-3">
                             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${visual.iconClass}`}>
@@ -1509,7 +1652,7 @@ export default function ManagementDashboardPage() {
                           </div>
                           <div className="shrink-0">{visual.tag}</div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -1545,7 +1688,12 @@ export default function ManagementDashboardPage() {
                           : Math.min(100, Math.round((item.roomsInUse / item.totalRooms) * 100));
 
                       return (
-                        <div key={item.facilityId} className="rounded-xl border border-slate-200 p-4">
+                        <button
+                          key={item.facilityId}
+                          type="button"
+                          className="rounded-xl border border-slate-200 p-4 text-left transition hover:border-teal-300 hover:bg-teal-50/40 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          onClick={() => goToAppointments({ facilityId: item.facilityId })}
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex min-w-0 gap-3">
                               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
@@ -1583,7 +1731,7 @@ export default function ManagementDashboardPage() {
                               <Progress percent={roomPercent} showInfo={false} size="small" status="success" />
                             </div>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1615,7 +1763,11 @@ export default function ManagementDashboardPage() {
             ) : null}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <Card className="border-slate-200 bg-white">
+              <Card
+                hoverable
+                className="cursor-pointer border-slate-200 bg-white"
+                onClick={() => goToAppointments({ status: "pending_payment" })}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                     <CalendarClock className="h-4 w-4" />
@@ -1630,7 +1782,11 @@ export default function ManagementDashboardPage() {
                   </div>
                 </div>
               </Card>
-              <Card className="border-slate-200 bg-white">
+              <Card
+                hoverable
+                className="cursor-pointer border-slate-200 bg-white"
+                onClick={() => goToAppointments({ status: "completed" })}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                     <CheckCircle2 className="h-4 w-4" />
@@ -1645,7 +1801,15 @@ export default function ManagementDashboardPage() {
                   </div>
                 </div>
               </Card>
-              <Card className="border-slate-200 bg-white">
+              <Card
+                hoverable
+                className="cursor-pointer border-slate-200 bg-white"
+                onClick={() => goToManagement("/management/doctor-shifts", {
+                  dateFrom: range.dateFrom,
+                  dateTo: range.dateTo,
+                  facilityId: dashboardFacilityId,
+                })}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
                     <Stethoscope className="h-4 w-4" />
@@ -1660,7 +1824,11 @@ export default function ManagementDashboardPage() {
                   </div>
                 </div>
               </Card>
-              <Card className="border-slate-200 bg-white">
+              <Card
+                hoverable
+                className="cursor-pointer border-slate-200 bg-white"
+                onClick={() => goToManagement("/management/rooms", { facilityId: dashboardFacilityId })}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
                     <Building2 className="h-4 w-4" />
