@@ -618,6 +618,10 @@ export default function ManagementDashboardPage() {
     () => getWindowRange(windowValue, selectedDate, customRange),
     [customRange, selectedDate, windowValue],
   );
+  const selectedDateKey = useMemo(
+    () => formatDateKey(selectedDate),
+    [selectedDate],
+  );
   const canViewSystemStats = roleConfig.showSystemCards;
   const canViewStaffStats = roleConfig.showSystemCards;
   const dashboardFacilityId =
@@ -630,8 +634,8 @@ export default function ManagementDashboardPage() {
   const buildAppointmentUrl = useCallback(
     (overrides: Record<string, string | undefined> = {}) => {
       const params = new URLSearchParams();
-      params.set("dateFrom", range.dateFrom);
-      params.set("dateTo", range.dateTo);
+      params.set("dateFrom", overrides.dateFrom ?? selectedDateKey);
+      params.set("dateTo", overrides.dateTo ?? overrides.dateFrom ?? selectedDateKey);
 
       if (dashboardFacilityId) {
         params.set("facilityId", dashboardFacilityId);
@@ -647,7 +651,7 @@ export default function ManagementDashboardPage() {
 
       return `/management/appointments?${params.toString()}`;
     },
-    [dashboardFacilityId, dashboardRole, range.dateFrom, range.dateTo],
+    [dashboardFacilityId, dashboardRole, selectedDateKey],
   );
 
   const goToAppointments = useCallback(
