@@ -218,6 +218,13 @@ const statusColors: Record<ManagementAppointmentStatus, string> = {
   no_show: "volcano",
 };
 
+const shiftStatusLabels: Record<DoctorShiftItem["status"], string> = {
+  available: "Còn trống",
+  full: "Đã đầy",
+  cancelled: "Đã hủy",
+  off: "Nghỉ",
+};
+
 const periodOptions: { value: DashboardWindow; label: string }[] = [
   { value: "day", label: "Theo ngày" },
   { value: "week", label: "Theo tuần" },
@@ -382,6 +389,18 @@ function formatCurrency(value: number) {
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatPercent(numerator: number, denominator: number) {
+  if (denominator === 0) return "0%";
+  return `${Math.round((numerator / denominator) * 100)}%`;
+}
+
+function formatExportDateTime(value = new Date()) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
   }).format(value);
 }
 
@@ -914,62 +933,28 @@ export default function ManagementDashboardPage() {
     return Array.from(services.values()).sort((a, b) => b.revenue - a.revenue || b.appointments - a.appointments);
   }, [data.appointments]);
 
+  const appointmentStatusMetrics = useMemo(() => {
+    return (Object.keys(statusLabels) as ManagementAppointmentStatus[])
+      .map((status) => {
+        const appointments = data.appointments.filter((appointment) => appointment.status === status);
+        const revenue = appointments
+          .filter(isRevenueAppointment)
+          .reduce((sum, appointment) => sum + parseMoney(appointment.servicePrice), 0);
+
+        return {
+          status,
+          label: statusLabels[status],
+          appointments: appointments.length,
+          revenue,
+        };
+      })
+      .filter((item) => item.appointments > 0);
+  }, [data.appointments]);
+
   const visibleShifts = useMemo(
     () => data.shifts.filter((shift) => shift.status === "available" || shift.status === "full"),
     [data.shifts],
   );
-
-  const exportDashboard = useCallback(() => {
-    const rows: unknown[][] = [
-      ["Dashboard", `${range.dateFrom} - ${range.dateTo}`],
-      ["Cơ sở", dashboardRole === "super_admin" && selectedFacilityId === "all" ? "Tất cả cơ sở" : dashboardFacilityId ?? "-"],
-      [],
-      ["Tổng quan"],
-      ["Tổng lịch", appointmentSummary.total],
-      ["Lịch hoàn thành", appointmentSummary.completed],
-      ["Doanh thu ước tính", revenueSummary.estimatedRevenue],
-      ["Doanh thu hoàn thành", revenueSummary.completedRevenue],
-      [],
-      ["Thống kê dịch vụ"],
-      ["Dịch vụ", "Số lịch", "Hoàn thành", "Doanh thu ước tính"],
-      ...serviceMetrics.map((item) => [
-        item.serviceName,
-        item.appointments,
-        item.completed,
-        item.revenue,
-      ]),
-      [],
-      ["Danh sách lịch"],
-      ["Mã lịch", "Ngày", "Giờ bắt đầu", "Giờ kết thúc", "Thai phụ", "SĐT", "Cơ sở", "Dịch vụ", "Bác sĩ", "Trạng thái", "Giá"],
-      ...visibleAppointments.map((appointment) => [
-        appointment.id,
-        appointment.date,
-        appointment.startTime,
-        appointment.endTime,
-        appointment.patientName,
-        appointment.patientPhone,
-        appointment.facilityName,
-        appointment.serviceName,
-        appointment.doctorName,
-        statusLabels[appointment.status],
-        parseMoney(appointment.servicePrice),
-      ]),
-    ];
-
-    downloadCsv(`dashboard-${range.dateFrom}-${range.dateTo}.csv`, rows);
-  }, [
-    appointmentSummary.completed,
-    appointmentSummary.total,
-    dashboardFacilityId,
-    dashboardRole,
-    range.dateFrom,
-    range.dateTo,
-    revenueSummary.completedRevenue,
-    revenueSummary.estimatedRevenue,
-    selectedFacilityId,
-    serviceMetrics,
-    visibleAppointments,
-  ]);
 
   const dashboardAlerts = useMemo<DashboardAlert[]>(() => {
     const alerts: DashboardAlert[] = [];
@@ -1085,6 +1070,225 @@ export default function ManagementDashboardPage() {
       ).size,
     }));
   }, [data.appointments, data.shifts]);
+
+  const exportDashboard = useCallback(() => {
+    const selectedFacility = dashboardFacilityId
+      ? facilityOptions.find((facility) => String(facility.id) === String(dashboardFacilityId))
+      : null;
+    const facilityLabel =
+      dashboardRole === "super_admin" && selectedFacilityId === "all"
+        ? "Tất cả cơ sở"
+        : selectedFacility
+          ? `${selectedFacility.code} - ${selectedFacility.name}`
+          : dashboardFacilityId ?? "-";
+    const exportRows: unknown[][] = [
+      ["DASHBOARD"],
+      ["Khoảng ngày", `${range.dateFrom} - ${range.dateTo}`],
+      ["Kiểu thống kê", getPeriodLabel(windowValue)],
+      ["Phạm vi", roleConfig.scopeLabel],
+      ["Vai trò", roleConfig.label],
+      ["Cơ sở", facilityLabel],
+      ["Người xuất", currentUser?.name ?? "-"],
+      ["Email", currentUser?.email ?? "-"],
+      ["Thời điểm xuất", formatExportDateTime()],
+      [],
+      ["TỔNG QUAN"],
+      ["Chỉ số", "Giá trị", "Ghi chú"],
+      ["Tổng lịch", appointmentSummary.total, `${range.days} ngày được chọn`],
+      ["Lịch đang xử lý", appointmentSummary.active, "Đã đặt, xác nhận, check-in hoặc đang khám"],
+      ["Lịch hoàn thành", appointmentSummary.completed, `${completionRate}% hoàn thành`],
+      ["Lịch chờ thanh toán", appointmentSummary.waiting, "Cần xác nhận thanh toán"],
+      ["Lịch hủy/không đến", appointmentSummary.cancelled, "Hủy hoặc no-show"],
+      ["Tổng lịch tính doanh thu", revenueSummary.billableCount, "Không gồm chờ thanh toán, hủy, no-show"],
+      ["Doanh thu ước tính", revenueSummary.estimatedRevenue, formatCurrency(revenueSummary.estimatedRevenue)],
+      ["Doanh thu hoàn thành", revenueSummary.completedRevenue, formatCurrency(revenueSummary.completedRevenue)],
+      ["Doanh thu trung bình/lịch", revenueSummary.averageRevenue, formatCurrency(revenueSummary.averageRevenue)],
+      ["Tổng ca trực", shiftSummary.total, "Tất cả trạng thái"],
+      ["Ca đang mở", shiftSummary.active, "Còn trống hoặc đã đầy"],
+      ["Ca đã đầy", shiftSummary.full, ""],
+      ["Ca nghỉ/hủy", shiftSummary.off, ""],
+      ["Công suất suất khám", shiftSummary.capacity, `${bookingRate}% đã đặt`],
+      ["Bác sĩ đang trực", activeDoctors, ""],
+      ["Ca chưa có bác sĩ", vacantShifts, ""],
+      ["Hồ sơ thai kỳ", data.profiles.length, ""],
+      ["Hồ sơ nguy cơ cao", highRiskProfiles, ""],
+      ["Tổng bác sĩ", data.doctorsTotal, ""],
+      ["Tổng nhân viên", data.staffsTotal, ""],
+      ["Tổng cơ sở", data.facilitiesTotal, ""],
+      [],
+      ["TRẠNG THÁI LỊCH"],
+      ["Trạng thái", "Số lịch", "Tỷ lệ", "Doanh thu ước tính"],
+      ...appointmentStatusMetrics.map((item) => [
+        item.label,
+        item.appointments,
+        formatPercent(item.appointments, appointmentSummary.total),
+        item.revenue,
+      ]),
+      [],
+      ["XU HƯỚNG THEO NGÀY"],
+      ["Ngày", "Nhãn", "Số lịch", "Hoàn thành", "Tỷ lệ hoàn thành"],
+      ...appointmentTrend.map((item) => [
+        item.date,
+        item.label,
+        item.appointments,
+        item.completed,
+        formatPercent(item.completed, item.appointments),
+      ]),
+      [],
+      ["THỐNG KÊ DỊCH VỤ"],
+      ["Mã dịch vụ", "Dịch vụ", "Số lịch", "Hoàn thành", "Tỷ lệ hoàn thành", "Doanh thu ước tính", "Trung bình/lịch"],
+      ...serviceMetrics.map((item) => [
+        item.serviceId,
+        item.serviceName,
+        item.appointments,
+        item.completed,
+        formatPercent(item.completed, item.appointments),
+        item.revenue,
+        item.appointments === 0 ? 0 : Math.round(item.revenue / item.appointments),
+      ]),
+      [],
+      ["HIỆU SUẤT CƠ SỞ"],
+      ["Mã cơ sở", "Cơ sở", "Số lịch", "Công suất", "Tỷ lệ đặt", "Bác sĩ đang trực", "Phòng đang dùng", "Tổng phòng/ca"],
+      ...facilityUtilization.map((item) => [
+        item.facilityCode,
+        item.facilityName,
+        item.appointments,
+        item.maxAppointments,
+        formatPercent(item.appointments, item.maxAppointments),
+        item.activeDoctors,
+        item.roomsInUse,
+        item.totalRooms,
+      ]),
+      [],
+      ["CA TRỰC"],
+      [
+        "Mã ca",
+        "Ngày",
+        "Bắt đầu",
+        "Kết thúc",
+        "Cơ sở",
+        "Phòng",
+        "Loại phòng",
+        "Bác sĩ",
+        "Chuyên khoa",
+        "Trạng thái",
+        "Đã đặt",
+        "Công suất",
+      ],
+      ...data.shifts.map((shift) => [
+        shift.id,
+        shift.shiftDate,
+        shift.startTime,
+        shift.endTime,
+        shift.facilityName,
+        shift.roomName,
+        shift.roomTypeName || shift.roomType,
+        [shift.doctorTitle, shift.doctorName].filter(Boolean).join(" "),
+        shift.doctorSpecialty,
+        shiftStatusLabels[shift.status],
+        shift.bookedAppointments,
+        shift.maxAppointments,
+      ]),
+      [],
+      ["CẢNH BÁO"],
+      ["Mức", "Tiêu đề", "Mô tả", "Thông tin"],
+      ...dashboardAlerts.map((alert) => [
+        alert.level,
+        alert.title,
+        alert.description,
+        alert.meta,
+      ]),
+      [],
+      ["DANH SÁCH LỊCH CHI TIẾT"],
+      [
+        "Mã lịch",
+        "Ngày",
+        "Giờ bắt đầu",
+        "Giờ kết thúc",
+        "Thai phụ",
+        "SĐT",
+        "Email",
+        "Mã hồ sơ thai",
+        "Cơ sở",
+        "Phòng",
+        "Mã dịch vụ",
+        "Dịch vụ",
+        "Bác sĩ",
+        "Chuyên khoa bác sĩ",
+        "Trạng thái",
+        "Trạng thái gốc",
+        "Giá",
+        "Đã check-in lúc",
+        "Lý do hủy",
+      ],
+      ...visibleAppointments.map((appointment) => [
+        appointment.id,
+        appointment.date,
+        appointment.startTime,
+        appointment.endTime,
+        appointment.patientName,
+        appointment.patientPhone,
+        appointment.patientEmail,
+        appointment.pregnancyProfileCode,
+        appointment.facilityName,
+        appointment.roomName,
+        appointment.serviceId,
+        appointment.serviceName,
+        [appointment.doctorTitle, appointment.doctorName].filter(Boolean).join(" "),
+        appointment.doctorSpecialty,
+        statusLabels[appointment.status],
+        appointment.status,
+        parseMoney(appointment.servicePrice),
+        appointment.checkedInAt,
+        appointment.cancelReason,
+      ]),
+    ];
+
+    downloadCsv(`dashboard-${range.dateFrom}-${range.dateTo}.csv`, exportRows);
+  }, [
+    activeDoctors,
+    appointmentStatusMetrics,
+    appointmentSummary.active,
+    appointmentSummary.cancelled,
+    appointmentSummary.completed,
+    appointmentSummary.total,
+    appointmentSummary.waiting,
+    appointmentTrend,
+    bookingRate,
+    completionRate,
+    currentUser?.email,
+    currentUser?.name,
+    dashboardAlerts,
+    dashboardFacilityId,
+    dashboardRole,
+    data.doctorsTotal,
+    data.facilitiesTotal,
+    data.profiles.length,
+    data.shifts,
+    data.staffsTotal,
+    facilityOptions,
+    facilityUtilization,
+    highRiskProfiles,
+    range.dateFrom,
+    range.dateTo,
+    range.days,
+    revenueSummary.averageRevenue,
+    revenueSummary.billableCount,
+    revenueSummary.completedRevenue,
+    revenueSummary.estimatedRevenue,
+    roleConfig.label,
+    roleConfig.scopeLabel,
+    selectedFacilityId,
+    serviceMetrics,
+    shiftSummary.active,
+    shiftSummary.capacity,
+    shiftSummary.full,
+    shiftSummary.off,
+    shiftSummary.total,
+    vacantShifts,
+    visibleAppointments,
+    windowValue,
+  ]);
 
   const roleStatCards = useMemo(
     () => [
