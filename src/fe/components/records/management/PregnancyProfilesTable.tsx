@@ -39,11 +39,17 @@ interface Props {
 
   onView: (profile: ManagementPregnancyProfile) => void;
 
-  onEdit: (profile: ManagementPregnancyProfile) => void;
+  onEdit?: (profile: ManagementPregnancyProfile) => void;
 
-  onDelete: (profile: ManagementPregnancyProfile) => void;
+  onDelete?: (profile: ManagementPregnancyProfile) => void;
 
   onAddMedicalRecord?: (profile: ManagementPregnancyProfile) => void;
+
+  canManageProfiles?: boolean;
+
+  canViewMedicalRecords?: boolean;
+
+  canAddMedicalRecord?: boolean;
 }
 
 function formatDate(value?: string | null): string {
@@ -100,42 +106,60 @@ export function PregnancyProfilesTable({
   onEdit,
   onDelete,
   onAddMedicalRecord,
+  canManageProfiles = true,
+  canViewMedicalRecords = true,
+  canAddMedicalRecord = true,
 }: Props) {
   const getActionItems = (
     profile: ManagementPregnancyProfile,
-  ): MenuProps["items"] => [
-    {
-      key: "view",
-      label: "Xem chi tiết",
-      icon: <Eye size={16} />,
-      onClick: () => onView(profile),
-    },
-    {
-      key: "edit",
-      label: "Cập nhật hồ sơ",
-      icon: <Pencil size={16} />,
-      disabled: profile.status === "deleted",
-      onClick: () => onEdit(profile),
-    },
-    {
-      key: "add-medical-record",
-      label: "Thêm kết quả khám",
-      icon: <FilePlus2 size={16} />,
-      disabled: profile.status === "deleted",
-      onClick: () => onAddMedicalRecord?.(profile), // thêm prop này
-    },
-    {
-      type: "divider",
-    },
-    {
-      key: "delete",
-      label: "Xóa hồ sơ",
-      danger: true,
-      icon: <Trash2 size={16} />,
-      disabled: profile.status === "deleted",
-      onClick: () => onDelete(profile),
-    },
-  ];
+  ): MenuProps["items"] => {
+    const items: MenuProps["items"] = [
+      {
+        key: "view",
+        label: "Xem chi tiết",
+        icon: <Eye size={16} />,
+        onClick: () => onView(profile),
+      },
+    ];
+
+    if (canManageProfiles && onEdit) {
+      items.push({
+        key: "edit",
+        label: "Cập nhật hồ sơ",
+        icon: <Pencil size={16} />,
+        disabled: profile.status === "deleted",
+        onClick: () => onEdit(profile),
+      });
+    }
+
+    if (canAddMedicalRecord && onAddMedicalRecord) {
+      items.push({
+        key: "add-medical-record",
+        label: "Thêm kết quả khám",
+        icon: <FilePlus2 size={16} />,
+        disabled: profile.status === "deleted",
+        onClick: () => onAddMedicalRecord(profile),
+      });
+    }
+
+    if (canManageProfiles && onDelete) {
+      items.push(
+        {
+          type: "divider",
+        },
+        {
+          key: "delete",
+          label: "Xóa hồ sơ",
+          danger: true,
+          icon: <Trash2 size={16} />,
+          disabled: profile.status === "deleted",
+          onClick: () => onDelete(profile),
+        },
+      );
+    }
+
+    return items;
+  };
 
   const columns: TableColumnsType<ManagementPregnancyProfile> = [
     {
@@ -221,28 +245,33 @@ export function PregnancyProfilesTable({
       width: 150,
       render: getStatusTag,
     },
-    {
-      title: "Hồ sơ khám",
-      key: "records",
-      width: 130,
-      align: "center",
-      render: (_, profile) => {
-        const count =
-          profile.medicalRecords.length + profile.consultations.length;
+    ...(canViewMedicalRecords
+      ? [
+          {
+            title: "Hồ sơ khám",
+            key: "records",
+            width: 130,
+            align: "center" as const,
+            render: (_: unknown, profile: ManagementPregnancyProfile) => {
+              const count =
+                (profile.medicalRecords?.length ?? 0) +
+                (profile.consultations?.length ?? 0);
 
-        return (
-          <Tooltip title="Xem hồ sơ và kết quả khám">
-            <Button
-              type="text"
-              icon={<FileText size={17} />}
-              onClick={() => onView(profile)}
-            >
-              {count}
-            </Button>
-          </Tooltip>
-        );
-      },
-    },
+              return (
+                <Tooltip title="Xem hồ sơ và kết quả khám">
+                  <Button
+                    type="text"
+                    icon={<FileText size={17} />}
+                    onClick={() => onView(profile)}
+                  >
+                    {count}
+                  </Button>
+                </Tooltip>
+              );
+            },
+          },
+        ]
+      : []),
     {
       title: "Cập nhật",
       dataIndex: "updatedAt",
