@@ -28,6 +28,7 @@ import {
 } from "@/management/components/ui/TableFilter";
 import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
 import { UpdateMedicalRecordModal } from "@/fe/components/records/management/UpdateMedicalRecordModal";
+import { useAuthStore } from "@/features/auth/auth.store";
 
 const { Title, Text } = Typography;
 
@@ -112,6 +113,19 @@ const PREGNANCY_PROFILE_FILTER_COLUMNS: TableFilterColumn[] = [
 
 export default function ManagementPregnancyProfilesPage() {
   const { message, modal } = App.useApp();
+  const roles = useAuthStore((state) => state.roles);
+  const user = useAuthStore((state) => state.user);
+  const roleNames = [
+    ...roles,
+    ...(user?.roles?.map((role) => (typeof role === "string" ? role : role?.name)) ?? []),
+    ...(user?.facilities?.flatMap((facility) => [
+      ...(facility.roles ?? []),
+      facility.role,
+    ]) ?? []).map((role) => (typeof role === "string" ? role : role?.name)),
+  ]
+    .filter((role): role is string => Boolean(role))
+    .map((role) => role.toLowerCase());
+  const canAccessRecords = roleNames.includes("doctor");
 
   const [profiles, setProfiles] = useState<ManagementPregnancyProfile[]>([]);
 
@@ -162,6 +176,8 @@ export default function ManagementPregnancyProfilesPage() {
   }, [filters, message, page, pageSize]);
 
   useEffect(() => {
+    if (!canAccessRecords) return;
+
     const timeoutId = window.setTimeout(() => {
       void loadProfiles();
     }, 0);
@@ -169,7 +185,7 @@ export default function ManagementPregnancyProfilesPage() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [loadProfiles]);
+  }, [canAccessRecords, loadProfiles]);
 
   const handleFilterChange = (values: TableFilterValues) => {
     const nextFilters: GetManagementPregnancyProfilesParams = {
@@ -306,6 +322,16 @@ export default function ManagementPregnancyProfilesPage() {
 
   return (
     <AdminLayout>
+      {!canAccessRecords ? (
+        <Card>
+          <Title level={4} style={{ marginTop: 0 }}>
+            Không có quyền truy cập
+          </Title>
+          <Text type="secondary">
+            Chỉ bác sĩ được xem và cập nhật hồ sơ thai kỳ tại màn này.
+          </Text>
+        </Card>
+      ) : (
       <Space orientation="vertical" size={20} style={{ width: "100%" }}>
         <div
           style={{
@@ -373,8 +399,11 @@ export default function ManagementPregnancyProfilesPage() {
           />
         </Card>
       </Space>
+      )}
 
-      <PregnancyProfileDetailModal
+      {canAccessRecords ? (
+      <>
+        <PregnancyProfileDetailModal
         open={detailProfile !== null}
         profile={detailProfile}
         onClose={() => setDetailProfile(null)}
@@ -427,6 +456,8 @@ export default function ManagementPregnancyProfilesPage() {
           void loadProfiles();
         }}
       />
+      </>
+      ) : null}
     </AdminLayout>
   );
 }

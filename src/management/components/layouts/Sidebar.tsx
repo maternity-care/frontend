@@ -49,7 +49,7 @@ function getSidebarCollapsedServerSnapshot() {
 
 const navItems = [
   { href: "/management/dashboard", label: "Dashboard (Thống kê)", icon: Gauge },
-  { href: "/management/users", label: "Quản lý người dùng", icon: Users, roles: ["super_admin"] },
+  { href: "/management/users", label: "Quản lý người dùng", icon: Users, roles: ["super_admin", "admin"] },
   { href: "/management/staffs", label: "Quản lý nhân viên", icon: UserCog, roles: ["super_admin", "admin"] },
   // { href: "/management/doctors", label: "Quản lý bác sĩ", icon: Stethoscope, roles: ["super_admin", "admin"] },
   { href: "/management/facilities", label: "Quản lý cơ sở", icon: Building2, roles: ["super_admin", "admin"] },
@@ -67,7 +67,7 @@ const navItems = [
   { href: "/management/messages", label: "Hộp thư hỗ trợ", icon: Inbox, roles: ["super_admin", "admin", "staff"] },
   { href: "/management/message-accounts", label: "Tài khoản kênh", icon: Settings2, roles: ["super_admin", "admin", "staff"] },
   { href: "/management/shift-slots", label: "Quản lý khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
-  { href: "/management/doctor-shifts", label: "Quản lý ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
+  { href: "/management/doctor-shifts", label: "Quản lý ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "doctor", "nurse"] },
   { href: "/management/appointments", label: "Lịch đặt khám", icon: CalendarCheck, roles: ["super_admin", "admin", "staff", "doctor"] },
   { href: "/management/service-indications", label: "Chỉ định của tôi", icon: ClipboardList, roles: ["doctor"] },
   // { href: "/management/appointment-disruptions", label: "Lịch bị ảnh hưởng", icon: CalendarX2, roles: ["super_admin", "admin"] },

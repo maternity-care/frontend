@@ -228,6 +228,56 @@ export function RoomTypeManagementModal({
     }
   }
 
+  async function openView(
+    roomType: RoomType,
+  ) {
+    try {
+      const detail =
+        await getRoomTypeById(
+          roomType.id,
+        );
+
+      modalApi.info({
+        centered: true,
+        width: 560,
+        title: "Chi tiết loại phòng",
+        okText: "Đóng",
+        content: (
+          <div className="space-y-3">
+            <div>
+              <Text type="secondary">Mã loại phòng</Text>
+              <div className="font-semibold">
+                {detail.code || detail.id}
+              </div>
+            </div>
+            <div>
+              <Text type="secondary">Tên loại phòng</Text>
+              <div className="font-semibold">{detail.name}</div>
+            </div>
+            <div>
+              <Text type="secondary">Mô tả</Text>
+              <div>{detail.description || "Chưa cập nhật"}</div>
+            </div>
+            <div>
+              <Text type="secondary">Trạng thái</Text>
+              <div>
+                {detail.status === "active" ? (
+                  <Tag color="green">Hoạt động</Tag>
+                ) : (
+                  <Tag>Ngừng hoạt động</Tag>
+                )}
+              </div>
+            </div>
+          </div>
+        ),
+      });
+    } catch (loadError) {
+      messageApi.error(
+        getRoomErrorMessage(loadError),
+      );
+    }
+  }
+
   function closeForm() {
     if (submitting) return;
 
@@ -404,13 +454,13 @@ export function RoomTypeManagementModal({
       align: "center",
       render: (_value, roomType) => (
         <Space size={6}>
-          <Tooltip title="Xem và sửa">
+          <Tooltip title="Xem chi tiết">
             <Button
               icon={
                 <Eye className="h-4 w-4" />
               }
               onClick={() =>
-                void openEdit(roomType)
+                void openView(roomType)
               }
             />
           </Tooltip>

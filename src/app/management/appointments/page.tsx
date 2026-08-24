@@ -180,6 +180,9 @@ function isObstetricsSpecialty(value?: string | null) {
 
 function getServiceSpecialtyKey(service?: FacilityService | null) {
   if (!service) return "";
+  const configuredSpecialty = getSpecialtyKeyword(service.serviceDoctorSpecialty);
+  if (configuredSpecialty) return configuredSpecialty;
+
   if (service.serviceType === "ultrasound") return "sieu am";
   if (service.serviceType === "lab_test" || service.serviceType === "screening") {
     return "xet nghiem";
@@ -188,9 +191,8 @@ function getServiceSpecialtyKey(service?: FacilityService | null) {
 
   return getSpecialtyKeyword(
     [
-      service.serviceDoctorSpecialty,
-      service.serviceName,
       service.serviceCode,
+      service.serviceName,
     ]
       .filter(Boolean)
       .join(" "),

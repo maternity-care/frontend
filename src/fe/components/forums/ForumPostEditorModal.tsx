@@ -815,17 +815,6 @@ export function ForumPostEditorModal({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Form.Item
-              name="isPinned"
-              label="Ghim bài viết"
-              valuePropName="checked"
-            >
-              <Switch
-                checkedChildren="Có"
-                unCheckedChildren="Không"
-              />
-            </Form.Item>
-
-            <Form.Item
               name="isFeatured"
               label="Đánh dấu nổi bật"
               valuePropName="checked"
@@ -857,4 +846,3 @@ export function ForumPostEditorModal({
     </Modal>
   );
 }
-

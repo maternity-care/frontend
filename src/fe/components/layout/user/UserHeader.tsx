@@ -102,7 +102,7 @@ export function UserHeader() {
     {
       key: "profile",
       icon: <UserRound className="h-4 w-4" />,
-      label: RESPONSE_MESSAGES.NAVIGATION.VIEW_PROFILE,
+      label: "Hồ sơ / Đổi mật khẩu",
     },
     {
       key: "schedule",
