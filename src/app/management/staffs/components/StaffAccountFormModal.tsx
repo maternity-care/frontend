@@ -58,6 +58,7 @@ const { Text, Title } = Typography;
 
 export type UserRole =
   | "pregnant"
+  | "super_admin"
   | "staff"
   | "doctor"
   | "nurse"
@@ -102,6 +103,7 @@ export interface StaffFormValues {
 }
 
 export const roleOptions = [
+  { value: "super_admin", label: "Super Admin" },
   { value: "admin", label: "Admin" },
   { value: "doctor", label: "Bác sĩ" },
   { value: "nurse", label: "Điều dưỡng" },
@@ -165,6 +167,7 @@ export function getAccountTypeLabel(accountType: AccountType) {
 }
 
 export function getRoleColor(role: UserRole) {
+  if (role === "super_admin") return "magenta";
   if (role === "admin") return "red";
   if (role === "owner") return "purple";
   if (role === "doctor") return "blue";
@@ -228,7 +231,8 @@ function toUiStatus(status: string): UserStatus {
 }
 
 function toUiRole(roleName?: string): UserRole {
-  if (roleName === "super_admin" || roleName === "admin") return "admin";
+  if (roleName === "super_admin") return "super_admin";
+  if (roleName === "admin") return "admin";
   if (roleName === "doctor") return "doctor";
   if (roleName === "nurse") return "nurse";
   if (roleName === "staff") return "staff";
@@ -288,6 +292,7 @@ function getStaffProfile(user: StaffListUser): BackendStaff["staffProfile"] {
     .filter(
       (role): role is StaffPosition =>
         role === "admin" ||
+        role === "super_admin" ||
         role === "doctor" ||
         role === "nurse" ||
         role === "staff",
@@ -438,6 +443,13 @@ export function StaffAccountFormModal({
   const isSuperAdmin = [...storeRoles, ...currentUserRoleNames]
     .map((role) => role.toLowerCase())
     .includes("super_admin");
+  const assignableRoleOptions = useMemo(
+    () =>
+      isSuperAdmin
+        ? roleOptions
+        : roleOptions.filter((option) => option.value !== "super_admin"),
+    [isSuperAdmin],
+  );
   const activeFacility = currentUser?.facilities?.find(
     (facility) => String(facility.id) === String(activeFacilityId),
   );
@@ -1156,7 +1168,10 @@ export function StaffAccountFormModal({
                                 },
                               ]}
                             >
-                              <Select mode="multiple" options={roleOptions} />
+                              <Select
+                                mode="multiple"
+                                options={assignableRoleOptions}
+                              />
                             </Form.Item>
                           </Col>
                         </Row>
