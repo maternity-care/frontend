@@ -176,7 +176,8 @@ function formatBackendRoleLabel(roleName?: string) {
 }
 
 function toUiRole(roleName?: string): UserRole {
-  if (roleName === "super_admin" || roleName === "admin") return "admin";
+  if (roleName === "super_admin") return "super_admin";
+  if (roleName === "admin") return "admin";
   if (roleName === "doctor") return "doctor";
   if (roleName === "nurse") return "nurse";
   if (roleName === "staff") return "staff";
@@ -214,7 +215,11 @@ function getStaffProfile(user: StaffListUser): BackendStaff["staffProfile"] {
   const roles = (user.roles ?? [])
     .map((role) => role.name)
     .filter((role): role is StaffPosition =>
-      role === "admin" || role === "doctor" || role === "nurse" || role === "staff",
+      role === "super_admin" ||
+        role === "admin" ||
+        role === "doctor" ||
+        role === "nurse" ||
+        role === "staff",
     );
 
   if (!facilityId && !user.personalEmail && !user.employeeCode && roles.length === 0) {

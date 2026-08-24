@@ -58,6 +58,7 @@ const { Text, Title } = Typography;
 
 export type UserRole =
   | "pregnant"
+  | "super_admin"
   | "staff"
   | "doctor"
   | "nurse"
@@ -102,6 +103,7 @@ export interface StaffFormValues {
 }
 
 export const roleOptions = [
+  { value: "super_admin", label: "Super Admin" },
   { value: "admin", label: "Admin" },
   { value: "doctor", label: "Bác sĩ" },
   { value: "nurse", label: "Điều dưỡng" },
@@ -136,6 +138,11 @@ const initialValues: Partial<StaffFormValues> = {
   facilityAssignments: [{ facilityId: "", roles: ["staff"] }],
 };
 
+type FacilityOption = {
+  value: string;
+  label: string;
+};
+
 function normalizeSingleFacilityAssignment(
   assignments: StaffFormValues["facilityAssignments"],
 ): StaffFormValues["facilityAssignments"] {
@@ -165,6 +172,7 @@ export function getAccountTypeLabel(accountType: AccountType) {
 }
 
 export function getRoleColor(role: UserRole) {
+  if (role === "super_admin") return "magenta";
   if (role === "admin") return "red";
   if (role === "owner") return "purple";
   if (role === "doctor") return "blue";
@@ -228,7 +236,8 @@ function toUiStatus(status: string): UserStatus {
 }
 
 function toUiRole(roleName?: string): UserRole {
-  if (roleName === "super_admin" || roleName === "admin") return "admin";
+  if (roleName === "super_admin") return "super_admin";
+  if (roleName === "admin") return "admin";
   if (roleName === "doctor") return "doctor";
   if (roleName === "nurse") return "nurse";
   if (roleName === "staff") return "staff";
@@ -288,6 +297,7 @@ function getStaffProfile(user: StaffListUser): BackendStaff["staffProfile"] {
     .filter(
       (role): role is StaffPosition =>
         role === "admin" ||
+        role === "super_admin" ||
         role === "doctor" ||
         role === "nurse" ||
         role === "staff",
@@ -417,6 +427,7 @@ export function StaffAccountFormModal({
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [defaultFacilityName, setDefaultFacilityName] = useState<string>("");
+  const [facilityOptions, setFacilityOptions] = useState<FacilityOption[]>([]);
 
   const fullName = Form.useWatch("fullName", form);
   const email = Form.useWatch("email", form);
@@ -438,6 +449,13 @@ export function StaffAccountFormModal({
   const isSuperAdmin = [...storeRoles, ...currentUserRoleNames]
     .map((role) => role.toLowerCase())
     .includes("super_admin");
+  const assignableRoleOptions = useMemo(
+    () =>
+      isSuperAdmin
+        ? roleOptions
+        : roleOptions.filter((option) => option.value !== "super_admin"),
+    [isSuperAdmin],
+  );
   const activeFacility = currentUser?.facilities?.find(
     (facility) => String(facility.id) === String(activeFacilityId),
   );
@@ -666,6 +684,10 @@ export function StaffAccountFormModal({
         if (cancelled) return;
 
         const facilities = extractFacilities(response);
+        const nextFacilityOptions = facilities.map((facility) => ({
+          value: String(facility.id),
+          label: `${facility.name}${facility.code ? ` (${facility.code})` : ""}`,
+        }));
 
         selectedFacility = facilities[0] ?? null;
 
@@ -679,6 +701,23 @@ export function StaffAccountFormModal({
             code: activeFacility.code ?? null,
           };
         }
+
+        if (
+          !isSuperAdmin &&
+          activeFacility &&
+          !nextFacilityOptions.some(
+            (option) => option.value === String(activeFacility.id),
+          )
+        ) {
+          nextFacilityOptions.push({
+            value: String(activeFacility.id),
+            label: `${activeFacility.name}${
+              activeFacility.code ? ` (${activeFacility.code})` : ""
+            }`,
+          });
+        }
+
+        setFacilityOptions(nextFacilityOptions);
 
         if (selectedFacility) {
           const facilityLabel = `${selectedFacility.name}${
@@ -696,6 +735,7 @@ export function StaffAccountFormModal({
               : "Không tải được danh sách cơ sở.",
           );
           setDefaultFacilityName("Lỗi tải cơ sở");
+          setFacilityOptions([]);
         }
       }
 
@@ -1122,27 +1162,54 @@ export function StaffAccountFormModal({
                       return (
                         <Row gutter={12} key={key} align="middle">
                           <Col xs={24} md={12}>
-                            <Form.Item label="Cơ sở làm việc" required>
-                              <Input
-                                value={defaultFacilityName || "Đang tải..."}
-                                disabled
-                                readOnly
-                              />
-                            </Form.Item>
+                            {isSuperAdmin ? (
+                              <Form.Item
+                                {...fieldItemProps}
+                                name={[field.name, "facilityId"]}
+                                label="Cơ sở làm việc"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Vui lòng chọn cơ sở làm việc",
+                                  },
+                                ]}
+                              >
+                                <Select
+                                  showSearch
+                                  optionFilterProp="label"
+                                  placeholder={
+                                    facilityOptions.length
+                                      ? "Chọn cơ sở làm việc"
+                                      : defaultFacilityName || "Đang tải..."
+                                  }
+                                  options={facilityOptions}
+                                />
+                              </Form.Item>
+                            ) : (
+                              <>
+                                <Form.Item label="Cơ sở làm việc" required>
+                                  <Input
+                                    value={defaultFacilityName || "Đang tải..."}
+                                    disabled
+                                    readOnly
+                                  />
+                                </Form.Item>
 
-                            <Form.Item
-                              {...fieldItemProps}
-                              name={[field.name, "facilityId"]}
-                              hidden
-                              rules={[
-                                {
-                                  required: true,
-                                  message: "Thiếu cơ sở làm việc",
-                                },
-                              ]}
-                            >
-                              <Input />
-                            </Form.Item>
+                                <Form.Item
+                                  {...fieldItemProps}
+                                  name={[field.name, "facilityId"]}
+                                  hidden
+                                  rules={[
+                                    {
+                                      required: true,
+                                      message: "Thiếu cơ sở làm việc",
+                                    },
+                                  ]}
+                                >
+                                  <Input />
+                                </Form.Item>
+                              </>
+                            )}
                           </Col>
                           <Col xs={24} md={12}>
                             <Form.Item
@@ -1156,7 +1223,10 @@ export function StaffAccountFormModal({
                                 },
                               ]}
                             >
-                              <Select mode="multiple" options={roleOptions} />
+                              <Select
+                                mode="multiple"
+                                options={assignableRoleOptions}
+                              />
                             </Form.Item>
                           </Col>
                         </Row>
