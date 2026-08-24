@@ -44,7 +44,7 @@ const { TextArea } = Input;
 
 export type FacilityUpdateValues = {
   name: string;
-  ownerId: string;
+  ownerId?: string;
   hotline: string;
   email: string;
   status: FacilityStatus;
@@ -100,7 +100,7 @@ export function FacilityUpdateModal({
     const timer = window.setTimeout(() => {
       form.setFieldsValue({
         name: facility.name,
-        ownerId: facility.ownerId,
+        ownerId: facility.ownerId ?? undefined,
         hotline: facility.hotline,
         email: facility.email ?? "",
         status: facility.status,
@@ -407,7 +407,7 @@ export function FacilityUpdateModal({
                       owners.loading
                     }
                     currentOwnerId={
-                      facility?.ownerId
+                      facility?.ownerId ?? undefined
                     }
                     disabled={
                       submitting

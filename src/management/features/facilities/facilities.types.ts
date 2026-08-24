@@ -89,7 +89,7 @@ export interface BackendFacility {
   name: string;
   code: string;
 
-  ownerId: string;
+  ownerId?: string | null;
   ownerName?: string;
   ownerEmail?: string;
   ownerPhone?: string;
@@ -130,7 +130,7 @@ export interface Facility {
   name: string;
   code: string;
 
-  ownerId: string;
+  ownerId?: string | null;
   ownerName: string;
   ownerEmail?: string;
   ownerPhone?: string;
@@ -171,7 +171,7 @@ export interface FacilityListResult {
 
 export interface CreateFacilityInput {
   name: string;
-  ownerId: string;
+  ownerId?: string;
   hotline: string;
   email?: string;
   schedules: FacilityScheduleInput[];

@@ -86,8 +86,10 @@ export function FacilityTable({
       width: 160,
       render: (ownerName: string, record) => (
         <div>
-          <div className="font-medium text-slate-900">{ownerName}</div>
-          <div className="text-xs text-slate-500">ID: {record.ownerId}</div>
+          <div className="font-medium text-slate-900">{ownerName || "Chưa gán"}</div>
+          {record.ownerId ? (
+            <div className="text-xs text-slate-500">ID: {record.ownerId}</div>
+          ) : null}
           {record.ownerPhone ? (
             <div className="text-xs text-slate-500">{record.ownerPhone}</div>
           ) : null}

@@ -19,7 +19,7 @@ const { Text, Title } = Typography;
 
 export type FacilityFormValues = {
   name: string;
-  ownerId: string;
+  ownerId?: string;
   hotline: string;
   email: string;
   status: FacilityStatus;
@@ -73,7 +73,7 @@ export function FacilityCreateModal({ open, onClose, onSubmit }: Props) {
       await onSubmit({
         ...values,
         name: values.name.trim(),
-        ownerId: values.ownerId.trim(),
+        ownerId: values.ownerId?.trim() || undefined,
         hotline: values.hotline.trim(),
         email: values.email?.trim() ?? "",
         address: values.address.trim(),
