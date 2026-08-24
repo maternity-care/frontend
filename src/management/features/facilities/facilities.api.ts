@@ -620,10 +620,12 @@ export async function suspendFacility(
   id: string,
   input: SuspendResourceInput,
 ) {
+  const reason = input.reason?.trim() || "Cập nhật trạng thái cơ sở";
+
   const response = await unwrapApiResponse<FacilitySuspendResult>(
     apiClient.patch(`/management/facilities/${id}/suspend`, {
       inactiveUntil: input.inactiveUntil || null,
-      reason: input.reason?.trim() || undefined,
+      reason,
     }),
   );
 

@@ -279,10 +279,16 @@ export function FacilityUpdateModal({
               name="suspendReason"
               label="Lý do tạm ngưng"
               className="!mb-3"
+              rules={[
+                {
+                  min: 3,
+                  message: "Lý do tạm ngưng cần ít nhất 3 ký tự.",
+                },
+              ]}
             >
               <TextArea
                 rows={3}
-                placeholder="Ví dụ: Bảo trì cơ sở"
+                placeholder="Ví dụ: Bảo trì cơ sở. Để trống sẽ dùng lý do mặc định."
                 disabled={submitting}
               />
             </Form.Item>
