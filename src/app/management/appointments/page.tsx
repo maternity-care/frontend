@@ -74,6 +74,7 @@ import { getDoctorAvailability } from "@/management/features/doctor-shifts/docto
 import type { DoctorShiftItem } from "@/management/features/doctor-shifts/doctor-shifts.types";
 import { getPublicWeeklyDoctorShifts } from "@/features/doctor-shifts/public-doctor-shifts.api";
 import { useAuthStore } from "@/features/auth/auth.store";
+import { useNotificationRealtime } from "@/features/notifications/useNotificationRealtime";
 import { getFacilityServices } from "@/management/features/services/services.api";
 import type { FacilityService } from "@/management/features/services/services.types";
 import { getRooms } from "@/management/features/rooms/rooms.api";
@@ -493,6 +494,34 @@ export default function ManagementAppointmentsPage() {
     }
   }, [dateRange, doctorId, isDoctor, scope, scopedFacilityId, search, status]);
 
+  const realtimeReloadTimerRef = useRef<number | null>(null);
+  const scheduleRealtimeReload = useCallback(
+    (notice: string) => {
+      if (realtimeReloadTimerRef.current) {
+        window.clearTimeout(realtimeReloadTimerRef.current);
+      }
+      realtimeReloadTimerRef.current = window.setTimeout(() => {
+        void loadAppointments();
+        void message.info(notice);
+        realtimeReloadTimerRef.current = null;
+      }, 250);
+    },
+    [loadAppointments],
+  );
+
+  const handleRealtimeAppointmentNotification = useCallback(
+    (notification: { referenceType: string }) => {
+      if (notification.referenceType !== "appointment") return;
+      scheduleRealtimeReload("Lịch đặt khám vừa có cập nhật mới.");
+    },
+    [scheduleRealtimeReload],
+  );
+
+  useNotificationRealtime({
+    management: true,
+    onNotification: handleRealtimeAppointmentNotification,
+  });
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadAppointments();
@@ -500,6 +529,15 @@ export default function ManagementAppointmentsPage() {
 
     return () => window.clearTimeout(timer);
   }, [loadAppointments]);
+
+  useEffect(
+    () => () => {
+      if (realtimeReloadTimerRef.current) {
+        window.clearTimeout(realtimeReloadTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!initialAppointmentId || loading) return;
