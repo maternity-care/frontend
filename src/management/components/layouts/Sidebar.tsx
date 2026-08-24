@@ -49,7 +49,7 @@ function getSidebarCollapsedServerSnapshot() {
 
 const navItems = [
   { href: "/management/dashboard", label: "Dashboard (Thống kê)", icon: Gauge },
-  { href: "/management/users", label: "Quản lý người dùng", icon: Users, roles: ["super_admin"] },
+  { href: "/management/users", label: "Quản lý người dùng", icon: Users, roles: ["super_admin", "admin"] },
   { href: "/management/staffs", label: "Quản lý nhân viên", icon: UserCog, roles: ["super_admin", "admin"] },
   // { href: "/management/doctors", label: "Quản lý bác sĩ", icon: Stethoscope, roles: ["super_admin", "admin"] },
   { href: "/management/facilities", label: "Quản lý cơ sở", icon: Building2, roles: ["super_admin", "admin"] },
@@ -67,11 +67,25 @@ const navItems = [
   { href: "/management/messages", label: "Hộp thư hỗ trợ", icon: Inbox, roles: ["super_admin", "admin", "staff"] },
   { href: "/management/message-accounts", label: "Tài khoản kênh", icon: Settings2, roles: ["super_admin", "admin", "staff"] },
   { href: "/management/shift-slots", label: "Quản lý khung ca", icon: BriefcaseBusiness, roles: ["super_admin", "admin"] },
-  { href: "/management/doctor-shifts", label: "Quản lý ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "staff", "doctor", "nurse"] },
+  { href: "/management/doctor-shifts", label: "Quản lý ca trực", icon: BriefcaseBusiness, roles: ["super_admin", "admin", "doctor", "nurse"] },
   { href: "/management/appointments", label: "Lịch đặt khám", icon: CalendarCheck, roles: ["super_admin", "admin", "staff", "doctor"] },
   { href: "/management/service-indications", label: "Chỉ định của tôi", icon: ClipboardList, roles: ["doctor"] },
   // { href: "/management/appointment-disruptions", label: "Lịch bị ảnh hưởng", icon: CalendarX2, roles: ["super_admin", "admin"] },
 ];
+
+function isSidebarItemActive(pathname: string, href: string) {
+  if (pathname === href || pathname.startsWith(`${href}/`)) return true;
+
+  if (href === "/management/services/super") {
+    return pathname.startsWith("/management/services/super");
+  }
+
+  if (href === "/management/services/facility") {
+    return pathname.startsWith("/management/services/facility");
+  }
+
+  return false;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -211,7 +225,7 @@ export function Sidebar() {
         )}
       >
         {visibleNavItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = isSidebarItemActive(pathname, item.href);
           const Icon = item.icon;
 
           return (
@@ -222,23 +236,27 @@ export function Sidebar() {
               aria-label={collapsed ? item.label : undefined}
               title={collapsed ? item.label : undefined}
               className={cn(
-                "relative flex h-11 items-center rounded-md text-sm font-medium text-[#94a3b8] transition hover:bg-white/10 hover:text-white",
+                "group relative flex h-11 items-center rounded-md text-sm font-medium text-[#94a3b8] transition hover:bg-white/10 hover:text-white",
                 collapsed ? "justify-center px-2" : "gap-3 px-3",
                 active &&
-                  "bg-cyan-400/10 !text-white ring-1 ring-inset ring-cyan-300/20 hover:bg-cyan-400/15",
+                  "bg-cyan-400/15 !text-white shadow-[inset_0_0_0_1px_rgba(103,232,249,0.22)] ring-1 ring-inset ring-cyan-300/25 hover:bg-cyan-400/20",
               )}
             >
               {active ? (
-                <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-cyan-300" />
+                <>
+                  <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-cyan-300" />
+                  <span className="absolute inset-y-0 right-0 w-px bg-cyan-200/20" />
+                </>
               ) : null}
 
-              <Icon
+              <span
                 className={cn(
-                  "h-4 w-4 shrink-0",
-                  active ? "text-cyan-200" : "text-slate-500",
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition",
+                  active ? "bg-cyan-300/15 text-cyan-100" : "text-slate-500 group-hover:text-white",
                 )}
-                aria-hidden="true"
-              />
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+              </span>
 
               {!collapsed ? <span className="truncate">{item.label}</span> : null}
             </Link>

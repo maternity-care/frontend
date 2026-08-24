@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Alert,
@@ -47,6 +47,7 @@ import {
   checkInAppointmentServiceItem,
   completeAppointment,
   completeAppointmentServiceItem,
+  getManagementAppointment,
   getAppointmentServiceItems,
   getManagementAppointments,
   markNoShowAppointment,
@@ -180,6 +181,9 @@ function isObstetricsSpecialty(value?: string | null) {
 
 function getServiceSpecialtyKey(service?: FacilityService | null) {
   if (!service) return "";
+  const configuredSpecialty = getSpecialtyKeyword(service.serviceDoctorSpecialty);
+  if (configuredSpecialty) return configuredSpecialty;
+
   if (service.serviceType === "ultrasound") return "sieu am";
   if (service.serviceType === "lab_test" || service.serviceType === "screening") {
     return "xet nghiem";
@@ -188,9 +192,8 @@ function getServiceSpecialtyKey(service?: FacilityService | null) {
 
   return getSpecialtyKeyword(
     [
-      service.serviceDoctorSpecialty,
-      service.serviceName,
       service.serviceCode,
+      service.serviceName,
     ]
       .filter(Boolean)
       .join(" "),
@@ -233,6 +236,7 @@ export default function ManagementAppointmentsPage() {
   const activeFacility = authUser?.facilities?.find(
     (facility) => String(facility.id) === String(activeFacilityId),
   );
+  const queryInitializedRef = useRef(false);
   const canCreateIndicationForAppointment = useCallback(
     (appointment?: ManagementAppointment | null) =>
       canCreateIndication ||
@@ -243,6 +247,7 @@ export default function ManagementAppointmentsPage() {
   const [appointments, setAppointments] = useState<ManagementAppointment[]>(
     [],
   );
+  const [initialAppointmentId, setInitialAppointmentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -296,6 +301,56 @@ export default function ManagementAppointmentsPage() {
   const scopedFacilityId = isSuperAdmin
     ? facilityId
     : (activeFacilityId ?? undefined);
+
+  useEffect(() => {
+    if (queryInitializedRef.current || typeof window === "undefined") return;
+    if (effectiveRoleNames.length === 0) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const nextSearch = params.get("q") || params.get("search") || "";
+    const nextStatus = params.get("status");
+    const nextFacilityId = params.get("facilityId");
+    const nextDoctorId = params.get("doctorId");
+    const nextScope = params.get("scope");
+    const dateFrom = params.get("dateFrom");
+    const dateTo = params.get("dateTo");
+    const appointmentId = params.get("appointmentId");
+
+    if (nextSearch) {
+      setSearchInput(nextSearch);
+      setSearch(nextSearch.trim());
+    }
+
+    if (nextStatus && nextStatus in statusMeta) {
+      setStatus(nextStatus as ManagementAppointmentStatus);
+    }
+
+    if (isSuperAdmin && nextFacilityId && nextFacilityId !== "all") {
+      setFacilityId(nextFacilityId);
+    }
+
+    if (!isDoctor && nextDoctorId) {
+      setDoctorId(nextDoctorId);
+    }
+
+    if (nextScope === "mine" || nextScope === "all") {
+      setScope(nextScope);
+    }
+
+    if (dateFrom && dateTo) {
+      const from = dayjs(dateFrom);
+      const to = dayjs(dateTo);
+      if (from.isValid() && to.isValid()) {
+        setDateRange([from, to]);
+      }
+    }
+
+    if (appointmentId) {
+      setInitialAppointmentId(appointmentId);
+    }
+
+    queryInitializedRef.current = true;
+  }, [effectiveRoleNames.length, isDoctor, isSuperAdmin]);
 
   const doctorOptions = useMemo(() => {
     const options = doctors.map((doctor) => ({
@@ -445,6 +500,39 @@ export default function ManagementAppointmentsPage() {
 
     return () => window.clearTimeout(timer);
   }, [loadAppointments]);
+
+  useEffect(() => {
+    if (!initialAppointmentId || loading) return;
+
+    const matchedAppointment = appointments.find(
+      (appointment) => String(appointment.id) === String(initialAppointmentId),
+    );
+
+    if (matchedAppointment) {
+      setSelectedAppointment(matchedAppointment);
+      setDetailOpen(true);
+      setInitialAppointmentId(null);
+      return;
+    }
+
+    let active = true;
+    void getManagementAppointment(initialAppointmentId)
+      .then((appointment) => {
+        if (!active) return;
+        setSelectedAppointment(appointment);
+        setDetailOpen(true);
+        setInitialAppointmentId(null);
+      })
+      .catch(() => {
+        if (!active) return;
+        message.warning("Không mở được chi tiết lịch hẹn từ dashboard.");
+        setInitialAppointmentId(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [appointments, initialAppointmentId, loading]);
 
   useEffect(() => {
     const reloadFromExternalBooking = () => {

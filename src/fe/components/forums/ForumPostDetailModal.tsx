@@ -650,19 +650,6 @@ export function ForumPostDetailModal({
                     Khóa
                   </Button>
 
-                  <Button
-                    icon={
-                      <Pin className="h-4 w-4" />
-                    }
-                    onClick={() =>
-                      onModeratePost?.(
-                        post,
-                        "pin",
-                      )
-                    }
-                  >
-                    Ghim
-                  </Button>
                 </>
               ) : null}
               </Space>

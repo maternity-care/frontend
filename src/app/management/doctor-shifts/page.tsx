@@ -319,7 +319,7 @@ export default function DoctorShiftPage() {
   }
 
   return (
-    <AdminLayout>
+    <AdminLayout roles={["super_admin", "admin", "doctor", "nurse"]}>
       {modalContextHolder}
 
       <div>

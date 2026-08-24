@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
@@ -217,6 +218,13 @@ const statusColors: Record<ManagementAppointmentStatus, string> = {
   no_show: "volcano",
 };
 
+const shiftStatusLabels: Record<DoctorShiftItem["status"], string> = {
+  available: "Còn trống",
+  full: "Đã đầy",
+  cancelled: "Đã hủy",
+  off: "Nghỉ",
+};
+
 const periodOptions: { value: DashboardWindow; label: string }[] = [
   { value: "day", label: "Theo ngày" },
   { value: "week", label: "Theo tuần" },
@@ -384,6 +392,18 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function formatPercent(numerator: number, denominator: number) {
+  if (denominator === 0) return "0%";
+  return `${Math.round((numerator / denominator) * 100)}%`;
+}
+
+function formatExportDateTime(value = new Date()) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(value);
+}
+
 function isRevenueAppointment(appointment: ManagementAppointment) {
   return !["cancelled", "no_show", "pending_payment"].includes(appointment.status);
 }
@@ -442,6 +462,7 @@ function StatCard({
   trend,
   trendDirection,
   tone,
+  onClick,
 }: {
   title: string;
   value: string | number;
@@ -451,11 +472,24 @@ function StatCard({
   trend: string;
   trendDirection: "up" | "down";
   tone: StatTone;
+  onClick?: () => void;
 }) {
   const toneClasses = statToneClasses[tone];
 
   return (
-    <Card className={`h-full overflow-hidden ${toneClasses.card}`}>
+    <Card
+      hoverable={Boolean(onClick)}
+      className={`h-full overflow-hidden ${toneClasses.card} ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(event) => {
+        if (!onClick) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <Text className="text-sm font-medium text-slate-500">{title}</Text>
@@ -493,7 +527,13 @@ function StatCard({
   );
 }
 
-function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
+function AppointmentTrendChart({
+  data,
+  onDateClick,
+}: {
+  data: DailyMetric[];
+  onDateClick?: (date: string) => void;
+}) {
   if (data.length === 0) {
     return <Empty description="Không có dữ liệu lịch hẹn trong khoảng ngày đã chọn." />;
   }
@@ -522,7 +562,12 @@ function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
               : Math.round((item.completed / item.appointments) * totalPercent);
 
           return (
-            <div key={item.date} className="grid gap-2 sm:grid-cols-[96px_1fr_82px] sm:items-center">
+            <button
+              key={item.date}
+              type="button"
+              className="grid w-full gap-2 rounded-lg text-left transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 sm:grid-cols-[96px_1fr_82px] sm:items-center"
+              onClick={() => onDateClick?.(item.date)}
+            >
               <Text type="secondary" className="text-xs">
                 {item.label}
               </Text>
@@ -540,7 +585,7 @@ function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
               <Text strong className="text-right text-xs text-slate-700">
                 {item.appointments} lịch
               </Text>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -550,6 +595,7 @@ function AppointmentTrendChart({ data }: { data: DailyMetric[] }) {
 
 export default function ManagementDashboardPage() {
   const { message } = App.useApp();
+  const router = useRouter();
   const roles = useAuthStore((state) => state.roles);
   const currentUser = useAuthStore((state) => state.user);
   const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
@@ -580,6 +626,47 @@ export default function ManagementDashboardPage() {
         ? undefined
         : selectedFacilityId
       : activeFacilityId ?? undefined;
+
+  const buildAppointmentUrl = useCallback(
+    (overrides: Record<string, string | undefined> = {}) => {
+      const params = new URLSearchParams();
+      params.set("dateFrom", range.dateFrom);
+      params.set("dateTo", range.dateTo);
+
+      if (dashboardFacilityId) {
+        params.set("facilityId", dashboardFacilityId);
+      }
+
+      if (dashboardRole === "doctor") {
+        params.set("scope", "mine");
+      }
+
+      Object.entries(overrides).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+
+      return `/management/appointments?${params.toString()}`;
+    },
+    [dashboardFacilityId, dashboardRole, range.dateFrom, range.dateTo],
+  );
+
+  const goToAppointments = useCallback(
+    (overrides: Record<string, string | undefined> = {}) => {
+      router.push(buildAppointmentUrl(overrides));
+    },
+    [buildAppointmentUrl, router],
+  );
+
+  const goToManagement = useCallback(
+    (path: string, params?: Record<string, string | undefined>) => {
+      const query = new URLSearchParams();
+      Object.entries(params ?? {}).forEach(([key, value]) => {
+        if (value) query.set(key, value);
+      });
+      router.push(query.size > 0 ? `${path}?${query.toString()}` : path);
+    },
+    [router],
+  );
 
   const handleSelectedDateChange = (value: Dayjs | null) => {
     if (value) {
@@ -846,62 +933,28 @@ export default function ManagementDashboardPage() {
     return Array.from(services.values()).sort((a, b) => b.revenue - a.revenue || b.appointments - a.appointments);
   }, [data.appointments]);
 
+  const appointmentStatusMetrics = useMemo(() => {
+    return (Object.keys(statusLabels) as ManagementAppointmentStatus[])
+      .map((status) => {
+        const appointments = data.appointments.filter((appointment) => appointment.status === status);
+        const revenue = appointments
+          .filter(isRevenueAppointment)
+          .reduce((sum, appointment) => sum + parseMoney(appointment.servicePrice), 0);
+
+        return {
+          status,
+          label: statusLabels[status],
+          appointments: appointments.length,
+          revenue,
+        };
+      })
+      .filter((item) => item.appointments > 0);
+  }, [data.appointments]);
+
   const visibleShifts = useMemo(
     () => data.shifts.filter((shift) => shift.status === "available" || shift.status === "full"),
     [data.shifts],
   );
-
-  const exportDashboard = useCallback(() => {
-    const rows: unknown[][] = [
-      ["Dashboard", `${range.dateFrom} - ${range.dateTo}`],
-      ["Cơ sở", dashboardRole === "super_admin" && selectedFacilityId === "all" ? "Tất cả cơ sở" : dashboardFacilityId ?? "-"],
-      [],
-      ["Tổng quan"],
-      ["Tổng lịch", appointmentSummary.total],
-      ["Lịch hoàn thành", appointmentSummary.completed],
-      ["Doanh thu ước tính", revenueSummary.estimatedRevenue],
-      ["Doanh thu hoàn thành", revenueSummary.completedRevenue],
-      [],
-      ["Thống kê dịch vụ"],
-      ["Dịch vụ", "Số lịch", "Hoàn thành", "Doanh thu ước tính"],
-      ...serviceMetrics.map((item) => [
-        item.serviceName,
-        item.appointments,
-        item.completed,
-        item.revenue,
-      ]),
-      [],
-      ["Danh sách lịch"],
-      ["Mã lịch", "Ngày", "Giờ bắt đầu", "Giờ kết thúc", "Thai phụ", "SĐT", "Cơ sở", "Dịch vụ", "Bác sĩ", "Trạng thái", "Giá"],
-      ...visibleAppointments.map((appointment) => [
-        appointment.id,
-        appointment.date,
-        appointment.startTime,
-        appointment.endTime,
-        appointment.patientName,
-        appointment.patientPhone,
-        appointment.facilityName,
-        appointment.serviceName,
-        appointment.doctorName,
-        statusLabels[appointment.status],
-        parseMoney(appointment.servicePrice),
-      ]),
-    ];
-
-    downloadCsv(`dashboard-${range.dateFrom}-${range.dateTo}.csv`, rows);
-  }, [
-    appointmentSummary.completed,
-    appointmentSummary.total,
-    dashboardFacilityId,
-    dashboardRole,
-    range.dateFrom,
-    range.dateTo,
-    revenueSummary.completedRevenue,
-    revenueSummary.estimatedRevenue,
-    selectedFacilityId,
-    serviceMetrics,
-    visibleAppointments,
-  ]);
 
   const dashboardAlerts = useMemo<DashboardAlert[]>(() => {
     const alerts: DashboardAlert[] = [];
@@ -1018,6 +1071,225 @@ export default function ManagementDashboardPage() {
     }));
   }, [data.appointments, data.shifts]);
 
+  const exportDashboard = useCallback(() => {
+    const selectedFacility = dashboardFacilityId
+      ? facilityOptions.find((facility) => String(facility.id) === String(dashboardFacilityId))
+      : null;
+    const facilityLabel =
+      dashboardRole === "super_admin" && selectedFacilityId === "all"
+        ? "Tất cả cơ sở"
+        : selectedFacility
+          ? `${selectedFacility.code} - ${selectedFacility.name}`
+          : dashboardFacilityId ?? "-";
+    const exportRows: unknown[][] = [
+      ["DASHBOARD"],
+      ["Khoảng ngày", `${range.dateFrom} - ${range.dateTo}`],
+      ["Kiểu thống kê", getPeriodLabel(windowValue)],
+      ["Phạm vi", roleConfig.scopeLabel],
+      ["Vai trò", roleConfig.label],
+      ["Cơ sở", facilityLabel],
+      ["Người xuất", currentUser?.name ?? "-"],
+      ["Email", currentUser?.email ?? "-"],
+      ["Thời điểm xuất", formatExportDateTime()],
+      [],
+      ["TỔNG QUAN"],
+      ["Chỉ số", "Giá trị", "Ghi chú"],
+      ["Tổng lịch", appointmentSummary.total, `${range.days} ngày được chọn`],
+      ["Lịch đang xử lý", appointmentSummary.active, "Đã đặt, xác nhận, check-in hoặc đang khám"],
+      ["Lịch hoàn thành", appointmentSummary.completed, `${completionRate}% hoàn thành`],
+      ["Lịch chờ thanh toán", appointmentSummary.waiting, "Cần xác nhận thanh toán"],
+      ["Lịch hủy/không đến", appointmentSummary.cancelled, "Hủy hoặc no-show"],
+      ["Tổng lịch tính doanh thu", revenueSummary.billableCount, "Không gồm chờ thanh toán, hủy, no-show"],
+      ["Doanh thu ước tính", revenueSummary.estimatedRevenue, formatCurrency(revenueSummary.estimatedRevenue)],
+      ["Doanh thu hoàn thành", revenueSummary.completedRevenue, formatCurrency(revenueSummary.completedRevenue)],
+      ["Doanh thu trung bình/lịch", revenueSummary.averageRevenue, formatCurrency(revenueSummary.averageRevenue)],
+      ["Tổng ca trực", shiftSummary.total, "Tất cả trạng thái"],
+      ["Ca đang mở", shiftSummary.active, "Còn trống hoặc đã đầy"],
+      ["Ca đã đầy", shiftSummary.full, ""],
+      ["Ca nghỉ/hủy", shiftSummary.off, ""],
+      ["Công suất suất khám", shiftSummary.capacity, `${bookingRate}% đã đặt`],
+      ["Bác sĩ đang trực", activeDoctors, ""],
+      ["Ca chưa có bác sĩ", vacantShifts, ""],
+      ["Hồ sơ thai kỳ", data.profiles.length, ""],
+      ["Hồ sơ nguy cơ cao", highRiskProfiles, ""],
+      ["Tổng bác sĩ", data.doctorsTotal, ""],
+      ["Tổng nhân viên", data.staffsTotal, ""],
+      ["Tổng cơ sở", data.facilitiesTotal, ""],
+      [],
+      ["TRẠNG THÁI LỊCH"],
+      ["Trạng thái", "Số lịch", "Tỷ lệ", "Doanh thu ước tính"],
+      ...appointmentStatusMetrics.map((item) => [
+        item.label,
+        item.appointments,
+        formatPercent(item.appointments, appointmentSummary.total),
+        item.revenue,
+      ]),
+      [],
+      ["XU HƯỚNG THEO NGÀY"],
+      ["Ngày", "Nhãn", "Số lịch", "Hoàn thành", "Tỷ lệ hoàn thành"],
+      ...appointmentTrend.map((item) => [
+        item.date,
+        item.label,
+        item.appointments,
+        item.completed,
+        formatPercent(item.completed, item.appointments),
+      ]),
+      [],
+      ["THỐNG KÊ DỊCH VỤ"],
+      ["Mã dịch vụ", "Dịch vụ", "Số lịch", "Hoàn thành", "Tỷ lệ hoàn thành", "Doanh thu ước tính", "Trung bình/lịch"],
+      ...serviceMetrics.map((item) => [
+        item.serviceId,
+        item.serviceName,
+        item.appointments,
+        item.completed,
+        formatPercent(item.completed, item.appointments),
+        item.revenue,
+        item.appointments === 0 ? 0 : Math.round(item.revenue / item.appointments),
+      ]),
+      [],
+      ["HIỆU SUẤT CƠ SỞ"],
+      ["Mã cơ sở", "Cơ sở", "Số lịch", "Công suất", "Tỷ lệ đặt", "Bác sĩ đang trực", "Phòng đang dùng", "Tổng phòng/ca"],
+      ...facilityUtilization.map((item) => [
+        item.facilityCode,
+        item.facilityName,
+        item.appointments,
+        item.maxAppointments,
+        formatPercent(item.appointments, item.maxAppointments),
+        item.activeDoctors,
+        item.roomsInUse,
+        item.totalRooms,
+      ]),
+      [],
+      ["CA TRỰC"],
+      [
+        "Mã ca",
+        "Ngày",
+        "Bắt đầu",
+        "Kết thúc",
+        "Cơ sở",
+        "Phòng",
+        "Loại phòng",
+        "Bác sĩ",
+        "Chuyên khoa",
+        "Trạng thái",
+        "Đã đặt",
+        "Công suất",
+      ],
+      ...data.shifts.map((shift) => [
+        shift.id,
+        shift.shiftDate,
+        shift.startTime,
+        shift.endTime,
+        shift.facilityName,
+        shift.roomName,
+        shift.roomTypeName || shift.roomType,
+        [shift.doctorTitle, shift.doctorName].filter(Boolean).join(" "),
+        shift.doctorSpecialty,
+        shiftStatusLabels[shift.status],
+        shift.bookedAppointments,
+        shift.maxAppointments,
+      ]),
+      [],
+      ["CẢNH BÁO"],
+      ["Mức", "Tiêu đề", "Mô tả", "Thông tin"],
+      ...dashboardAlerts.map((alert) => [
+        alert.level,
+        alert.title,
+        alert.description,
+        alert.meta,
+      ]),
+      [],
+      ["DANH SÁCH LỊCH CHI TIẾT"],
+      [
+        "Mã lịch",
+        "Ngày",
+        "Giờ bắt đầu",
+        "Giờ kết thúc",
+        "Thai phụ",
+        "SĐT",
+        "Email",
+        "Mã hồ sơ thai",
+        "Cơ sở",
+        "Phòng",
+        "Mã dịch vụ",
+        "Dịch vụ",
+        "Bác sĩ",
+        "Chuyên khoa bác sĩ",
+        "Trạng thái",
+        "Trạng thái gốc",
+        "Giá",
+        "Đã check-in lúc",
+        "Lý do hủy",
+      ],
+      ...visibleAppointments.map((appointment) => [
+        appointment.id,
+        appointment.date,
+        appointment.startTime,
+        appointment.endTime,
+        appointment.patientName,
+        appointment.patientPhone,
+        appointment.patientEmail,
+        appointment.pregnancyProfileCode,
+        appointment.facilityName,
+        appointment.roomName,
+        appointment.serviceId,
+        appointment.serviceName,
+        [appointment.doctorTitle, appointment.doctorName].filter(Boolean).join(" "),
+        appointment.doctorSpecialty,
+        statusLabels[appointment.status],
+        appointment.status,
+        parseMoney(appointment.servicePrice),
+        appointment.checkedInAt,
+        appointment.cancelReason,
+      ]),
+    ];
+
+    downloadCsv(`dashboard-${range.dateFrom}-${range.dateTo}.csv`, exportRows);
+  }, [
+    activeDoctors,
+    appointmentStatusMetrics,
+    appointmentSummary.active,
+    appointmentSummary.cancelled,
+    appointmentSummary.completed,
+    appointmentSummary.total,
+    appointmentSummary.waiting,
+    appointmentTrend,
+    bookingRate,
+    completionRate,
+    currentUser?.email,
+    currentUser?.name,
+    dashboardAlerts,
+    dashboardFacilityId,
+    dashboardRole,
+    data.doctorsTotal,
+    data.facilitiesTotal,
+    data.profiles.length,
+    data.shifts,
+    data.staffsTotal,
+    facilityOptions,
+    facilityUtilization,
+    highRiskProfiles,
+    range.dateFrom,
+    range.dateTo,
+    range.days,
+    revenueSummary.averageRevenue,
+    revenueSummary.billableCount,
+    revenueSummary.completedRevenue,
+    revenueSummary.estimatedRevenue,
+    roleConfig.label,
+    roleConfig.scopeLabel,
+    selectedFacilityId,
+    serviceMetrics,
+    shiftSummary.active,
+    shiftSummary.capacity,
+    shiftSummary.full,
+    shiftSummary.off,
+    shiftSummary.total,
+    vacantShifts,
+    visibleAppointments,
+    windowValue,
+  ]);
+
   const roleStatCards = useMemo(
     () => [
       {
@@ -1028,6 +1300,7 @@ export default function ManagementDashboardPage() {
         trendDirection: completionRate >= 60 ? "up" as const : "down" as const,
         helper: `${range.days} ngày được chọn`,
         tone: "blue" as const,
+        onClick: () => goToAppointments(),
       },
       {
         title: roleConfig.secondaryMetric,
@@ -1037,6 +1310,7 @@ export default function ManagementDashboardPage() {
         trendDirection: highRiskProfiles > 0 ? "down" as const : "up" as const,
         helper: roleConfig.scopeLabel,
         tone: "violet" as const,
+        onClick: dashboardRole === "doctor" ? () => goToManagement("/management/records") : undefined,
       },
       {
         title: roleConfig.shiftMetric,
@@ -1047,6 +1321,11 @@ export default function ManagementDashboardPage() {
         trendDirection: vacantShifts > 0 ? "down" as const : "up" as const,
         helper: `${shiftSummary.capacity} suất khám khả dụng`,
         tone: "emerald" as const,
+        onClick: () => goToManagement("/management/doctor-shifts", {
+          dateFrom: range.dateFrom,
+          dateTo: range.dateTo,
+          facilityId: dashboardFacilityId,
+        }),
       },
       {
         title: "Doanh thu ước tính",
@@ -1056,6 +1335,7 @@ export default function ManagementDashboardPage() {
         trendDirection: revenueSummary.estimatedRevenue > 0 ? "up" as const : "down" as const,
         helper: `${serviceMetrics.length} dịch vụ`,
         tone: "amber" as const,
+        onClick: () => goToAppointments(),
       },
     ],
     [
@@ -1063,8 +1343,13 @@ export default function ManagementDashboardPage() {
       appointmentSummary.total,
       completionRate,
       dashboardRole,
+      dashboardFacilityId,
       data.profiles.length,
+      goToAppointments,
+      goToManagement,
       highRiskProfiles,
+      range.dateFrom,
+      range.dateTo,
       range.days,
       roleConfig,
       revenueSummary.billableCount,
@@ -1248,7 +1533,10 @@ export default function ManagementDashboardPage() {
               }
               extra={<Tag color="blue">{getPeriodLabel(windowValue)}</Tag>}
             >
-              <AppointmentTrendChart data={appointmentTrend} />
+              <AppointmentTrendChart
+                data={appointmentTrend}
+                onDateClick={(date) => goToAppointments({ dateFrom: date, dateTo: date })}
+              />
             </Card>
 
             <Card
@@ -1265,38 +1553,54 @@ export default function ManagementDashboardPage() {
               }
             >
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+                <button
+                  type="button"
+                  className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  onClick={() => goToAppointments({ status: "completed" })}
+                >
                   <Text type="secondary" className="text-xs">
                     Hoàn thành
                   </Text>
                   <div className="mt-1 text-2xl font-bold text-slate-950">
                     {appointmentSummary.completed}
                   </div>
-                </div>
-                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-blue-100 bg-blue-50/70 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onClick={() => goToAppointments({ status: "in_progress" })}
+                >
                   <Text type="secondary" className="text-xs">
                     Đang xử lý
                   </Text>
                   <div className="mt-1 text-2xl font-bold text-slate-950">
                     {appointmentSummary.active}
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  onClick={() => goToAppointments({ status: "cancelled" })}
+                >
                   <Text type="secondary" className="text-xs">
                     Đã hủy
                   </Text>
                   <div className="mt-1 text-2xl font-bold text-slate-950">
                     {appointmentSummary.cancelled}
                   </div>
-                </div>
-                <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-4">
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-left transition hover:border-violet-300 hover:bg-violet-50 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  onClick={() => goToAppointments()}
+                >
                   <Text type="secondary" className="text-xs">
                     Tỷ lệ lấp đầy
                   </Text>
                   <div className="mt-1 text-2xl font-bold text-slate-950">
                     {bookingRate}%
                   </div>
-                </div>
+                </button>
               </div>
 
               <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -1359,7 +1663,12 @@ export default function ManagementDashboardPage() {
                       item.appointments === 0 ? 0 : Math.round((item.completed / item.appointments) * 100);
 
                     return (
-                      <div key={item.serviceId} className="rounded-xl border border-slate-200 p-4">
+                      <button
+                        key={item.serviceId}
+                        type="button"
+                        className="rounded-xl border border-slate-200 p-4 text-left transition hover:border-teal-300 hover:bg-teal-50/40 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        onClick={() => goToAppointments({ q: item.serviceName })}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <Text strong className="block truncate text-slate-950">
@@ -1380,7 +1689,7 @@ export default function ManagementDashboardPage() {
                           size="small"
                           className="mt-2"
                         />
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -1391,7 +1700,11 @@ export default function ManagementDashboardPage() {
 
             {canViewSystemStats ? (
               <div className="grid gap-4 md:grid-cols-3">
-                <Card className="border-slate-200 bg-white">
+                <Card
+                  hoverable
+                  className="cursor-pointer border-slate-200 bg-white"
+                  onClick={() => goToManagement("/management/facilities")}
+                >
                   <div className="flex items-center gap-3">
                     <Building2 className="h-5 w-5 text-blue-700" />
                     <div>
@@ -1404,7 +1717,11 @@ export default function ManagementDashboardPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="border-slate-200 bg-white">
+                <Card
+                  hoverable
+                  className="cursor-pointer border-slate-200 bg-white"
+                  onClick={() => goToManagement("/management/doctors", { facilityId: dashboardFacilityId })}
+                >
                   <div className="flex items-center gap-3">
                     <UserRoundCheck className="h-5 w-5 text-emerald-700" />
                     <div>
@@ -1417,7 +1734,11 @@ export default function ManagementDashboardPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="border-slate-200 bg-white">
+                <Card
+                  hoverable
+                  className="cursor-pointer border-slate-200 bg-white"
+                  onClick={() => goToManagement("/management/staffs", { facilityId: dashboardFacilityId })}
+                >
                   <div className="flex items-center gap-3">
                     <Users className="h-5 w-5 text-violet-700" />
                     <div>
@@ -1460,6 +1781,13 @@ export default function ManagementDashboardPage() {
                 size="middle"
                 columns={appointmentColumns}
                 dataSource={visibleAppointments}
+                rowClassName="cursor-pointer"
+                onRow={(appointment) => ({
+                  onClick: () => goToAppointments({
+                    appointmentId: String(appointment.id),
+                    q: String(appointment.id),
+                  }),
+                })}
                 pagination={{
                   pageSize: 8,
                   showTotal: (total, rangeValues) => `${rangeValues[0]}-${rangeValues[1]} / ${total} lịch hẹn`,
@@ -1489,7 +1817,26 @@ export default function ManagementDashboardPage() {
                     const visual = getAlertVisual(item.level);
 
                     return (
-                      <div key={item.id} className={`rounded-xl border p-4 ${visual.borderClass}`}>
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`rounded-xl border p-4 text-left transition hover:brightness-[0.98] focus:outline-none focus:ring-2 focus:ring-teal-500 ${visual.borderClass}`}
+                        onClick={() => {
+                          if (item.id === "pending-payment") {
+                            goToAppointments({ status: "pending_payment" });
+                          } else if (item.id === "cancelled") {
+                            goToAppointments({ status: "cancelled" });
+                          } else if (item.id === "shift-capacity") {
+                            goToManagement("/management/doctor-shifts", {
+                              dateFrom: range.dateFrom,
+                              dateTo: range.dateTo,
+                              facilityId: dashboardFacilityId,
+                            });
+                          } else if (dashboardRole === "doctor") {
+                            goToManagement("/management/records");
+                          }
+                        }}
+                      >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex min-w-0 gap-3">
                             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${visual.iconClass}`}>
@@ -1509,7 +1856,7 @@ export default function ManagementDashboardPage() {
                           </div>
                           <div className="shrink-0">{visual.tag}</div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -1545,7 +1892,12 @@ export default function ManagementDashboardPage() {
                           : Math.min(100, Math.round((item.roomsInUse / item.totalRooms) * 100));
 
                       return (
-                        <div key={item.facilityId} className="rounded-xl border border-slate-200 p-4">
+                        <button
+                          key={item.facilityId}
+                          type="button"
+                          className="rounded-xl border border-slate-200 p-4 text-left transition hover:border-teal-300 hover:bg-teal-50/40 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          onClick={() => goToAppointments({ facilityId: item.facilityId })}
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex min-w-0 gap-3">
                               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
@@ -1583,7 +1935,7 @@ export default function ManagementDashboardPage() {
                               <Progress percent={roomPercent} showInfo={false} size="small" status="success" />
                             </div>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1615,7 +1967,11 @@ export default function ManagementDashboardPage() {
             ) : null}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <Card className="border-slate-200 bg-white">
+              <Card
+                hoverable
+                className="cursor-pointer border-slate-200 bg-white"
+                onClick={() => goToAppointments({ status: "pending_payment" })}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                     <CalendarClock className="h-4 w-4" />
@@ -1630,7 +1986,11 @@ export default function ManagementDashboardPage() {
                   </div>
                 </div>
               </Card>
-              <Card className="border-slate-200 bg-white">
+              <Card
+                hoverable
+                className="cursor-pointer border-slate-200 bg-white"
+                onClick={() => goToAppointments({ status: "completed" })}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                     <CheckCircle2 className="h-4 w-4" />
@@ -1645,7 +2005,15 @@ export default function ManagementDashboardPage() {
                   </div>
                 </div>
               </Card>
-              <Card className="border-slate-200 bg-white">
+              <Card
+                hoverable
+                className="cursor-pointer border-slate-200 bg-white"
+                onClick={() => goToManagement("/management/doctor-shifts", {
+                  dateFrom: range.dateFrom,
+                  dateTo: range.dateTo,
+                  facilityId: dashboardFacilityId,
+                })}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
                     <Stethoscope className="h-4 w-4" />
@@ -1660,7 +2028,11 @@ export default function ManagementDashboardPage() {
                   </div>
                 </div>
               </Card>
-              <Card className="border-slate-200 bg-white">
+              <Card
+                hoverable
+                className="cursor-pointer border-slate-200 bg-white"
+                onClick={() => goToManagement("/management/rooms", { facilityId: dashboardFacilityId })}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
                     <Building2 className="h-4 w-4" />

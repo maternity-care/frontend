@@ -142,11 +142,18 @@ function tagTextColor(color: string) {
 }
 
 function conversationAvatar(conversation?: MessagingConversation | null) {
-  return metadataString(conversation?.metadata, "customerAvatarUrl");
+  return metadataString(conversation?.metadata, "customerAvatarUrl")
+    || metadataString(conversation?.metadata, "avatarUrl")
+    || metadataString(conversation?.metadata, "profilePic")
+    || metadataString(conversation?.metadata, "pictureUrl");
 }
 
 function messageAvatar(message: MessagingMessage, conversation?: MessagingConversation | null) {
-  return metadataString(message.metadata, "customerAvatarUrl") || conversationAvatar(conversation);
+  return metadataString(message.metadata, "customerAvatarUrl")
+    || metadataString(message.metadata, "avatarUrl")
+    || metadataString(message.metadata, "profilePic")
+    || metadataString(message.metadata, "pictureUrl")
+    || conversationAvatar(conversation);
 }
 
 function messageImageUrl(message: MessagingMessage) {
