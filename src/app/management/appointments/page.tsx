@@ -1186,7 +1186,7 @@ export default function ManagementAppointmentsPage() {
             >
               Chi tiết
             </Button>
-            {item.pregnancyProfileId ? (
+            {canOperateIndication && item.pregnancyProfileId ? (
               <Button
                 size="small"
                 icon={<FilePlus2 className="h-3.5 w-3.5" />}
@@ -1742,6 +1742,8 @@ export default function ManagementAppointmentsPage() {
         profile={profileDetail}
         onClose={() => setProfileDetail(null)}
         onEdit={() => undefined}
+        canEditProfile={false}
+        canViewMedicalRecords={canOperateIndication}
       />
 
       <CreateMedicalRecordModal

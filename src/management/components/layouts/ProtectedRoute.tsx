@@ -41,7 +41,7 @@ function ProtectedRouteContent({
     return null;
   }
 
-  if (loading) {
+  if (!accessToken || loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
         <section className="w-full max-w-sm text-center">
@@ -52,10 +52,12 @@ function ProtectedRouteContent({
             />
           </div>
           <h1 className="mt-6 text-lg font-semibold text-slate-950">
-            Đang kiểm tra phiên đăng nhập
+            {!accessToken ? "Đang chuyển tới trang đăng nhập" : "Đang kiểm tra phiên đăng nhập"}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Đang tải tài khoản, cơ sở làm việc và quyền truy cập.
+            {!accessToken
+              ? "Bạn cần đăng nhập để truy cập khu vực quản lý."
+              : "Đang tải tài khoản, cơ sở làm việc và quyền truy cập."}
           </p>
         </section>
       </main>
