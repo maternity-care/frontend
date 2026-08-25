@@ -192,13 +192,18 @@ export default function ManagementServiceIndicationsPage() {
     await loadResultRecords(item);
   };
 
-  const handlePublishResult = async (record: MedicalRecord) => {
-    if (!viewingResultsFor) return;
+  const handlePublishResult = async (
+    record: Pick<MedicalRecord, "id">,
+    sourceItem?: AppointmentServiceItem | null,
+  ) => {
+    const targetItem = sourceItem ?? viewingResultsFor;
     setActionKey(`publish-result-${record.id}`);
     try {
       await publishManagementMedicalRecord(record.id);
       message.success("Đã công khai kết quả cho thai phụ.");
-      await loadResultRecords(viewingResultsFor);
+      if (targetItem && viewingResultsFor?.id === targetItem.id) {
+        await loadResultRecords(targetItem);
+      }
       await loadItems();
     } catch {
       message.error("Không công khai được kết quả. Chỉ bác sĩ được công khai kết quả lịch hôm nay.");
@@ -393,6 +398,23 @@ export default function ManagementServiceIndicationsPage() {
             >
               Xem kết quả
             </Button>
+            {item.medicalRecordId && !item.medicalRecordIsPublic && isToday(item.scheduledStart) ? (
+              <Button
+                size="small"
+                icon={<Globe2 className="h-3.5 w-3.5" />}
+                loading={actionKey === `publish-result-${item.medicalRecordId}`}
+                onClick={() =>
+                  void handlePublishResult(
+                    {
+                      id: item.medicalRecordId as string,
+                    },
+                    item,
+                  )
+                }
+              >
+                Công khai KQ
+              </Button>
+            ) : null}
             <Button
               size="small"
               icon={<FilePlus2 className="h-3.5 w-3.5" />}
