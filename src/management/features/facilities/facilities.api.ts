@@ -196,6 +196,11 @@ function removeUndefined<T extends Record<string, unknown>>(value: T) {
   ) as Partial<T>;
 }
 
+function trimOptional(value?: string | null) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized || undefined;
+}
+
 function normalizeSchedules(schedules: FacilityScheduleInput[]) {
   return schedules.map((schedule) => {
     if (schedule.isClosed) {
@@ -217,16 +222,16 @@ function normalizeSchedules(schedules: FacilityScheduleInput[]) {
 function toCreatePayload(input: CreateFacilityInput) {
   return removeUndefined({
     name: input.name.trim(),
-    ownerId: input.ownerId?.trim() || undefined,
+    ownerId: trimOptional(input.ownerId),
     phone: input.hotline.trim(),
-    email: input.email?.trim() || "",
+    email: trimOptional(input.email) ?? "",
     schedules: normalizeSchedules(input.schedules),
     address: input.address.trim(),
     province: input.city.trim(),
     ward: input.ward.trim(),
     floorCount: input.floorCount ?? 1,
-    latitude: input.latitude?.trim() || "0",
-    longitude: input.longitude?.trim() || "0",
+    latitude: trimOptional(input.latitude) ?? "0",
+    longitude: trimOptional(input.longitude) ?? "0",
     status: toBackendStatus(input.status),
   });
 }
@@ -234,15 +239,15 @@ function toCreatePayload(input: CreateFacilityInput) {
 function toUpdatePayload(input: UpdateFacilityInput) {
   return removeUndefined({
     name: input.name?.trim(),
-    ownerId: input.ownerId?.trim(),
+    ownerId: trimOptional(input.ownerId),
     phone: input.hotline?.trim(),
-    email: input.email === undefined ? undefined : input.email.trim(),
+    email: input.email === undefined ? undefined : trimOptional(input.email) ?? "",
     address: input.address?.trim(),
     province: input.city?.trim(),
     ward: input.ward?.trim(),
     floorCount: input.floorCount,
-    latitude: input.latitude?.trim(),
-    longitude: input.longitude?.trim(),
+    latitude: trimOptional(input.latitude),
+    longitude: trimOptional(input.longitude),
   });
 }
 
