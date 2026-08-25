@@ -2,8 +2,8 @@
 
 import { App } from "antd";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { KeyRound, Save, ShieldCheck, UserRound } from "lucide-react";
-import { useEffect } from "react";
+import { Eye, EyeOff, KeyRound, Save, ShieldCheck, UserRound } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useAuthStore } from "@/features/auth/auth.store";
@@ -47,6 +47,15 @@ function ManagementProfileContent() {
   const { message } = App.useApp();
   const { currentUser, mutate } = useAuth();
   const setUser = useAuthStore((state) => state.setUser);
+  const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
+  const roles = useAuthStore((state) => state.roles);
+  const [visiblePasswords, setVisiblePasswords] = useState<
+    Record<keyof PasswordForm, boolean>
+  >({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
   const profileForm = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
   });
@@ -62,6 +71,76 @@ function ManagementProfileContent() {
       personalEmail: currentUser.personalEmail ?? currentUser.email,
     });
   }, [currentUser, profileForm]);
+
+  const facilitySummary = useMemo(() => {
+    if (!currentUser) return "-";
+
+    const formatFacility = (facility?: {
+      id?: string | number;
+      name?: string | null;
+      code?: string | null;
+    } | null) => {
+      if (!facility?.name) return null;
+      return `${facility.name}${facility.code ? ` (${facility.code})` : ""}`;
+    };
+
+    const activeFacility = currentUser.facilities?.find(
+      (facility) => String(facility.id) === String(activeFacilityId),
+    );
+    const activeFacilityLabel = formatFacility(activeFacility);
+    if (activeFacilityLabel) return activeFacilityLabel;
+
+    const facilityLabels = currentUser.facilities
+      ?.map(formatFacility)
+      .filter((label): label is string => Boolean(label));
+    if (facilityLabels?.length) return facilityLabels.join(", ");
+
+    return formatFacility(currentUser.facility) ?? currentUser.address ?? "-";
+  }, [activeFacilityId, currentUser]);
+
+  const renderPasswordInput = (
+    field: keyof PasswordForm,
+    label: string,
+    autoComplete: string,
+  ) => {
+    const visible = visiblePasswords[field];
+
+    return (
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium text-slate-700">{label}</span>
+        <span className="relative block">
+          <input
+            type={visible ? "text" : "password"}
+            autoComplete={autoComplete}
+            className="h-10 w-full rounded-md border border-border bg-white px-3 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            {...passwordForm.register(field)}
+          />
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            onClick={() =>
+              setVisiblePasswords((prev) => ({
+                ...prev,
+                [field]: !prev[field],
+              }))
+            }
+            aria-label={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+          >
+            {visible ? (
+              <EyeOff className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Eye className="h-4 w-4" aria-hidden="true" />
+            )}
+          </button>
+        </span>
+        {passwordForm.formState.errors[field]?.message ? (
+          <p className="text-sm text-red-600">
+            {passwordForm.formState.errors[field]?.message}
+          </p>
+        ) : null}
+      </label>
+    );
+  };
 
   if (!currentUser) {
     return <StateBlock type="loading" title="Đang tải hồ sơ" />;
@@ -149,28 +228,18 @@ function ManagementProfileContent() {
               <CardTitle>Đổi mật khẩu</CardTitle>
             </div>
             <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={submitPassword}>
-              <Input
-                label="Mật khẩu hiện tại"
-                type="password"
-                autoComplete="current-password"
-                error={passwordForm.formState.errors.currentPassword?.message}
-                {...passwordForm.register("currentPassword")}
-              />
+              {renderPasswordInput(
+                "currentPassword",
+                "Mật khẩu hiện tại",
+                "current-password",
+              )}
               <div className="hidden md:block" />
-              <Input
-                label="Mật khẩu mới"
-                type="password"
-                autoComplete="new-password"
-                error={passwordForm.formState.errors.newPassword?.message}
-                {...passwordForm.register("newPassword")}
-              />
-              <Input
-                label="Xác nhận mật khẩu mới"
-                type="password"
-                autoComplete="new-password"
-                error={passwordForm.formState.errors.confirmPassword?.message}
-                {...passwordForm.register("confirmPassword")}
-              />
+              {renderPasswordInput("newPassword", "Mật khẩu mới", "new-password")}
+              {renderPasswordInput(
+                "confirmPassword",
+                "Xác nhận mật khẩu mới",
+                "new-password",
+              )}
               <div className="md:col-span-2">
                 <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
                   <KeyRound className="h-4 w-4" aria-hidden="true" />
@@ -199,7 +268,7 @@ function ManagementProfileContent() {
             <div>
               <p className="text-slate-500">Cơ sở làm việc</p>
               <p className="mt-1 font-medium text-slate-950">
-                {currentUser.address ?? "-"}
+                {facilitySummary}
               </p>
             </div>
             <div>
@@ -211,7 +280,7 @@ function ManagementProfileContent() {
             <div>
               <p className="text-slate-500">Quyền hiện tại</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {useAuthStore.getState().roles.map((role) => (
+                {roles.map((role) => (
                   <Badge key={role}>{role}</Badge>
                 ))}
               </div>

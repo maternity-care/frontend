@@ -55,6 +55,8 @@ export interface StaffProfile {
 export type StaffPosition = "super_admin" | "admin" | "doctor" | "nurse" | "staff";
 export interface FacilityStaffAssignment {
   facilityId: string;
+  facilityName?: string | null;
+  facilityCode?: string | null;
   roles: StaffPosition[];
 }
 
