@@ -84,19 +84,6 @@ function formatAppointmentRange(
   return endLabel ? `${startLabel} - ${endLabel}` : startLabel;
 }
 
-function isToday(value?: string | null): boolean {
-  if (!value) return false;
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  return formatter.format(date) === formatter.format(new Date());
-}
-
 function formatFileSize(value?: number | null): string {
   if (!value || value <= 0) return "";
   if (value < 1024) return `${value} B`;
@@ -702,8 +689,7 @@ export function PregnancyProfileDetailModal({
                                 )}
                               </Space>
                               {canPublishMedicalRecords &&
-                              !consultation.isPublic &&
-                              isToday(consultation.appointmentScheduledStart) ? (
+                              !consultation.isPublic ? (
                                 <Button
                                   size="small"
                                   icon={<Globe2 size={14} />}
