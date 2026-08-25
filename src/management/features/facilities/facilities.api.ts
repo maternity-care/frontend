@@ -201,6 +201,10 @@ function trimOptional(value?: string | null) {
   return normalized || undefined;
 }
 
+function trimRequired(value?: string | null) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function normalizeSchedules(schedules: FacilityScheduleInput[]) {
   return schedules.map((schedule) => {
     if (schedule.isClosed) {
@@ -221,14 +225,14 @@ function normalizeSchedules(schedules: FacilityScheduleInput[]) {
 
 function toCreatePayload(input: CreateFacilityInput) {
   return removeUndefined({
-    name: input.name.trim(),
+    name: trimRequired(input.name),
     ownerId: trimOptional(input.ownerId),
-    phone: input.hotline.trim(),
+    phone: trimRequired(input.hotline),
     email: trimOptional(input.email) ?? "",
     schedules: normalizeSchedules(input.schedules),
-    address: input.address.trim(),
-    province: input.city.trim(),
-    ward: input.ward.trim(),
+    address: trimRequired(input.address),
+    province: trimRequired(input.city),
+    ward: trimRequired(input.ward),
     floorCount: input.floorCount ?? 1,
     latitude: trimOptional(input.latitude) ?? "0",
     longitude: trimOptional(input.longitude) ?? "0",
