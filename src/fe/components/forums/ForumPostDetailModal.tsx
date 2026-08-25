@@ -643,11 +643,15 @@ export function ForumPostDetailModal({
                     onClick={() =>
                       onModeratePost?.(
                         post,
-                        "lock",
+                        post.commentable
+                          ? "lock_comments"
+                          : "unlock_comments",
                       )
                     }
                   >
-                    Khóa
+                    {post.commentable
+                      ? "Khóa bình luận"
+                      : "Mở bình luận"}
                   </Button>
 
                 </>

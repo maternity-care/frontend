@@ -28,7 +28,8 @@ export type ForumPostModerationAction =
   | "hide"
   | "reject"
   | "delete"
-  | "lock"
+  | "lock_comments"
+  | "unlock_comments"
   | "pin"
   | "feature";
 

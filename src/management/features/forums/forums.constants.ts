@@ -92,7 +92,8 @@ export const FORUM_POST_ACTION_LABELS: Record<
   hide: "Ẩn bài",
   reject: "Từ chối",
   delete: "Xóa bài",
-  lock: "Khóa bình luận",
+  lock_comments: "Khóa bình luận",
+  unlock_comments: "Mở bình luận",
   pin: "Ghim bài",
   feature: "Đánh dấu nổi bật",
 };
