@@ -46,10 +46,6 @@ function formatDateTime(value?: string | null) {
   return value ? dayjs(value).format("DD/MM/YYYY HH:mm") : "-";
 }
 
-function isToday(value?: string | null) {
-  return value ? dayjs(value).isSame(dayjs(), "day") : false;
-}
-
 export default function ManagementServiceIndicationsPage() {
   const [items, setItems] = useState<AppointmentServiceItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -398,7 +394,7 @@ export default function ManagementServiceIndicationsPage() {
             >
               Xem kết quả
             </Button>
-            {item.medicalRecordId && !item.medicalRecordIsPublic && isToday(item.scheduledStart) ? (
+            {item.medicalRecordId && !item.medicalRecordIsPublic ? (
               <Button
                 size="small"
                 icon={<Globe2 className="h-3.5 w-3.5" />}
@@ -628,7 +624,7 @@ export default function ManagementServiceIndicationsPage() {
                     ) : (
                       <Tag>Chưa công khai</Tag>
                     )}
-                    {!record.isPublic && viewingResultsFor && isToday(viewingResultsFor.scheduledStart) ? (
+                    {!record.isPublic ? (
                       <Button
                         size="small"
                         icon={<Globe2 className="h-3.5 w-3.5" />}

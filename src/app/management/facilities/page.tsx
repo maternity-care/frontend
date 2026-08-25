@@ -440,9 +440,6 @@ export default function FacilityManagementPage() {
           onEdit={
             openUpdate
           }
-          onDelete={
-            openDelete
-          }
           onCreate={() =>
             setCreateOpen(true)
           }

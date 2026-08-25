@@ -14,7 +14,6 @@ import {
   Eye,
   Pencil,
   Plus,
-  Trash2,
 } from "lucide-react";
 import { CopyText } from "@/management/components/ui/CopyText";
 import type {
@@ -34,7 +33,6 @@ type Props = {
   isSuperAdmin: boolean;
   onView: (facility: Facility) => void;
   onEdit: (facility: Facility) => void;
-  onDelete: (facility: Facility) => void;
   onCreate: () => void;
   onPageChange: (page: number, pageSize: number) => void;
 };
@@ -48,7 +46,6 @@ export function FacilityTable({
   isSuperAdmin,
   onView,
   onEdit,
-  onDelete,
   onCreate,
   onPageChange,
 }: Props) {
@@ -151,7 +148,7 @@ export function FacilityTable({
     {
       title: "Thao tác",
       key: "actions",
-      width: isSuperAdmin ? 145 : 100,
+      width: 100,
       align: "center",
       render: (_value, record) => (
         <Space size={6}>
@@ -171,17 +168,6 @@ export function FacilityTable({
               onEdit(record);
             }}
           />
-          {isSuperAdmin ? (
-            <Button
-              danger
-              title="Xóa"
-              icon={<Trash2 className="h-4 w-4" />}
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete(record);
-              }}
-            />
-          ) : null}
         </Space>
       ),
     },
