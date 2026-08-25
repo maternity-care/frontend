@@ -71,7 +71,9 @@ import {
 import type {
   CreateManagementPregnancyProfileInput,
   ManagementPregnancyProfile,
+  PregnancyConsultationRecord,
 } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
+import { publishManagementMedicalRecord } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
 import { PregnancyProfileDetailModal } from "@/fe/components/records/management/PregnancyProfileDetailModal";
 import { CreatePregnancyProfileModal } from "@/fe/components/records/management/CreatePregnancyProfileModal";
 import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
@@ -283,6 +285,8 @@ export default function ManagementAppointmentsPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [profileDetail, setProfileDetail] =
     useState<ManagementPregnancyProfile | null>(null);
+  const [publishingMedicalRecordId, setPublishingMedicalRecordId] =
+    useState<string | null>(null);
   const [creatingMedicalRecordFor, setCreatingMedicalRecordFor] =
     useState<ManagementPregnancyProfile | null>(null);
   const [medicalRecordAppointmentId, setMedicalRecordAppointmentId] =
@@ -900,6 +904,22 @@ export default function ManagementAppointmentsPage() {
       setProfileDetail(await getManagementPregnancyProfileById(profileId));
     } catch {
       message.error("Không tải được chi tiết hồ sơ.");
+    }
+  };
+
+  const handlePublishMedicalRecord = async (record: PregnancyConsultationRecord) => {
+    setPublishingMedicalRecordId(record.id);
+    try {
+      await publishManagementMedicalRecord(record.id);
+      message.success("Đã công khai kết quả cho thai phụ.");
+      if (profileDetail?.id) {
+        await openProfileDetail(profileDetail.id);
+      }
+      loadAppointments();
+    } catch {
+      message.error("Không công khai được kết quả. Chỉ bác sĩ được công khai kết quả lịch hôm nay.");
+    } finally {
+      setPublishingMedicalRecordId(null);
     }
   };
 
@@ -1744,6 +1764,9 @@ export default function ManagementAppointmentsPage() {
         onEdit={() => undefined}
         canEditProfile={false}
         canViewMedicalRecords={canOperateIndication}
+        canPublishMedicalRecords={isDoctor}
+        publishingMedicalRecordId={publishingMedicalRecordId}
+        onPublishMedicalRecord={handlePublishMedicalRecord}
       />
 
       <CreateMedicalRecordModal

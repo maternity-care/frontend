@@ -236,6 +236,9 @@ function normalizeConsultation(
     recommendation: consultation.recommendation ?? null,
     nextAppointmentSuggestedAt:
       consultation.nextAppointmentSuggestedAt ?? null,
+    isPublic: Boolean(consultation.isPublic ?? consultation.is_public),
+    publishedAt: consultation.publishedAt ?? consultation.published_at ?? null,
+    publishedBy: toNullableString(consultation.publishedBy ?? consultation.published_by),
     files: (consultation.files ?? []).map(normalizeMedicalRecordFile),
     createdAt: consultation.createdAt ?? null,
     updatedAt: consultation.updatedAt ?? null,

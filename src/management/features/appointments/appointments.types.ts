@@ -113,6 +113,9 @@ export interface AppointmentServiceItem {
   note?: string | null;
   durationMinutes?: number | string | null;
   medicalRecordId?: string | null;
+  medicalRecordIsPublic?: boolean | number | null;
+  medicalRecordPublishedAt?: string | null;
+  medicalRecordPublishedBy?: string | number | null;
   diagnosis?: string | null;
   conclusion?: string | null;
   recommendation?: string | null;

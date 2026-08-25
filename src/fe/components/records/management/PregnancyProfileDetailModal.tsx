@@ -18,6 +18,7 @@ import {
 import {
   ExternalLink,
   FileText,
+  Globe2,
   Pencil,
   Stethoscope,
   UserRound,
@@ -39,8 +40,11 @@ interface Props {
   onClose: () => void;
   onEdit: (profile: ManagementPregnancyProfile) => void;
   onEditMedicalRecord?: (recordId: string) => void;
+  onPublishMedicalRecord?: (record: PregnancyConsultationRecord) => void | Promise<void>;
   canEditProfile?: boolean;
   canViewMedicalRecords?: boolean;
+  canPublishMedicalRecords?: boolean;
+  publishingMedicalRecordId?: string | null;
 }
 
 function formatDate(value?: string | null): string {
@@ -78,6 +82,19 @@ function formatAppointmentRange(
   const startLabel = formatDateTime(start);
   const endLabel = formatTime(end);
   return endLabel ? `${startLabel} - ${endLabel}` : startLabel;
+}
+
+function isToday(value?: string | null): boolean {
+  if (!value) return false;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return formatter.format(date) === formatter.format(new Date());
 }
 
 function formatFileSize(value?: number | null): string {
@@ -294,8 +311,11 @@ export function PregnancyProfileDetailModal({
   onClose,
   onEdit,
   onEditMedicalRecord,
+  onPublishMedicalRecord,
   canEditProfile = true,
   canViewMedicalRecords = true,
+  canPublishMedicalRecords = false,
+  publishingMedicalRecordId = null,
 }: Props) {
   if (!profile) return null;
 
@@ -670,12 +690,32 @@ export function PregnancyProfileDetailModal({
                                 <Tag color={isServiceIndicationResult ? "blue" : "default"}>
                                   {isServiceIndicationResult ? "Chỉ định" : "Chung"}
                                 </Tag>
+                                {consultation.isPublic ? (
+                                  <Tag color="green">Đã công khai</Tag>
+                                ) : (
+                                  <Tag>Chưa công khai</Tag>
+                                )}
                                 {consultation.conclusion && (
                                   <Text type="secondary" style={{ fontSize: 13 }}>
                                     • {consultation.conclusion}
                                   </Text>
                                 )}
                               </Space>
+                              {canPublishMedicalRecords &&
+                              !consultation.isPublic &&
+                              isToday(consultation.appointmentScheduledStart) ? (
+                                <Button
+                                  size="small"
+                                  icon={<Globe2 size={14} />}
+                                  loading={publishingMedicalRecordId === consultation.id}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void onPublishMedicalRecord?.(consultation);
+                                  }}
+                                >
+                                  Công khai
+                                </Button>
+                              ) : null}
                             </Flex>
                           ),
                           children: (

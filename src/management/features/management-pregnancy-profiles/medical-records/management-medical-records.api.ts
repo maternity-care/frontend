@@ -101,6 +101,9 @@ export function normalizeMedicalRecord(
     conclusion: record.conclusion ?? null,
     recommendation: record.recommendation ?? null,
     nextAppointmentSuggestedAt: record.nextAppointmentSuggestedAt ?? null,
+    isPublic: Boolean(record.isPublic ?? record.is_public),
+    publishedAt: record.publishedAt ?? record.published_at ?? null,
+    publishedBy: toNullableString(record.publishedBy ?? record.published_by),
     files: (record.files ?? []).map(normalizeFile),
     createdAt: record.createdAt ?? null,
     updatedAt: record.updatedAt ?? null,
@@ -148,6 +151,16 @@ export async function updateManagementMedicalRecord(
 ): Promise<MedicalRecord> {
   const data = await unwrapApiData<BackendMedicalRecord>(
     apiClient.patch(`${MEDICAL_RECORDS_URL}/${id}`, input),
+  );
+  return normalizeMedicalRecord(data);
+}
+
+/** PATCH /management/medical-records/{id}/publish */
+export async function publishManagementMedicalRecord(
+  id: string,
+): Promise<MedicalRecord> {
+  const data = await unwrapApiData<BackendMedicalRecord>(
+    apiClient.patch(`${MEDICAL_RECORDS_URL}/${id}/publish`),
   );
   return normalizeMedicalRecord(data);
 }

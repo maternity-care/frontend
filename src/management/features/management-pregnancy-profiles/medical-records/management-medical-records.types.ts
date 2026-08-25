@@ -81,6 +81,9 @@ export interface MedicalRecord {
   conclusion: string | null;
   recommendation: string | null;
   nextAppointmentSuggestedAt: string | null;
+  isPublic: boolean;
+  publishedAt: string | null;
+  publishedBy: string | null;
   files: MedicalRecordFile[];
   createdAt: string | null;
   updatedAt: string | null;
@@ -111,6 +114,12 @@ export interface BackendMedicalRecord {
   conclusion?: string | null;
   recommendation?: string | null;
   nextAppointmentSuggestedAt?: string | null;
+  isPublic?: boolean | number | null;
+  is_public?: boolean | number | null;
+  publishedAt?: string | null;
+  published_at?: string | null;
+  publishedBy?: string | number | null;
+  published_by?: string | number | null;
   files?: BackendMedicalRecordFile[] | null;
   createdAt?: string | null;
   updatedAt?: string | null;

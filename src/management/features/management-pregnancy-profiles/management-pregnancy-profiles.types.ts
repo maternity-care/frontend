@@ -60,6 +60,9 @@ export interface PregnancyConsultationRecord {
   recommendation: string | null;
 
   nextAppointmentSuggestedAt: string | null;
+  isPublic: boolean;
+  publishedAt: string | null;
+  publishedBy: string | null;
   files: PregnancyProfileMedicalRecordFile[];
   createdAt: string | null;
   updatedAt: string | null;
@@ -283,6 +286,12 @@ export interface BackendPregnancyConsultationRecord {
   recommendation?: string | null;
 
   nextAppointmentSuggestedAt?: string | null;
+  isPublic?: boolean | number | null;
+  is_public?: boolean | number | null;
+  publishedAt?: string | null;
+  published_at?: string | null;
+  publishedBy?: string | number | null;
+  published_by?: string | number | null;
   files?: BackendMedicalRecordFile[] | null;
 
   createdAt?: string | null;

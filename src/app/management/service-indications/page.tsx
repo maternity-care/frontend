@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Empty, Modal, Space, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
-import { CalendarDays, CheckCircle2, ClipboardList, Eye, FilePlus2, LogIn, PlayCircle, Radio } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardList, Eye, FilePlus2, Globe2, LogIn, PlayCircle, Radio } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
@@ -21,7 +21,10 @@ import type {
 } from "@/management/features/appointments/appointments.types";
 import { getManagementPregnancyProfileById } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.api";
 import type { ManagementPregnancyProfile } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
-import { getManagementMedicalRecordsByServiceItemId } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
+import {
+  getManagementMedicalRecordsByServiceItemId,
+  publishManagementMedicalRecord,
+} from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
 import type { MedicalRecord } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.types";
 import { useNotificationRealtime } from "@/features/notifications/useNotificationRealtime";
 
@@ -41,6 +44,10 @@ const statusMeta: Record<AppointmentServiceItemStatus, { label: string; color: s
 
 function formatDateTime(value?: string | null) {
   return value ? dayjs(value).format("DD/MM/YYYY HH:mm") : "-";
+}
+
+function isToday(value?: string | null) {
+  return value ? dayjs(value).isSame(dayjs(), "day") : false;
 }
 
 export default function ManagementServiceIndicationsPage() {
@@ -168,8 +175,7 @@ export default function ManagementServiceIndicationsPage() {
     }
   };
 
-  const openResultsModal = async (item: AppointmentServiceItem) => {
-    setViewingResultsFor(item);
+  const loadResultRecords = async (item: AppointmentServiceItem) => {
     setResultsLoading(true);
     try {
       setResultRecords(await getManagementMedicalRecordsByServiceItemId(item.id));
@@ -178,6 +184,26 @@ export default function ManagementServiceIndicationsPage() {
       setResultRecords([]);
     } finally {
       setResultsLoading(false);
+    }
+  };
+
+  const openResultsModal = async (item: AppointmentServiceItem) => {
+    setViewingResultsFor(item);
+    await loadResultRecords(item);
+  };
+
+  const handlePublishResult = async (record: MedicalRecord) => {
+    if (!viewingResultsFor) return;
+    setActionKey(`publish-result-${record.id}`);
+    try {
+      await publishManagementMedicalRecord(record.id);
+      message.success("Đã công khai kết quả cho thai phụ.");
+      await loadResultRecords(viewingResultsFor);
+      await loadItems();
+    } catch {
+      message.error("Không công khai được kết quả. Chỉ bác sĩ được công khai kết quả lịch hôm nay.");
+    } finally {
+      setActionKey(null);
     }
   };
 
@@ -269,7 +295,14 @@ export default function ManagementServiceIndicationsPage() {
         title: "Kết quả",
         render: (_, item) =>
           item.medicalRecordId ? (
-            <Tag color="green">Đã upload</Tag>
+            <Space wrap size={4}>
+              <Tag color="green">Đã upload</Tag>
+              {item.medicalRecordIsPublic ? (
+                <Tag color="blue">Đã công khai</Tag>
+              ) : (
+                <Tag>Chưa công khai</Tag>
+              )}
+            </Space>
           ) : item.resultExpectedAt ? (
             <Tag color="orange">Hẹn {formatDateTime(item.resultExpectedAt)}</Tag>
           ) : (
@@ -566,7 +599,24 @@ export default function ManagementServiceIndicationsPage() {
                       Bác sĩ: {record.doctor?.name || (record.doctorId ? `#${record.doctorId}` : "-")}
                     </div>
                   </div>
-                  <Tag color="green">Đã upload</Tag>
+                  <Space wrap>
+                    <Tag color="green">Đã upload</Tag>
+                    {record.isPublic ? (
+                      <Tag color="blue">Đã công khai</Tag>
+                    ) : (
+                      <Tag>Chưa công khai</Tag>
+                    )}
+                    {!record.isPublic && viewingResultsFor && isToday(viewingResultsFor.scheduledStart) ? (
+                      <Button
+                        size="small"
+                        icon={<Globe2 className="h-3.5 w-3.5" />}
+                        loading={actionKey === `publish-result-${record.id}`}
+                        onClick={() => void handlePublishResult(record)}
+                      >
+                        Công khai cho thai phụ
+                      </Button>
+                    ) : null}
+                  </Space>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
