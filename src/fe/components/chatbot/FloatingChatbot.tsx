@@ -149,6 +149,7 @@ function createOptimisticMessage(
 
 function buildRequesterPayload(
   user: ReturnType<typeof useAuthStore.getState>["user"],
+  activeFacilityId?: string | null,
 ): ChatbotRequester | undefined {
   if (!user) return undefined;
 
@@ -160,6 +161,7 @@ function buildRequesterPayload(
     email: user.email,
     phone: user.phone,
     address: userWithOptionalAddress.address,
+    activeFacilityId,
     facilities: user.facilities?.map((facility) => ({
       id: facility.id,
       name: facility.name,
@@ -262,6 +264,7 @@ function formatMessageTime(value: string) {
 export function FloatingChatbot() {
   const pathname = usePathname();
   const currentUser = useAuthStore((state) => state.user);
+  const activeFacilityId = useAuthStore((state) => state.activeFacilityId);
   const isStaffMode = Boolean(pathname?.startsWith("/management"));
   const [isOpen, setIsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -295,8 +298,8 @@ export function FloatingChatbot() {
   const currentStaffId = currentUser?.id ? String(currentUser.id) : "current-staff";
   const currentStaffName = currentUser?.name || "Tư vấn viên";
   const requesterPayload = useMemo(
-    () => buildRequesterPayload(currentUser),
-    [currentUser],
+    () => buildRequesterPayload(currentUser, activeFacilityId),
+    [activeFacilityId, currentUser],
   );
   const effectiveRequesterPayload = useMemo(
     () => {
