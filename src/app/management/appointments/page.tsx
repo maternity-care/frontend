@@ -696,12 +696,23 @@ export default function ManagementAppointmentsPage() {
     try {
       const profiles = await getManagementPregnancyProfiles({
         patientId: appointment.patientId,
+        status: "active",
         limit: 50,
       });
-      setProfileOptions(profiles.items);
-      if (!profiles.items.length) {
+      const activeProfiles = profiles.items.filter(
+        (profile) => profile.status === "active",
+      );
+      setProfileOptions(activeProfiles);
+      checkInForm.setFieldsValue({
+        pregnancyProfileId: activeProfiles.some(
+          (profile) => profile.id === appointment.pregnancyProfileId,
+        )
+          ? appointment.pregnancyProfileId ?? undefined
+          : undefined,
+      });
+      if (!activeProfiles.length) {
         message.warning(
-          "User này chưa có hồ sơ thai kỳ. Cần tạo hồ sơ trước khi check-in.",
+          "User này chưa có hồ sơ thai kỳ đang hoạt động. Cần tạo hồ sơ trước khi check-in.",
         );
       }
     } catch {
@@ -1537,7 +1548,7 @@ export default function ManagementAppointmentsPage() {
               showIcon
               type="warning"
               className="mb-4"
-              title="Người dùng này chưa có hồ sơ thai kỳ"
+              title="Người dùng này chưa có hồ sơ thai kỳ đang hoạt động"
               description="Cần tạo hồ sơ thai kỳ cho user trước, sau đó quay lại check-in và chọn hồ sơ."
               action={
                 <Button
