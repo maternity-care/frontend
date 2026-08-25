@@ -43,7 +43,10 @@ import {
   createStaffProfile,
 } from "@/management/features/staffs/staffs.api";
 import { getFacilities } from "@/management/features/facilities/facilities.api";
-import type { Staff as BackendStaff } from "@/management/features/staffs/staffs.types";
+import type {
+  FacilityStaffAssignment,
+  Staff as BackendStaff,
+} from "@/management/features/staffs/staffs.types";
 import type { StaffPosition } from "@/management/features/staffs/staffs.types";
 import {
   StaffAccountFormModal,
@@ -173,6 +176,25 @@ function formatBackendRoleLabel(roleName?: string) {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ")
   );
+}
+
+function formatFacilityAssignmentLabel(
+  assignment: FacilityStaffAssignment,
+  facilityOptions: Array<{ value: string; label: string }>,
+) {
+  const facilityLabelFromBackend = assignment.facilityName
+    ? `${assignment.facilityName}${
+        assignment.facilityCode ? ` (${assignment.facilityCode})` : ""
+      }`
+    : undefined;
+  const facilityLabelFromOptions = facilityOptions.find(
+    (option) => String(option.value) === String(assignment.facilityId),
+  )?.label;
+  const roleLabel =
+    assignment.roles.map(formatBackendRoleLabel).join(", ") ||
+    "Chưa phân quyền";
+
+  return `${facilityLabelFromBackend ?? facilityLabelFromOptions ?? `Cơ sở #${assignment.facilityId}`} · ${roleLabel}`;
 }
 
 function toUiRole(roleName?: string): UserRole {
@@ -1025,16 +1047,24 @@ export default function StaffsManagementPage() {
 
               <Descriptions.Item label="Hồ sơ nhân viên" span={2}>
                 {detailStaff.staffProfile ? (
-                  <Space wrap>
+                  <Space direction="vertical" size={6}>
                     <Tag color="blue">
                       {detailStaff.staffProfile.employeeCode}
                     </Tag>
-                    <span>
-                      {detailStaff.staffProfile.facilityAssignments
-                        .flatMap((assignment) => assignment.roles)
-                        .map(formatBackendRoleLabel)
-                        .join(", ")}
-                    </span>
+                    {detailStaff.staffProfile.facilityAssignments.length ? (
+                      detailStaff.staffProfile.facilityAssignments.map(
+                        (assignment) => (
+                          <span key={`${assignment.facilityId}-${assignment.roles.join("-")}`}>
+                            {formatFacilityAssignmentLabel(
+                              assignment,
+                              staffFacilityOptions,
+                            )}
+                          </span>
+                        ),
+                      )
+                    ) : (
+                      <span>Chưa gán cơ sở</span>
+                    )}
                     <span>{detailStaff.staffProfile.personalEmail}</span>
                   </Space>
                 ) : (

@@ -16,6 +16,7 @@ import { ProfileLoading } from "./ProfileLoading";
 import { ProfileSummaryCard } from "./ProfileSummaryCard";
 import { RESPONSE_MESSAGES } from "@/constants/response-message.constant";
 import { ChangePasswordCard } from "./ChangePasswordCard";
+import { BookedServicesCard } from "./BookedServicesCard";
 
 export function ProfileContent() {
   const { currentUser, mutate } = useAuth();
@@ -104,6 +105,7 @@ export function ProfileContent() {
               onError={handleProfileError}
             />
             <ChangePasswordCard />
+            <BookedServicesCard />
           </div>
         </Col>
       </Row>
