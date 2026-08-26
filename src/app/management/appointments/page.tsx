@@ -73,7 +73,10 @@ import type {
   ManagementPregnancyProfile,
   PregnancyConsultationRecord,
 } from "@/management/features/management-pregnancy-profiles/management-pregnancy-profiles.types";
-import { publishManagementMedicalRecord } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
+import {
+  publishManagementMedicalRecord,
+  unpublishManagementMedicalRecord,
+} from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
 import { PregnancyProfileDetailModal } from "@/fe/components/records/management/PregnancyProfileDetailModal";
 import { CreatePregnancyProfileModal } from "@/fe/components/records/management/CreatePregnancyProfileModal";
 import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
@@ -286,6 +289,8 @@ export default function ManagementAppointmentsPage() {
   const [profileDetail, setProfileDetail] =
     useState<ManagementPregnancyProfile | null>(null);
   const [publishingMedicalRecordId, setPublishingMedicalRecordId] =
+    useState<string | null>(null);
+  const [unpublishingMedicalRecordId, setUnpublishingMedicalRecordId] =
     useState<string | null>(null);
   const [creatingMedicalRecordFor, setCreatingMedicalRecordFor] =
     useState<ManagementPregnancyProfile | null>(null);
@@ -927,10 +932,34 @@ export default function ManagementAppointmentsPage() {
         await openProfileDetail(profileDetail.id);
       }
       loadAppointments();
-    } catch {
-      message.error("Không công khai được kết quả. Chỉ bác sĩ được công khai kết quả lịch hôm nay.");
+    } catch (error) {
+      message.error(
+        error instanceof Error ? error.message : "Không công khai được kết quả.",
+      );
     } finally {
       setPublishingMedicalRecordId(null);
+    }
+  };
+
+  const handleUnpublishMedicalRecord = async (
+    record: PregnancyConsultationRecord,
+  ) => {
+    setUnpublishingMedicalRecordId(record.id);
+    try {
+      await unpublishManagementMedicalRecord(record.id);
+      message.success("Đã thu hồi công khai kết quả.");
+      if (profileDetail?.id) {
+        await openProfileDetail(profileDetail.id);
+      }
+      loadAppointments();
+    } catch (error) {
+      message.error(
+        error instanceof Error
+          ? error.message
+          : "Không thu hồi công khai được kết quả.",
+      );
+    } finally {
+      setUnpublishingMedicalRecordId(null);
     }
   };
 
@@ -1777,7 +1806,9 @@ export default function ManagementAppointmentsPage() {
         canViewMedicalRecords={canOperateIndication}
         canPublishMedicalRecords={isDoctor}
         publishingMedicalRecordId={publishingMedicalRecordId}
+        unpublishingMedicalRecordId={unpublishingMedicalRecordId}
         onPublishMedicalRecord={handlePublishMedicalRecord}
+        onUnpublishMedicalRecord={handleUnpublishMedicalRecord}
       />
 
       <CreateMedicalRecordModal
