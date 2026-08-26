@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Empty, Modal, Space, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
-import { CalendarDays, CheckCircle2, ClipboardList, Eye, FilePlus2, Globe2, LogIn, PlayCircle, Radio } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardList, Eye, EyeOff, FilePlus2, Globe2, LogIn, PlayCircle, Radio } from "lucide-react";
 import { AdminLayout } from "@/management/components/layouts/AdminLayout";
 import { PageHeader } from "@/management/components/ui/PageHeader";
 import { CreateMedicalRecordModal } from "@/fe/components/records/management-medical-records/CreateMedicalRecordModal";
@@ -24,6 +24,7 @@ import type { ManagementPregnancyProfile } from "@/management/features/managemen
 import {
   getManagementMedicalRecordsByServiceItemId,
   publishManagementMedicalRecord,
+  unpublishManagementMedicalRecord,
 } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.api";
 import type { MedicalRecord } from "@/management/features/management-pregnancy-profiles/medical-records/management-medical-records.types";
 import { useNotificationRealtime } from "@/features/notifications/useNotificationRealtime";
@@ -201,8 +202,28 @@ export default function ManagementServiceIndicationsPage() {
         await loadResultRecords(targetItem);
       }
       await loadItems();
-    } catch {
-      message.error("Không công khai được kết quả. Chỉ bác sĩ được công khai kết quả lịch hôm nay.");
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không công khai được kết quả.");
+    } finally {
+      setActionKey(null);
+    }
+  };
+
+  const handleUnpublishResult = async (
+    record: Pick<MedicalRecord, "id">,
+    sourceItem?: AppointmentServiceItem | null,
+  ) => {
+    const targetItem = sourceItem ?? viewingResultsFor;
+    setActionKey(`unpublish-result-${record.id}`);
+    try {
+      await unpublishManagementMedicalRecord(record.id);
+      message.success("Đã thu hồi công khai kết quả.");
+      if (targetItem && viewingResultsFor?.id === targetItem.id) {
+        await loadResultRecords(targetItem);
+      }
+      await loadItems();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không thu hồi công khai được kết quả.");
     } finally {
       setActionKey(null);
     }
@@ -409,6 +430,23 @@ export default function ManagementServiceIndicationsPage() {
                 }
               >
                 Công khai KQ
+              </Button>
+            ) : null}
+            {item.medicalRecordId && item.medicalRecordIsPublic ? (
+              <Button
+                size="small"
+                icon={<EyeOff className="h-3.5 w-3.5" />}
+                loading={actionKey === `unpublish-result-${item.medicalRecordId}`}
+                onClick={() =>
+                  void handleUnpublishResult(
+                    {
+                      id: item.medicalRecordId as string,
+                    },
+                    item,
+                  )
+                }
+              >
+                Thu hồi KQ
               </Button>
             ) : null}
             <Button
@@ -633,7 +671,16 @@ export default function ManagementServiceIndicationsPage() {
                       >
                         Công khai cho thai phụ
                       </Button>
-                    ) : null}
+                    ) : (
+                      <Button
+                        size="small"
+                        icon={<EyeOff className="h-3.5 w-3.5" />}
+                        loading={actionKey === `unpublish-result-${record.id}`}
+                        onClick={() => void handleUnpublishResult(record)}
+                      >
+                        Thu hồi công khai
+                      </Button>
+                    )}
                   </Space>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">

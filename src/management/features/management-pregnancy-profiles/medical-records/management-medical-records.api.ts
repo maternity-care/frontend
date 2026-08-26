@@ -165,6 +165,16 @@ export async function publishManagementMedicalRecord(
   return normalizeMedicalRecord(data);
 }
 
+/** PATCH /management/medical-records/{id}/unpublish */
+export async function unpublishManagementMedicalRecord(
+  id: string,
+): Promise<MedicalRecord> {
+  const data = await unwrapApiData<BackendMedicalRecord>(
+    apiClient.patch(`${MEDICAL_RECORDS_URL}/${id}/unpublish`),
+  );
+  return normalizeMedicalRecord(data);
+}
+
 /** DELETE /management/medical-records/{id} */
 export async function deleteManagementMedicalRecord(id: string): Promise<void> {
   await apiClient.delete(`${MEDICAL_RECORDS_URL}/${id}`);

@@ -17,6 +17,7 @@ import {
 } from "antd";
 import {
   ExternalLink,
+  EyeOff,
   FileText,
   Globe2,
   Pencil,
@@ -41,10 +42,12 @@ interface Props {
   onEdit: (profile: ManagementPregnancyProfile) => void;
   onEditMedicalRecord?: (recordId: string) => void;
   onPublishMedicalRecord?: (record: PregnancyConsultationRecord) => void | Promise<void>;
+  onUnpublishMedicalRecord?: (record: PregnancyConsultationRecord) => void | Promise<void>;
   canEditProfile?: boolean;
   canViewMedicalRecords?: boolean;
   canPublishMedicalRecords?: boolean;
   publishingMedicalRecordId?: string | null;
+  unpublishingMedicalRecordId?: string | null;
 }
 
 function formatDate(value?: string | null): string {
@@ -299,10 +302,12 @@ export function PregnancyProfileDetailModal({
   onEdit,
   onEditMedicalRecord,
   onPublishMedicalRecord,
+  onUnpublishMedicalRecord,
   canEditProfile = true,
   canViewMedicalRecords = true,
   canPublishMedicalRecords = false,
   publishingMedicalRecordId = null,
+  unpublishingMedicalRecordId = null,
 }: Props) {
   if (!profile) return null;
 
@@ -688,19 +693,32 @@ export function PregnancyProfileDetailModal({
                                   </Text>
                                 )}
                               </Space>
-                              {canPublishMedicalRecords &&
-                              !consultation.isPublic ? (
-                                <Button
-                                  size="small"
-                                  icon={<Globe2 size={14} />}
-                                  loading={publishingMedicalRecordId === consultation.id}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void onPublishMedicalRecord?.(consultation);
-                                  }}
-                                >
-                                  Công khai
-                                </Button>
+                              {canPublishMedicalRecords ? (
+                                consultation.isPublic ? (
+                                  <Button
+                                    size="small"
+                                    icon={<EyeOff size={14} />}
+                                    loading={unpublishingMedicalRecordId === consultation.id}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void onUnpublishMedicalRecord?.(consultation);
+                                    }}
+                                  >
+                                    Thu hồi
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="small"
+                                    icon={<Globe2 size={14} />}
+                                    loading={publishingMedicalRecordId === consultation.id}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void onPublishMedicalRecord?.(consultation);
+                                    }}
+                                  >
+                                    Công khai
+                                  </Button>
+                                )
                               ) : null}
                             </Flex>
                           ),
